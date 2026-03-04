@@ -1127,12 +1127,41 @@ SOURCE_CONFIGURATIONS = {
     ],
     "salesforce": [
         {
-            "key": "objects",
-            "label": "Which Salesforce objects?",
+            "key": "standard_objects",
+            "label": "Select Standard Salesforce Objects",
+            "type": "multiselect",
+            "required": False,
+            "help": "Select standard Salesforce objects to sync",
+            "options": [
+                {"value": "Account", "label": "Account"},
+                {"value": "Contact", "label": "Contact"},
+                {"value": "Lead", "label": "Lead"},
+                {"value": "Opportunity", "label": "Opportunity"},
+                {"value": "OpportunityLineItem", "label": "Opportunity Line Item"},
+                {"value": "Case", "label": "Case"},
+                {"value": "Task", "label": "Task"},
+                {"value": "Event", "label": "Event"},
+                {"value": "Campaign", "label": "Campaign"},
+                {"value": "CampaignMember", "label": "Campaign Member"},
+                {"value": "Product2", "label": "Product"},
+                {"value": "Pricebook2", "label": "Pricebook"},
+                {"value": "PricebookEntry", "label": "Pricebook Entry"},
+                {"value": "Order", "label": "Order"},
+                {"value": "OrderItem", "label": "Order Item"},
+                {"value": "Contract", "label": "Contract"},
+                {"value": "Quote", "label": "Quote"},
+                {"value": "User", "label": "User"},
+                {"value": "UserRole", "label": "User Role"}
+            ],
+            "default": ["Account", "Contact", "Opportunity", "Lead"]
+        },
+        {
+            "key": "custom_objects",
+            "label": "Custom Objects (optional)",
             "type": "text",
-            "required": True,
-            "help": "Comma-separated list of Salesforce objects",
-            "placeholder": "Account, Contact, Opportunity, Lead"
+            "required": False,
+            "help": "Comma-separated list of custom Salesforce objects (e.g., CustomObject__c, AnotherCustom__c)",
+            "placeholder": "MyCustomObject__c, AnotherObject__c"
         },
         {
             "key": "use_bulk_api",

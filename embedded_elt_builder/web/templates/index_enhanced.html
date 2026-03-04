@@ -3284,6 +3284,29 @@
                 }
             });
 
+            // Special handling for Salesforce: combine standard and custom objects
+            if (formData.get('source_type') === 'salesforce') {
+                const standardObjects = data.source_configuration.standard_objects || [];
+                const customObjectsStr = data.source_configuration.custom_objects || '';
+
+                // Parse custom objects (comma-separated)
+                const customObjects = customObjectsStr
+                    .split(',')
+                    .map(obj => obj.trim())
+                    .filter(obj => obj.length > 0);
+
+                // Combine into single comma-separated list
+                const allObjects = [...standardObjects, ...customObjects];
+
+                if (allObjects.length > 0) {
+                    data.source_configuration.objects = allObjects.join(', ');
+                }
+
+                // Remove the separate fields since dlt expects 'objects'
+                delete data.source_configuration.standard_objects;
+                delete data.source_configuration.custom_objects;
+            }
+
             try {
                 let result;
                 if (editingPipeline) {
