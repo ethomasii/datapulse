@@ -1831,17 +1831,17 @@
 
         function initializeApp() {
 
-        // Source and destination groups (keep const for local use)
+        // Source and destination groups (alphabetically sorted within each group)
         const SOURCE_GROUPS = {
-            "APIs & SaaS": ["github", "stripe", "shopify", "salesforce", "hubspot", "slack", "notion", "airtable", "zendesk", "jira", "google_analytics", "facebook_ads", "google_ads", "intercom", "mixpanel", "segment", "asana"],
-            "Databases": ["postgres", "mysql", "mongodb", "duckdb", "sqlite"],
-            "Cloud Storage": ["s3", "gcs", "azure_blob"],
+            "APIs & SaaS": ["airtable", "asana", "facebook_ads", "github", "google_ads", "google_analytics", "hubspot", "intercom", "jira", "mixpanel", "notion", "salesforce", "segment", "shopify", "slack", "stripe", "zendesk"],
+            "Cloud Storage": ["azure_blob", "gcs", "s3"],
+            "Databases": ["duckdb", "mongodb", "mysql", "postgres", "sqlite"],
             "Files": ["csv", "json", "parquet"]
         };
 
         const DESTINATION_GROUPS = {
-            "Cloud Warehouses": ["snowflake", "bigquery", "redshift", "databricks"],
-            "Databases": ["postgres", "mysql", "duckdb", "motherduck", "clickhouse", "sqlite"],
+            "Cloud Warehouses": ["bigquery", "databricks", "redshift", "snowflake"],
+            "Databases": ["clickhouse", "duckdb", "motherduck", "mysql", "postgres", "sqlite"],
             "Storage": ["filesystem"]
         };
 
