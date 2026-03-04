@@ -927,6 +927,9 @@
                     <button onclick="openCreatePipelineModal()" class="btn-success" style="text-transform: none;" title="Create new pipeline">
                         <span class="action-icon">+</span><span class="action-text">New Pipeline</span>
                     </button>
+                    <button onclick="openOpenAPIModal()" class="btn-primary" style="text-transform: none;" title="Browse OpenAPI sources">
+                        <span class="action-icon">🔌</span><span class="action-text">Browse OpenAPI Sources</span>
+                    </button>
                     <button onclick="openEnvModal()" class="btn-outline" style="text-transform: none;" title="Manage environment variables">
                         <span class="action-icon">$</span><span class="action-text">Environment Variables</span>
                     </button>
@@ -1820,6 +1823,74 @@
         </div>
     </div>
 
+    <!-- OpenAPI Sources Modal -->
+    <div id="openAPIModal" class="modal">
+        <div class="modal-content" style="max-width: 1000px;">
+            <div class="modal-header">
+                <h2>🔌 Browse OpenAPI Sources</h2>
+                <span class="close" onclick="closeModal('openAPIModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 20px; color: #666;">
+                    Generate dlt pipelines from OpenAPI specifications. Select a source below to automatically create a working pipeline.
+                </p>
+
+                <!-- Search and Filter -->
+                <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+                    <input
+                        type="text"
+                        id="openapiSearch"
+                        placeholder="Search sources..."
+                        style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px;"
+                        oninput="filterOpenAPISources()"
+                    >
+                    <select
+                        id="openapiCategoryFilter"
+                        style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;"
+                        onchange="filterOpenAPISources()"
+                    >
+                        <option value="">All Categories</option>
+                        <option value="Public">Public</option>
+                        <option value="Business">Business</option>
+                        <option value="Deployed">Deployed</option>
+                        <option value="Specs-3.0">Specs 3.0</option>
+                        <option value="Uncategorized">Uncategorized</option>
+                    </select>
+                </div>
+
+                <!-- Loading State -->
+                <div id="openapiLoading" style="text-align: center; padding: 40px; display: none;">
+                    <div style="font-size: 2em; margin-bottom: 10px;">⏳</div>
+                    <div>Loading OpenAPI sources...</div>
+                </div>
+
+                <!-- Sources Table -->
+                <div id="openapiSourcesContainer" style="max-height: 500px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead style="position: sticky; top: 0; background: #f5f5f5; z-index: 1;">
+                            <tr>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">Source Name</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">Category</th>
+                                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd; width: 150px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="openapiSourcesList">
+                            <!-- Sources will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Summary -->
+                <div id="openapiSummary" style="margin-top: 12px; padding: 12px; background: #f0f9ff; border-radius: 4px; font-size: 0.9em; color: #0369a1;">
+                    <strong>ℹ️ Info:</strong> OpenAPI specs are auto-discovered from <a href="https://github.com/dlt-hub/openapi-specs" target="_blank" style="color: #0369a1; text-decoration: underline;">dlt-hub/openapi-specs</a>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('openAPIModal')" class="btn-outline">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         console.log('ELT Builder JavaScript loaded');
 
@@ -2050,6 +2121,103 @@
             const iconMode = localStorage.getItem('iconMode') === 'true';
             document.getElementById('darkModeToggle').checked = darkMode;
             document.getElementById('iconModeToggle').checked = iconMode;
+        }
+
+        // OpenAPI Sources Management
+        let allOpenAPISources = [];
+
+        async function openOpenAPIModal() {
+            openModal('openAPIModal');
+            await loadOpenAPISources();
+        }
+
+        async function loadOpenAPISources() {
+            const loading = document.getElementById('openapiLoading');
+            const container = document.getElementById('openapiSourcesList');
+
+            loading.style.display = 'block';
+            container.innerHTML = '';
+
+            try {
+                const data = await apiCall('/api/openapi-sources');
+                allOpenAPISources = data.sources;
+
+                if (allOpenAPISources.length === 0) {
+                    container.innerHTML = '<tr><td colspan="3" style="padding: 40px; text-align: center; color: #999;">No OpenAPI sources found</td></tr>';
+                    return;
+                }
+
+                renderOpenAPISources(allOpenAPISources);
+            } catch (error) {
+                console.error('Error loading OpenAPI sources:', error);
+                container.innerHTML = `<tr><td colspan="3" style="padding: 40px; text-align: center; color: #e74c3c;">Failed to load sources: ${error.message}</td></tr>`;
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        function renderOpenAPISources(sources) {
+            const container = document.getElementById('openapiSourcesList');
+
+            if (sources.length === 0) {
+                container.innerHTML = '<tr><td colspan="3" style="padding: 40px; text-align: center; color: #999;">No matching sources found</td></tr>';
+                return;
+            }
+
+            container.innerHTML = sources.map(source => `
+                <tr style="border-bottom: 1px solid #eee; transition: background 0.2s;" onmouseover="this.style.background='#f9f9f9'" onmouseout="this.style.background='white'">
+                    <td style="padding: 12px;">
+                        <div style="font-weight: 500; margin-bottom: 4px;">${source.name}</div>
+                        <div style="font-size: 0.85em; color: #666;">${source.file_type.toUpperCase()} spec</div>
+                    </td>
+                    <td style="padding: 12px;">
+                        <span style="background: #e3f2fd; color: #1976d2; padding: 4px 8px; border-radius: 4px; font-size: 0.85em;">${source.category}</span>
+                    </td>
+                    <td style="padding: 12px; text-align: center;">
+                        <button onclick="generateFromOpenAPI('${source.name}', '${source.download_url}')" class="btn-success" style="font-size: 0.9em; padding: 6px 12px;">
+                            Generate Pipeline
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function filterOpenAPISources() {
+            const searchTerm = document.getElementById('openapiSearch').value.toLowerCase();
+            const categoryFilter = document.getElementById('openapiCategoryFilter').value;
+
+            const filtered = allOpenAPISources.filter(source => {
+                const matchesSearch = source.name.toLowerCase().includes(searchTerm);
+                const matchesCategory = !categoryFilter || source.category === categoryFilter;
+                return matchesSearch && matchesCategory;
+            });
+
+            renderOpenAPISources(filtered);
+        }
+
+        async function generateFromOpenAPI(specName, downloadUrl) {
+            const pipelineName = prompt(`Enter a name for this pipeline:`, specName);
+            if (!pipelineName) return;
+
+            try {
+                showAlert('Generating pipeline from OpenAPI spec... This may take a moment.', 'info');
+
+                const result = await apiCall('/api/openapi-sources/generate', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        spec_name: specName,
+                        download_url: downloadUrl,
+                        pipeline_name: pipelineName
+                    })
+                });
+
+                showAlert(result.message, 'success');
+                closeModal('openAPIModal');
+                await loadPipelines(); // Refresh pipeline list
+            } catch (error) {
+                console.error('Error generating pipeline:', error);
+                showAlert(`Failed to generate pipeline: ${error.message}`, 'error');
+            }
         }
 
         // Repository Path Settings Management
@@ -4665,6 +4833,9 @@
         window.openEnvModal = openEnvModal;
         window.openCredentialsModal = openCredentialsModal;
         window.openSettingsModal = openSettingsModal;
+        window.openOpenAPIModal = openOpenAPIModal;
+        window.generateFromOpenAPI = generateFromOpenAPI;
+        window.filterOpenAPISources = filterOpenAPISources;
         window.browseDirectory = browseDirectory;
         window.selectRepoPath = selectRepoPath;
         window.validateManualPath = validateManualPath;
