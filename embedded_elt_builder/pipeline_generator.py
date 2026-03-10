@@ -12,6 +12,7 @@ class PipelineRequest(BaseModel):
     name: str
     source_type: str
     destination_type: str
+    destination_instance: Optional[str] = None  # Instance name for multiple destinations of same type (e.g., "dev", "qa", "prod")
     source_configuration: Dict[str, Any] = Field(default_factory=dict)
     credentials: Dict[str, str] = Field(default_factory=dict)
     description: Optional[str] = None
@@ -73,6 +74,14 @@ def _generate_github_pipeline(request: PipelineRequest) -> str:
     # Determine dataset name
     dataset_name = request.schema_override or f"github_{repo_owner}_{repo_name}"
 
+    # Build destination string with instance name if provided
+    if request.destination_instance:
+        destination = f"{request.destination_type}__{request.destination_instance}"
+        destination_comment = f"# Named destination: {destination} (uses {request.destination_type.upper()}_{request.destination_instance.upper()}_* env vars)"
+    else:
+        destination = request.destination_type
+        destination_comment = ""
+
     return f'''"""dlt pipeline: {request.name}
 
 {request.description or f"Load GitHub data from {repo_owner}/{repo_name} to {request.destination_type}"}
@@ -85,9 +94,10 @@ def run(partition_key: str = None):
     """Run the GitHub pipeline."""
 
     # Configure the pipeline
+    {destination_comment}
     pipeline = dlt.pipeline(
         pipeline_name="{request.name}",
-        destination="{request.destination_type}",
+        destination="{destination}",
         dataset_name="{dataset_name}",
     )
 
@@ -141,6 +151,14 @@ def _generate_rest_api_pipeline(request: PipelineRequest) -> str:
 
     # Determine dataset name
     dataset_name = request.schema_override or f"{resource_name}_data"
+
+    # Build destination string with instance name if provided
+    if request.destination_instance:
+        destination = f"{request.destination_type}__{request.destination_instance}"
+        destination_comment = f"# Named destination: {destination} (uses {request.destination_type.upper()}_{request.destination_instance.upper()}_* env vars)"
+    else:
+        destination = request.destination_type
+        destination_comment = ""
 
     # Build paginator config based on type
     paginator_code = ''
@@ -197,9 +215,10 @@ def run(partition_key: str = None):
     """
 
     # Configure the pipeline
+    {destination_comment}
     pipeline = dlt.pipeline(
         pipeline_name="{request.name}",
-        destination="{request.destination_type}",
+        destination="{destination}",
         dataset_name="{dataset_name}",
     )
 
@@ -259,6 +278,14 @@ def _generate_rest_api_advanced(request: PipelineRequest) -> str:
     # Determine dataset name
     dataset_name = request.schema_override or f"{resource_name}_data"
 
+    # Build destination string with instance name if provided
+    if request.destination_instance:
+        destination = f"{request.destination_type}__{request.destination_instance}"
+        destination_comment = f"# Named destination: {destination} (uses {request.destination_type.upper()}_{request.destination_instance.upper()}_* env vars)"
+    else:
+        destination = request.destination_type
+        destination_comment = ""
+
     return f'''"""dlt pipeline: {request.name}
 
 {request.description or f"Load data from REST API to {request.destination_type}"}
@@ -271,9 +298,10 @@ def run(partition_key: str = None):
     """Run the REST API pipeline."""
 
     # Configure the pipeline
+    {destination_comment}
     pipeline = dlt.pipeline(
         pipeline_name="{request.name}",
-        destination="{request.destination_type}",
+        destination="{destination}",
         dataset_name="{dataset_name}",
     )
 
@@ -305,6 +333,14 @@ def _generate_generic_pipeline(request: PipelineRequest) -> str:
     # Determine dataset name
     dataset_name = request.schema_override or f"{request.source_type}_data"
 
+    # Build destination string with instance name if provided
+    if request.destination_instance:
+        destination = f"{request.destination_type}__{request.destination_instance}"
+        destination_comment = f"# Named destination: {destination} (uses {request.destination_type.upper()}_{request.destination_instance.upper()}_* env vars)"
+    else:
+        destination = request.destination_type
+        destination_comment = ""
+
     return f'''"""dlt pipeline: {request.name}
 
 {request.description or f"Load data from {request.source_type} to {request.destination_type}"}
@@ -314,9 +350,10 @@ import dlt
 
 def run(partition_key: str = None):
     """Run the pipeline."""
+    {destination_comment}
     pipeline = dlt.pipeline(
         pipeline_name="{request.name}",
-        destination="{request.destination_type}",
+        destination="{destination}",
         dataset_name="{dataset_name}",
     )
 
@@ -345,7 +382,7 @@ if __name__ == "__main__":
 
 
 def generate_sling_replication(request: PipelineRequest) -> Dict[str, Any]:
-    """Generate Sling replication YAML structure."""
+    """Generate Sling replication YAML structure with named connections."""
 
     # Build streams based on configuration
     streams = {}
@@ -360,15 +397,72 @@ def generate_sling_replication(request: PipelineRequest) -> Dict[str, Any]:
         # Default placeholder
         streams["# TODO: Configure your streams"] = {"# Example": "public.users"}
 
-    return {
-        "source": request.source_type.upper(),
-        "target": request.destination_type.upper(),
+    # Build connection names with instance suffix if provided
+    source_conn_name = request.source_type.upper()
+    if request.destination_instance:
+        dest_conn_name = f"{request.destination_type.upper()}_{request.destination_instance.upper()}"
+    else:
+        dest_conn_name = request.destination_type.upper()
+
+    replication = {
+        "source": source_conn_name,
+        "target": dest_conn_name,
         "defaults": {
             "mode": "full-refresh",
             "object": "{stream_schema}.{stream_table}"
         },
         "streams": streams
     }
+
+    # Add env section with connection definitions if instance is specified
+    if request.destination_instance:
+        env_section = _generate_sling_env_section(request.destination_type, request.destination_instance)
+        if env_section:
+            replication["env"] = {dest_conn_name: env_section}
+
+    return replication
+
+
+def _generate_sling_env_section(dest_type: str, instance: str) -> str:
+    """Generate Sling env connection definition for a destination instance."""
+    instance_upper = instance.upper()
+
+    if dest_type == 'snowflake':
+        return f"""type: snowflake
+account: ${{SNOWFLAKE_{instance_upper}_ACCOUNT}}
+user: ${{SNOWFLAKE_{instance_upper}_USER}}
+password: ${{SNOWFLAKE_{instance_upper}_PASSWORD}}
+database: ${{SNOWFLAKE_{instance_upper}_DATABASE}}
+warehouse: ${{SNOWFLAKE_{instance_upper}_WAREHOUSE}}
+role: ${{SNOWFLAKE_{instance_upper}_ROLE}}"""
+
+    elif dest_type in ['postgres', 'postgresql']:
+        return f"""type: postgres
+host: ${{DEST_POSTGRES_{instance_upper}_HOST}}
+port: ${{DEST_POSTGRES_{instance_upper}_PORT:-5432}}
+database: ${{DEST_POSTGRES_{instance_upper}_DATABASE}}
+user: ${{DEST_POSTGRES_{instance_upper}_USER}}
+password: ${{DEST_POSTGRES_{instance_upper}_PASSWORD}}
+sslmode: ${{DEST_POSTGRES_{instance_upper}_SSLMODE:-prefer}}"""
+
+    elif dest_type == 'duckdb':
+        return f"""type: duckdb
+instance: ${{DEST_DUCKDB_{instance_upper}_PATH:-./data.duckdb}}"""
+
+    elif dest_type == 'redshift':
+        return f"""type: redshift
+host: ${{REDSHIFT_{instance_upper}_HOST}}
+port: ${{REDSHIFT_{instance_upper}_PORT:-5439}}
+database: ${{REDSHIFT_{instance_upper}_DATABASE}}
+user: ${{REDSHIFT_{instance_upper}_USER}}
+password: ${{REDSHIFT_{instance_upper}_PASSWORD}}"""
+
+    elif dest_type in ['bigquery', 'gcp']:
+        return f"""type: bigquery
+project: ${{GCP_{instance_upper}_PROJECT_ID}}
+credentials: ${{GCP_{instance_upper}_CREDENTIALS}}"""
+
+    return None
 
 
 def create_pipeline(
@@ -400,6 +494,8 @@ def create_pipeline(
         "source_type": request.source_type,
         "destination_type": request.destination_type,
     }
+    if request.destination_instance:
+        config_data["destination_instance"] = request.destination_instance
     if request.source_configuration:
         config_data["configuration"] = request.source_configuration
 

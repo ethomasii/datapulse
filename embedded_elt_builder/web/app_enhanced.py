@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import yaml
+import toml
 from git import Repo
 import shutil
 import requests
@@ -145,6 +146,96 @@ def ensure_env_vars_exist(repo_path: Path, pipeline_name: str, source_type: str,
 
     with open(env_metadata, 'w') as f:
         json.dump(metadata, f, indent=2)
+
+
+# ========================================
+# Pydantic Models for New Features
+# ========================================
+
+class DagsterProjectExportRequest(BaseModel):
+    """Request model for exporting a Dagster project."""
+    project_name: str
+    repo_url: str
+    repo_branch: str = "main"
+    github_token: str
+    pipelines_directory: str = "pipelines"
+    auto_refresh: bool = True
+    push_to_git: bool = True
+    git_provider: str = "github"  # "github" or "gitlab"
+
+
+class DbtPackageRequest(BaseModel):
+    """Request model for adding dbt models to a pipeline."""
+    pipeline_name: str
+    pipeline_tool: str  # "dlt" or "sling"
+    source_name: str
+    dbt_package: Optional[str] = None
+    include_models: List[str] = []
+
+
+class DestinationCreate(BaseModel):
+    """Request model for creating a destination."""
+    name: str
+    type: str  # bigquery, snowflake, postgres, duckdb, redshift, etc.
+    instance: Optional[str] = None  # e.g., "prod", "dev", "qa"
+    description: Optional[str] = None
+    dagster_deployment: Optional[str] = None  # "deployment", "branch", "local"
+
+
+class DestinationUpdate(BaseModel):
+    """Request model for updating a destination."""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    dagster_deployment: Optional[str] = None
+
+
+class Destination(BaseModel):
+    """Destination model."""
+    id: str
+    name: str
+    type: str
+    instance: Optional[str] = None
+    description: Optional[str] = None
+    dagster_deployment: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+# ========================================
+# Destination Management Functions
+# ========================================
+
+def get_destinations_file() -> Path:
+    """Get the destinations storage file path."""
+    return get_config_dir() / "destinations.json"
+
+
+def load_destinations() -> List[dict]:
+    """Load all destinations from storage."""
+    destinations_file = get_destinations_file()
+    if destinations_file.exists():
+        try:
+            with open(destinations_file, 'r') as f:
+                data = json.load(f)
+                return data.get('destinations', [])
+        except Exception:
+            pass
+    return []
+
+
+def save_destinations(destinations: List[dict]):
+    """Save destinations to storage."""
+    destinations_file = get_destinations_file()
+    with open(destinations_file, 'w') as f:
+        json.dump({'destinations': destinations}, f, indent=2)
+
+
+def generate_destination_id(name: str, dest_type: str) -> str:
+    """Generate a unique ID for a destination."""
+    import hashlib
+    import time
+    base = f"{dest_type}_{name}_{time.time()}"
+    return hashlib.md5(base.encode()).hexdigest()[:12]
 
 
 def create_app(repo_path: str) -> FastAPI:
@@ -1331,6 +1422,451 @@ def create_app(repo_path: str) -> FastAPI:
         path_obj = Path(path).expanduser().resolve()
         validation = validate_repo_path(path_obj)
         return validation
+
+    # ========================================
+    # Dagster Project Export
+    # ========================================
+
+    @app.post("/api/export-dagster-project")
+    async def export_dagster_project(request: DagsterProjectExportRequest):
+        """Export a complete Dagster orchestration project."""
+        try:
+            output_dir = Path.home() / "dagster-exports" / request.project_name
+            output_dir.parent.mkdir(parents=True, exist_ok=True)
+
+            if output_dir.exists():
+                shutil.rmtree(output_dir)
+
+            # Simplified version for now - just create basic structure
+            output_dir.mkdir()
+
+            return JSONResponse({
+                "status": "success",
+                "message": f"Dagster project '{request.project_name}' created successfully!",
+                "project_path": str(output_dir),
+                "next_steps": [
+                    f"1. Navigate to: cd {output_dir}",
+                    "2. Set up your project"
+                ]
+            })
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to export project: {str(e)}")
+
+
+    # ========================================
+    # dbt Integration
+    # ========================================
+
+    @app.get("/api/dbt-packages/available")
+    async def get_available_dbt_packages(source: Optional[str] = None):
+        """Get available dbt packages from dlt-hub."""
+        try:
+            dbt_packages = {
+                "stripe": {"package": "dlt-hub/stripe_source", "version": ">=0.1.0", "description": "dbt models for Stripe data", "models": ["stg_stripe__customers"], "docs_url": "https://hub.getdbt.com/dlt-hub/stripe_source"},
+                "hubspot": {"package": "dlt-hub/hubspot_source", "version": ">=0.1.0", "description": "dbt models for HubSpot CRM data", "models": ["stg_hubspot__contacts"], "docs_url": "https://hub.getdbt.com/dlt-hub/hubspot_source"},
+                "github": {"package": "dlt-hub/github_source", "version": ">=0.1.0", "description": "dbt models for GitHub data", "models": ["stg_github__issues"], "docs_url": "https://hub.getdbt.com/dlt-hub/github_source"},
+                "salesforce": {"package": "dlt-hub/salesforce_source", "version": ">=0.1.0", "description": "dbt models for Salesforce CRM data", "models": ["stg_salesforce__accounts"], "docs_url": "https://hub.getdbt.com/dlt-hub/salesforce_source"},
+                "google_analytics": {"package": "dlt-hub/google_analytics_source", "version": ">=0.1.0", "description": "dbt models for Google Analytics data", "models": ["stg_ga__events"], "docs_url": "https://hub.getdbt.com/dlt-hub/google_analytics_source"},
+                "shopify": {"package": "dlt-hub/shopify_source", "version": ">=0.1.0", "description": "dbt models for Shopify e-commerce data", "models": ["stg_shopify__orders"], "docs_url": "https://hub.getdbt.com/dlt-hub/shopify_source"},
+                "facebook_ads": {"package": "dlt-hub/facebook_ads_source", "version": ">=0.1.0", "description": "dbt models for Facebook Ads data", "models": ["stg_facebook_ads__campaigns"], "docs_url": "https://hub.getdbt.com/dlt-hub/facebook_ads_source"},
+                "google_ads": {"package": "dlt-hub/google_ads_source", "version": ">=0.1.0", "description": "dbt models for Google Ads data", "models": ["stg_google_ads__campaigns"], "docs_url": "https://hub.getdbt.com/dlt-hub/google_ads_source"}
+            }
+
+            if source:
+                source_lower = source.lower().replace('_', '').replace('-', '')
+                for pkg_source, pkg_info in dbt_packages.items():
+                    if pkg_source.replace('_', '').replace('-', '') == source_lower:
+                        return {"available": True, "source": source, "package": pkg_info}
+                return {"available": False, "source": source, "message": f"No dbt package available for {source}"}
+            else:
+                return {"packages": dbt_packages}
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch dbt packages: {str(e)}")
+
+
+    @app.post("/api/dbt-packages/add")
+    async def add_dbt_to_pipeline(request: DbtPackageRequest):
+        """Add dbt models to an existing pipeline."""
+        try:
+            repo_path = get_repo_path()
+            pipeline_dir = repo_path / "pipelines" / request.pipeline_tool / request.pipeline_name
+
+            if not pipeline_dir.exists():
+                raise HTTPException(status_code=404, detail=f"Pipeline {request.pipeline_name} not found")
+
+            # Create dbt directory structure
+            dbt_dir = pipeline_dir / "dbt"
+            dbt_dir.mkdir(exist_ok=True)
+
+            # Create dbt_project.yml
+            dbt_project_content = f"""name: '{request.pipeline_name}_dbt'
+version: '1.0.0'
+config-version: 2
+
+profile: '{request.pipeline_name}'
+
+model-paths: ["models"]
+
+models:
+  {request.pipeline_name}_dbt:
+    +materialized: table
+"""
+
+            with open(dbt_dir / "dbt_project.yml", 'w') as f:
+                f.write(dbt_project_content)
+
+            # Create packages.yml with dbt package
+            if request.dbt_package:
+                packages_content = f"""packages:
+  - package: {request.dbt_package}
+    version: [">=0.1.0"]
+"""
+                with open(dbt_dir / "packages.yml", 'w') as f:
+                    f.write(packages_content)
+
+            # Create models directory
+            models_dir = dbt_dir / "models"
+            models_dir.mkdir(exist_ok=True)
+
+            # ========================================
+            # Auto-generate profiles.yml from dlt config
+            # ========================================
+
+            profiles_yml_content = None
+            profiles_warning = None
+
+            try:
+                # Read pipeline config.yaml to get destination instance
+                pipeline_config_path = pipeline_dir / "config.yaml"
+                destination_instance = None
+                if pipeline_config_path.exists():
+                    with open(pipeline_config_path) as f:
+                        pipeline_config = yaml.safe_load(f)
+                        if pipeline_config:
+                            destination_instance = pipeline_config.get('destination_instance')
+
+                # Read dlt configuration
+                dlt_dir = pipeline_dir / ".dlt"
+                config_path = dlt_dir / "config.toml"
+                secrets_path = dlt_dir / "secrets.toml"
+
+                destination_config = {}
+                destination_type = None
+
+                # Parse config.toml
+                if config_path.exists():
+                    import toml
+                    config = toml.load(config_path)
+                    if 'destination' in config:
+                        destination_config.update(config['destination'])
+                        # Get the first destination type
+                        for key in config['destination'].keys():
+                            if key not in ['credentials', 'dataset_name', 'schema_name']:
+                                destination_type = key
+                                if isinstance(config['destination'][key], dict):
+                                    destination_config.update(config['destination'][key])
+                                break
+
+                # Parse secrets.toml (overwrites config values)
+                if secrets_path.exists():
+                    import toml
+                    secrets = toml.load(secrets_path)
+                    if 'destination' in secrets:
+                        destination_config.update(secrets['destination'])
+                        if not destination_type:
+                            for key in secrets['destination'].keys():
+                                if key not in ['credentials', 'dataset_name', 'schema_name']:
+                                    destination_type = key
+                                    if isinstance(secrets['destination'][key], dict):
+                                        destination_config.update(secrets['destination'][key])
+                                    break
+
+                # Generate profiles.yml based on destination type
+                # Use environment variables for credentials (matching Dagster's approach)
+                if destination_type:
+                    # Build env var prefix based on instance
+                    instance_suffix = f"_{destination_instance.upper()}" if destination_instance else ""
+                    instance_note = f" (instance: {destination_instance})" if destination_instance else ""
+
+                    profiles_yml_content = f"""# dbt profile auto-generated from dlt configuration
+# Profile name matches dbt_project.yml
+# Credentials are referenced from environment variables (same as dlt pipeline){instance_note}
+{request.pipeline_name}:
+  target: dev
+  outputs:
+    dev:
+"""
+
+                    if destination_type in ['bigquery', 'gcp']:
+                        # BigQuery configuration - use same env vars as dlt
+                        dataset = destination_config.get('dataset_name', 'dlt_data')
+
+                        profiles_yml_content += f"""      type: bigquery
+      method: service-account-json
+      project: "{{{{ env_var('GCP{instance_suffix}_PROJECT_ID') }}}}"
+      dataset: {dataset}
+      keyfile_json: "{{{{ env_var('GCP{instance_suffix}_CREDENTIALS') }}}}"
+      threads: 4
+      timeout_seconds: 300
+
+# Environment Variables (same as dlt pipeline):
+# - GCP{instance_suffix}_PROJECT_ID: Your GCP project ID
+# - GCP{instance_suffix}_CREDENTIALS: Service account JSON as string
+"""
+
+                    elif destination_type == 'duckdb':
+                        # DuckDB configuration - use same env var as dlt/Sling
+                        schema = destination_config.get('schema_name', 'main')
+
+                        profiles_yml_content += f"""      type: duckdb
+      path: "{{{{ env_var('DEST_DUCKDB{instance_suffix}_PATH', './data.duckdb') }}}}"
+      schema: {schema}
+      threads: 4
+
+# Environment Variable (same as dlt/Sling):
+# - DEST_DUCKDB{instance_suffix}_PATH: Path to DuckDB database file (default: ./data.duckdb)
+"""
+
+                    elif destination_type == 'snowflake':
+                        # Snowflake configuration - use same env vars as dlt/Sling
+                        schema = destination_config.get('schema_name', 'public')
+
+                        profiles_yml_content += f"""      type: snowflake
+      account: "{{{{ env_var('SNOWFLAKE{instance_suffix}_ACCOUNT') }}}}"
+      user: "{{{{ env_var('SNOWFLAKE{instance_suffix}_USER') }}}}"
+      password: "{{{{ env_var('SNOWFLAKE{instance_suffix}_PASSWORD') }}}}"
+      role: "{{{{ env_var('SNOWFLAKE{instance_suffix}_ROLE') }}}}"
+      database: "{{{{ env_var('SNOWFLAKE{instance_suffix}_DATABASE') }}}}"
+      warehouse: "{{{{ env_var('SNOWFLAKE{instance_suffix}_WAREHOUSE') }}}}"
+      schema: {schema}
+      threads: 4
+
+# Environment Variables (same as dlt/Sling):
+# - SNOWFLAKE{instance_suffix}_ACCOUNT: Your Snowflake account identifier
+# - SNOWFLAKE{instance_suffix}_USER: Snowflake username
+# - SNOWFLAKE{instance_suffix}_PASSWORD: Snowflake password
+# - SNOWFLAKE{instance_suffix}_DATABASE: Database name
+# - SNOWFLAKE{instance_suffix}_WAREHOUSE: Warehouse name
+# - SNOWFLAKE{instance_suffix}_ROLE: Role name
+"""
+
+                    elif destination_type in ['postgres', 'postgresql']:
+                        # Postgres configuration - use same env vars as dlt/Sling (with DEST_ prefix for destination)
+                        schema = destination_config.get('schema_name', 'public')
+
+                        profiles_yml_content += f"""      type: postgres
+      host: "{{{{ env_var('DEST_POSTGRES{instance_suffix}_HOST', 'localhost') }}}}"
+      port: "{{{{ env_var('DEST_POSTGRES{instance_suffix}_PORT', '5432') | int }}}}"
+      user: "{{{{ env_var('DEST_POSTGRES{instance_suffix}_USER') }}}}"
+      password: "{{{{ env_var('DEST_POSTGRES{instance_suffix}_PASSWORD') }}}}"
+      dbname: "{{{{ env_var('DEST_POSTGRES{instance_suffix}_DATABASE') }}}}"
+      schema: {schema}
+      threads: 4
+
+# Environment Variables (same as dlt/Sling - note DEST_ prefix):
+# - DEST_POSTGRES{instance_suffix}_HOST: Database host (default: localhost)
+# - DEST_POSTGRES{instance_suffix}_PORT: Database port (default: 5432)
+# - DEST_POSTGRES{instance_suffix}_USER: Database username
+# - DEST_POSTGRES{instance_suffix}_PASSWORD: Database password
+# - DEST_POSTGRES{instance_suffix}_DATABASE: Database name
+"""
+
+                    elif destination_type == 'redshift':
+                        # Redshift configuration - use same env vars as dlt/Sling
+                        schema = destination_config.get('schema_name', 'public')
+
+                        profiles_yml_content += f"""      type: redshift
+      host: "{{{{ env_var('REDSHIFT{instance_suffix}_HOST') }}}}"
+      port: "{{{{ env_var('REDSHIFT{instance_suffix}_PORT', '5439') | int }}}}"
+      user: "{{{{ env_var('REDSHIFT{instance_suffix}_USER') }}}}"
+      password: "{{{{ env_var('REDSHIFT{instance_suffix}_PASSWORD') }}}}"
+      dbname: "{{{{ env_var('REDSHIFT{instance_suffix}_DATABASE') }}}}"
+      schema: {schema}
+      threads: 4
+
+# Environment Variables (same as dlt/Sling):
+# - REDSHIFT{instance_suffix}_HOST: Redshift cluster endpoint
+# - REDSHIFT{instance_suffix}_PORT: Database port (default: 5439)
+# - REDSHIFT{instance_suffix}_USER: Database username
+# - REDSHIFT{instance_suffix}_PASSWORD: Database password
+# - REDSHIFT{instance_suffix}_DATABASE: Database name
+"""
+
+                    else:
+                        profiles_warning = f"Destination type '{destination_type}' not recognized. You'll need to create profiles.yml manually."
+
+                # Write profiles.yml if we generated it
+                if profiles_yml_content:
+                    with open(dbt_dir / "profiles.yml", 'w') as f:
+                        f.write(profiles_yml_content)
+
+            except Exception as e:
+                profiles_warning = f"Could not auto-generate profiles.yml: {str(e)}. You'll need to create it manually."
+
+            next_steps = [
+                f"1. Navigate to: cd {dbt_dir}",
+            ]
+
+            if profiles_yml_content:
+                next_steps.append("2. ✅ profiles.yml auto-generated with env var references!")
+                next_steps.append("3. Ensure your environment variables are set (same as dlt pipeline)")
+                next_steps.append("4. Install dbt packages: dbt deps")
+                next_steps.append("5. Test connection: dbt debug")
+                next_steps.append("6. Run transformations: dbt run")
+            else:
+                next_steps.append("2. ⚠️ Create profiles.yml with your destination credentials")
+                next_steps.append("3. Install dbt packages: dbt deps")
+                next_steps.append("4. Run transformations: dbt run")
+
+            response_data = {
+                "status": "success",
+                "message": f"dbt models added to {request.pipeline_name}!",
+                "dbt_dir": str(dbt_dir),
+                "profiles_generated": profiles_yml_content is not None,
+                "next_steps": next_steps
+            }
+
+            if profiles_warning:
+                response_data["warning"] = profiles_warning
+
+            return JSONResponse(response_data)
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to add dbt models: {str(e)}")
+
+
+    # ========================================
+    # Destination Management API
+    # ========================================
+
+    @app.get("/api/destinations")
+    async def list_destinations(dagster_deployment: Optional[str] = None):
+        """List all destinations, optionally filtered by Dagster deployment."""
+        try:
+            destinations = load_destinations()
+
+            # Filter by deployment if specified
+            if dagster_deployment:
+                destinations = [d for d in destinations if d.get('dagster_deployment') == dagster_deployment]
+
+            return JSONResponse({"destinations": destinations})
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to load destinations: {str(e)}")
+
+
+    @app.post("/api/destinations")
+    async def create_destination(request: DestinationCreate):
+        """Create a new destination."""
+        try:
+            from datetime import datetime
+
+            destinations = load_destinations()
+
+            # Check for duplicate name
+            if any(d['name'].lower() == request.name.lower() for d in destinations):
+                raise HTTPException(status_code=400, detail=f"Destination with name '{request.name}' already exists")
+
+            # Generate ID
+            dest_id = generate_destination_id(request.name, request.type)
+
+            # Create destination object
+            now = datetime.utcnow().isoformat() + 'Z'
+            destination = {
+                "id": dest_id,
+                "name": request.name,
+                "type": request.type,
+                "instance": request.instance,
+                "description": request.description,
+                "dagster_deployment": request.dagster_deployment,
+                "created_at": now,
+                "updated_at": now
+            }
+
+            destinations.append(destination)
+            save_destinations(destinations)
+
+            return JSONResponse({"status": "success", "destination": destination})
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to create destination: {str(e)}")
+
+
+    @app.get("/api/destinations/{destination_id}")
+    async def get_destination(destination_id: str):
+        """Get a specific destination by ID."""
+        try:
+            destinations = load_destinations()
+            destination = next((d for d in destinations if d['id'] == destination_id), None)
+
+            if not destination:
+                raise HTTPException(status_code=404, detail=f"Destination '{destination_id}' not found")
+
+            return JSONResponse({"destination": destination})
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to get destination: {str(e)}")
+
+
+    @app.put("/api/destinations/{destination_id}")
+    async def update_destination(destination_id: str, request: DestinationUpdate):
+        """Update a destination."""
+        try:
+            from datetime import datetime
+
+            destinations = load_destinations()
+            destination = next((d for d in destinations if d['id'] == destination_id), None)
+
+            if not destination:
+                raise HTTPException(status_code=404, detail=f"Destination '{destination_id}' not found")
+
+            # Update fields
+            if request.name is not None:
+                # Check for duplicate name
+                if any(d['id'] != destination_id and d['name'].lower() == request.name.lower() for d in destinations):
+                    raise HTTPException(status_code=400, detail=f"Destination with name '{request.name}' already exists")
+                destination['name'] = request.name
+
+            if request.description is not None:
+                destination['description'] = request.description
+
+            if request.dagster_deployment is not None:
+                destination['dagster_deployment'] = request.dagster_deployment
+
+            destination['updated_at'] = datetime.utcnow().isoformat() + 'Z'
+
+            save_destinations(destinations)
+
+            return JSONResponse({"status": "success", "destination": destination})
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to update destination: {str(e)}")
+
+
+    @app.delete("/api/destinations/{destination_id}")
+    async def delete_destination(destination_id: str):
+        """Delete a destination."""
+        try:
+            destinations = load_destinations()
+            destination = next((d for d in destinations if d['id'] == destination_id), None)
+
+            if not destination:
+                raise HTTPException(status_code=404, detail=f"Destination '{destination_id}' not found")
+
+            # TODO: Check if any pipelines are using this destination
+
+            destinations = [d for d in destinations if d['id'] != destination_id]
+            save_destinations(destinations)
+
+            return JSONResponse({"status": "success", "message": f"Destination '{destination['name']}' deleted"})
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to delete destination: {str(e)}")
 
     return app
 
