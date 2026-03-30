@@ -1,4 +1,34 @@
-# Embedded ELT Builder
+# DataPulse
+
+**DataPulse** is the product name for this repo: an ELT builder and (growing) hosted control plane. The open-source core is the Python **embedded_elt_builder** package (CLI + FastAPI UI). The **SaaS shell** lives in **`web/`** — a [Next.js](https://nextjs.org/) app with the same shape as ServicePulse (App Router, Clerk, Prisma, Stripe, Resend, Vercel). Intended home: [github.com/ethomasii/datapulse](https://github.com/ethomasii/datapulse).
+
+## Repo layout
+
+| Path | What it is |
+|------|------------|
+| `embedded_elt_builder/` | Python package: `elt` CLI, pipeline generator, FastAPI/Jinja web UI |
+| `web/` | DataPulse marketing site + authenticated dashboard (Neon/Postgres via Prisma) |
+
+### SaaS stack (`web/`)
+
+- **Auth:** [Clerk](https://clerk.com) — middleware + `/api/webhooks/clerk`
+- **Database:** [Neon](https://neon.tech) (or any Postgres) — Prisma
+- **Billing:** [Stripe](https://stripe.com) — `/api/webhooks/stripe`
+- **Email:** [Resend](https://resend.com) — `lib/email/resend.ts`
+- **AI:** [Anthropic](https://www.anthropic.com) — `lib/ai/anthropic.ts`
+- **Deploy:** [Vercel](https://vercel.com) — see `web/vercel.json`
+
+```bash
+cd web
+cp .env.example .env.local   # fill Clerk, DATABASE_URL, etc.
+npm install
+npm run db:push               # or db:migrate once you add migrations
+npm run dev                   # http://localhost:3000
+```
+
+---
+
+# Embedded ELT Builder (Python package)
 
 A powerful tool for creating, managing, and deploying ELT pipelines using [dlt](https://dlthub.com/) and [Sling](https://slingdata.io/). Features both a CLI and a modern web UI with dark mode support.
 
@@ -43,8 +73,8 @@ A powerful tool for creating, managing, and deploying ELT pipelines using [dlt](
 
 ```bash
 # Clone the repository
-git clone https://github.com/eric-thomas-dagster/embedded_elt_builder.git
-cd embedded_elt_builder
+git clone https://github.com/ethomasii/datapulse.git
+cd datapulse
 
 # Install dependencies (using uv or pip)
 uv pip install -e .

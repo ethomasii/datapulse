@@ -35,3 +35,10 @@ elt_pipelines_example/
 requirements.txt
 requirements-min.txt
 pyproject.toml
+
+# DataPulse web (Next.js)
+web/node_modules/
+web/.next/
+web/.env.local
+web/.vercel
+web/tsconfig.tsbuildinfo
