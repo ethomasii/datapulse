@@ -245,7 +245,7 @@ export default function WebhooksPage() {
   -d '{"pipeline": "my_pipeline_name", "environment": "prod"}'`}
               </pre>
               <p className="mt-2 text-xs text-slate-500">
-                Optional body fields: <code className="font-mono">environment</code> (default: <code className="font-mono">"webhook"</code>),{' '}
+                Optional body fields: <code className="font-mono">environment</code> (default: <code className="font-mono">&quot;webhook&quot;</code>),{' '}
                 <code className="font-mono">correlationId</code> (default: random UUID).
               </p>
             </div>
@@ -260,7 +260,7 @@ export default function WebhooksPage() {
           <h2 className="text-base font-semibold text-slate-900 dark:text-white">Outgoing — account default</h2>
         </div>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Fires for any run that doesn't have a pipeline-specific override when it reaches a terminal state.
+          Fires for any run that doesn&apos;t have a pipeline-specific override when it reaches a terminal state.
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1">
@@ -288,7 +288,7 @@ export default function WebhooksPage() {
           <h2 className="text-base font-semibold text-slate-900 dark:text-white">Outgoing — per-pipeline overrides</h2>
         </div>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Pipeline URL takes priority over the account default for that pipeline's runs.
+          Pipeline URL takes priority over the account default for that pipeline&apos;s runs.
         </p>
         <div className="mt-1 inline-flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-200">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
