@@ -42,5 +42,3 @@ export async function GET(req: Request) {
   return NextResponse.json({ heartbeat: hb });
 }
 
-/** Called by the account settings UI (Clerk auth, not agent token) */
-export { GET as agentHeartbeatForUser };
