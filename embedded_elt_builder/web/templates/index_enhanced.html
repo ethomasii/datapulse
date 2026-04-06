@@ -2434,6 +2434,9 @@
 
         function initializeApp() {
 
+        // When served behind DataPulse Next.js at /elt-builder, API calls must use this prefix (set via ELT_API_PREFIX env).
+        const ELT_API_PREFIX = {{ elt_api_prefix | default('') | tojson }};
+
         // Source and destination groups (will be sorted alphabetically when displayed)
         const SOURCE_GROUPS = {
             "APIs & SaaS": ["github", "stripe", "shopify", "salesforce", "hubspot", "slack", "notion", "airtable", "zendesk", "jira", "google_analytics", "facebook_ads", "google_ads", "intercom", "mixpanel", "segment", "asana"],
@@ -2450,8 +2453,9 @@
 
         // API helpers
         async function apiCall(endpoint, options = {}) {
+            const url = endpoint.startsWith('http') ? endpoint : (ELT_API_PREFIX + endpoint);
             try {
-                const response = await fetch(endpoint, {
+                const response = await fetch(url, {
                     ...options,
                     headers: {
                         'Content-Type': 'application/json',
@@ -2485,7 +2489,7 @@
                 // Improve error messaging for network failures
                 if (error instanceof TypeError && error.message === 'Failed to fetch') {
                     const betterError = new Error(
-                        `Network error: Unable to connect to the server at ${endpoint}. ` +
+                        `Network error: Unable to connect to the server at ${url}. ` +
                         `Please check that:\n` +
                         `1. The backend server is running\n` +
                         `2. You can access the server URL\n` +
@@ -3547,7 +3551,7 @@
         async function performDltHubSearch(searchTerm, dropdown, popularSources, allDltHubVerifiedSources) {
             try {
                 // Search dltHub Context via our backend
-                const response = await fetch(`/api/dlthub-search?q=${encodeURIComponent(searchTerm)}`);
+                const response = await fetch(`${ELT_API_PREFIX}/api/dlthub-search?q=${encodeURIComponent(searchTerm)}`);
                 const data = await response.json();
 
                 // Also search local sources
@@ -6738,7 +6742,7 @@
             // Check backend health first
             try {
                 console.log('Checking backend connectivity...');
-                const health = await fetch('/api/health');
+                const health = await fetch(ELT_API_PREFIX + '/api/health');
                 if (health.ok) {
                     const data = await health.json();
                     console.log('✅ Backend is running:', data);
@@ -6749,7 +6753,7 @@
             } catch (error) {
                 console.error('❌ Cannot connect to backend:', error);
                 showAlert(
-                    '⚠️ Cannot connect to backend server. Please check that the server is running on http://localhost:8000',
+                    '⚠️ Cannot connect to the ELT Builder API. If you use DataPulse web, ensure FastAPI is running and ELT_BUILDER_ORIGIN points to it.',
                     'error'
                 );
             }

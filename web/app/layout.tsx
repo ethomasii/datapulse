@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
+import "@xyflow/react/dist/style.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
     template: "%s | DataPulse",
   },
   description:
-    "Design dlt and Sling pipelines, sync with Git, and run on Dagster. The hosted control plane for your data ingestion.",
+    "Design and ship data pipelines with a git-native control plane. DataPulse handles orchestration, metadata, and observability — run on our infrastructure or yours.",
   openGraph: {
     type: "website",
     locale: "en_US",

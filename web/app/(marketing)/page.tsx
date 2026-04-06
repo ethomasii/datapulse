@@ -11,9 +11,9 @@ import {
 const features = [
   {
     icon: Layers,
-    title: "dlt + Sling in one flow",
+    title: "Any source, any destination",
     description:
-      "Scaffold REST and database pipelines with smart defaults. Same mental model whether you ship Python or YAML.",
+      "Scaffold REST and database pipelines with smart defaults. DataPulse picks the right sync engine automatically.",
   },
   {
     icon: GitBranch,
@@ -23,9 +23,9 @@ const features = [
   },
   {
     icon: Workflow,
-    title: "Dagster-ready",
+    title: "Orchestration-ready",
     description:
-      "Every pipeline ships with metadata your orchestrator can discover — schedules, owners, tags, and asset kinds.",
+      "Every pipeline ships with workspace metadata — schedules, owners, tags, and kinds — for whatever runner you connect.",
   },
   {
     icon: Zap,
@@ -48,10 +48,10 @@ export default function HomePage() {
             ELT pipelines without the friction
           </h1>
           <p className="mt-6 text-lg text-slate-600 dark:text-slate-300">
-            DataPulse is the control plane for designing and managing ingestion built on{" "}
-            <span className="font-medium text-slate-800 dark:text-slate-200">dlt</span>,{" "}
-            <span className="font-medium text-slate-800 dark:text-slate-200">Sling</span>, and{" "}
-            <span className="font-medium text-slate-800 dark:text-slate-200">Dagster</span>.
+            DataPulse is the{" "}
+            <span className="font-medium text-slate-800 dark:text-slate-200">control plane</span> for designing,
+            running, and observing data pipelines — on our infrastructure or yours. You own the code; we handle the
+            orchestration.
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link

@@ -17,6 +17,9 @@ elt scaffold create <name> --source <type> --destination <type>
 elt list
 elt delete <name>
 elt ui
+elt sensors create <name> <pipeline> --type <sensor_type> --config <config>
+elt sensors list
+elt sensors check
 ```
 
 **Web UI:**
@@ -33,6 +36,7 @@ elt ui
 - ✅ Interactive CLI with multiselect, boolean, text prompts
 - ✅ Modern web UI with dynamic forms
 - ✅ Git integration (auto-commit and push)
+- ✅ **Event-driven sensors** for automated pipeline orchestration
 
 ### 2. **dagster_elt_project/** - Dagster Orchestration
 Automated Dagster integration that discovers and orchestrates your pipelines.

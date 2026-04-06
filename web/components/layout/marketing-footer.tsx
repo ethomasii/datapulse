@@ -8,6 +8,18 @@ export function MarketingFooter() {
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 text-sm text-slate-600 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <p>© {new Date().getFullYear()} DataPulse</p>
         <div className="flex flex-wrap gap-4">
+          <Link href="/docs" className="hover:text-slate-900 dark:hover:text-slate-200">
+            Docs
+          </Link>
+          <Link href="/roadmap" className="hover:text-slate-900 dark:hover:text-slate-200">
+            Roadmap
+          </Link>
+          <Link href="/changelog" className="hover:text-slate-900 dark:hover:text-slate-200">
+            Changelog
+          </Link>
+          <Link href="/compare" className="hover:text-slate-900 dark:hover:text-slate-200">
+            Compare
+          </Link>
           <Link href="/privacy" className="hover:text-slate-900 dark:hover:text-slate-200">
             Privacy
           </Link>

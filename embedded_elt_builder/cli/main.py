@@ -10,12 +10,14 @@ from .show import show
 from .toggle import enable, disable
 from .validate import validate
 from .status import status
+from .sensors import sensors
+from .schedules import schedules
 
 
 @click.group()
 @click.version_option(version="0.1.0")
 def cli():
-    """ELT Pipeline Manager - Manage dlt and Sling pipelines for Dagster.
+    """ELT Pipeline Manager - Manage dlt and Sling pipelines with sensor orchestration.
 
     \b
     Examples:
@@ -44,6 +46,16 @@ def cli():
 
         # Launch web UI
         elt ui
+
+        # Manage sensors
+        elt sensors create s3_monitor my_pipeline --type s3_file_count --config bucket_name=my-bucket,threshold=5
+        elt sensors list
+        elt sensors check
+
+        # Manage schedules
+        elt schedules create daily_backup my_pipeline --type cron --config cron_expression="0 2 * * *"
+        elt schedules list
+        elt schedules check
     """
     pass
 
@@ -57,6 +69,8 @@ cli.add_command(validate)
 cli.add_command(status)
 cli.add_command(delete)
 cli.add_command(ui)
+cli.add_command(sensors)
+cli.add_command(schedules)
 
 
 if __name__ == "__main__":

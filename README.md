@@ -26,6 +26,12 @@ npm run db:push               # or db:migrate once you add migrations
 npm run dev                   # http://localhost:3000
 ```
 
+### ELT Builder in the browser (`/builder`)
+
+The **Next.js app** includes a native ELT Builder (React + API routes + Prisma). Pipeline definitions and generated `pipeline.py` / `replication.yaml` / `dagster.yaml` text are stored in **Neon** — no FastAPI process required. One command: `cd web && npm run dev`, then open **http://localhost:3000/builder** (after signing in). Run **`npx prisma db push`** after pulling so the `EltPipeline` table exists.
+
+The original **Python** package (`embedded_elt_builder/`) remains available for **`elt` CLI** users and as the reference implementation for generators; parity with every CLI feature is incremental.
+
 ---
 
 # Embedded ELT Builder (Python package)
@@ -56,6 +62,7 @@ A powerful tool for creating, managing, and deploying ELT pipelines using [dlt](
 - **List Pipelines** - View all configured pipelines
 - **Delete Pipelines** - Remove pipelines from your repository
 - **Launch Web UI** - Start the web interface from the command line
+- **Manage Sensors** - Create and manage event-driven sensors for pipeline orchestration
 
 ### 🔧 Supported Tools
 - **dlt (Data Load Tool)** - Python-based data pipeline framework
@@ -68,6 +75,15 @@ A powerful tool for creating, managing, and deploying ELT pipelines using [dlt](
   - Database-to-database replication
   - Incremental loading
   - Schema inference
+
+### 📡 Sensors (Event-Driven Orchestration)
+- **S3 File Count Sensor** - Monitor AWS S3 buckets for file count thresholds
+- **GCS File Count Sensor** - Monitor Google Cloud Storage buckets for file count thresholds
+- **ADLS File Count Sensor** - Monitor Azure Data Lake Storage for file count thresholds
+- **CSV Row Count Sensor** - Monitor CSV files for row count thresholds
+- **Kafka Message Count Sensor** - Monitor Kafka topics for message count thresholds
+- **SQS Message Count Sensor** - Monitor AWS SQS queues for message count thresholds
+- **Extensible Architecture** - Easy to add new sensor types for different monitoring scenarios
 
 ## Installation
 

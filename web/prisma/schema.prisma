@@ -34,10 +34,121 @@ model User {
   email     String
   name      String?
   imageUrl  String?
+  /// Optional HTTPS URL — POST when a pipeline run finishes (success or failure). No warehouse secrets in payload.
+  runsWebhookUrl String? @db.Text
+  /// Secret token for the incoming webhook trigger endpoint (POST /api/webhooks/trigger/:token).
+  incomingWebhookToken String? @unique @db.Text
+  /// Secret token for the self-hosted DataPulse agent (polls pending runs, reports back).
+  agentToken String? @unique @db.Text
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   subscription Subscription?
+  eltPipelines EltPipeline[]
+  githubConnection GithubConnection?
+  eltPipelineRuns EltPipelineRun[]
+  connections Connection[]
+}
+
+/// Optional: per-customer GitHub OAuth (BYO org). Disabled when using managed repos under DataPulse’s org only.
+model GithubConnection {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  githubUserId     String
+  githubLogin      String
+  accessTokenEnc   String   @db.Text
+  scope            String?
+  defaultRepoOwner String?
+  defaultRepoName  String?
+  defaultBranch    String?  @default("main")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/// Named, reusable connection profile (source or destination). Referenced by pipelines by name.
+model Connection {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Human-readable label, e.g. "prod-postgres" or "bigquery-warehouse"
+  name        String
+  /// "source" | "destination"
+  connectionType String
+  /// Connector key, e.g. "postgres", "bigquery", "snowflake", "github"
+  connector   String
+  /// Non-secret config blob (schema, project_id, account, etc.). Secrets stay in env vars.
+  config      Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+/// Generated ELT pipeline definitions stored in Neon — no local runner required.
+model EltPipeline {
+  id                  String   @id @default(cuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String
+  tool                String // "dlt" | "sling"
+  enabled             Boolean  @default(true)
+  sourceType          String
+  destinationType     String
+  description         String?
+  groupName           String?
+  sourceConfiguration Json     @default("{}")
+  pipelineCode        String   @db.Text
+  configYaml          String?  @db.Text
+  /// datapulse_workspace.yaml manifest (DB column name is historical)
+  workspaceYaml       String?  @map("dagsterYaml") @db.Text
+  /// Optional: POST run events here for this pipeline only (overrides account default when set).
+  runsWebhookUrl      String?  @db.Text
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([userId, name, tool])
+  @@index([userId])
+  runs EltPipelineRun[]
+}
+
+enum RunStatus {
+  pending
+  running
+  succeeded
+  failed
+  cancelled
+}
+
+/// Execution records reported by runners, CI, or the app — structured logs only (no raw warehouse credentials).
+model EltPipelineRun {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pipelineId    String
+  pipeline      EltPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  status        RunStatus @default(pending)
+  environment   String    @default("default")
+  correlationId String    @unique
+  triggeredBy   String?
+  startedAt     DateTime  @default(now())
+  finishedAt    DateTime?
+  /// JSON array: [{ "at": ISO string, "level": "info"|"warn"|"error", "message": string }]
+  logEntries    Json      @default("[]")
+  /// Sanitized error text for UI — never store connection strings or API keys here.
+  errorSummary  String?   @db.Text
+  webhookSentAt DateTime?
+  webhookStatus String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId, startedAt(sort: Desc)])
+  @@index([pipelineId, startedAt(sort: Desc)])
+  @@index([userId, status])
+  @@index([userId, environment])
 }
 
 model Subscription {

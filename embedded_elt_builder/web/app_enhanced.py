@@ -258,10 +258,20 @@ def create_app(repo_path: str) -> FastAPI:
     templates_dir = Path(__file__).parent / "templates"
     templates = Jinja2Templates(directory=str(templates_dir))
 
+    elt_api_prefix = os.environ.get("ELT_API_PREFIX", "")
+
+    @app.get("/api/health")
+    async def health():
+        """Liveness check for the web UI and proxies."""
+        return {"status": "ok", "service": "elt-builder"}
+
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request):
         """Serve the main UI."""
-        return templates.TemplateResponse("index_enhanced.html", {"request": request})
+        return templates.TemplateResponse(
+            "index_enhanced.html",
+            {"request": request, "elt_api_prefix": elt_api_prefix},
+        )
 
     @app.get("/api/pipelines")
     async def list_pipelines():
