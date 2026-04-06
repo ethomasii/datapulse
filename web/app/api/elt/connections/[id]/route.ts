@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
 
@@ -24,7 +25,7 @@ export async function PATCH(req: Request, { params }: Params) {
     where: { id },
     data: {
       ...(typeof name === "string" && name.trim() ? { name: name.trim() } : {}),
-      ...(config && typeof config === "object" && !Array.isArray(config) ? { config: config as Record<string, unknown> } : {}),
+      ...(config && typeof config === "object" && !Array.isArray(config) ? { config: config as Prisma.InputJsonValue } : {}),
     },
   });
   return NextResponse.json({ connection });
