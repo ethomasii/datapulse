@@ -3,7 +3,7 @@ import { stripCanvasFromSourceConfig } from "./canvas-source-config";
 import { chooseTool } from "./choose-tool";
 import { generateDltPipeline } from "./generate-dlt";
 import { generateSlingReplication, slingReplicationToYaml } from "./generate-sling";
-import { generateDatapulseWorkspaceYaml } from "./generate-datapulse-workspace";
+import { generateEltpulseWorkspaceYaml } from "./generate-eltpulse-workspace";
 import { normalizeSourceConfigurationForCodegen } from "./normalize-source-configuration";
 import type { CreatePipelineBody, PipelineRequest } from "./types";
 
@@ -74,7 +74,7 @@ export function generatePipelineArtifacts(body: CreatePipelineBody) {
       configuration: req.sourceConfiguration,
     };
     const configYaml = YAML.stringify(configData);
-    const workspaceYaml = generateDatapulseWorkspaceYaml(req);
+    const workspaceYaml = generateEltpulseWorkspaceYaml(req);
     return { tool: "dlt" as const, pipelineCode, configYaml, workspaceYaml };
   }
 
@@ -87,6 +87,6 @@ export function generatePipelineArtifacts(body: CreatePipelineBody) {
     configuration: req.sourceConfiguration,
   };
   const configYaml = YAML.stringify(configData);
-  const workspaceYaml = generateDatapulseWorkspaceYaml(req);
+  const workspaceYaml = generateEltpulseWorkspaceYaml(req);
   return { tool: "sling" as const, pipelineCode, configYaml, workspaceYaml };
 }

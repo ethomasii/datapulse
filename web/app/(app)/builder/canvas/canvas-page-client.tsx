@@ -196,7 +196,7 @@ export function CanvasPageClient() {
   const loadPipelines = useCallback(async () => {
     setListLoading(true);
     try {
-      const res = await fetch("/api/elt/pipelines");
+      const res = await fetch("/api/elt/pipelines", { credentials: "same-origin" });
       if (!res.ok) return;
       const data = await res.json();
       const rows = (data.pipelines ?? []) as PipelineRow[];
@@ -240,8 +240,23 @@ export function CanvasPageClient() {
     setSourceConfigError(null);
     lastFullSourceConfigRef.current = {};
     try {
-      const res = await fetch(`/api/elt/pipelines/${id}`, { signal: ac.signal });
-      if (!res.ok) throw new Error("Could not load pipeline");
+      const res = await fetch(`/api/elt/pipelines/${id}`, {
+        signal: ac.signal,
+        credentials: "same-origin",
+      });
+      if (!res.ok) {
+        let msg = `Could not load pipeline (${res.status})`;
+        try {
+          const errBody = (await res.json()) as { error?: unknown };
+          if (typeof errBody.error === "string") msg = errBody.error;
+          else if (errBody.error && typeof errBody.error === "object") {
+            msg = `${msg}: ${JSON.stringify(errBody.error)}`;
+          }
+        } catch {
+          /* ignore non-JSON error bodies */
+        }
+        throw new Error(msg);
+      }
       const data = await res.json();
       const row = data.pipeline as { sourceType?: string; destinationType?: string; tool?: string };
       setPipelineSourceType(typeof row.sourceType === "string" ? row.sourceType : "");
@@ -275,7 +290,7 @@ export function CanvasPageClient() {
       if (aborted) return;
       setLoadedGraph(null);
       setLoadedSig("demo");
-      setSaveError("Failed to load pipeline");
+      setSaveError(e instanceof Error ? e.message : "Failed to load pipeline");
     } finally {
       if (graphAbortRef.current === ac) {
         setDetailLoading(false);
@@ -296,6 +311,7 @@ export function CanvasPageClient() {
       try {
         const res = await fetch(`/api/elt/pipelines/${selectedId}`, {
           method: "PATCH",
+          credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(patch),
         });
@@ -384,6 +400,7 @@ export function CanvasPageClient() {
       const sourceConfiguration = minimalSourceConfigurationForNewPipeline(newSourceType);
       const res = await fetch("/api/elt/pipelines", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
@@ -424,6 +441,7 @@ export function CanvasPageClient() {
     try {
       const res = await fetch(`/api/elt/pipelines/${selectedId}`, {
         method: "PATCH",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ canvas: { nodes, edges, v: 1 } }),
       });
@@ -487,6 +505,7 @@ export function CanvasPageClient() {
       const merged = attachCanvasToSourceConfiguration(base, loadedGraph, lastFullSourceConfigRef.current);
       const res = await fetch(`/api/elt/pipelines/${selectedId}`, {
         method: "PATCH",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sourceConfiguration: merged }),
       });

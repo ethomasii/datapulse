@@ -69,7 +69,7 @@ const tiers = [
       "Run eltPulse entirely on your own infrastructure — we ship the Docker image, you run it, and telemetry / metadata reports back to our control plane.",
     features: [
       "Everything in Team",
-      "Self-hosted eltPulse agent (Docker)",
+      "Self-hosted eltPulse gateway (Docker)",
       "Metadata & run logs reported to control plane",
       "Air-gapped option (metadata stays on-prem)",
       "SLA-backed uptime commitment",
@@ -193,7 +193,7 @@ export default function PricingPage() {
         </h2>
         <p className="mt-2 text-sm text-violet-900/80 dark:text-violet-200/80">
           eltPulse ships a Docker image you deploy into your VPC or on-prem environment. Your pipeline code, warehouse
-          credentials, and raw data never leave your network. The agent sends only run metadata (status, row counts,
+          credentials, and raw data never leave your network. The gateway sends only run metadata (status, row counts,
           timing, sanitized logs) back to the eltPulse control plane so you get full observability in the UI, webhooks,
           and alerting — without giving us access to your data.
         </p>

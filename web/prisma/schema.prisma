@@ -32,7 +32,9 @@ enum SubscriptionStatus {
 enum ExecutionPlane {
   /// Customer-operated execution (optional self-hosted agent token, CI, or control-plane API reporting).
   customer_agent
-  /// eltPulse-operated execution when managed compute is available (roadmap).
+  /// eltPulse-operated managed execution (SaaS default).
+  eltpulse_managed
+  /// Legacy label on older databases; treated as `eltpulse_managed` in app logic. Migrated away by SQL migrations.
   datapulse_managed
 }
 
@@ -40,6 +42,8 @@ enum ExecutionPlane {
 enum RunIngestionExecutor {
   unspecified
   customer_agent
+  eltpulse_managed
+  /// Legacy label on older databases; treated as `eltpulse_managed` in app logic.
   datapulse_managed
   /// Logged-in app or session API (`/api/elt/runs`) reporting without the self-hosted agent.
   customer_control_plane
@@ -55,10 +59,16 @@ model User {
   runsWebhookUrl String? @db.Text
   /// Secret token for the incoming webhook trigger endpoint (POST /api/webhooks/trigger/:token).
   incomingWebhookToken String? @unique @db.Text
-  /// Secret token for the self-hosted eltPulse agent (polls pending runs, reports back). Optional — omit for API-only or managed-only flows.
+  /// Optional account-wide gateway Bearer token (polls pending runs, reports back). Omit for API-only, org token, or named-connector-only flows.
   agentToken String? @unique @db.Text
   /// Preferred execution plane; does not require `agentToken` when set to `customer_agent` (CI / app can still report runs).
-  executionPlane ExecutionPlane @default(customer_agent) @map("execution_plane")
+  executionPlane ExecutionPlane @default(eltpulse_managed) @map("execution_plane")
+  /// Last successful `POST /api/agent/heartbeat` (customer connector) or internal managed touch — survives serverless restarts.
+  agentLastSeenAt      DateTime? @map("agent_last_seen_at")
+  agentLastSeenVersion String?   @map("agent_last_seen_version")
+  agentLastSeenLabels  Json      @default("{}") @map("agent_last_seen_labels")
+  /// `customer_agent` = your process with Bearer token; `eltpulse_managed` = eltPulse-operated worker (SaaS / dedicated).
+  agentLastSeenSource  String?   @map("agent_last_seen_source")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -67,6 +77,64 @@ model User {
   githubConnection GithubConnection?
   eltPipelineRuns EltPipelineRun[]
   connections Connection[]
+  eltMonitors EltMonitor[]
+
+  /// Membership in a shared org (not the owner row — use `ownedOrganization`).
+  organizationId String?       @map("organization_id")
+  organization   Organization? @relation("OrganizationMembers", fields: [organizationId], references: [id], onDelete: SetNull)
+  /// Org this user owns (billing + org-level agent token). At most one.
+  ownedOrganization Organization? @relation("OrganizationOwner")
+
+  @@index([organizationId])
+  /// Named agent connectors (AWS, GCP, on-prem, etc.) — each has its own Bearer token and heartbeat.
+  agentTokens AgentToken[]
+}
+
+/// Per-user agent API token (multiple connectors: one per cloud, on-prem, etc.).
+model AgentToken {
+  id               String    @id @default(cuid())
+  userId           String    @map("user_id")
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String
+  token            String    @unique @db.Text
+  /// Optional labels, e.g. `{ "cloud": "aws", "site": "on-prem-dc1" }` for your own routing — not secret.
+  metadata         Json      @default("{}")
+  lastSeenAt       DateTime? @map("last_seen_at")
+  lastSeenVersion  String?   @map("last_seen_version")
+  lastSeenLabels   Json      @default("{}") @map("last_seen_labels")
+  lastSeenSource   String?   @map("last_seen_source")
+  revokedAt        DateTime? @map("revoked_at")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  /// Runs pinned to this gateway only (null on run = any gateway may execute).
+  targetedRuns            EltPipelineRun[]
+  /// Pipelines whose new runs default to this gateway unless overridden.
+  pipelinesDefaultGateway EltPipeline[]  @relation("PipelineDefaultGateway")
+
+  @@index([userId])
+  @@map("AgentToken")
+}
+
+/// Shared workspace: billing tier follows the owner’s subscription; org-scoped gateway uses `agentToken`.
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  /// Clerk Organization id when using Clerk orgs — optional until wired.
+  clerkOrgId  String?  @unique @map("clerk_org_id")
+  ownerUserId String   @unique @map("owner_user_id")
+  owner       User     @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  /// Bearer token for org-scoped gateways (same API as user `agentToken`).
+  agentToken  String?  @unique @map("agent_token") @db.Text
+  /// Optional floor for sensor checks (seconds). If set, overrides plan-tier default for this org (e.g. enterprise contract).
+  sensorPollIntervalSecondsOverride Int? @map("sensor_poll_interval_seconds_override")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members User[] @relation("OrganizationMembers")
+
+  @@index([ownerUserId])
+  @@map("Organization")
 }
 
 /// Optional: per-customer GitHub OAuth (BYO org). Disabled when using managed repos under eltPulse’s org only.
@@ -107,6 +175,28 @@ model Connection {
 
   @@unique([userId, name])
   @@index([userId])
+  eltMonitors EltMonitor[]
+}
+
+/// eltPulse cloud monitor (S3/SQS/etc.) — evaluated by the control plane cron, not local CLI files.
+model EltMonitor {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String
+  pipelineName     String
+  type             String
+  config           Json      @default("{}")
+  connectionId     String?
+  connection       Connection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  lastCheckAt      DateTime?
+  lastTriggeredAt  DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("EltMonitor")
 }
 
 /// Generated ELT pipeline definitions stored in Neon. Execution is customer-operated (optional agent / API) or eltPulse-managed when enabled.
@@ -128,6 +218,9 @@ model EltPipeline {
   workspaceYaml       String?  @map("workspace_yaml") @db.Text
   /// Optional: POST run events here for this pipeline only (overrides account default when set).
   runsWebhookUrl      String?  @db.Text
+  /// New pending runs from triggers/API inherit this gateway unless a per-run override is set.
+  defaultTargetAgentTokenId String?     @map("default_target_agent_token_id")
+  defaultTargetAgentToken   AgentToken? @relation("PipelineDefaultGateway", fields: [defaultTargetAgentTokenId], references: [id], onDelete: SetNull)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -156,6 +249,9 @@ model EltPipelineRun {
   status        RunStatus @default(pending)
   environment   String    @default("default")
   correlationId String    @unique
+  /// When set, only this named gateway (Bearer on `AgentToken`) may poll and PATCH this run; null = any gateway for this user.
+  targetAgentTokenId String?    @map("target_agent_token_id")
+  targetAgentToken   AgentToken? @relation(fields: [targetAgentTokenId], references: [id], onDelete: SetNull)
   triggeredBy   String?
   startedAt     DateTime  @default(now())
   finishedAt    DateTime?
@@ -172,6 +268,7 @@ model EltPipelineRun {
   @@index([pipelineId, startedAt(sort: Desc)])
   @@index([userId, status])
   @@index([userId, environment])
+  @@index([userId, status, targetAgentTokenId])
 }
 
 model Subscription {

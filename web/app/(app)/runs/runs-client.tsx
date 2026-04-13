@@ -30,13 +30,14 @@ type RunRow = {
   errorSummary: string | null;
   webhookStatus: string | null;
   pipeline: { id: string; name: string };
+  targetAgentToken?: { id: string; name: string } | null;
 };
 
 function telemetrySourceLabel(executor: string) {
   switch (executor) {
     case "customer_agent":
-      return "Your agent";
-    case "datapulse_managed":
+      return "Your gateway";
+    case "eltpulse_managed":
       return "eltPulse";
     case "customer_control_plane":
       return "App / API";
@@ -191,7 +192,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
         <p className="mt-2 max-w-3xl text-slate-600 dark:text-slate-300">
           List and filter executions per pipeline (newest first). Logs are structured and scrubbed — we never store raw
           warehouse credentials. Telemetry is stored here whether ingestion runs on{" "}
-          <strong className="font-medium text-slate-800 dark:text-slate-200">your agent</strong>,{" "}
+          <strong className="font-medium text-slate-800 dark:text-slate-200">your gateway</strong>,{" "}
           <strong className="font-medium text-slate-800 dark:text-slate-200">eltPulse-managed</strong> compute (when
           enabled), or the <strong className="font-medium text-slate-800 dark:text-slate-200">app / API</strong>. Share
           the <strong className="font-medium text-slate-800 dark:text-slate-200">correlation ID</strong> with your
@@ -313,6 +314,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
               <tr>
                 <th className="px-3 py-2 font-medium">Started</th>
                 <th className="px-3 py-2 font-medium">Pipeline</th>
+                <th className="px-3 py-2 font-medium">Gateway</th>
                 <th className="px-3 py-2 font-medium">Environment</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2 font-medium">Telemetry</th>
@@ -327,6 +329,9 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                     {new Date(r.startedAt).toLocaleString()}
                   </td>
                   <td className="px-3 py-2 font-medium text-slate-900 dark:text-white">{r.pipeline.name}</td>
+                  <td className="max-w-[140px] truncate px-3 py-2 text-slate-600 dark:text-slate-300" title={r.targetAgentToken?.name ?? "Any gateway"}>
+                    {r.targetAgentToken?.name ?? "Any"}
+                  </td>
                   <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{r.environment}</td>
                   <td className="px-3 py-2">
                     <span className="inline-flex items-center gap-1.5">
@@ -394,6 +399,11 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                   </span>
                   <span className="text-slate-500">{detail.run.pipeline.name}</span>
                   <span className="text-slate-500">· {detail.run.environment}</span>
+                  {detail.run.targetAgentToken ? (
+                    <span className="text-slate-500">· Gateway: {detail.run.targetAgentToken.name}</span>
+                  ) : (
+                    <span className="text-slate-500">· Gateway: any</span>
+                  )}
                 </div>
                 <div>
                   <span className="text-xs font-medium uppercase text-slate-500">Correlation ID</span>

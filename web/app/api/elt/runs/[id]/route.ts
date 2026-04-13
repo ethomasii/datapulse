@@ -21,7 +21,10 @@ export async function GET(_req: Request, context: RouteContext) {
   const { id } = context.params;
   const run = await db.eltPipelineRun.findFirst({
     where: { id, userId: user.id },
-    include: { pipeline: { select: { name: true, tool: true } } },
+    include: {
+      pipeline: { select: { name: true, tool: true } },
+      targetAgentToken: { select: { id: true, name: true } },
+    },
   });
   if (!run) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

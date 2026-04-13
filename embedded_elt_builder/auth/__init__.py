@@ -228,7 +228,7 @@ class AuthManager:
     """Manager for authentication credentials."""
 
     def __init__(self, storage_path: Optional[str] = None):
-        self.storage_path = Path(storage_path or os.path.expanduser("~/.datapulse/auth.json"))
+        self.storage_path = Path(storage_path or os.path.expanduser("~/.eltpulse/auth.json"))
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
         self.credentials: Dict[str, AuthCredentials] = {}
         self.load_credentials()
@@ -349,7 +349,7 @@ def _create_aws_client(credentials: Optional[AWSCredentials], service: str = "s3
             sts_client = boto3.client('sts')
             response = sts_client.assume_role(
                 RoleArn=credentials.role_arn,
-                RoleSessionName='datapulse-sensor'
+                RoleSessionName='eltpulse-sensor'
             )
             return boto3.client(
                 service,

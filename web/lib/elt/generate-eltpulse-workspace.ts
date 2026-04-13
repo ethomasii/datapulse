@@ -1,13 +1,13 @@
 import YAML from "yaml";
 import type { PipelineRequest } from "./types";
-import { DATAPULSE_REPO, pipelineModuleSegment } from "./datapulse-repo-layout";
+import { ELTPULSE_REPO, pipelineModuleSegment } from "./eltpulse-repo-layout";
 
 /**
  * YAML fragment stored alongside generated pipeline code — eltPulse workspace metadata only.
  */
-export function generateDatapulseWorkspaceYaml(request: PipelineRequest): string {
+export function generateEltpulseWorkspaceYaml(request: PipelineRequest): string {
   const mod = pipelineModuleSegment(request.name);
-  const relPath = `${DATAPULSE_REPO.pipelinesDir}/${request.name}/`;
+  const relPath = `${ELTPULSE_REPO.pipelinesDir}/${request.name}/`;
 
   const metadata: Record<string, unknown> = {
     pipeline_name: request.name,
@@ -37,16 +37,16 @@ export function generateDatapulseWorkspaceYaml(request: PipelineRequest): string
   if (request.otherNotes) triggers.other_notes = request.otherNotes;
 
   const doc: Record<string, unknown> = {
-    datapulse_version: 1,
+    eltpulse_version: 1,
     kind: "workspace_fragment",
     orchestration: {
-      engine: "datapulse",
+      engine: "eltpulse",
     },
     metadata,
     definitions: {
       code_location: {
         type: "python_module",
-        module: `datapulse.pipelines.${mod}`,
+        module: `eltpulse.pipelines.${mod}`,
         entrypoint: "run",
         relative_path: relPath,
       },

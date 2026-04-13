@@ -14,6 +14,8 @@ export const createRunBodySchema = z.object({
   correlationId: z.string().max(128).optional(),
   triggeredBy: z.string().max(256).optional(),
   status: runStatusSchema.optional().default("running"),
+  /** Named gateway (`AgentToken` id). Omit for pipeline default, then single-gateway auto-pin if applicable; null = any gateway. */
+  targetAgentTokenId: z.string().min(1).nullable().optional(),
 });
 
 export const patchRunBodySchema = z.object({

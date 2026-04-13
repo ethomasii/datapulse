@@ -5,18 +5,24 @@
  * POST → generate (or rotate) token, returns token ONCE
  * DELETE → revoke token
  *
- * Requires a valid Clerk session (account owner manages their agent token).
+ * Requires a valid Clerk session (account owner manages the account-wide gateway token).
  */
 import { NextResponse } from "next/server";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
+import { normalizeExecutionPlane } from "@/lib/elt/execution-plane";
 
 export async function GET() {
   const user = await getCurrentDbUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const namedCount = await db.agentToken.count({
+    where: { userId: user.id, revokedAt: null },
+  });
   return NextResponse.json({
-    hasToken: Boolean(user.agentToken),
-    executionPlane: user.executionPlane,
+    hasToken: Boolean(user.agentToken) || namedCount > 0,
+    accountToken: Boolean(user.agentToken),
+    namedConnectorCount: namedCount,
+    executionPlane: normalizeExecutionPlane(user.executionPlane),
   });
 }
 
@@ -37,6 +43,15 @@ export async function POST() {
 export async function DELETE() {
   const user = await getCurrentDbUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  await db.user.update({ where: { id: user.id }, data: { agentToken: null } });
+  await db.user.update({
+    where: { id: user.id },
+    data: {
+      agentToken: null,
+      agentLastSeenAt: null,
+      agentLastSeenVersion: null,
+      agentLastSeenLabels: {},
+      agentLastSeenSource: null,
+    },
+  });
   return NextResponse.json({ ok: true });
 }

@@ -7,11 +7,14 @@
  */
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
-import { getUserFromAgentToken } from "@/lib/agent/auth";
+import { getAgentAuthContext } from "@/lib/agent/auth";
+import { agentPollRunsWhere } from "@/lib/agent/gateway-routing";
 
 export async function GET(req: Request) {
-  const user = await getUserFromAgentToken(req);
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const ctx = await getAgentAuthContext(req);
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { user } = ctx;
+  const namedId = ctx.agentTokenRow?.id ?? null;
 
   const url = new URL(req.url);
   const statusParam = url.searchParams.get("status") ?? "pending";
@@ -23,9 +26,11 @@ export async function GET(req: Request) {
 
   const runs = await db.eltPipelineRun.findMany({
     where: {
-      userId: user.id,
-      status: statuses.length ? { in: statuses } : undefined,
-      ...(pipelineId ? { pipelineId } : {}),
+      AND: [
+        agentPollRunsWhere(user.id, namedId),
+        ...(statuses.length ? [{ status: { in: statuses } as const }] : []),
+        ...(pipelineId ? [{ pipelineId }] : []),
+      ],
     },
     orderBy: { startedAt: "asc" },
     take: limit,

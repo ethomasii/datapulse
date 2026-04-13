@@ -6,6 +6,7 @@ import { createPipelineBodySchema } from "@/lib/elt/types";
 import { generatePipelineArtifacts, resolveTool } from "@/lib/elt/generate-artifacts";
 import { syncDltDbtWithCanvas } from "@/lib/elt/dbt-canvas";
 import { mergeEltMetadataIntoSourceConfig } from "@/lib/elt/merge-elt-metadata";
+import { assertUserOwnsGatewayToken } from "@/lib/agent/gateway-routing";
 import { normalizeRunWebhookUrl } from "@/lib/elt/validate-run-webhook-url";
 
 export async function GET() {
@@ -25,6 +26,7 @@ export async function GET() {
       destinationType: true,
       description: true,
       updatedAt: true,
+      defaultTargetAgentTokenId: true,
     },
   });
   return NextResponse.json({ pipelines: rows });
@@ -84,6 +86,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: msg }, { status: 400 });
     }
 
+    let defaultTargetAgentTokenId: string | null | undefined;
+    if (body.defaultTargetAgentTokenId !== undefined) {
+      if (body.defaultTargetAgentTokenId === null) {
+        defaultTargetAgentTokenId = null;
+      } else {
+        try {
+          await assertUserOwnsGatewayToken(user.id, body.defaultTargetAgentTokenId);
+          defaultTargetAgentTokenId = body.defaultTargetAgentTokenId;
+        } catch {
+          return NextResponse.json({ error: "Invalid default gateway" }, { status: 400 });
+        }
+      }
+    }
+
     const row = await db.eltPipeline.create({
       data: {
         userId: user.id,
@@ -98,6 +114,7 @@ export async function POST(req: Request) {
         configYaml,
         workspaceYaml,
         runsWebhookUrl,
+        ...(defaultTargetAgentTokenId !== undefined ? { defaultTargetAgentTokenId } : {}),
       },
     });
 

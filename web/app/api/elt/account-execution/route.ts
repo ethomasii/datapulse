@@ -1,23 +1,31 @@
 /**
- * GET /api/elt/account-execution — preferred ingestion plane + whether an agent token exists.
- * PATCH — set `executionPlane` (customer-operated vs eltPulse-managed when available).
+ * GET /api/elt/account-execution — preferred ingestion plane + whether a gateway token exists.
+ * PATCH — set `executionPlane` (your infrastructure vs eltPulse-managed).
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
+import { isManagedExecutionPlane, normalizeExecutionPlane } from "@/lib/elt/execution-plane";
 
 const patchSchema = z.object({
-  executionPlane: z.enum(["customer_agent", "datapulse_managed"]),
+  executionPlane: z.enum(["customer_agent", "eltpulse_managed"]),
 });
 
 export async function GET() {
   const user = await getCurrentDbUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const namedCount = await db.agentToken.count({
+    where: { userId: user.id, revokedAt: null },
+  });
+  const managedComputeReady = isManagedExecutionPlane(user.executionPlane);
+
   return NextResponse.json({
-    executionPlane: user.executionPlane,
-    hasAgentToken: Boolean(user.agentToken),
+    executionPlane: normalizeExecutionPlane(user.executionPlane),
+    hasAgentToken: Boolean(user.agentToken) || namedCount > 0,
+    namedConnectorCount: namedCount,
+    managedComputeReady,
   });
 }
 
@@ -43,8 +51,15 @@ export async function PATCH(req: Request) {
     select: { executionPlane: true, agentToken: true },
   });
 
+  const namedCount = await db.agentToken.count({
+    where: { userId: user.id, revokedAt: null },
+  });
+  const managedComputeReady = isManagedExecutionPlane(updated.executionPlane);
+
   return NextResponse.json({
-    executionPlane: updated.executionPlane,
-    hasAgentToken: Boolean(updated.agentToken),
+    executionPlane: normalizeExecutionPlane(updated.executionPlane),
+    hasAgentToken: Boolean(updated.agentToken) || namedCount > 0,
+    namedConnectorCount: namedCount,
+    managedComputeReady,
   });
 }

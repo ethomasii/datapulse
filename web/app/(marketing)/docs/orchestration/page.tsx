@@ -29,7 +29,7 @@ export default function OrchestrationDocsPage() {
       </p>
       <p>
         In-product, event triggers are <strong>eltPulse monitors</strong>. They run in eltPulse&apos;s control plane (or
-        an agent you explicitly connect), so anything that touches your cloud accounts — S3, GCS, ADLS, queues, SaaS APIs
+        a gateway you explicitly connect), so anything that touches your cloud accounts — S3, GCS, ADLS, queues, SaaS APIs
         — needs <strong>credentials or connection profiles</strong> you grant to eltPulse, unlike jobs that only run
         inside your own VPC with ambient instance roles.
       </p>
@@ -47,7 +47,7 @@ export default function OrchestrationDocsPage() {
           <Link href="/builder">Pipelines</Link> — definitions and exports.
         </li>
         <li>
-          <code>datapulse_workspace.yaml</code> — <code>scheduling</code> and resilience metadata next to generated code.
+          <code>eltpulse_workspace.yaml</code> — <code>scheduling</code> and resilience metadata next to generated code.
         </li>
         <li>
           <Link href="/runs">Runs</Link> (signed in) — execution history reported by your runner or CI.

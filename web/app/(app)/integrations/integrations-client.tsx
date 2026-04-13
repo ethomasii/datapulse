@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ExternalLink, Loader2, Radio, Unplug } from "lucide-react";
 import {
   getServicePulseBaseUrl,
-  servicePulseDatapulseHandoffUrl,
+  servicePulseEltpulseHandoffUrl,
 } from "@/lib/integrations/servicepulse-url";
 
 type Props = {
@@ -81,7 +81,7 @@ export function IntegrationsClient({
     }
   }
 
-  const legacyByoConnected = Boolean(githubLogin) && !showCustomerGithubOauth;
+  const byoGithubOnly = Boolean(githubLogin) && !showCustomerGithubOauth;
 
   return (
     <div className="space-y-8">
@@ -140,11 +140,11 @@ export function IntegrationsClient({
         </p>
       </section>
 
-      {legacyByoConnected && (
+      {byoGithubOnly && (
         <section
           className="rounded-2xl border border-amber-200 bg-amber-50/80 p-6 dark:border-amber-900/50 dark:bg-amber-950/20"
           role="region"
-          aria-label="Legacy GitHub connection"
+          aria-label="BYO GitHub connection"
         >
           <h2 className="text-lg font-semibold text-amber-950 dark:text-amber-100">Previous GitHub connection</h2>
           <p className="mt-2 text-sm text-amber-950/90 dark:text-amber-100/90">
@@ -222,7 +222,7 @@ export function IntegrationsClient({
             <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">GITHUB_CLIENT_ID</code>,{" "}
             <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">GITHUB_CLIENT_SECRET</code>,{" "}
             <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">GITHUB_OAUTH_STATE_SECRET</code>,{" "}
-            <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">DATAPULSE_TOKEN_ENCRYPTION_KEY</code>.
+            <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">ELTPULSE_TOKEN_ENCRYPTION_KEY</code>.
           </p>
         </section>
       )}
@@ -261,7 +261,7 @@ export function IntegrationsClient({
             <ExternalLink className="h-4 w-4 opacity-90" aria-hidden />
           </a>
           <a
-            href={servicePulseDatapulseHandoffUrl()}
+            href={servicePulseEltpulseHandoffUrl()}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
@@ -272,7 +272,7 @@ export function IntegrationsClient({
           </a>
         </div>
         <p className="mt-3 text-xs text-slate-500 dark:text-slate-500">
-          The second link is optional cross-product wiring (adds <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">datapulse_origin</code> from{" "}
+          The second link is optional cross-product wiring (adds <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">eltpulse_origin</code> from{" "}
           <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">NEXT_PUBLIC_APP_URL</code>). If that page does not
           exist on ServicePulse yet, use the main link only. Non-production ServicePulse: set{" "}
           <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">NEXT_PUBLIC_SERVICEPULSE_URL</code>.

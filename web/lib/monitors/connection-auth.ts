@@ -13,7 +13,7 @@ function asConfigRecord(config: unknown): Record<string, string> {
 /**
  * Non-secret hints from Connection.config merged into the process environment
  * so boto / GCP / Azure default chains see region, project, account, etc.
- * Secrets remain in your deployment or in ~/.datapulse/auth.json under auth_credentials.
+ * Secrets remain in your deployment or in ~/.eltpulse/auth.json under auth_credentials.
  */
 export function connectionConfigToProcessEnv(conn: Pick<Connection, "connector" | "config">): Record<string, string> {
   const cfg = asConfigRecord(conn.config);
@@ -32,7 +32,7 @@ export function connectionConfigToProcessEnv(conn: Pick<Connection, "connector" 
   return out;
 }
 
-/** Optional profile name stored in connection JSON for Python auth_manager (~/.datapulse/auth.json). */
+/** Optional profile name stored in connection JSON for Python auth_manager (~/.eltpulse/auth.json). */
 export function credentialProfileFromConnection(conn: Pick<Connection, "name" | "config">): string {
   const cfg = asConfigRecord(conn.config);
   const explicit = cfg.credential_profile?.trim();

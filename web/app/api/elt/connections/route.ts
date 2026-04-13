@@ -81,7 +81,7 @@ export async function POST(req: Request) {
       );
     } catch {
       return NextResponse.json(
-        { error: "Could not encrypt secrets — set DATAPULSE_TOKEN_ENCRYPTION_KEY (32-byte base64) on the server" },
+        { error: "Could not encrypt secrets — set ELTPULSE_TOKEN_ENCRYPTION_KEY (32-byte base64) on the server" },
         { status: 503 }
       );
     }

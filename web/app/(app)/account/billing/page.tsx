@@ -47,11 +47,11 @@ export default async function BillingPage() {
           margin stay explicit so you can reason about the bill — no bundled “mystery” compute.
         </p>
         <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
-          An <strong className="font-medium text-slate-800 dark:text-slate-200">optional</strong> self-hosted agent is
+          An <strong className="font-medium text-slate-800 dark:text-slate-200">optional</strong> self-hosted gateway is
           one way to run ingestion on your hardware; run history and telemetry are always stored in eltPulse whether
-          you use an agent, report runs from the app or API, or (when available) choose{" "}
+          you use a gateway, report runs from the app or API, or (when available) choose{" "}
           <strong className="font-medium text-slate-800 dark:text-slate-200">managed execution</strong> on our stack.
-          Set your preference under <Link href="/agent" className="font-medium text-sky-600 hover:underline dark:text-sky-400">Agent</Link>.
+          Set your preference under <Link href="/gateway" className="font-medium text-sky-600 hover:underline dark:text-sky-400">Gateway</Link>.
           Bring-your-own execution avoids compute charges you would otherwise pay for managed tiers.
         </p>
         <p className="mt-3 text-xs text-slate-500 dark:text-slate-500">

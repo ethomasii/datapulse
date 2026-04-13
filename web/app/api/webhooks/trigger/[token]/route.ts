@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveRunTargetAgentTokenId } from "@/lib/agent/gateway-routing";
 import { db } from "@/lib/db/client";
 
 type Ctx = { params: { token: string } };
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
   const pipeline = await db.eltPipeline.findFirst({
     where: { userId: user.id, name: pipelineName },
-    select: { id: true, name: true, enabled: true },
+    select: { id: true, name: true, enabled: true, defaultTargetAgentTokenId: true },
   });
 
   if (!pipeline) {
@@ -69,6 +70,12 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     ? body.environment.trim()
     : "webhook";
 
+  const targetAgentTokenId = await resolveRunTargetAgentTokenId({
+    userId: user.id,
+    bodyOverride: undefined,
+    pipelineDefaultId: pipeline.defaultTargetAgentTokenId,
+  });
+
   const run = await db.eltPipelineRun.create({
     data: {
       userId: user.id,
@@ -77,6 +84,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       environment,
       correlationId,
       triggeredBy: "incoming_webhook",
+      targetAgentTokenId,
     },
     select: { id: true, correlationId: true, status: true, environment: true },
   });

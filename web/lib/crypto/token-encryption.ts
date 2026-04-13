@@ -5,13 +5,13 @@ const IV_LEN = 16;
 const AUTH_TAG_LEN = 16;
 
 function key32(): Buffer {
-  const b64 = process.env.DATAPULSE_TOKEN_ENCRYPTION_KEY;
+  const b64 = process.env.ELTPULSE_TOKEN_ENCRYPTION_KEY;
   if (!b64) {
-    throw new Error("DATAPULSE_TOKEN_ENCRYPTION_KEY is not set (32-byte key, base64-encoded)");
+    throw new Error("ELTPULSE_TOKEN_ENCRYPTION_KEY is not set (32-byte key, base64-encoded)");
   }
   const k = Buffer.from(b64, "base64");
   if (k.length !== 32) {
-    throw new Error("DATAPULSE_TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes");
+    throw new Error("ELTPULSE_TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes");
   }
   return k;
 }

@@ -32,7 +32,7 @@ const CARDS = [
   {
     href: "/docs/repositories",
     title: "Repositories",
-    desc: "How customer repos fit under the datapulse/ layout.",
+    desc: "How customer repos fit under the eltpulse/ layout.",
   },
   {
     href: "/docs/security",

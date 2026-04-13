@@ -36,7 +36,7 @@ requirements.txt
 requirements-min.txt
 pyproject.toml
 
-# DataPulse web (Next.js)
+# eltPulse web (Next.js)
 web/node_modules/
 web/.next/
 web/.env.local

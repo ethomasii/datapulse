@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { Prisma, RunStatus } from "@prisma/client";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
+import { resolveRunTargetAgentTokenId } from "@/lib/agent/gateway-routing";
 import { createRunBodySchema } from "@/lib/elt/run-types";
 
 export async function GET(req: Request) {
@@ -33,6 +34,7 @@ export async function GET(req: Request) {
     take: limit,
     include: {
       pipeline: { select: { id: true, name: true } },
+      targetAgentToken: { select: { id: true, name: true } },
     },
   });
 
@@ -60,9 +62,24 @@ export async function POST(req: Request) {
   const body = parsed.data;
   const pipeline = await db.eltPipeline.findFirst({
     where: { id: body.pipelineId, userId: user.id },
+    select: {
+      id: true,
+      defaultTargetAgentTokenId: true,
+    },
   });
   if (!pipeline) {
     return NextResponse.json({ error: "Pipeline not found" }, { status: 404 });
+  }
+
+  let targetAgentTokenId: string | null;
+  try {
+    targetAgentTokenId = await resolveRunTargetAgentTokenId({
+      userId: user.id,
+      bodyOverride: body.targetAgentTokenId,
+      pipelineDefaultId: pipeline.defaultTargetAgentTokenId,
+    });
+  } catch {
+    return NextResponse.json({ error: "Invalid gateway token" }, { status: 400 });
   }
 
   const correlationId = body.correlationId?.trim() || crypto.randomUUID();
@@ -81,6 +98,7 @@ export async function POST(req: Request) {
       environment: body.environment,
       correlationId,
       triggeredBy: body.triggeredBy ?? null,
+      targetAgentTokenId,
     },
     include: { pipeline: { select: { name: true } } },
   });

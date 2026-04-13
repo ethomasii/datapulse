@@ -10,7 +10,7 @@ export type StoredSensorConfig = {
 };
 
 export function sensorsConfigFilePath(): string {
-  return path.join(os.homedir(), ".datapulse", "sensors_config.json");
+  return path.join(os.homedir(), ".eltpulse", "sensors_config.json");
 }
 
 export function readStoredSensorConfigs(): StoredSensorConfig[] {

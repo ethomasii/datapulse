@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateDatapulseWorkspaceYaml } from "./generate-datapulse-workspace";
+import { generateEltpulseWorkspaceYaml } from "./generate-eltpulse-workspace";
 import type { PipelineRequest } from "./types";
 
 const minimal: PipelineRequest = {
@@ -9,9 +9,9 @@ const minimal: PipelineRequest = {
   sourceConfiguration: {},
 };
 
-describe("generateDatapulseWorkspaceYaml", () => {
+describe("generateEltpulseWorkspaceYaml", () => {
   it("includes quality.tests and triggers when set", () => {
-    const yaml = generateDatapulseWorkspaceYaml({
+    const yaml = generateEltpulseWorkspaceYaml({
       ...minimal,
       tests: ["row_count > 0"],
       sensors: ["new object in bucket"],
@@ -27,8 +27,15 @@ describe("generateDatapulseWorkspaceYaml", () => {
   });
 
   it("omits empty quality/triggers", () => {
-    const yaml = generateDatapulseWorkspaceYaml(minimal);
+    const yaml = generateEltpulseWorkspaceYaml(minimal);
     expect(yaml).not.toMatch(/^\s*quality:/m);
     expect(yaml).not.toMatch(/^\s*triggers:/m);
+  });
+
+  it("uses eltpulse workspace keys", () => {
+    const yaml = generateEltpulseWorkspaceYaml(minimal);
+    expect(yaml).toContain("eltpulse_version:");
+    expect(yaml).toMatch(/engine:\s*eltpulse/);
+    expect(yaml).toContain("eltpulse.pipelines.my_pipeline");
   });
 });

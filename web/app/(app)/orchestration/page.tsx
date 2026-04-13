@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { FileJson, PlayCircle, Split, Plus, Trash2, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import { DATAPULSE_MONITOR_CATALOG } from "@/lib/orchestration/datapulse-monitor-catalog";
+import { ELTPULSE_MONITOR_CATALOG } from "@/lib/orchestration/eltpulse-monitor-catalog";
 import { connectorMatchesMonitorType, monitorTypeRequiresConnection } from "@/lib/monitors/monitor-types";
 
 interface Sensor {
@@ -37,12 +37,30 @@ export default function OrchestrationPage() {
   const loadSensors = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/monitors");
-      const data = await response.json();
+      setError(null);
+      const response = await fetch("/api/monitors", { credentials: "same-origin" });
+      const text = await response.text();
+      let data: { sensors?: Sensor[]; error?: string };
+      try {
+        data = JSON.parse(text) as { sensors?: Sensor[]; error?: string };
+      } catch {
+        setError(
+          response.ok
+            ? "Failed to load monitors"
+            : `Monitors request failed (${response.status})`
+        );
+        setSensors([]);
+        return;
+      }
+      if (!response.ok) {
+        setError(data.error || `Failed to load monitors (${response.status})`);
+        setSensors([]);
+        return;
+      }
       setSensors(data.sensors || []);
     } catch (err) {
       setError("Failed to load monitors");
-      console.error('Error loading sensors:', err);
+      console.error("Error loading sensors:", err);
     } finally {
       setLoading(false);
     }
@@ -117,11 +135,11 @@ export default function OrchestrationPage() {
         </p>
         <p className="mt-3 text-slate-600 dark:text-slate-300">
           Because checks run from <strong className="font-medium text-slate-800 dark:text-slate-200">eltPulse&apos;s
-          environment</strong> (or an agent you connect), anything that reads{" "}
+          environment</strong> (or a gateway you connect), anything that reads{" "}
           <strong className="font-medium text-slate-800 dark:text-slate-200">your</strong> S3, GCS, ADLS, Kafka, or
           other cloud APIs needs <strong className="font-medium text-slate-800 dark:text-slate-200">credentials you
           supply</strong> — for example a named profile in{" "}
-          <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">~/.datapulse/auth.json</code> (see the
+          <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">~/.eltpulse/auth.json</code> (see the
           Python CLI) matched to the connection via{" "}
           <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">credential_profile</code> on the
           connection, or the default credential chain when secrets are already in the process environment.
@@ -326,7 +344,7 @@ export default function OrchestrationPage() {
           each row will map to credential-backed checks against your systems.
         </p>
         <ul className="mt-4 grid grid-cols-1 gap-2 text-sm text-slate-600 dark:text-slate-300 md:grid-cols-2">
-          {DATAPULSE_MONITOR_CATALOG.map((s) => (
+          {ELTPULSE_MONITOR_CATALOG.map((s) => (
             <li
               key={s.id}
               className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
@@ -458,7 +476,7 @@ function CreateSensorForm({ onClose, onSuccess }: { onClose: () => void; onSucce
           Cloud monitors must be linked to a saved connection. The server records{" "}
           <code className="rounded bg-slate-100 px-1 text-[10px] dark:bg-slate-800">auth_credentials</code> from that
           connection (profile name) for the Python runner. Store secrets in{" "}
-          <code className="rounded bg-slate-100 px-1 text-[10px] dark:bg-slate-800">~/.datapulse/auth.json</code> or your
+          <code className="rounded bg-slate-100 px-1 text-[10px] dark:bg-slate-800">~/.eltpulse/auth.json</code> or your
           process environment — optionally set <code className="rounded bg-slate-100 px-1 text-[10px] dark:bg-slate-800">credential_profile</code>{" "}
           on the connection to override the profile name.
         </p>

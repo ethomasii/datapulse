@@ -33,7 +33,7 @@ export default function PipelinesDocsPage() {
           <strong>config.yaml</strong> — Serialized source/destination configuration for reproducibility.
         </li>
         <li>
-          <strong>datapulse_workspace.yaml</strong> — Workspace metadata (scheduling, retries, code location) for your
+          <strong>eltpulse_workspace.yaml</strong> — Workspace metadata (scheduling, retries, code location) for your
           repo layout. See <Link href="/docs/orchestration">Orchestration</Link> for how schedules relate to pipeline
           definitions.
         </li>

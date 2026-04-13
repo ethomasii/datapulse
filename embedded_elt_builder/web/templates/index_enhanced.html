@@ -2434,7 +2434,7 @@
 
         function initializeApp() {
 
-        // When served behind DataPulse Next.js at /elt-builder, API calls must use this prefix (set via ELT_API_PREFIX env).
+        // When served behind eltPulse Next.js at /elt-builder, API calls must use this prefix (set via ELT_API_PREFIX env).
         const ELT_API_PREFIX = {{ elt_api_prefix | default('') | tojson }};
 
         // Source and destination groups (will be sorted alphabetically when displayed)
@@ -6753,7 +6753,7 @@
             } catch (error) {
                 console.error('❌ Cannot connect to backend:', error);
                 showAlert(
-                    '⚠️ Cannot connect to the ELT Builder API. If you use DataPulse web, ensure FastAPI is running and ELT_BUILDER_ORIGIN points to it.',
+                    '⚠️ Cannot connect to the ELT Builder API. If you use eltPulse web, ensure FastAPI is running and ELT_BUILDER_ORIGIN points to it.',
                     'error'
                 );
             }

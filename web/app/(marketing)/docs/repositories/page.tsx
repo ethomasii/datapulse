@@ -4,7 +4,7 @@ import { DocsProse } from "@/components/docs/docs-prose";
 
 export const metadata: Metadata = {
   title: "Repositories",
-  description: "datapulse/ repository layout and managed Git.",
+  description: "eltpulse/ repository layout and managed Git.",
 };
 
 export default function RepositoriesDocsPage() {
@@ -17,17 +17,17 @@ export default function RepositoriesDocsPage() {
       </p>
       <pre className="not-prose overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-100">
         {`repo/
-  datapulse/
+    eltpulse/
     pipelines/
       my_pipeline/
         pipeline.py          # or replication.yaml
         config.yaml
-    datapulse_workspace.yaml   # optional per-repo aggregate (future)`}
+    eltpulse_workspace.yaml   # optional per-repo aggregate (future)`}
       </pre>
 
       <h2>Workspace manifest</h2>
       <p>
-        Generated <code>datapulse_workspace.yaml</code> (stored alongside definitions in the app) describes scheduling
+        Generated <code>eltpulse_workspace.yaml</code> (stored alongside definitions in the app) describes scheduling
         hints, retries, and a logical code location for automation — consumable by eltPulse or by an external
         orchestrator (Airflow, Prefect, etc.) if you prefer to run triggers outside our control plane.
       </p>

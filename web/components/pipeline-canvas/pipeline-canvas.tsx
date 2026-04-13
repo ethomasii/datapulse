@@ -30,7 +30,7 @@ import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-
 import { dashedAnimatedEdgeStyle, resolveCanvasEdges } from "./canvas-edge-defaults";
 import { pipelineNodeTypes } from "./custom-nodes";
 
-const STORAGE_KEY = "datapulse-pipeline-canvas-v1";
+const STORAGE_KEY = "eltpulse-pipeline-canvas-v1";
 
 /** Default graph: extract → load. Add a transform node from the toolbar when you need in-warehouse modeling. */
 const demoNodes: Node[] = [
@@ -275,7 +275,7 @@ function FlowCanvas({
     });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "datapulse-pipeline-diagram.json";
+    a.download = "eltpulse-pipeline-diagram.json";
     a.click();
     URL.revokeObjectURL(a.href);
   }, [nodes, edges, persistValidationOptions]);

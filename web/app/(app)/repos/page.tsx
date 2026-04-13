@@ -85,14 +85,14 @@ export default async function ReposPage() {
           title: "What this page will do",
           bullets: [
             "List repos the installation can access; pick default owner/repo per workspace.",
-            "Choose branch and path prefix (e.g. datapulse/pipelines/).",
+            "Choose branch and path prefix (e.g. eltpulse/pipelines/).",
             "Show last sync commit and diff summary when we push updates from the builder.",
           ],
         },
         {
           title: "Layout",
           bullets: [
-            "Follows the datapulse/ tree documented in /docs/repositories.",
+            "Follows the eltpulse/ tree documented in /docs/repositories.",
             "Workspace YAML and pipeline code stay reviewable in PRs like application code.",
           ],
         },

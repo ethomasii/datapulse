@@ -11,6 +11,8 @@ import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-
 import { normalizeRunWebhookUrl } from "@/lib/elt/validate-run-webhook-url";
 import { mergeSourceConfigurationForSourceTypeChange } from "@/lib/elt/merge-source-config-on-type-change";
 import { syncDltDbtWithCanvas } from "@/lib/elt/dbt-canvas";
+import { resolveRouteParamId } from "@/lib/server/route-params";
+import { assertUserOwnsGatewayToken } from "@/lib/agent/gateway-routing";
 
 const canvasPayloadSchema = z.union([
   z.object({
@@ -30,6 +32,7 @@ const pipelinePatchSchema = z
     destinationType: z.string().min(1).optional(),
     /** Full replacement for `source_configuration` (same shape as form builder / JSON tab). */
     sourceConfiguration: z.record(z.string(), z.any()).optional(),
+    defaultTargetAgentTokenId: z.union([z.string().min(1), z.null()]).optional(),
   })
   .refine(
     (d) =>
@@ -37,20 +40,22 @@ const pipelinePatchSchema = z
       typeof d.enabled === "boolean" ||
       d.sourceType !== undefined ||
       d.destinationType !== undefined ||
-      d.sourceConfiguration !== undefined,
+      d.sourceConfiguration !== undefined ||
+      d.defaultTargetAgentTokenId !== undefined,
     { message: "No updatable fields" }
   );
 
-type Ctx = { params: { id: string } };
+type Ctx = { params: { id: string } | Promise<{ id: string }> };
 
 export async function GET(_req: Request, ctx: Ctx) {
   const user = await getCurrentDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const pipelineId = await resolveRouteParamId(ctx.params);
   try {
     const row = await db.eltPipeline.findFirst({
-      where: { id: ctx.params.id, userId: user.id },
+      where: { id: pipelineId, userId: user.id },
     });
     if (!row) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -68,8 +73,9 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const pipelineId = await resolveRouteParamId(ctx.params);
   const res = await db.eltPipeline.deleteMany({
-    where: { id: ctx.params.id, userId: user.id },
+    where: { id: pipelineId, userId: user.id },
   });
   if (res.count === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -82,6 +88,7 @@ export async function PUT(req: Request, ctx: Ctx) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const pipelineId = await resolveRouteParamId(ctx.params);
   let json: unknown;
   try {
     json = await req.json();
@@ -101,7 +108,7 @@ export async function PUT(req: Request, ctx: Ctx) {
 
   try {
     const existing = await db.eltPipeline.findFirst({
-      where: { id: ctx.params.id, userId: user.id },
+      where: { id: pipelineId, userId: user.id },
     });
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -140,6 +147,20 @@ export async function PUT(req: Request, ctx: Ctx) {
       }
     }
 
+    let defaultTargetAgentTokenId: string | null | undefined;
+    if (body.defaultTargetAgentTokenId !== undefined) {
+      if (body.defaultTargetAgentTokenId === null) {
+        defaultTargetAgentTokenId = null;
+      } else {
+        try {
+          await assertUserOwnsGatewayToken(user.id, body.defaultTargetAgentTokenId);
+          defaultTargetAgentTokenId = body.defaultTargetAgentTokenId;
+        } catch {
+          return NextResponse.json({ error: "Invalid default gateway" }, { status: 400 });
+        }
+      }
+    }
+
     const row = await db.eltPipeline.update({
       where: { id: existing.id },
       data: {
@@ -154,6 +175,7 @@ export async function PUT(req: Request, ctx: Ctx) {
         configYaml,
         workspaceYaml,
         ...(runsWebhookUrl !== undefined ? { runsWebhookUrl } : {}),
+        ...(defaultTargetAgentTokenId !== undefined ? { defaultTargetAgentTokenId } : {}),
       },
     });
 
@@ -170,6 +192,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const pipelineId = await resolveRouteParamId(ctx.params);
   let json: unknown;
   try {
     json = await req.json();
@@ -191,28 +214,84 @@ export async function PATCH(req: Request, ctx: Ctx) {
     p.canvas === undefined &&
     p.sourceType === undefined &&
     p.destinationType === undefined &&
+    p.sourceConfiguration === undefined &&
+    p.defaultTargetAgentTokenId === undefined;
+
+  const onlyDefaultGateway =
+    p.defaultTargetAgentTokenId !== undefined &&
+    p.canvas === undefined &&
+    typeof p.enabled !== "boolean" &&
+    p.sourceType === undefined &&
+    p.destinationType === undefined &&
     p.sourceConfiguration === undefined;
 
   try {
+    if (onlyDefaultGateway) {
+      if (p.defaultTargetAgentTokenId === null) {
+        const row = await db.eltPipeline.updateMany({
+          where: { id: pipelineId, userId: user.id },
+          data: { defaultTargetAgentTokenId: null },
+        });
+        if (row.count === 0) {
+          return NextResponse.json({ error: "Not found" }, { status: 404 });
+        }
+      } else {
+        const tokenId = p.defaultTargetAgentTokenId;
+        if (!tokenId) {
+          return NextResponse.json({ error: "Invalid default gateway" }, { status: 400 });
+        }
+        try {
+          await assertUserOwnsGatewayToken(user.id, tokenId);
+        } catch {
+          return NextResponse.json({ error: "Invalid default gateway" }, { status: 400 });
+        }
+        const row = await db.eltPipeline.updateMany({
+          where: { id: pipelineId, userId: user.id },
+          data: { defaultTargetAgentTokenId: tokenId },
+        });
+        if (row.count === 0) {
+          return NextResponse.json({ error: "Not found" }, { status: 404 });
+        }
+      }
+      const pipeline = await db.eltPipeline.findFirst({
+        where: { id: pipelineId, userId: user.id },
+      });
+      return NextResponse.json({ pipeline });
+    }
+
     if (onlyEnabled) {
       const row = await db.eltPipeline.updateMany({
-        where: { id: ctx.params.id, userId: user.id },
+        where: { id: pipelineId, userId: user.id },
         data: { enabled: p.enabled },
       });
       if (row.count === 0) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
       const pipeline = await db.eltPipeline.findFirst({
-        where: { id: ctx.params.id, userId: user.id },
+        where: { id: pipelineId, userId: user.id },
       });
       return NextResponse.json({ pipeline });
     }
 
     const existing = await db.eltPipeline.findFirst({
-      where: { id: ctx.params.id, userId: user.id },
+      where: { id: pipelineId, userId: user.id },
     });
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    let nextDefaultGateway: string | null | undefined;
+    if (p.defaultTargetAgentTokenId !== undefined) {
+      if (p.defaultTargetAgentTokenId === null) {
+        nextDefaultGateway = null;
+      } else {
+        try {
+          await assertUserOwnsGatewayToken(user.id, p.defaultTargetAgentTokenId);
+          nextDefaultGateway = p.defaultTargetAgentTokenId;
+        } catch {
+          return NextResponse.json({ error: "Invalid default gateway" }, { status: 400 });
+        }
+      }
     }
 
     let base = { ...(existing.sourceConfiguration as Record<string, unknown>) };
@@ -285,6 +364,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
         pipelineCode,
         configYaml,
         workspaceYaml,
+        ...(nextDefaultGateway !== undefined ? { defaultTargetAgentTokenId: nextDefaultGateway } : {}),
       },
     });
 

@@ -315,7 +315,7 @@ class KafkaMessageCountSensor(BaseSensor):
         self.bootstrap_servers = config["bootstrap_servers"]
         self.topic = config["topic"]
         self.threshold = config["threshold"]
-        self.group_id = config.get("group_id", f"datapulse-sensor-{name}")
+        self.group_id = config.get("group_id", f"eltpulse-sensor-{name}")
         self.auto_offset_reset = config.get("auto_offset_reset", "earliest")
         self.auth_credentials = config.get("auth_credentials")  # Name of stored credentials
 
@@ -476,8 +476,8 @@ class SensorManager:
 
     def __init__(self):
         self.sensors: Dict[str, BaseSensor] = {}
-        self.results_file = Path.home() / ".datapulse" / "sensors.json"
-        self.config_file = Path.home() / ".datapulse" / "sensors_config.json"
+        self.results_file = Path.home() / ".eltpulse" / "sensors.json"
+        self.config_file = Path.home() / ".eltpulse" / "sensors_config.json"
         self.results_file.parent.mkdir(parents=True, exist_ok=True)
         self._load_sensors()
 

@@ -155,7 +155,7 @@ class ScheduleManager:
     """Manager for eltPulse schedules."""
 
     def __init__(self, storage_path: Optional[str] = None):
-        self.storage_path = Path(storage_path or os.path.expanduser("~/.datapulse/schedules.json"))
+        self.storage_path = Path(storage_path or os.path.expanduser("~/.eltpulse/schedules.json"))
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
         self.schedules: Dict[str, BaseSchedule] = {}
         self.load_schedules()

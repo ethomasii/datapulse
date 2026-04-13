@@ -204,7 +204,7 @@ function ConnectorRunnerAuthBlock({
       <p className="mt-1 text-[11px] leading-snug text-emerald-900/90 dark:text-emerald-100/90">
         eltPulse does not store passwords or API keys in connection JSON. Set these variables where this connection is
         used (local <code className="rounded bg-white/60 px-0.5 dark:bg-emerald-950/50">.env</code>, CI secrets, or your
-        agent host).
+        gateway host).
       </p>
       <ul className="mt-2 space-y-1.5 text-[11px] text-emerald-950 dark:text-emerald-100">
         {rows.map((r) => (
@@ -374,7 +374,7 @@ function ConnectionRow({
             <>
               <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
                 Non-secret config values only. Use the encrypted section below for secrets you want eltPulse to store
-                for managed runners and the agent.
+                for managed runners and the gateway.
               </p>
               <ConfigFields connector={conn.connector} values={cfg} onChange={(k, v) => setCfg((p) => ({ ...p, [k]: v }))} />
             </>

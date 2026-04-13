@@ -1,58 +1,32 @@
+import type { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
-import { runEltCli } from "@/lib/monitors/cli";
-import { connectionConfigToProcessEnv, credentialProfileFromConnection } from "@/lib/monitors/connection-auth";
+import { credentialProfileFromConnection } from "@/lib/monitors/connection-auth";
 import {
   connectorMatchesMonitorType,
   monitorTypeRequiresConnection,
 } from "@/lib/monitors/monitor-types";
-import { readStoredSensorConfigs } from "@/lib/monitors/sensor-config";
-
-function configObjectToCliString(config: Record<string, unknown>): string {
-  return Object.entries(config)
-    .map(([key, value]) => {
-      if (value === null || value === undefined) return null;
-      const v =
-        typeof value === "boolean" || typeof value === "number"
-          ? String(value)
-          : String(value).trim();
-      if (!v) return null;
-      return `${key}=${v}`;
-    })
-    .filter(Boolean)
-    .join(",");
-}
+import { runMonitorChecksForUser } from "@/lib/monitors/run-monitors";
 
 export async function monitorsGET() {
   const user = await getCurrentDbUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { stdout, stderr, code } = await runEltCli(["sensors", "list", "--json"]);
+  const rows = await db.eltMonitor.findMany({
+    where: { userId: user.id },
+    orderBy: { updatedAt: "desc" },
+  });
 
-  if (stderr && !stdout.includes("[")) {
-    const { stdout: textOutput } = await runEltCli(["sensors", "list"]);
-    return NextResponse.json({
-      sensors: [],
-      monitors: [],
-      message: "No monitors found or CLI error",
-      raw: textOutput,
-    });
-  }
+  const sensors = rows.map((row) => ({
+    name: row.name,
+    type: row.type,
+    pipeline_name: row.pipelineName,
+    config: row.config as Record<string, unknown>,
+    last_check: row.lastCheckAt?.toISOString(),
+  }));
 
-  try {
-    const sensors = JSON.parse(stdout) as unknown[];
-    return NextResponse.json({ sensors, monitors: sensors });
-  } catch {
-    return NextResponse.json({
-      sensors: [],
-      monitors: [],
-      message: "Could not parse monitor data",
-      raw: stdout,
-      stderr,
-      code,
-    });
-  }
+  return NextResponse.json({ sensors, monitors: sensors });
 }
 
 export async function monitorsPOST(request: NextRequest) {
@@ -80,6 +54,7 @@ export async function monitorsPOST(request: NextRequest) {
   }
 
   const config: Record<string, unknown> = { ...(configIn as Record<string, unknown>) };
+  let resolvedConnectionId: string | null = null;
 
   if (monitorTypeRequiresConnection(type)) {
     if (!connectionId) {
@@ -109,60 +84,36 @@ export async function monitorsPOST(request: NextRequest) {
     }
 
     const profile = credentialProfileFromConnection(connection);
-    config.datapulse_connection_id = connection.id;
-    config.datapulse_connection_name = connection.name;
-    config.datapulse_connection_connector = connection.connector;
+    config.eltpulse_connection_id = connection.id;
+    config.eltpulse_connection_name = connection.name;
+    config.eltpulse_connection_connector = connection.connector;
     config.auth_credentials = profile;
+    resolvedConnectionId = connection.id;
   }
 
-  const configStr = configObjectToCliString(config);
-  if (!configStr) {
-    return NextResponse.json({ error: "Monitor config is empty" }, { status: 400 });
-  }
-
-  const { stdout, stderr, code } = await runEltCli([
-    "sensors",
-    "create",
-    name,
-    pipelineName,
-    "--type",
-    type,
-    "--config",
-    configStr,
-  ]);
-
-  if (!stdout.includes("Created sensor")) {
-    return NextResponse.json(
-      { error: "Failed to create monitor", details: stderr || stdout || `exit ${code}` },
-      { status: 400 }
-    );
+  try {
+    await db.eltMonitor.create({
+      data: {
+        userId: user.id,
+        name,
+        pipelineName,
+        type,
+        config: config as Prisma.InputJsonValue,
+        connectionId: resolvedConnectionId,
+      },
+    });
+  } catch (e: unknown) {
+    const code = typeof e === "object" && e !== null && "code" in e ? String((e as { code: unknown }).code) : "";
+    if (code === "P2002") {
+      return NextResponse.json({ error: "A monitor with this name already exists" }, { status: 409 });
+    }
+    throw e;
   }
 
   return NextResponse.json({
     success: true,
     message: `Monitor '${name}' created successfully`,
-    output: stdout,
   });
-}
-
-async function buildCheckEnv(userId: string): Promise<Record<string, string>> {
-  const rows = readStoredSensorConfigs();
-  const ids = new Set<string>();
-  for (const row of rows) {
-    const id = row.config?.datapulse_connection_id;
-    if (typeof id === "string" && id) ids.add(id);
-  }
-  if (ids.size === 0) return {};
-
-  const connections = await db.connection.findMany({
-    where: { userId, id: { in: Array.from(ids) } },
-  });
-
-  const merged: Record<string, string> = {};
-  for (const c of connections) {
-    Object.assign(merged, connectionConfigToProcessEnv(c));
-  }
-  return merged;
 }
 
 export async function monitorsCheckPOST(request: NextRequest) {
@@ -177,59 +128,19 @@ export async function monitorsCheckPOST(request: NextRequest) {
   }
 
   const pipeline = typeof body.pipeline === "string" ? body.pipeline.trim() : "";
-  const extraEnv = await buildCheckEnv(user.id);
 
-  const args = pipeline
-    ? (["sensors", "check", "--pipeline", pipeline] as const)
-    : (["sensors", "check"] as const);
-  const { stdout, stderr } = await runEltCli([...args], { env: extraEnv });
+  const { triggeredSensors, errors } = await runMonitorChecksForUser(user.id, {
+    pipelineFilter: pipeline || undefined,
+  });
 
-  const lines = stdout.split("\n");
-  const triggeredSensors: Array<{
-    sensorName: string;
-    pipelineName: string;
-    message: string;
-    metadata: Record<string, unknown>;
-    timestamp: string;
-  }> = [];
-  let currentSensor: (typeof triggeredSensors)[0] | null = null;
-
-  for (const line of lines) {
-    if (line.includes("→")) {
-      const match = line.match(/\[bold\](.*?)\[\/bold\] → (.*)/);
-      if (match) {
-        if (currentSensor) triggeredSensors.push(currentSensor);
-        currentSensor = {
-          sensorName: match[1],
-          pipelineName: match[2],
-          message: "",
-          metadata: {},
-          timestamp: new Date().toISOString(),
-        };
-      }
-    } else if (currentSensor && line.includes("Metadata:")) {
-      try {
-        const metadataMatch = line.match(/Metadata: (.+)/);
-        if (metadataMatch) {
-          currentSensor.metadata = JSON.parse(metadataMatch[1]) as Record<string, unknown>;
-        }
-      } catch {
-        /* ignore */
-      }
-    } else if (currentSensor && line.trim() && !line.includes("⚡") && !line.includes("sensor(s) triggered")) {
-      currentSensor.message = line.trim();
-    }
-  }
-
-  if (currentSensor) triggeredSensors.push(currentSensor);
-
+  const errText = errors.join("\n");
   return NextResponse.json({
     triggeredSensors,
     monitorsTriggered: triggeredSensors,
     totalTriggered: triggeredSensors.length,
-    output: stdout,
-    hasErrors: stderr.length > 0,
-    errors: stderr,
+    output: "",
+    hasErrors: errors.length > 0,
+    errors: errText,
   });
 }
 
@@ -241,18 +152,16 @@ export async function monitorsDELETE(name: string) {
     return NextResponse.json({ error: "Monitor name is required" }, { status: 400 });
   }
 
-  const { stdout, stderr, code } = await runEltCli(["sensors", "delete", name]);
+  const result = await db.eltMonitor.deleteMany({
+    where: { userId: user.id, name },
+  });
 
-  if (!stdout.includes("Deleted sensor")) {
-    return NextResponse.json(
-      { error: "Failed to delete monitor", details: stderr || stdout || `exit ${code}` },
-      { status: 400 }
-    );
+  if (result.count === 0) {
+    return NextResponse.json({ error: "Monitor not found" }, { status: 404 });
   }
 
   return NextResponse.json({
     success: true,
     message: `Monitor '${name}' deleted successfully`,
-    output: stdout,
   });
 }

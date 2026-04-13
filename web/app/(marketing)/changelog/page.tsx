@@ -20,7 +20,7 @@ const ENTRIES: Entry[] = [
       "Collapsible app sidebar (persisted) and light / dark / system theme toggle in app + marketing headers.",
       "Documentation section with sidebar: overview, getting started, pipelines, integrations, repositories, security.",
       "Roadmap and changelog pages expanded with structured content.",
-      "Prisma `workspaceYaml` maps to DB column `workspace_yaml` (renamed from legacy `dagsterYaml`).",
+      "Prisma `workspaceYaml` maps to DB column `workspace_yaml` (renamed from earlier `dagsterYaml`).",
     ],
   },
   {
@@ -29,7 +29,7 @@ const ENTRIES: Entry[] = [
     highlights: [
       "Public docs, roadmap, changelog routes; Help section in sidebar (ServicePulse-style).",
       "Managed vs BYO GitHub documented; optional OAuth behind env flag.",
-      "eltPulse workspace YAML replaces legacy-named artifacts in the product UI.",
+      "eltPulse workspace YAML replaces older Dagster-style artifact names in the product UI.",
     ],
   },
   {

@@ -3,22 +3,22 @@
  * Each kind expects explicit credentials or a connection profile where it touches customer systems.
  */
 
-export type DatapulseMonitorCategory =
+export type EltpulseMonitorCategory =
   | "object_storage"
   | "messaging"
   | "files"
   | "integrations"
   | "notifications";
 
-export type DatapulseMonitorKind = {
+export type EltpulseMonitorKind = {
   /** Stable id for API / docs (snake_case). */
   id: string;
   label: string;
-  category: DatapulseMonitorCategory;
+  category: EltpulseMonitorCategory;
   description: string;
 };
 
-export const DATAPULSE_MONITOR_CATALOG: readonly DatapulseMonitorKind[] = [
+export const ELTPULSE_MONITOR_CATALOG: readonly EltpulseMonitorKind[] = [
   {
     id: "s3_object_count",
     label: "S3 object count",
@@ -97,10 +97,3 @@ export const DATAPULSE_MONITOR_CATALOG: readonly DatapulseMonitorKind[] = [
       "When a signed Slack or custom webhook payload matches rules, trigger the pipeline. Uses your signing secret.",
   },
 ] as const;
-
-/** @deprecated Use `DATAPULSE_MONITOR_CATALOG` */
-export const DATAPULSE_SENSOR_CATALOG = DATAPULSE_MONITOR_CATALOG;
-/** @deprecated Use `DatapulseMonitorKind` */
-export type DatapulseSensorKind = DatapulseMonitorKind;
-/** @deprecated Use `DatapulseMonitorCategory` */
-export type DatapulseSensorCategory = DatapulseMonitorCategory;

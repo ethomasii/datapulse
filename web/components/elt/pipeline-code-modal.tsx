@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check, Copy, Download, Info, Terminal } from "lucide-react";
-import { DATAPULSE_REPO } from "@/lib/elt/datapulse-repo-layout";
+import { ELTPULSE_REPO } from "@/lib/elt/eltpulse-repo-layout";
 
 type Props = {
   tool: string;           // internal only — never shown
@@ -18,19 +18,19 @@ type Tab = "sync" | "config" | "workspace";
 const TAB_META: Record<Tab, { label: string; file: string; description: string }> = {
   sync: {
     label: "Sync runner",
-    file: DATAPULSE_REPO.syncRunnerFile,
+    file: ELTPULSE_REPO.syncRunnerFile,
     description:
       "Executable sync definition for this pipeline. Run on your own infra or let eltPulse manage it — same code either way.",
   },
   config: {
     label: "Connection config",
-    file: DATAPULSE_REPO.pipelineConfigFile,
+    file: ELTPULSE_REPO.pipelineConfigFile,
     description:
       "Source and destination parameters. Keep secrets in environment variables; this file is safe to commit.",
   },
   workspace: {
     label: "Workspace manifest",
-    file: DATAPULSE_REPO.workspaceFile,
+    file: ELTPULSE_REPO.workspaceFile,
     description:
       "eltPulse orchestration metadata: scheduling, quality checks, monitors, and run slice settings.",
   },
@@ -139,7 +139,7 @@ export function PipelineCodeModal({
             <p className="mt-0.5 text-xs text-slate-400">
               {"Path: "}
               <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">
-                {DATAPULSE_REPO.pipelinesDir}/&lt;name&gt;/{file}
+                {ELTPULSE_REPO.pipelinesDir}/&lt;name&gt;/{file}
               </code>
             </p>
           </div>

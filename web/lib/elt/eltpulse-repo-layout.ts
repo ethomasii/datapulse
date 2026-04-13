@@ -1,14 +1,14 @@
 /**
  * Canonical layout for managed eltPulse repositories (your GitHub org).
  */
-export const DATAPULSE_REPO = {
-  root: "datapulse",
-  pipelinesDir: "datapulse/pipelines",
-  definitionsDir: "datapulse/definitions",
-  workspaceFile: "datapulse_workspace.yaml",
+export const ELTPULSE_REPO = {
+  root: "eltpulse",
+  pipelinesDir: "eltpulse/pipelines",
+  definitionsDir: "eltpulse/definitions",
+  workspaceFile: "eltpulse_workspace.yaml",
   pipelineConfigFile: "config.yaml",
   /** User-visible label for the primary sync runner file */
-  syncRunnerFile: "sync.dp",
+  syncRunnerFile: "sync.elp",
 } as const;
 
 /** Safe segment for Python import paths derived from pipeline name */

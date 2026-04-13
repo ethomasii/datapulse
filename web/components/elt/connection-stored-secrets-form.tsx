@@ -39,7 +39,7 @@ export function ConnectionStoredSecretsForm({
       <p className="mt-1 text-[11px] leading-snug text-violet-900/90 dark:text-violet-100/90">
         Values are <strong className="font-medium">AES-256-GCM encrypted</strong> at rest (same key material as GitHub OAuth
         tokens). They are <strong className="font-medium">never</strong> returned to the browser after save — only your
-        self-hosted <strong className="font-medium">agent</strong> (Bearer token) can fetch them to populate the runner
+        self-hosted <strong className="font-medium">gateway</strong> (Bearer token) can fetch them to populate the runner
         environment. Leave blank to leave an existing value unchanged; save with empty fields only to remove individual
         keys.
       </p>

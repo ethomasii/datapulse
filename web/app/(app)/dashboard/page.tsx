@@ -1,10 +1,44 @@
 import Link from "next/link";
-import { ArrowRight, FolderGit2, Layers, Plug } from "lucide-react";
+import { ArrowRight, FolderGit2, Layers, Plug, Waypoints } from "lucide-react";
 import { requireDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
+import { isManagedExecutionPlane } from "@/lib/elt/execution-plane";
+
+function formatAgentSeen(iso: Date | null, source: string | null) {
+  if (!iso) return { line: "No heartbeat yet", sub: "Optional self-hosted or managed worker." };
+  const delta = Date.now() - iso.getTime();
+  const ago =
+    delta < 60_000
+      ? `${Math.floor(delta / 1000)}s ago`
+      : delta < 3_600_000
+        ? `${Math.floor(delta / 60_000)}m ago`
+        : `${Math.floor(delta / 3_600_000)}h ago`;
+  const who = source === "eltpulse_managed" ? "eltPulse-managed" : "Your gateway";
+  return { line: `${who} · ${ago}`, sub: "Heartbeats stored in eltPulse." };
+}
 
 export default async function DashboardPage() {
   const user = await requireDbUser();
+  const namedAgents = await db.agentToken.findMany({
+    where: { userId: user.id, revokedAt: null },
+    select: { lastSeenAt: true, lastSeenSource: true },
+  });
+  type Best = { at: Date; src: string | null };
+  let best: Best | null = null;
+  for (const t of namedAgents) {
+    if (t.lastSeenAt && (!best || t.lastSeenAt > best.at)) {
+      best = { at: t.lastSeenAt, src: t.lastSeenSource };
+    }
+  }
+  if (user.agentLastSeenAt && user.agentToken) {
+    if (!best || user.agentLastSeenAt > best.at) {
+      best = { at: user.agentLastSeenAt, src: user.agentLastSeenSource };
+    }
+  }
+  const agentSeen = formatAgentSeen(best?.at ?? null, best?.src ?? null);
+  const executionHint = isManagedExecutionPlane(user.executionPlane)
+    ? "Execution: eltPulse-managed (connectivity, ingestion, run metrics)"
+    : "Execution: your infrastructure";
   const [pipelineCount, enabledCount] = await Promise.all([
     db.eltPipeline.count({ where: { userId: user.id } }),
     db.eltPipeline.count({ where: { userId: user.id, enabled: true } }),
@@ -20,7 +54,7 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <Link
           href="/builder"
           className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-sky-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-sky-700"
@@ -59,6 +93,27 @@ export default async function DashboardPage() {
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             Private repos under eltPulse&apos;s GitHub org—no customer GitHub login required.
           </p>
+        </Link>
+
+        <Link
+          href="/gateway"
+          className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-cyan-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-cyan-800"
+        >
+          <div className="flex items-center justify-between">
+            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-100 text-cyan-900 dark:bg-cyan-950 dark:text-cyan-200">
+              <Waypoints className="h-5 w-5" aria-hidden />
+            </span>
+            <ArrowRight
+              className="h-5 w-5 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-cyan-600 dark:group-hover:text-cyan-400"
+              aria-hidden
+            />
+          </div>
+          <h2 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">Gateway &amp; execution</h2>
+          <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-cyan-800 dark:text-cyan-200">
+            {executionHint}
+          </p>
+          <p className="mt-1 text-sm font-medium text-slate-700 dark:text-slate-200">{agentSeen.line}</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{agentSeen.sub}</p>
         </Link>
 
         <Link

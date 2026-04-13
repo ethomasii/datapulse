@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 def load_sensor_config():
     """Load sensor configurations from file."""
-    config_file = Path.home() / ".datapulse" / "sensors_config.json"
+    config_file = Path.home() / ".eltpulse" / "sensors_config.json"
     if config_file.exists():
         try:
             with open(config_file, 'r') as f:
@@ -51,7 +51,7 @@ def load_sensor_config():
 
 def save_sensor_config():
     """Save current sensor configurations to file."""
-    config_file = Path.home() / ".datapulse" / "sensors_config.json"
+    config_file = Path.home() / ".eltpulse" / "sensors_config.json"
     config_file.parent.mkdir(parents=True, exist_ok=True)
 
     configs = []

@@ -26,6 +26,8 @@ export const createPipelineBodySchema = z.object({
   scheduleTimezone: z.string().max(64).optional(),
   /** Per-pipeline run webhook (optional; overrides account default for this pipeline). */
   runsWebhookUrl: z.string().max(2048).optional(),
+  /** Default named gateway for new runs (AgentToken id). Null clears. */
+  defaultTargetAgentTokenId: z.string().min(1).nullable().optional(),
 });
 
 export type CreatePipelineBody = z.infer<typeof createPipelineBodySchema>;

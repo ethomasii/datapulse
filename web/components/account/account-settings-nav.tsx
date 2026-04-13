@@ -6,6 +6,7 @@ import clsx from "clsx";
 
 export const ACCOUNT_SETTINGS_TABS = [
   { href: "/account", label: "Profile", match: "exact" as const },
+  { href: "/gateway", label: "Gateway", match: "prefix" as const },
   { href: "/account/billing", label: "Billing", match: "prefix" as const },
   { href: "/account/notifications", label: "Notifications", match: "prefix" as const },
   { href: "/account/notification-history", label: "Notification history", match: "prefix" as const },

@@ -1,6 +1,6 @@
 # eltPulse
 
-**eltPulse** is the product name for this repo: an ELT builder and (growing) hosted control plane. The open-source core is the Python **embedded_elt_builder** package (CLI + FastAPI UI). The **SaaS shell** lives in **`web/`** — a [Next.js](https://nextjs.org/) app with the same shape as ServicePulse (App Router, Clerk, Prisma, Stripe, Resend, Vercel). Public-facing source: [github.com/eltpulsehq/eltpulse](https://github.com/eltpulsehq/eltpulse). Internal development may also use [github.com/ethomasii/datapulse](https://github.com/ethomasii/datapulse).
+**eltPulse** is the product name for this repo: an ELT builder and (growing) hosted control plane. The open-source core is the Python **embedded_elt_builder** package (CLI + FastAPI UI). The **SaaS shell** lives in **`web/`** — a [Next.js](https://nextjs.org/) app with the same shape as ServicePulse (App Router, Clerk, Prisma, Stripe, Resend, Vercel). Public source: [github.com/eltpulsehq/eltpulse](https://github.com/eltpulsehq/eltpulse).
 
 ## Repo layout
 

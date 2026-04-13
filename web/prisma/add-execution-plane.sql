@@ -1,6 +1,6 @@
 -- Account preference: who runs ingestion (BYO agent vs eltPulse-managed when available).
 DO $$ BEGIN
-  CREATE TYPE "ExecutionPlane" AS ENUM ('customer_agent', 'datapulse_managed');
+  CREATE TYPE "ExecutionPlane" AS ENUM ('customer_agent', 'eltpulse_managed');
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
@@ -12,7 +12,7 @@ DO $$ BEGIN
   CREATE TYPE "RunIngestionExecutor" AS ENUM (
     'unspecified',
     'customer_agent',
-    'datapulse_managed',
+    'eltpulse_managed',
     'customer_control_plane'
   );
 EXCEPTION

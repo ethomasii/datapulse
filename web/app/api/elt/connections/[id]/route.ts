@@ -55,7 +55,7 @@ export async function PATCH(req: Request, { params }: Params) {
           data.connectionSecretsEnc = nextEnc;
         } catch {
           return NextResponse.json(
-            { error: "Could not encrypt secrets — set DATAPULSE_TOKEN_ENCRYPTION_KEY on the server" },
+            { error: "Could not encrypt secrets — set ELTPULSE_TOKEN_ENCRYPTION_KEY on the server" },
             { status: 503 }
           );
         }

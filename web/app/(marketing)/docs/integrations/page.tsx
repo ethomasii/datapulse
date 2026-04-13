@@ -37,7 +37,7 @@ export default function IntegrationsDocsPage() {
         </a>{" "}
         by opening that site directly; eltPulse does not host or proxy it. The in-app{" "}
         <Link href="/integrations">Integrations</Link> page includes a shortcut to the same URL. An optional “with
-        context” link passes your deployment’s public base as <code>datapulse_origin</code> for future cross-product
+        context” link passes your deployment’s public base as <code>eltpulse_origin</code> for future cross-product
         setup (no credentials). Pipeline <Link href="/runs">run webhooks</Link> may include{" "}
         <code>source: &quot;eltpulse&quot;</code> so a receiver like ServicePulse can identify the emitter. Set{" "}
         <code>NEXT_PUBLIC_SERVICEPULSE_URL</code> if ServicePulse is not at the default host.

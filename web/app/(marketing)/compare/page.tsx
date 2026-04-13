@@ -41,7 +41,7 @@ const rows: Row[] = [
   {
     dimension: "Execution & data plane",
     eltpulse:
-      "Designed for BYO runners or future managed agents; infra cost with transparent markup is the direction of travel.",
+      "Designed for BYO runners or future managed gateways; infra cost with transparent markup is the direction of travel.",
     fivetran: "Runs on Fivetran’s infrastructure; you pay for usage and plan tier.",
     airbyte: "Self-hosted (your compute) or Airbyte Cloud (managed).",
     hevo: "Hevo-hosted execution for managed product tiers.",
@@ -81,7 +81,7 @@ export default function ComparePage() {
         Portable, and others. None of them are “wrong” — they optimize for different constraints. This page situates{" "}
         <span className="font-medium text-slate-800 dark:text-slate-200">eltPulse</span> honestly: a{" "}
         <strong className="font-medium">git-native control plane</strong> for designing, running, and observing data
-        pipelines — with transparent usage economics and the ability to run workloads on your own agents.
+        pipelines — with transparent usage economics and the ability to run workloads on your own gateways.
       </p>
       <p className="mt-4 text-sm text-slate-500 dark:text-slate-500">
         Product names are trademarks of their respective owners. Summaries are for orientation only — verify features and

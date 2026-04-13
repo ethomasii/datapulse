@@ -26,25 +26,25 @@ describe("connection-secrets-store", () => {
   });
 
   it("parseStoredConnectionSecrets round-trips encrypted JSON", () => {
-    vi.stubEnv("DATAPULSE_TOKEN_ENCRYPTION_KEY", TEST_ENC_KEY);
+    vi.stubEnv("ELTPULSE_TOKEN_ENCRYPTION_KEY", TEST_ENC_KEY);
     const enc = encryptSecret(JSON.stringify({ POSTGRES_PASSWORD: "secret1" }));
     expect(parseStoredConnectionSecrets(enc)).toEqual({ POSTGRES_PASSWORD: "secret1" });
   });
 
   it("mergeConnectionSecretsEnc(undefined) leaves existing unchanged", () => {
-    vi.stubEnv("DATAPULSE_TOKEN_ENCRYPTION_KEY", TEST_ENC_KEY);
+    vi.stubEnv("ELTPULSE_TOKEN_ENCRYPTION_KEY", TEST_ENC_KEY);
     const enc = encryptSecret(JSON.stringify({ POSTGRES_PASSWORD: "a" }));
     expect(mergeConnectionSecretsEnc(enc, undefined, "source", "postgres")).toBe(enc);
   });
 
   it("mergeConnectionSecretsEnc(null) clears", () => {
-    vi.stubEnv("DATAPULSE_TOKEN_ENCRYPTION_KEY", TEST_ENC_KEY);
+    vi.stubEnv("ELTPULSE_TOKEN_ENCRYPTION_KEY", TEST_ENC_KEY);
     const enc = encryptSecret(JSON.stringify({ POSTGRES_PASSWORD: "a" }));
     expect(mergeConnectionSecretsEnc(enc, null, "source", "postgres")).toBeNull();
   });
 
   it("mergeConnectionSecretsEnc merges allowed keys and ignores unknown keys", () => {
-    vi.stubEnv("DATAPULSE_TOKEN_ENCRYPTION_KEY", TEST_ENC_KEY);
+    vi.stubEnv("ELTPULSE_TOKEN_ENCRYPTION_KEY", TEST_ENC_KEY);
     const next = mergeConnectionSecretsEnc(
       null,
       {
@@ -59,7 +59,7 @@ describe("connection-secrets-store", () => {
   });
 
   it("mergeConnectionSecretsEnc empty string removes key and null when empty", () => {
-    vi.stubEnv("DATAPULSE_TOKEN_ENCRYPTION_KEY", TEST_ENC_KEY);
+    vi.stubEnv("ELTPULSE_TOKEN_ENCRYPTION_KEY", TEST_ENC_KEY);
     const enc = encryptSecret(
       JSON.stringify({ POSTGRES_PASSWORD: "x", POSTGRES_USER: "u" })
     );

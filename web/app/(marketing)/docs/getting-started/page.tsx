@@ -29,14 +29,14 @@ export default function GettingStartedDocsPage() {
         </li>
         <li>
           Submit — we store the definition and generate <code>pipeline.py</code> or <code>replication.yaml</code>,{" "}
-          <code>config.yaml</code>, and <code>datapulse_workspace.yaml</code>.
+          <code>config.yaml</code>, and <code>eltpulse_workspace.yaml</code>.
         </li>
       </ol>
 
       <h2>2. Review generated files</h2>
       <p>
         From the pipeline table, open <strong>Code</strong> to copy artifacts. Save them under{" "}
-        <code>datapulse/pipelines/&lt;name&gt;/</code> in your managed repository when Git sync is connected.
+        <code>eltpulse/pipelines/&lt;name&gt;/</code> in your managed repository when Git sync is connected.
       </p>
 
       <h2>3. Credentials</h2>

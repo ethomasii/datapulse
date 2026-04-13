@@ -19,6 +19,7 @@ import {
   TableProperties,
   UserCircle,
   Users,
+  Waypoints,
   Webhook,
 } from "lucide-react";
 import clsx from "clsx";
@@ -44,6 +45,7 @@ const PRODUCT_NAV: NavItem[] = [
   { href: "/run-slices", label: "Run slices", icon: TableProperties },
   { href: "/connections", label: "Connections", icon: Cable },
   { href: "/webhooks", label: "Webhooks", icon: Webhook },
+  { href: "/gateway", label: "Gateway", icon: Waypoints },
   { href: "/repos", label: "Repositories", icon: FolderGit2, soon: true },
   { href: "/integrations", label: "Integrations", icon: Plug },
   { href: "/help", label: "Help", icon: CircleHelp },

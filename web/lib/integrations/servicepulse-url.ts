@@ -1,7 +1,7 @@
 /**
  * Minimal eltPulse ↔ ServicePulse linking.
  *
- * Convention: ServicePulse may expose `/integrations/datapulse` and read `datapulse_origin`
+ * Convention: ServicePulse may expose `/integrations/eltpulse` and read `eltpulse_origin`
  * (base URL of this eltPulse deployment, no secrets) to complete cross-product setup.
  */
 
@@ -19,7 +19,7 @@ export function getServicePulseBaseUrl(): string {
 }
 
 /** This eltPulse deployment’s public base URL (no trailing slash). */
-export function getDatapulseAppPublicUrl(): string {
+export function getEltpulseAppPublicUrl(): string {
   return stripTrailingSlash(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000");
 }
 
@@ -27,9 +27,9 @@ export function getDatapulseAppPublicUrl(): string {
  * Open in ServicePulse with context so it can associate this eltPulse tenant (URL only).
  * ServicePulse should treat unknown query params as optional until the route ships.
  */
-export function servicePulseDatapulseHandoffUrl(): string {
+export function servicePulseEltpulseHandoffUrl(): string {
   const base = getServicePulseBaseUrl();
-  const u = new URL("/integrations/datapulse", `${base}/`);
-  u.searchParams.set("datapulse_origin", getDatapulseAppPublicUrl());
+  const u = new URL("/integrations/eltpulse", `${base}/`);
+  u.searchParams.set("eltpulse_origin", getEltpulseAppPublicUrl());
   return u.toString();
 }

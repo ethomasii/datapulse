@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Loader2, Plus, Trash2, Code2, RefreshCw, Pencil, Workflow } from "lucide-react";
 import {
   DESTINATION_GROUPS,
@@ -40,6 +41,7 @@ type PipelineRow = {
   destinationType: string;
   description: string | null;
   updatedAt: string;
+  defaultTargetAgentTokenId: string | null;
 };
 
 type FormMode = "structured" | "json";
@@ -49,7 +51,15 @@ export function BuilderClient({
 }: {
   initialEditPipelineId?: string | null;
 }) {
+  const searchParams = useSearchParams();
+  /** Client query wins so soft navigation from Canvas / links always opens the right pipeline. */
+  const pipelineIdFromUrl = searchParams.get("pipeline");
+  const openPipelineIdFromQuery =
+    typeof pipelineIdFromUrl === "string" && pipelineIdFromUrl.length > 0 ? pipelineIdFromUrl : null;
+  const effectiveOpenPipelineId = openPipelineIdFromQuery ?? initialEditPipelineId;
+
   const [pipelines, setPipelines] = useState<PipelineRow[]>([]);
+  const [gatewayOptions, setGatewayOptions] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -108,10 +118,22 @@ export function BuilderClient({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/elt/pipelines");
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
+      const [pipRes, gwRes] = await Promise.all([
+        fetch("/api/elt/pipelines", { credentials: "same-origin" }),
+        fetch("/api/elt/agent-status", { credentials: "same-origin" }),
+      ]);
+      if (!pipRes.ok) throw new Error(await pipRes.text());
+      const data = await pipRes.json();
       setPipelines(data.pipelines ?? []);
+      if (gwRes.ok) {
+        const gw = (await gwRes.json()) as { connectors?: { id: string; name: string }[] };
+        const list = Array.isArray(gw.connectors)
+          ? gw.connectors.map((c) => ({ id: c.id, name: c.name }))
+          : [];
+        setGatewayOptions(list);
+      } else {
+        setGatewayOptions([]);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load pipelines");
     } finally {
@@ -188,6 +210,7 @@ export function BuilderClient({
     try {
       const res = await fetch(editingId ? `/api/elt/pipelines/${editingId}` : "/api/elt/pipelines", {
         method: editingId ? "PUT" : "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
@@ -267,12 +290,23 @@ export function BuilderClient({
 
   const showPipelineForm = Boolean(editingId) || showCreateForm;
 
+  /** Last pipeline id opened from `?pipeline=` — reset when cleared or load fails so retries work. */
+  const lastOpenedFromUrlRef = useRef<string | null>(null);
+
   async function startEdit(id: string) {
     setShowCreateForm(false);
     setError(null);
-    const res = await fetch(`/api/elt/pipelines/${id}`);
+    const res = await fetch(`/api/elt/pipelines/${id}`, { credentials: "same-origin" });
     if (!res.ok) {
-      setError("Could not load pipeline");
+      lastOpenedFromUrlRef.current = null;
+      let msg = `Could not load pipeline (${res.status})`;
+      try {
+        const errBody = (await res.json()) as { error?: unknown };
+        if (typeof errBody.error === "string") msg = errBody.error;
+      } catch {
+        /* ignore */
+      }
+      setError(msg);
       return;
     }
     const data = await res.json();
@@ -312,17 +346,20 @@ export function BuilderClient({
     setCanvasGraph(getCanvasFromSourceConfig(cfg));
   }
 
-  const openedInitialPipelineRef = useRef(false);
   useEffect(() => {
-    if (!initialEditPipelineId || openedInitialPipelineRef.current) return;
-    openedInitialPipelineRef.current = true;
-    void startEdit(initialEditPipelineId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot open from URL
-  }, [initialEditPipelineId]);
+    if (!effectiveOpenPipelineId) {
+      lastOpenedFromUrlRef.current = null;
+      return;
+    }
+    if (lastOpenedFromUrlRef.current === effectiveOpenPipelineId) return;
+    lastOpenedFromUrlRef.current = effectiveOpenPipelineId;
+    void startEdit(effectiveOpenPipelineId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- URL-driven open; avoid effect churn from startEdit identity
+  }, [effectiveOpenPipelineId]);
 
   async function remove(id: string) {
     if (!confirm("Delete this connection?")) return;
-    await fetch(`/api/elt/pipelines/${id}`, { method: "DELETE" });
+    await fetch(`/api/elt/pipelines/${id}`, { method: "DELETE", credentials: "same-origin" });
     await load();
     if (detail?.id === id) setDetail(null);
   }
@@ -330,14 +367,27 @@ export function BuilderClient({
   async function toggleEnabled(id: string, enabled: boolean) {
     await fetch(`/api/elt/pipelines/${id}`, {
       method: "PATCH",
+      credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ enabled: !enabled }),
     });
     await load();
   }
 
+  async function setDefaultGateway(pipelineId: string, tokenId: string) {
+    await fetch(`/api/elt/pipelines/${pipelineId}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        defaultTargetAgentTokenId: tokenId === "" ? null : tokenId,
+      }),
+    });
+    await load();
+  }
+
   async function openDetail(id: string) {
-    const res = await fetch(`/api/elt/pipelines/${id}`);
+    const res = await fetch(`/api/elt/pipelines/${id}`, { credentials: "same-origin" });
     if (!res.ok) return;
     const data = await res.json();
     const p = data.pipeline;
@@ -408,6 +458,7 @@ export function BuilderClient({
                 <tr>
                   <th className="px-4 py-2 font-medium">Name</th>
                   <th className="px-4 py-2 font-medium">Route</th>
+                  <th className="px-4 py-2 font-medium">Default gateway</th>
                   <th className="px-4 py-2 font-medium">Enabled</th>
                   <th className="px-4 py-2 font-medium" />
                 </tr>
@@ -418,6 +469,27 @@ export function BuilderClient({
                     <td className="px-4 py-2 font-medium text-slate-900 dark:text-white">{p.name}</td>
                     <td className="px-4 py-2 text-slate-600 dark:text-slate-300">
                       {p.sourceType} → {p.destinationType}
+                    </td>
+                    <td className="px-4 py-2">
+                      {gatewayOptions.length === 0 ? (
+                        <span className="text-xs text-slate-500" title="Create named gateways on the Gateway page">
+                          —
+                        </span>
+                      ) : (
+                        <select
+                          value={p.defaultTargetAgentTokenId ?? ""}
+                          onChange={(e) => void setDefaultGateway(p.id, e.target.value)}
+                          className="max-w-[160px] rounded border border-slate-300 bg-white px-1.5 py-1 text-xs dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                          aria-label={`Default gateway for ${p.name}`}
+                        >
+                          <option value="">Any gateway</option>
+                          {gatewayOptions.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </td>
                     <td className="px-4 py-2">
                       <button

@@ -14,7 +14,8 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
-import { getUserFromAgentToken } from "@/lib/agent/auth";
+import { getAgentAuthContext } from "@/lib/agent/auth";
+import { agentCanMutateRun } from "@/lib/agent/gateway-routing";
 import { maybeDispatchRunWebhook } from "@/lib/elt/maybe-dispatch-run-webhook";
 import { sanitizeForRunStorage } from "@/lib/elt/run-log-sanitize";
 
@@ -27,12 +28,21 @@ function isTerminal(s: string) {
 type Params = { params: Promise<{ id: string }> };
 
 export async function PATCH(req: Request, { params }: Params) {
-  const user = await getUserFromAgentToken(req);
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const ctx = await getAgentAuthContext(req);
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { user } = ctx;
+  const namedId = ctx.agentTokenRow?.id ?? null;
 
   const { id } = await params;
   const existing = await db.eltPipelineRun.findFirst({ where: { id, userId: user.id } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (!agentCanMutateRun(namedId, existing.targetAgentTokenId)) {
+    return NextResponse.json(
+      { error: "This run is targeted to a different gateway" },
+      { status: 403 }
+    );
+  }
 
   let body: Record<string, unknown>;
   try {

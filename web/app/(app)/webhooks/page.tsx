@@ -267,7 +267,7 @@ export default function WebhooksPage() {
             <label className="block text-xs font-medium text-slate-500 mb-1">Endpoint URL</label>
             <input
               type="url" value={globalUrl} onChange={e => setGlobalUrl(e.target.value)}
-              placeholder="https://example.com/hooks/datapulse"
+              placeholder="https://example.com/hooks/eltpulse"
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
             />
           </div>
