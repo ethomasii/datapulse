@@ -62,13 +62,17 @@ export default function GatewayPage() {
         hasAccountToken?: boolean;
         hasAnyToken?: boolean;
         heartbeat?: Heartbeat;
-        executionPlane?: ExecutionPlane;
+        executionPlane?: ExecutionPlane | "datapulse_managed";
       };
       setConnectors(Array.isArray(s.connectors) ? s.connectors : []);
       setHasAccountToken(Boolean(s.hasAccountToken));
       setHasAnyToken(Boolean(s.hasAnyToken));
       setHeartbeat(s.heartbeat ?? null);
-      setExecutionPlane(s.executionPlane === "eltpulse_managed" ? "eltpulse_managed" : "customer_agent");
+      setExecutionPlane(
+        s.executionPlane === "eltpulse_managed" || s.executionPlane === "datapulse_managed"
+          ? "eltpulse_managed"
+          : "customer_agent"
+      );
     } finally {
       setLoading(false);
     }
@@ -87,8 +91,12 @@ export default function GatewayPage() {
         const t = await res.text().catch(() => "");
         throw new Error(t || res.statusText);
       }
-      const data = (await res.json()) as { executionPlane: ExecutionPlane };
-      setExecutionPlane(data.executionPlane === "eltpulse_managed" ? "eltpulse_managed" : "customer_agent");
+      const data = (await res.json()) as { executionPlane: ExecutionPlane | "datapulse_managed" };
+      setExecutionPlane(
+        data.executionPlane === "eltpulse_managed" || data.executionPlane === "datapulse_managed"
+          ? "eltpulse_managed"
+          : "customer_agent"
+      );
       await load();
     } catch {
       await load();
@@ -310,24 +318,23 @@ ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
             </span>
           </button>
         </div>
-      </section>
-
-      {executionPlane === "eltpulse_managed" ? (
-        <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50/90 p-4 dark:border-emerald-800 dark:bg-emerald-950/35">
-          <p className="text-sm font-semibold text-emerald-950 dark:text-emerald-100">Managed execution is on</p>
-          <p className="mt-1 text-xs text-emerald-900/95 dark:text-emerald-200/90">
-            Pending runs are offered to eltPulse-operated workers automatically. You keep the same Runs view, structured
-            logs, and webhooks—no Docker or gateway token required unless you expand the optional self-hosted section
-            below (hybrid or migration).
-          </p>
-          {heartbeat?.source === "eltpulse_managed" ? (
-            <p className="mt-2 text-xs text-emerald-800/90 dark:text-emerald-300/90">
-              Last managed worker activity {msAgo(heartbeat.seenAt)}
-              {heartbeat.version !== "unknown" ? ` · v${heartbeat.version}` : ""}
+        {executionPlane === "eltpulse_managed" ? (
+          <div className="mt-4 rounded-lg border border-violet-200/80 bg-violet-50/50 px-3 py-2.5 dark:border-violet-900/50 dark:bg-violet-950/25">
+            <p className="text-xs text-violet-950 dark:text-violet-100/95">
+              <span className="font-semibold">While this mode is selected:</span> pending runs use eltPulse-managed workers
+              by default—no Docker or token required. The button below only{" "}
+              <span className="font-medium">reveals</span> gateway setup for hybrid teams; it does not switch you to
+              &quot;You operate execution.&quot;
             </p>
-          ) : null}
-        </div>
-      ) : null}
+            {heartbeat?.source === "eltpulse_managed" || heartbeat?.source === "datapulse_managed" ? (
+              <p className="mt-2 text-xs text-violet-900/85 dark:text-violet-200/85">
+                Last managed worker activity {msAgo(heartbeat.seenAt)}
+                {heartbeat.version !== "unknown" ? ` · v${heartbeat.version}` : ""}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
 
       {executionPlane === "eltpulse_managed" && !selfHostedSectionsVisible ? (
         <button
@@ -335,9 +342,10 @@ ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
           onClick={() => setShowSelfHostedSetup(true)}
           className="w-full rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-4 py-3 text-left text-sm text-slate-700 transition hover:border-sky-400 hover:bg-sky-50/50 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:border-sky-700 dark:hover:bg-sky-950/30"
         >
-          <span className="font-medium text-slate-900 dark:text-white">Optional: self-hosted gateway</span>
+          <span className="font-medium text-slate-900 dark:text-white">Show gateway setup (advanced)</span>
           <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
-            Docker, tokens, and connector setup—only if you also run workloads on your own infrastructure.
+            Docker, tokens, and named connectors—only if you also run some workloads on your network. Does not change the
+            choice above.
           </span>
         </button>
       ) : null}
