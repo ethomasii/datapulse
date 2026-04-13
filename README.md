@@ -8,7 +8,7 @@
 |------|------------|
 | `embedded_elt_builder/` | Python package: `elt` CLI, pipeline generator, FastAPI/Jinja web UI |
 | `web/` | eltPulse marketing site + authenticated dashboard (Neon/Postgres via Prisma) |
-| `integrations/` | Customer-facing mirror of **[github.com/eltpulsehq/integrations](https://github.com/eltpulsehq/integrations)** — `gateways/` (Docker, K8s, ECS, Terraform) + CI smoke workflow |
+| `integrations/` | **[github.com/eltpulsehq/integrations](https://github.com/eltpulsehq/integrations)** — `agent/` (gateway source + GHCR image) and `gateways/` (Docker, K8s, ECS, Terraform) |
 
 ### SaaS stack (`web/`)
 

@@ -2,7 +2,7 @@
 
 This document describes how we want **self-hosted execution** to feel for customers: similar in spirit to [Dagster+ hybrid agents](https://docs.dagster.io/deployment/dagster-plus/hybrid) (ECS, Kubernetes, Docker/local), but with **egress-only** connectivity to the eltPulse control plane.
 
-**Canonical code** for the gateway lives in [`eltpulsehq/agent`](https://github.com/eltpulsehq/agent). **Recipes, CI, Terraform, GitOps, and glue** live in the integrations hub: **[`eltpulsehq/integrations`](https://github.com/eltpulsehq/integrations)** (same role as [servicepulsehq/integrations](https://github.com/servicepulsehq/integrations) for ServicePulse). This file is the in-repo product map; keep runnable samples authoritative in the integrations repo.
+**Canonical code** for the gateway lives in **[`eltpulsehq/integrations` → `agent/`](https://github.com/eltpulsehq/integrations/tree/main/agent)** (same repo as Docker/K8s/ECS samples). The container is **`ghcr.io/eltpulsehq/agent:latest`**, built by that repo’s GitHub Actions. This file is the in-repo product map.
 
 ## Control plane vs agent
 
@@ -21,9 +21,9 @@ Same **agent binary / image** and **Bearer token**; different **where** you run 
 |---------|-------------|----------------------------------|
 | **ECS agent** | AWS, Fargate or EC2-backed tasks, IAM-scoped | Task definition, service, secrets, egress SG to eltPulse + data plane. |
 | **Kubernetes agent** | K8s clusters, Helm/GitOps | Deployment, `ELTPULSE_*` env, optional NetworkPolicy egress-only. |
-| **Local agent** | Dev laptops, air-gapped jump hosts, CI | Docker Compose or `docker run` — see [`eltpulsehq/integrations` → `gateways/local`](https://github.com/eltpulsehq/integrations/tree/main/gateways/local) and [`gateways/docker`](https://github.com/eltpulsehq/integrations/tree/main/gateways/docker). Image **`ghcr.io/eltpulsehq/agent:latest`** is published from [`eltpulsehq/agent`](https://github.com/eltpulsehq/agent) when CI is wired; verify with `docker pull`. |
+| **Local agent** | Dev laptops, air-gapped jump hosts, CI | Docker Compose or `docker run` — see [`gateways/local`](https://github.com/eltpulsehq/integrations/tree/main/gateways/local), [`gateways/docker`](https://github.com/eltpulsehq/integrations/tree/main/gateways/docker), and source [`agent/`](https://github.com/eltpulsehq/integrations/tree/main/agent). Image **`ghcr.io/eltpulsehq/agent:latest`** is built from [`eltpulsehq/integrations`](https://github.com/eltpulsehq/integrations); verify with `docker pull`. |
 
-Each runtime is **documentation + example manifests** in [`eltpulsehq/integrations`](https://github.com/eltpulsehq/integrations) (and the [`agent`](https://github.com/eltpulsehq/agent) image), not duplicated in `embedded_elt_builder`.
+Each runtime is **documentation + example manifests** (and the **agent** image build) in [`eltpulsehq/integrations`](https://github.com/eltpulsehq/integrations), not duplicated in `embedded_elt_builder`.
 
 ## Egress-only posture
 
@@ -40,8 +40,7 @@ Each runtime is **documentation + example manifests** in [`eltpulsehq/integratio
 
 | Repo / artifact | Purpose |
 |-----------------|--------|
-| [`eltpulsehq/agent`](https://github.com/eltpulsehq/agent) | Reference gateway implementation and container image (`ghcr.io/eltpulsehq/agent`). |
-| [`eltpulsehq/integrations`](https://github.com/eltpulsehq/integrations) | **Customer-facing integrations:** `gateways/` (Docker Compose, Kubernetes, ECS JSON, Terraform ECS) + CI examples. |
+| [`eltpulsehq/integrations`](https://github.com/eltpulsehq/integrations) | **Gateway agent** source (`agent/`), **`ghcr.io/eltpulsehq/agent:latest`** publish workflow, and **`gateways/`** (Docker, K8s, ECS, Terraform). |
 
 The same tree lives under `integrations/` in this monorepo; publish from there to `eltpulsehq/integrations`.
 
