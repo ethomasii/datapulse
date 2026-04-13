@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Copy, Eye, EyeOff, Loader2, Plus, RefreshCw, RotateCcw, Trash2, Waypoints, Wifi, WifiOff } from "lucide-react";
+import { Check, Copy, Eye, EyeOff, Loader2, Plus, RefreshCw, Star, Trash2, Waypoints, Wifi, WifiOff } from "lucide-react";
 
 const CONTROL_PLANE_URL =
   process.env.NEXT_PUBLIC_APP_URL ?? "https://app.eltpulse.dev";
@@ -43,9 +43,9 @@ export default function GatewayPage() {
   const [showToken, setShowToken] = useState(false);
   const [copied, setCopied] = useState(false);
   const [heartbeat, setHeartbeat] = useState<Heartbeat>(null);
-  const [accountTokenHeartbeat, setAccountTokenHeartbeat] = useState<Heartbeat>(null);
+  const [defaultAgentTokenId, setDefaultAgentTokenId] = useState<string | null>(null);
+  const [defaultSaving, setDefaultSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
   const [creatingConnector, setCreatingConnector] = useState(false);
   const [executionPlane, setExecutionPlane] = useState<ExecutionPlane>("customer_agent");
   const [planeSaving, setPlaneSaving] = useState(false);
@@ -63,14 +63,14 @@ export default function GatewayPage() {
         hasAccountToken?: boolean;
         hasAnyToken?: boolean;
         heartbeat?: Heartbeat;
-        accountTokenHeartbeat?: Heartbeat;
+        defaultAgentTokenId?: string | null;
         executionPlane?: ExecutionPlane | "datapulse_managed";
       };
       setConnectors(Array.isArray(s.connectors) ? s.connectors : []);
       setHasAccountToken(Boolean(s.hasAccountToken));
       setHasAnyToken(Boolean(s.hasAnyToken));
       setHeartbeat(s.heartbeat ?? null);
-      setAccountTokenHeartbeat(s.accountTokenHeartbeat ?? null);
+      setDefaultAgentTokenId(s.defaultAgentTokenId ?? null);
       setExecutionPlane(
         s.executionPlane === "eltpulse_managed" || s.executionPlane === "datapulse_managed"
           ? "eltpulse_managed"
@@ -127,26 +127,24 @@ export default function GatewayPage() {
     return () => clearInterval(id);
   }, [load]);
 
-  async function generateAccountToken() {
-    setGenerating(true);
+  async function persistAccountDefault(id: string | null) {
+    setDefaultSaving(true);
     try {
-      const res = await fetch("/api/agent/token", { method: "POST", credentials: "same-origin" });
-      const data = (await res.json()) as { token?: string };
-      setToken(data.token ?? null);
-      setHasAccountToken(true);
-      setHasAnyToken(true);
-      setShowToken(true);
+      const res = await fetch("/api/agent/gateway-default", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ defaultAgentTokenId: id }),
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        alert(t || "Could not update default gateway");
+        return;
+      }
+      await load();
     } finally {
-      setGenerating(false);
+      setDefaultSaving(false);
     }
-  }
-
-  async function revokeAccountToken() {
-    if (!confirm("Revoke the account default gateway token? Named gateways are not affected.")) return;
-    await fetch("/api/agent/token", { method: "DELETE", credentials: "same-origin" });
-    setToken(null);
-    setHasAccountToken(false);
-    await load();
   }
 
   async function addNamedConnector() {
@@ -257,12 +255,11 @@ ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
           </p>
           {executionPlane === "customer_agent" ? (
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-              Multiple gateways: add a <span className="font-medium text-slate-800 dark:text-slate-200">named</span> token
-              per process, then set each pipeline&apos;s <span className="font-medium text-slate-800 dark:text-slate-200">default gateway</span> on the Pipelines page (or leave &quot;Any gateway&quot; for the shared queue). Optional{" "}
+              Multiple gateways: generate a token per process, then mark one as your{" "}
+              <span className="font-medium text-slate-800 dark:text-slate-200">account default</span> for unrouted runs.
+              Each pipeline can still set its own default gateway on the Pipelines page (or &quot;Any gateway&quot;). Optional{" "}
               <code className="text-[11px]">targetAgentTokenId</code> on{" "}
-              <code className="text-[11px]">POST /api/elt/runs</code> overrides per run. A single{" "}
-              <span className="font-medium text-slate-800 dark:text-slate-200">account default</span> token is enough
-              when you only run one gateway and do not need routing by name.
+              <code className="text-[11px]">POST /api/elt/runs</code> overrides per run.
             </p>
           ) : null}
         </div>
@@ -461,134 +458,101 @@ ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
       <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Gateway tokens</h2>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          Each self-hosted gateway process uses one secret Bearer token in{" "}
-          <code className="text-[11px]">Authorization: Bearer …</code>.{" "}
-          <span className="font-medium text-slate-600 dark:text-slate-300">Account default</span> is a single token on
-          your user — the usual choice for one gateway.{" "}
-          <span className="font-medium text-slate-600 dark:text-slate-300">Named gateways</span> each get their own
-          token and label (e.g. AWS vs on-prem); use them when you run several gateways or want pipelines to target a
-          specific gateway id. You do not need both styles for one machine — pick one approach per process.
+          Generate one secret Bearer token per gateway process (same <code className="text-[11px]">Authorization: Bearer</code>{" "}
+          header for all <code className="text-[11px]">/api/agent/*</code> calls). With several tokens, choose which one is
+          the <span className="font-medium text-slate-600 dark:text-slate-300">account default</span>: that gateway receives
+          runs that do not specify a pipeline-level default and do not pass{" "}
+          <code className="text-[11px]">targetAgentTokenId</code>. Pipelines can still override per pipeline on the
+          Pipelines page.
         </p>
 
-        {loading ? (
-          <p className="mt-4 text-sm text-slate-400">Loading…</p>
-        ) : (
-          <ul className="mt-4 space-y-3">
-            <li className="rounded-lg border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-950/40">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">Account default</p>
-                    <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                      One token
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Stored on your user record. Polls untargeted runs and any run not pinned to a named gateway.
-                  </p>
-                  {accountTokenHeartbeat ? (
-                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                      Last seen {msAgo(accountTokenHeartbeat.seenAt)} ·{" "}
-                      {accountTokenHeartbeat.source === "eltpulse_managed" ||
-                      accountTokenHeartbeat.source === "datapulse_managed"
-                        ? "managed"
-                        : "self-hosted"}
-                      {accountTokenHeartbeat.version !== "unknown" ? ` · v${accountTokenHeartbeat.version}` : ""}
-                    </p>
-                  ) : hasAccountToken ? (
-                    <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">Token set — no heartbeat yet.</p>
-                  ) : (
-                    <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">No account token.</p>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {!hasAccountToken ? (
-                    <button
-                      type="button"
-                      onClick={() => void generateAccountToken()}
-                      disabled={generating}
-                      className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-white dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
-                    >
-                      <Waypoints className="h-3.5 w-3.5" />
-                      {generating ? "…" : "Generate"}
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => void generateAccountToken()}
-                        disabled={generating}
-                        className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-white dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                        {generating ? "…" : "Rotate"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void revokeAccountToken()}
-                        className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/20"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Revoke
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </li>
-
-            {connectors.map((c) => (
-              <li
-                key={c.id}
-                className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/80"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-white">{c.name}</p>
-                      <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 dark:bg-sky-950 dark:text-sky-200">
-                        Named
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      Own token id — use for routing (pipeline default gateway or{" "}
-                      <code className="text-[11px]">targetAgentTokenId</code>).
-                    </p>
-                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                      {c.heartbeat
-                        ? `Last seen ${msAgo(c.heartbeat.seenAt)} · ${c.heartbeat.source === "eltpulse_managed" || c.heartbeat.source === "datapulse_managed" ? "managed" : "self-hosted"}`
-                        : "Never connected"}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void revokeConnector(c.id)}
-                    className="text-xs font-medium text-red-600 hover:underline dark:text-red-400"
-                  >
-                    Revoke
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {!loading && !hasAccountToken && connectors.length === 0 ? (
-          <p className="mt-3 text-xs text-amber-800/90 dark:text-amber-200/80">
-            Add at least one token below (account default or a named gateway) before starting a gateway container.
+        {!loading && connectors.length >= 2 && !defaultAgentTokenId ? (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50/90 px-3 py-2 text-xs text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+            You have more than one token — set an account default so unrouted runs always go to one gateway.
           </p>
         ) : null}
 
+        {loading ? (
+          <p className="mt-4 text-sm text-slate-400">Loading…</p>
+        ) : connectors.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+            No tokens yet. Generate one below, then use it in <code className="text-[11px]">ELTPULSE_AGENT_TOKEN</code>.
+          </p>
+        ) : (
+          <ul className="mt-4 space-y-3">
+            {connectors.map((c) => {
+              const isDefault = defaultAgentTokenId === c.id;
+              return (
+                <li
+                  key={c.id}
+                  className={`rounded-lg border p-4 dark:border-slate-700 ${
+                    isDefault
+                      ? "border-violet-300 bg-violet-50/70 dark:border-violet-800 dark:bg-violet-950/30"
+                      : "border-slate-200 bg-white dark:bg-slate-900/80"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{c.name}</p>
+                        {isDefault ? (
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                            <Star className="h-3 w-3 fill-current" aria-hidden />
+                            Account default
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                        {c.heartbeat
+                          ? `Last seen ${msAgo(c.heartbeat.seenAt)} · ${c.heartbeat.source === "eltpulse_managed" || c.heartbeat.source === "datapulse_managed" ? "managed" : "self-hosted"}`
+                          : "Never connected"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!isDefault ? (
+                        <button
+                          type="button"
+                          disabled={defaultSaving}
+                          onClick={() => void persistAccountDefault(c.id)}
+                          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                          Set as account default
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={defaultSaving}
+                          onClick={() => void persistAccountDefault(null)}
+                          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                          Clear default
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => void revokeConnector(c.id)}
+                        className="text-xs font-medium text-red-600 hover:underline dark:text-red-400"
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
         <div className="mt-4 space-y-2 rounded-lg border border-dashed border-slate-200 p-3 dark:border-slate-700">
-          <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">Add a named gateway</p>
+          <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">Generate a new token</p>
           <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            Optional JSON metadata is for your own labels (region, site) — not secrets.
+            Label this gateway (e.g. region or environment). Optional JSON metadata is for your own tags — not secrets.
           </p>
           <input
             type="text"
             value={newConnectorName}
             onChange={(e) => setNewConnectorName(e.target.value)}
-            placeholder="Gateway name (e.g. AWS prod)"
+            placeholder="Label (e.g. AWS prod)"
             className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
           />
           <textarea
@@ -605,9 +569,16 @@ ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
             className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
           >
             <Plus className="h-4 w-4" />
-            {creatingConnector ? "Creating…" : "Create named token"}
+            {creatingConnector ? "Generating…" : "Generate token"}
           </button>
         </div>
+
+        {hasAccountToken ? (
+          <p className="mt-4 text-[11px] text-slate-400 dark:text-slate-500">
+            A legacy account-wide API token is still on your user record (not listed here). Prefer the tokens above; you
+            can revoke the legacy token via the API or a future settings control if you no longer need it.
+          </p>
+        ) : null}
       </section>
 
       {token ? (

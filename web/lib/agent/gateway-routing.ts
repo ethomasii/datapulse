@@ -49,7 +49,7 @@ export async function singleNamedGatewayTokenIdForUser(userId: string): Promise<
  * Resolves which named gateway should execute the run.
  * - Explicit `null`: any gateway (account-wide poller or competing named gateways).
  * - Explicit string: that gateway (must be owned and active).
- * - `undefined`: pipeline default if valid; else if exactly one named gateway exists, pin to it; else null.
+ * - `undefined`: pipeline default if valid; else account `defaultAgentTokenId` if valid; else if exactly one named gateway, pin to it; else null.
  */
 export async function resolveRunTargetAgentTokenId(params: {
   userId: string;
@@ -68,6 +68,18 @@ export async function resolveRunTargetAgentTokenId(params: {
       return pipelineDefaultId;
     } catch {
       // Stored default points at a revoked or missing token.
+    }
+  }
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { defaultAgentTokenId: true },
+  });
+  if (user?.defaultAgentTokenId) {
+    try {
+      await assertUserOwnsGatewayToken(userId, user.defaultAgentTokenId);
+      return user.defaultAgentTokenId;
+    } catch {
+      // Revoked or invalid — fall through.
     }
   }
   return (await singleNamedGatewayTokenIdForUser(userId)) ?? null;

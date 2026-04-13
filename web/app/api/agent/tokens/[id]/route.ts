@@ -25,10 +25,16 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Connector not found or already revoked" }, { status: 404 });
   }
 
-  await db.agentToken.update({
-    where: { id: row.id },
-    data: { revokedAt: new Date() },
-  });
+  await db.$transaction([
+    db.user.updateMany({
+      where: { id: user.id, defaultAgentTokenId: row.id },
+      data: { defaultAgentTokenId: null },
+    }),
+    db.agentToken.update({
+      where: { id: row.id },
+      data: { revokedAt: new Date() },
+    }),
+  ]);
 
   return NextResponse.json({ ok: true });
 }

@@ -84,6 +84,7 @@ export async function GET() {
     hasAccountToken: Boolean(user.agentToken),
     hasNamedConnectors: connectors.length > 0,
     hasAnyToken: Boolean(user.agentToken) || connectors.length > 0,
+    defaultAgentTokenId: user.defaultAgentTokenId,
     connectors: connectorPayload,
     accountTokenHeartbeat: accountTokenHb,
     heartbeat: summaryHeartbeat,

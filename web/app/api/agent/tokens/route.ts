@@ -49,6 +49,7 @@ export async function GET() {
       createdAt: r.createdAt.toISOString(),
     })),
     accountToken: Boolean(user.agentToken),
+    defaultAgentTokenId: user.defaultAgentTokenId,
   });
 }
 
@@ -86,6 +87,16 @@ export async function POST(req: Request) {
     },
     select: { id: true, name: true },
   });
+
+  const activeAfter = await db.agentToken.count({
+    where: { userId: user.id, revokedAt: null },
+  });
+  if (activeAfter === 1) {
+    await db.user.update({
+      where: { id: user.id },
+      data: { defaultAgentTokenId: row.id },
+    });
+  }
 
   return NextResponse.json({
     connector: row,

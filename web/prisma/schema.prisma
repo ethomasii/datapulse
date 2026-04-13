@@ -84,8 +84,12 @@ model User {
   organization   Organization? @relation("OrganizationMembers", fields: [organizationId], references: [id], onDelete: SetNull)
   /// Org this user owns (billing + org-level agent token). At most one.
   ownedOrganization Organization? @relation("OrganizationOwner")
+  /// When set, unrouted runs (no pipeline default, no per-run override) pin to this named gateway. Distinct from legacy `agentToken`.
+  defaultAgentTokenId String?     @map("default_agent_token_id")
+  defaultAgentToken    AgentToken? @relation("UserAccountDefaultGateway", fields: [defaultAgentTokenId], references: [id], onDelete: SetNull)
 
   @@index([organizationId])
+  @@index([defaultAgentTokenId])
   /// Named agent connectors (AWS, GCP, on-prem, etc.) — each has its own Bearer token and heartbeat.
   agentTokens AgentToken[]
 }
@@ -111,6 +115,8 @@ model AgentToken {
   targetedRuns            EltPipelineRun[]
   /// Pipelines whose new runs default to this gateway unless overridden.
   pipelinesDefaultGateway EltPipeline[]  @relation("PipelineDefaultGateway")
+  /// User who selected this token as account-level default for unrouted runs (at most one).
+  userAccountDefaultFor User? @relation("UserAccountDefaultGateway")
 
   @@index([userId])
   @@map("AgentToken")
