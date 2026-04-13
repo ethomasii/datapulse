@@ -2,7 +2,7 @@
 
 This document describes how we want **self-hosted execution** to feel for customers: similar in spirit to [Dagster+ hybrid agents](https://docs.dagster.io/deployment/dagster-plus/hybrid) (ECS, Kubernetes, Docker/local), but with **egress-only** connectivity to the eltPulse control plane.
 
-**Canonical code and deployment assets** live under the [eltpulsehq](https://github.com/eltpulsehq) GitHub organization (not this repo). This file is the product map and link hub.
+**Canonical code** for the gateway lives in [`eltpulsehq/agent`](https://github.com/eltpulsehq/agent). **Recipes, CI, Terraform, GitOps, and glue** live in the integrations hub: **[`eltpulsehq/integrations`](https://github.com/eltpulsehq/integrations)** (same role as [servicepulsehq/integrations](https://github.com/servicepulsehq/integrations) for ServicePulse). This file is the in-repo product map; keep runnable samples authoritative in the integrations repo.
 
 ## Control plane vs agent
 
@@ -23,7 +23,7 @@ Same **agent binary / image** and **Bearer token**; different **where** you run 
 | **Kubernetes agent** | K8s clusters, Helm/GitOps | Deployment, `ELTPULSE_*` env, optional NetworkPolicy egress-only. |
 | **Local agent** | Dev laptops, air-gapped jump hosts, CI | Docker or bare metal; same env vars as today’s `ghcr.io/eltpulsehq/agent`. |
 
-Each runtime is **documentation + example manifests** in eltpulsehq repos (e.g. `agent`, future `agent-chart`, `agent-ecs`), not duplicated in `embedded_elt_builder`.
+Each runtime is **documentation + example manifests** in [`eltpulsehq/integrations`](https://github.com/eltpulsehq/integrations) (and the [`agent`](https://github.com/eltpulsehq/agent) image), not duplicated in `embedded_elt_builder`.
 
 ## Egress-only posture
 
@@ -41,10 +41,9 @@ Each runtime is **documentation + example manifests** in eltpulsehq repos (e.g. 
 | Repo / artifact | Purpose |
 |-----------------|--------|
 | [`eltpulsehq/agent`](https://github.com/eltpulsehq/agent) | Reference gateway implementation and container image (`ghcr.io/eltpulsehq/agent`). |
-| *Future* `agent-chart` | Helm chart for Kubernetes. |
-| *Future* `agent-ecs` | ECS task/service samples, Terraform/CDK snippets. |
+| [`eltpulsehq/integrations`](https://github.com/eltpulsehq/integrations) | **Integrations hub:** Docker/K8s/ECS/CI/GitOps examples, recipes, optional libraries, OpenAPI pointers—mirrors the [ServicePulse integrations](https://github.com/servicepulsehq/integrations) layout. |
 
-Links and status should stay current in the eltpulsehq org READMEs; this document only tracks the **intended** split.
+A **scaffold** for that repo also exists under `integrations/` in this monorepo so you can copy or subtree it into `eltpulsehq/integrations` until publishing is fully split.
 
 ## API surface (stable for all runtimes)
 
