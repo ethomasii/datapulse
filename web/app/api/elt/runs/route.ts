@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import type { Prisma, RunStatus } from "@prisma/client";
+import type { Prisma, RunIngestionExecutor, RunStatus } from "@prisma/client";
+import { getActiveOrganizationForSession } from "@/lib/auth/active-org";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
-import { resolveRunTargetAgentTokenId } from "@/lib/agent/gateway-routing";
+import { resolveNewRunExecution } from "@/lib/agent/run-execution";
 import { createRunBodySchema } from "@/lib/elt/run-types";
 
 export async function GET(req: Request) {
@@ -65,19 +66,29 @@ export async function POST(req: Request) {
     select: {
       id: true,
       defaultTargetAgentTokenId: true,
+      executionHost: true,
     },
   });
   if (!pipeline) {
     return NextResponse.json({ error: "Pipeline not found" }, { status: 404 });
   }
 
+  const orgCtx = await getActiveOrganizationForSession();
+  const organizationId = orgCtx?.id ?? user.organizationId ?? null;
+
   let targetAgentTokenId: string | null;
+  let ingestionExecutor: RunIngestionExecutor;
   try {
-    targetAgentTokenId = await resolveRunTargetAgentTokenId({
+    const resolved = await resolveNewRunExecution({
       userId: user.id,
+      organizationId,
+      executionHost: pipeline.executionHost,
+      pipelineDefaultTargetAgentTokenId: pipeline.defaultTargetAgentTokenId,
       bodyOverride: body.targetAgentTokenId,
-      pipelineDefaultId: pipeline.defaultTargetAgentTokenId,
+      userExecutionPlane: user.executionPlane,
     });
+    targetAgentTokenId = resolved.targetAgentTokenId;
+    ingestionExecutor = resolved.ingestionExecutor;
   } catch {
     return NextResponse.json({ error: "Invalid gateway token" }, { status: 400 });
   }
@@ -93,7 +104,7 @@ export async function POST(req: Request) {
     data: {
       userId: user.id,
       pipelineId: pipeline.id,
-      ingestionExecutor: "customer_control_plane",
+      ingestionExecutor,
       status: body.status,
       environment: body.environment,
       correlationId,

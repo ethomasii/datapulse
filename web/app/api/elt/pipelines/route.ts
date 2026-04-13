@@ -27,6 +27,7 @@ export async function GET() {
       description: true,
       updatedAt: true,
       defaultTargetAgentTokenId: true,
+      executionHost: true,
     },
   });
   return NextResponse.json({ pipelines: rows });
@@ -115,6 +116,7 @@ export async function POST(req: Request) {
         workspaceYaml,
         runsWebhookUrl,
         ...(defaultTargetAgentTokenId !== undefined ? { defaultTargetAgentTokenId } : {}),
+        ...(body.executionHost !== undefined ? { executionHost: body.executionHost } : {}),
       },
     });
 

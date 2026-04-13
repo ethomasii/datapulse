@@ -1,7 +1,7 @@
 import { ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
 import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
 import type { Connection, EltMonitor } from "@prisma/client";
-import { resolveRunTargetAgentTokenId } from "@/lib/agent/gateway-routing";
+import { resolveNewRunExecution } from "@/lib/agent/run-execution";
 import { db } from "@/lib/db/client";
 import { parseStoredConnectionSecrets } from "@/lib/elt/connection-secrets-store";
 import { resolveSensorCheckIntervalSeconds } from "@/lib/plans/agent-schedule";
@@ -223,7 +223,7 @@ async function enqueuePipelineRun(
 ): Promise<{ ok: true; runId: string } | { ok: false; reason: string }> {
   const pipeline = await db.eltPipeline.findFirst({
     where: { userId, name: pipelineName },
-    select: { id: true, enabled: true, defaultTargetAgentTokenId: true },
+    select: { id: true, enabled: true, defaultTargetAgentTokenId: true, executionHost: true },
   });
   if (!pipeline) {
     return { ok: false, reason: `Pipeline "${pipelineName}" not found` };
@@ -232,10 +232,18 @@ async function enqueuePipelineRun(
     return { ok: false, reason: `Pipeline "${pipelineName}" is disabled` };
   }
 
-  const targetAgentTokenId = await resolveRunTargetAgentTokenId({
+  const actor = await db.user.findUnique({
+    where: { id: userId },
+    select: { executionPlane: true, organizationId: true },
+  });
+  const organizationId = actor?.organizationId ?? null;
+  const { targetAgentTokenId, ingestionExecutor } = await resolveNewRunExecution({
     userId,
+    organizationId,
+    executionHost: pipeline.executionHost,
+    pipelineDefaultTargetAgentTokenId: pipeline.defaultTargetAgentTokenId,
     bodyOverride: undefined,
-    pipelineDefaultId: pipeline.defaultTargetAgentTokenId,
+    userExecutionPlane: actor?.executionPlane ?? "eltpulse_managed",
   });
 
   const run = await db.eltPipelineRun.create({
@@ -247,6 +255,7 @@ async function enqueuePipelineRun(
       correlationId: crypto.randomUUID(),
       triggeredBy: `monitor:${monitorName}`,
       targetAgentTokenId,
+      ingestionExecutor,
     },
     select: { id: true },
   });

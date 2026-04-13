@@ -1,13 +1,15 @@
 /**
  * Named agent connectors — multiple Bearer tokens per user (per cloud, on-prem, etc.).
  *
- * GET  — session: list connectors (no secret values)
- * POST — session: body `{ name: string, metadata?: Record<string, unknown> }` — returns `token` once
+ * GET  — session: personal connectors; when in an org workspace, also `organizationConnectors` + org default id
+ * POST — session: `{ name, metadata?, organizationId? }` — org-scoped tokens require Pro/Team on the org owner
  */
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
+import { getActiveOrganizationForSession } from "@/lib/auth/active-org";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
+import { tierAllowsOrgGatewayTokens } from "@/lib/plans/org-gateway-tier";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +59,7 @@ export async function POST(req: Request) {
   const user = await getCurrentDbUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: { name?: string; metadata?: unknown };
+  let body: { name?: string; metadata?: unknown; organizationId?: string };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -77,10 +79,40 @@ export async function POST(req: Request) {
     metadata = body.metadata as Prisma.InputJsonValue;
   }
 
+  const orgIdRaw = typeof body.organizationId === "string" ? body.organizationId.trim() : "";
+  let ownerUserId = user.id;
+  let organizationId: string | null = null;
+  if (orgIdRaw) {
+    const org = await db.organization.findFirst({
+      where: {
+        id: orgIdRaw,
+        OR: [{ ownerUserId: user.id }, { members: { some: { id: user.id } } }],
+      },
+      select: {
+        id: true,
+        ownerUserId: true,
+        owner: { select: { subscription: { select: { tier: true } } } },
+      },
+    });
+    if (!org) {
+      return NextResponse.json({ error: "Organization not found or access denied" }, { status: 403 });
+    }
+    const tier = org.owner.subscription?.tier ?? "free";
+    if (!tierAllowsOrgGatewayTokens(tier)) {
+      return NextResponse.json(
+        { error: "Org-scoped gateways require Pro or Team on the organization owner." },
+        { status: 403 }
+      );
+    }
+    ownerUserId = org.ownerUserId;
+    organizationId = org.id;
+  }
+
   const token = generateToken();
   const row = await db.agentToken.create({
     data: {
-      userId: user.id,
+      userId: ownerUserId,
+      organizationId,
       name,
       token,
       metadata,
@@ -88,14 +120,16 @@ export async function POST(req: Request) {
     select: { id: true, name: true },
   });
 
-  const activeAfter = await db.agentToken.count({
-    where: { userId: user.id, revokedAt: null },
-  });
-  if (activeAfter === 1) {
-    await db.user.update({
-      where: { id: user.id },
-      data: { defaultAgentTokenId: row.id },
+  if (organizationId === null) {
+    const activeAfter = await db.agentToken.count({
+      where: { userId: user.id, organizationId: null, revokedAt: null },
     });
+    if (activeAfter === 1) {
+      await db.user.update({
+        where: { id: user.id },
+        data: { defaultAgentTokenId: row.id },
+      });
+    }
   }
 
   return NextResponse.json({

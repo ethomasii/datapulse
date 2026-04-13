@@ -32,6 +32,8 @@ import {
 import { EltLoadingState } from "@/components/elt/elt-loading-state";
 import { PipelineCodeModal } from "@/components/elt/pipeline-code-modal";
 
+type PipelineExecutionHost = "inherit" | "eltpulse_managed" | "customer_gateway";
+
 type PipelineRow = {
   id: string;
   name: string;
@@ -42,6 +44,7 @@ type PipelineRow = {
   description: string | null;
   updatedAt: string;
   defaultTargetAgentTokenId: string | null;
+  executionHost: PipelineExecutionHost;
 };
 
 type FormMode = "structured" | "json";
@@ -126,11 +129,21 @@ export function BuilderClient({
       const data = await pipRes.json();
       setPipelines(data.pipelines ?? []);
       if (gwRes.ok) {
-        const gw = (await gwRes.json()) as { connectors?: { id: string; name: string }[] };
-        const list = Array.isArray(gw.connectors)
+        const gw = (await gwRes.json()) as {
+          connectors?: { id: string; name: string }[];
+          organization?: { connectors?: { id: string; name: string }[]; name?: string } | null;
+        };
+        const personal = Array.isArray(gw.connectors)
           ? gw.connectors.map((c) => ({ id: c.id, name: c.name }))
           : [];
-        setGatewayOptions(list);
+        const orgName = gw.organization?.name?.trim() || "Org";
+        const orgList = Array.isArray(gw.organization?.connectors)
+          ? gw.organization!.connectors!.map((c) => ({
+              id: c.id,
+              name: `${c.name} (${orgName})`,
+            }))
+          : [];
+        setGatewayOptions([...personal, ...orgList]);
       } else {
         setGatewayOptions([]);
       }
@@ -386,6 +399,16 @@ export function BuilderClient({
     await load();
   }
 
+  async function patchPipelineExecutionHost(pipelineId: string, host: PipelineExecutionHost) {
+    await fetch(`/api/elt/pipelines/${pipelineId}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ executionHost: host }),
+    });
+    await load();
+  }
+
   async function openDetail(id: string) {
     const res = await fetch(`/api/elt/pipelines/${id}`, { credentials: "same-origin" });
     if (!res.ok) return;
@@ -458,6 +481,7 @@ export function BuilderClient({
                 <tr>
                   <th className="px-4 py-2 font-medium">Name</th>
                   <th className="px-4 py-2 font-medium">Route</th>
+                  <th className="px-4 py-2 font-medium">Runs on</th>
                   <th className="px-4 py-2 font-medium">Default gateway</th>
                   <th className="px-4 py-2 font-medium">Enabled</th>
                   <th className="px-4 py-2 font-medium" />
@@ -469,6 +493,21 @@ export function BuilderClient({
                     <td className="px-4 py-2 font-medium text-slate-900 dark:text-white">{p.name}</td>
                     <td className="px-4 py-2 text-slate-600 dark:text-slate-300">
                       {p.sourceType} → {p.destinationType}
+                    </td>
+                    <td className="px-4 py-2">
+                      <select
+                        value={p.executionHost ?? "inherit"}
+                        onChange={(e) =>
+                          void patchPipelineExecutionHost(p.id, e.target.value as PipelineExecutionHost)
+                        }
+                        className="max-w-[200px] rounded border border-slate-300 bg-white px-1.5 py-1 text-xs dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                        aria-label={`Execution host for ${p.name}`}
+                        title="Hybrid: inherit account plane, force eltPulse-managed, or force a customer gateway"
+                      >
+                        <option value="inherit">Inherit account</option>
+                        <option value="eltpulse_managed">eltPulse-managed</option>
+                        <option value="customer_gateway">Customer gateway</option>
+                      </select>
                     </td>
                     <td className="px-4 py-2">
                       {gatewayOptions.length === 0 ? (

@@ -45,6 +45,14 @@ export default function GatewayPage() {
   const [heartbeat, setHeartbeat] = useState<Heartbeat>(null);
   const [defaultAgentTokenId, setDefaultAgentTokenId] = useState<string | null>(null);
   const [defaultSaving, setDefaultSaving] = useState(false);
+  const [workspaceOrg, setWorkspaceOrg] = useState<{ id: string; name: string } | null>(null);
+  const [orgConnectors, setOrgConnectors] = useState<ConnectorRow[]>([]);
+  const [orgDefaultAgentTokenId, setOrgDefaultAgentTokenId] = useState<string | null>(null);
+  const [orgGatewaysAllowed, setOrgGatewaysAllowed] = useState(false);
+  const [orgDefaultSaving, setOrgDefaultSaving] = useState(false);
+  const [creatingOrgConnector, setCreatingOrgConnector] = useState(false);
+  const [newOrgConnectorName, setNewOrgConnectorName] = useState("");
+  const [newOrgConnectorMeta, setNewOrgConnectorMeta] = useState("");
   const [loading, setLoading] = useState(true);
   const [creatingConnector, setCreatingConnector] = useState(false);
   const [executionPlane, setExecutionPlane] = useState<ExecutionPlane>("customer_agent");
@@ -60,6 +68,13 @@ export default function GatewayPage() {
       const statusRes = await fetch("/api/elt/agent-status", { credentials: "same-origin" });
       const s = (await statusRes.json()) as {
         connectors?: ConnectorRow[];
+        organization?: {
+          id: string;
+          name: string;
+          defaultAgentTokenId?: string | null;
+          orgGatewaysAllowed?: boolean;
+          connectors?: ConnectorRow[];
+        } | null;
         hasAccountToken?: boolean;
         hasAnyToken?: boolean;
         heartbeat?: Heartbeat;
@@ -67,6 +82,17 @@ export default function GatewayPage() {
         executionPlane?: ExecutionPlane | "datapulse_managed";
       };
       setConnectors(Array.isArray(s.connectors) ? s.connectors : []);
+      if (s.organization) {
+        setWorkspaceOrg({ id: s.organization.id, name: s.organization.name });
+        setOrgConnectors(Array.isArray(s.organization.connectors) ? s.organization.connectors : []);
+        setOrgDefaultAgentTokenId(s.organization.defaultAgentTokenId ?? null);
+        setOrgGatewaysAllowed(Boolean(s.organization.orgGatewaysAllowed));
+      } else {
+        setWorkspaceOrg(null);
+        setOrgConnectors([]);
+        setOrgDefaultAgentTokenId(null);
+        setOrgGatewaysAllowed(false);
+      }
       setHasAccountToken(Boolean(s.hasAccountToken));
       setHasAnyToken(Boolean(s.hasAnyToken));
       setHeartbeat(s.heartbeat ?? null);
@@ -127,6 +153,27 @@ export default function GatewayPage() {
     return () => clearInterval(id);
   }, [load]);
 
+  async function persistOrgDefault(id: string | null) {
+    if (!workspaceOrg) return;
+    setOrgDefaultSaving(true);
+    try {
+      const res = await fetch("/api/organization/gateway-default", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ defaultAgentTokenId: id }),
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        alert(t || "Could not update org default gateway");
+        return;
+      }
+      await load();
+    } finally {
+      setOrgDefaultSaving(false);
+    }
+  }
+
   async function persistAccountDefault(id: string | null) {
     setDefaultSaving(true);
     try {
@@ -185,6 +232,52 @@ export default function GatewayPage() {
       await load();
     } finally {
       setCreatingConnector(false);
+    }
+  }
+
+  async function addOrgNamedConnector() {
+    if (!workspaceOrg) return;
+    const name = newOrgConnectorName.trim();
+    if (!name) return;
+    let metadata: Record<string, unknown> | undefined;
+    const raw = newOrgConnectorMeta.trim();
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+          alert("Metadata must be a JSON object, e.g. {\"cloud\":\"aws\",\"region\":\"us-east-1\"}");
+          return;
+        }
+        metadata = parsed as Record<string, unknown>;
+      } catch {
+        alert("Invalid JSON in metadata");
+        return;
+      }
+    }
+    setCreatingOrgConnector(true);
+    try {
+      const res = await fetch("/api/agent/tokens", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          organizationId: workspaceOrg.id,
+          ...(metadata ? { metadata } : {}),
+        }),
+      });
+      const data = (await res.json()) as { token?: string; error?: string };
+      if (!res.ok) {
+        alert(data.error || "Failed to create org gateway token");
+        return;
+      }
+      setToken(data.token ?? null);
+      setShowToken(true);
+      setNewOrgConnectorName("");
+      setNewOrgConnectorMeta("");
+      await load();
+    } finally {
+      setCreatingOrgConnector(false);
     }
   }
 
@@ -336,6 +429,121 @@ ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
           </div>
         ) : null}
       </section>
+
+      {workspaceOrg ? (
+        <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+            Organization gateways — {workspaceOrg.name}
+          </h2>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Shared with this Clerk org workspace. Unrouted runs in org context use the org default when set, then your
+            personal default.{" "}
+            {!orgGatewaysAllowed ? (
+              <span className="font-medium text-amber-800 dark:text-amber-200">
+                Pro or Team on the org owner is required to create new org-scoped tokens.
+              </span>
+            ) : null}
+          </p>
+          {!loading && orgConnectors.length === 0 ? (
+            <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No org-scoped gateways yet.</p>
+          ) : !loading && orgConnectors.length > 0 ? (
+            <ul className="mt-4 space-y-3">
+              {orgConnectors.map((c) => {
+                const isDefault = orgDefaultAgentTokenId === c.id;
+                return (
+                  <li
+                    key={c.id}
+                    className={`rounded-lg border p-4 dark:border-slate-700 ${
+                      isDefault
+                        ? "border-violet-300 bg-violet-50/70 dark:border-violet-800 dark:bg-violet-950/30"
+                        : "border-slate-200 bg-white dark:bg-slate-900/80"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white">{c.name}</p>
+                          {isDefault ? (
+                            <span className="inline-flex items-center gap-0.5 rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                              <Star className="h-3 w-3 fill-current" aria-hidden />
+                              Org default
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                          {c.heartbeat
+                            ? `Last seen ${msAgo(c.heartbeat.seenAt)} · ${
+                                c.heartbeat.source === "eltpulse_managed" || c.heartbeat.source === "datapulse_managed"
+                                  ? "managed"
+                                  : "self-hosted"
+                              }`
+                            : "Never connected"}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {!isDefault ? (
+                          <button
+                            type="button"
+                            disabled={orgDefaultSaving}
+                            onClick={() => void persistOrgDefault(c.id)}
+                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                          >
+                            Set as org default
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={orgDefaultSaving}
+                            onClick={() => void persistOrgDefault(null)}
+                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                          >
+                            Clear org default
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => void revokeConnector(c.id)}
+                          className="text-xs font-medium text-red-600 hover:underline dark:text-red-400"
+                        >
+                          Revoke
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+          {orgGatewaysAllowed ? (
+            <div className="mt-4 space-y-2 rounded-lg border border-dashed border-slate-200 p-3 dark:border-slate-700">
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">New org-scoped token</p>
+              <input
+                type="text"
+                value={newOrgConnectorName}
+                onChange={(e) => setNewOrgConnectorName(e.target.value)}
+                placeholder="Label (e.g. shared VPC prod)"
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+              />
+              <textarea
+                value={newOrgConnectorMeta}
+                onChange={(e) => setNewOrgConnectorMeta(e.target.value)}
+                placeholder='Optional metadata JSON, e.g. {"cloud":"aws"}'
+                rows={2}
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 font-mono text-xs dark:border-slate-700 dark:bg-slate-950"
+              />
+              <button
+                type="button"
+                disabled={creatingOrgConnector || !newOrgConnectorName.trim()}
+                onClick={() => void addOrgNamedConnector()}
+                className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" />
+                {creatingOrgConnector ? "Generating…" : "Generate org token"}
+              </button>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {executionPlane === "eltpulse_managed" && !selfHostedSectionsVisible ? (
         <button

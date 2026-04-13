@@ -24,9 +24,24 @@ export function agentCanMutateRun(namedAgentTokenId: string | null, runTargetId:
   return namedAgentTokenId !== null && runTargetId === namedAgentTokenId;
 }
 
-export async function assertUserOwnsGatewayToken(userId: string, tokenId: string): Promise<void> {
+/**
+ * User may use a personal token (`userId` match, no org) or any org token for an org they own or belong to.
+ */
+export async function assertActorOwnsGatewayToken(actorUserId: string, tokenId: string): Promise<void> {
   const row = await db.agentToken.findFirst({
-    where: { id: tokenId, userId, revokedAt: null },
+    where: {
+      id: tokenId,
+      revokedAt: null,
+      OR: [
+        { userId: actorUserId, organizationId: null },
+        {
+          organizationId: { not: null },
+          organization: {
+            OR: [{ ownerUserId: actorUserId }, { members: { some: { id: actorUserId } } }],
+          },
+        },
+      ],
+    },
     select: { id: true },
   });
   if (!row) {
@@ -34,10 +49,20 @@ export async function assertUserOwnsGatewayToken(userId: string, tokenId: string
   }
 }
 
-/** When the account has exactly one active named gateway, return its id; otherwise null. */
-export async function singleNamedGatewayTokenIdForUser(userId: string): Promise<string | null> {
+/** Alias for older call sites. */
+export const assertUserOwnsGatewayToken = assertActorOwnsGatewayToken;
+
+/** Exactly one active token in scope (personal vs org-scoped). */
+export async function singleGatewayTokenIdInScope(
+  userId: string,
+  organizationId: string | null
+): Promise<string | null> {
+  const where: Prisma.AgentTokenWhereInput =
+    organizationId != null
+      ? { revokedAt: null, organizationId }
+      : { revokedAt: null, userId, organizationId: null };
   const tokens = await db.agentToken.findMany({
-    where: { userId, revokedAt: null },
+    where,
     select: { id: true },
     take: 2,
   });
@@ -45,42 +70,71 @@ export async function singleNamedGatewayTokenIdForUser(userId: string): Promise<
   return null;
 }
 
+/** @deprecated use singleGatewayTokenIdInScope */
+export async function singleNamedGatewayTokenIdForUser(userId: string): Promise<string | null> {
+  return singleGatewayTokenIdInScope(userId, null);
+}
+
 /**
- * Resolves which named gateway should execute the run.
+ * Resolves which named gateway should execute the run (customer path).
  * - Explicit `null`: any gateway (account-wide poller or competing named gateways).
- * - Explicit string: that gateway (must be owned and active).
- * - `undefined`: pipeline default if valid; else account `defaultAgentTokenId` if valid; else if exactly one named gateway, pin to it; else null.
+ * - Explicit string: that gateway (must be usable by this actor).
+ * - `undefined`: pipeline default if valid; else org or user `defaultAgentTokenId`; else single token in scope.
  */
 export async function resolveRunTargetAgentTokenId(params: {
   userId: string;
+  /** Clerk-linked org workspace when in org context (session or member's `organizationId` for background jobs). */
+  organizationId?: string | null;
   bodyOverride: string | null | undefined;
   pipelineDefaultId: string | null;
 }): Promise<string | null> {
   const { userId, bodyOverride, pipelineDefaultId } = params;
+  const organizationId = params.organizationId ?? null;
+
   if (bodyOverride !== undefined) {
     if (bodyOverride === null) return null;
-    await assertUserOwnsGatewayToken(userId, bodyOverride);
+    await assertActorOwnsGatewayToken(userId, bodyOverride);
     return bodyOverride;
   }
   if (pipelineDefaultId) {
     try {
-      await assertUserOwnsGatewayToken(userId, pipelineDefaultId);
+      await assertActorOwnsGatewayToken(userId, pipelineDefaultId);
       return pipelineDefaultId;
     } catch {
       // Stored default points at a revoked or missing token.
     }
   }
+
+  if (organizationId) {
+    const org = await db.organization.findFirst({
+      where: {
+        id: organizationId,
+        OR: [{ ownerUserId: userId }, { members: { some: { id: userId } } }],
+      },
+      select: { defaultAgentTokenId: true },
+    });
+    if (org?.defaultAgentTokenId) {
+      try {
+        await assertActorOwnsGatewayToken(userId, org.defaultAgentTokenId);
+        return org.defaultAgentTokenId;
+      } catch {
+        /* fall through */
+      }
+    }
+  }
+
   const user = await db.user.findUnique({
     where: { id: userId },
     select: { defaultAgentTokenId: true },
   });
   if (user?.defaultAgentTokenId) {
     try {
-      await assertUserOwnsGatewayToken(userId, user.defaultAgentTokenId);
+      await assertActorOwnsGatewayToken(userId, user.defaultAgentTokenId);
       return user.defaultAgentTokenId;
     } catch {
-      // Revoked or invalid — fall through.
+      /* fall through */
     }
   }
-  return (await singleNamedGatewayTokenIdForUser(userId)) ?? null;
+
+  return (await singleGatewayTokenIdInScope(userId, organizationId)) ?? null;
 }

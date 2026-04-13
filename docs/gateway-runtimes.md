@@ -57,3 +57,9 @@ All agents use the same routes (Bearer = gateway token from the app):
 - `PATCH /api/agent/runs/:id`
 
 See the in-app **Gateway** page and OpenAPI-style notes in agent source for details.
+
+## Organization workspaces (Clerk org)
+
+Named gateway tokens can be **org-scoped** (shared by the workspace) in addition to personal tokens. The org’s **default gateway** applies to unrouted runs when you are working in that org context (session), before falling back to your personal default. Creating org-scoped tokens is limited to **Pro** and **Team** on the **organization owner’s** subscription.
+
+**Per-pipeline hybrid:** each pipeline can set **Runs on** to *inherit account*, *eltPulse-managed*, or *customer gateway*, so one workspace can run some pipelines on eltPulse-managed compute and others on org or personal gateways.

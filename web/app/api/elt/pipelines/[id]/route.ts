@@ -33,6 +33,7 @@ const pipelinePatchSchema = z
     /** Full replacement for `source_configuration` (same shape as form builder / JSON tab). */
     sourceConfiguration: z.record(z.string(), z.any()).optional(),
     defaultTargetAgentTokenId: z.union([z.string().min(1), z.null()]).optional(),
+    executionHost: z.enum(["inherit", "eltpulse_managed", "customer_gateway"]).optional(),
   })
   .refine(
     (d) =>
@@ -41,7 +42,8 @@ const pipelinePatchSchema = z
       d.sourceType !== undefined ||
       d.destinationType !== undefined ||
       d.sourceConfiguration !== undefined ||
-      d.defaultTargetAgentTokenId !== undefined,
+      d.defaultTargetAgentTokenId !== undefined ||
+      d.executionHost !== undefined,
     { message: "No updatable fields" }
   );
 
@@ -176,6 +178,7 @@ export async function PUT(req: Request, ctx: Ctx) {
         workspaceYaml,
         ...(runsWebhookUrl !== undefined ? { runsWebhookUrl } : {}),
         ...(defaultTargetAgentTokenId !== undefined ? { defaultTargetAgentTokenId } : {}),
+        ...(body.executionHost !== undefined ? { executionHost: body.executionHost } : {}),
       },
     });
 
@@ -215,10 +218,21 @@ export async function PATCH(req: Request, ctx: Ctx) {
     p.sourceType === undefined &&
     p.destinationType === undefined &&
     p.sourceConfiguration === undefined &&
-    p.defaultTargetAgentTokenId === undefined;
+    p.defaultTargetAgentTokenId === undefined &&
+    p.executionHost === undefined;
 
   const onlyDefaultGateway =
     p.defaultTargetAgentTokenId !== undefined &&
+    p.executionHost === undefined &&
+    p.canvas === undefined &&
+    typeof p.enabled !== "boolean" &&
+    p.sourceType === undefined &&
+    p.destinationType === undefined &&
+    p.sourceConfiguration === undefined;
+
+  const onlyExecutionHost =
+    p.executionHost !== undefined &&
+    p.defaultTargetAgentTokenId === undefined &&
     p.canvas === undefined &&
     typeof p.enabled !== "boolean" &&
     p.sourceType === undefined &&
@@ -226,6 +240,20 @@ export async function PATCH(req: Request, ctx: Ctx) {
     p.sourceConfiguration === undefined;
 
   try {
+    if (onlyExecutionHost) {
+      const row = await db.eltPipeline.updateMany({
+        where: { id: pipelineId, userId: user.id },
+        data: { executionHost: p.executionHost },
+      });
+      if (row.count === 0) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
+      const pipeline = await db.eltPipeline.findFirst({
+        where: { id: pipelineId, userId: user.id },
+      });
+      return NextResponse.json({ pipeline });
+    }
+
     if (onlyDefaultGateway) {
       if (p.defaultTargetAgentTokenId === null) {
         const row = await db.eltPipeline.updateMany({
@@ -365,6 +393,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
         configYaml,
         workspaceYaml,
         ...(nextDefaultGateway !== undefined ? { defaultTargetAgentTokenId: nextDefaultGateway } : {}),
+        ...(p.executionHost !== undefined ? { executionHost: p.executionHost } : {}),
       },
     });
 

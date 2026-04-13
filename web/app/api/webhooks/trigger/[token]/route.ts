@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resolveRunTargetAgentTokenId } from "@/lib/agent/gateway-routing";
+import { resolveNewRunExecution } from "@/lib/agent/run-execution";
 import { db } from "@/lib/db/client";
 
 type Ctx = { params: { token: string } };
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   // Look up user by token
   const user = await db.user.findUnique({
     where: { incomingWebhookToken: token },
-    select: { id: true },
+    select: { id: true, executionPlane: true, organizationId: true },
   });
 
   if (!user) {
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
   const pipeline = await db.eltPipeline.findFirst({
     where: { userId: user.id, name: pipelineName },
-    select: { id: true, name: true, enabled: true, defaultTargetAgentTokenId: true },
+    select: { id: true, name: true, enabled: true, defaultTargetAgentTokenId: true, executionHost: true },
   });
 
   if (!pipeline) {
@@ -70,10 +70,13 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     ? body.environment.trim()
     : "webhook";
 
-  const targetAgentTokenId = await resolveRunTargetAgentTokenId({
+  const { targetAgentTokenId, ingestionExecutor } = await resolveNewRunExecution({
     userId: user.id,
+    organizationId: user.organizationId ?? null,
+    executionHost: pipeline.executionHost,
+    pipelineDefaultTargetAgentTokenId: pipeline.defaultTargetAgentTokenId,
     bodyOverride: undefined,
-    pipelineDefaultId: pipeline.defaultTargetAgentTokenId,
+    userExecutionPlane: user.executionPlane,
   });
 
   const run = await db.eltPipelineRun.create({
@@ -85,6 +88,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       correlationId,
       triggeredBy: "incoming_webhook",
       targetAgentTokenId,
+      ingestionExecutor,
     },
     select: { id: true, correlationId: true, status: true, environment: true },
   });

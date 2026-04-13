@@ -28,6 +28,8 @@ export const createPipelineBodySchema = z.object({
   runsWebhookUrl: z.string().max(2048).optional(),
   /** Default named gateway for new runs (AgentToken id). Null clears. */
   defaultTargetAgentTokenId: z.string().min(1).nullable().optional(),
+  /** Where new runs execute by default for this pipeline (hybrid). */
+  executionHost: z.enum(["inherit", "eltpulse_managed", "customer_gateway"]).optional(),
 });
 
 export type CreatePipelineBody = z.infer<typeof createPipelineBodySchema>;

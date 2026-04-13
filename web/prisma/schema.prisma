@@ -49,6 +49,16 @@ enum RunIngestionExecutor {
   customer_control_plane
 }
 
+/// Per-pipeline default for who executes new runs (hybrid: some managed, some on your gateway).
+enum PipelineExecutionHost {
+  /// Follow account/org execution plane (`User.executionPlane`) for managed vs customer.
+  inherit
+  /// Force eltPulse-managed workers for this pipeline’s new runs.
+  eltpulse_managed
+  /// Force self-hosted gateway resolution (tokens / routing) for this pipeline’s new runs.
+  customer_gateway
+}
+
 model User {
   id        String   @id @default(cuid())
   clerkId   String   @unique
@@ -82,7 +92,7 @@ model User {
   /// Membership in a shared org (not the owner row — use `ownedOrganization`).
   organizationId String?       @map("organization_id")
   organization   Organization? @relation("OrganizationMembers", fields: [organizationId], references: [id], onDelete: SetNull)
-  /// Org this user owns (billing + org-level agent token). At most one.
+  /// Org this user owns (billing + org-level gateway defaults). At most one.
   ownedOrganization Organization? @relation("OrganizationOwner")
   /// When set, unrouted runs (no pipeline default, no per-run override) pin to this named gateway. Distinct from legacy `agentToken`.
   defaultAgentTokenId String?     @unique @map("default_agent_token_id")
@@ -99,6 +109,9 @@ model AgentToken {
   id               String    @id @default(cuid())
   userId           String    @map("user_id")
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// When set, token is shared by this Clerk-linked org (Pro/Team). `userId` is the org owner for billing FK.
+  organizationId   String?   @map("organization_id")
+  organization     Organization? @relation("OrgScopedAgentTokens", fields: [organizationId], references: [id], onDelete: SetNull)
   name             String
   token            String    @unique @db.Text
   /// Optional labels, e.g. `{ "cloud": "aws", "site": "on-prem-dc1" }` for your own routing — not secret.
@@ -117,8 +130,11 @@ model AgentToken {
   pipelinesDefaultGateway EltPipeline[]  @relation("PipelineDefaultGateway")
   /// User who selected this token as account-level default for unrouted runs (at most one).
   userAccountDefaultFor User? @relation("UserAccountDefaultGateway")
+  /// Org that selected this token as workspace default for unrouted runs (at most one org row).
+  organizationAsWorkspaceDefault Organization? @relation("OrganizationDefaultGateway")
 
   @@index([userId])
+  @@index([organizationId])
   @@map("AgentToken")
 }
 
@@ -132,14 +148,19 @@ model Organization {
   owner       User     @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
   /// Bearer token for org-scoped gateways (same API as user `agentToken`).
   agentToken  String?  @unique @map("agent_token") @db.Text
+  /// Named gateway default for unrouted runs when working in this org (Clerk org session).
+  defaultAgentTokenId String?     @unique @map("default_agent_token_id")
+  defaultAgentToken    AgentToken? @relation("OrganizationDefaultGateway", fields: [defaultAgentTokenId], references: [id], onDelete: SetNull)
   /// Optional floor for sensor checks (seconds). If set, overrides plan-tier default for this org (e.g. enterprise contract).
   sensorPollIntervalSecondsOverride Int? @map("sensor_poll_interval_seconds_override")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   members User[] @relation("OrganizationMembers")
+  orgScopedAgentTokens AgentToken[] @relation("OrgScopedAgentTokens")
 
   @@index([ownerUserId])
+  @@index([defaultAgentTokenId])
   @@map("Organization")
 }
 
@@ -227,6 +248,8 @@ model EltPipeline {
   /// New pending runs from triggers/API inherit this gateway unless a per-run override is set.
   defaultTargetAgentTokenId String?     @map("default_target_agent_token_id")
   defaultTargetAgentToken   AgentToken? @relation("PipelineDefaultGateway", fields: [defaultTargetAgentTokenId], references: [id], onDelete: SetNull)
+  /// Hybrid execution: inherit account/org plane, force managed, or force customer gateway for new runs.
+  executionHost PipelineExecutionHost @default(inherit) @map("execution_host")
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

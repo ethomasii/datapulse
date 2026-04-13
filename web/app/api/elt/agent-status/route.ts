@@ -4,9 +4,11 @@
  * Session — execution preference, named connectors + heartbeats, account-wide token summary.
  */
 import { NextResponse } from "next/server";
+import { getActiveOrganizationForSession } from "@/lib/auth/active-org";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
 import { isManagedExecutionPlane, normalizeExecutionPlane } from "@/lib/elt/execution-plane";
+import { tierAllowsOrgGatewayTokens } from "@/lib/plans/org-gateway-tier";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +26,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const connectors = await db.agentToken.findMany({
-    where: { userId: user.id, revokedAt: null },
+    where: { userId: user.id, organizationId: null, revokedAt: null },
     orderBy: { createdAt: "asc" },
     select: {
       id: true,
@@ -53,6 +55,67 @@ export async function GET() {
     createdAt: c.createdAt.toISOString(),
   }));
 
+  const sessionOrg = await getActiveOrganizationForSession();
+  let organizationPayload: {
+    id: string;
+    name: string;
+    defaultAgentTokenId: string | null;
+    orgGatewaysAllowed: boolean;
+    connectors: typeof connectorPayload;
+  } | null = null;
+
+  if (sessionOrg) {
+    const org = await db.organization.findFirst({
+      where: {
+        id: sessionOrg.id,
+        OR: [{ ownerUserId: user.id }, { members: { some: { id: user.id } } }],
+      },
+      select: {
+        id: true,
+        name: true,
+        defaultAgentTokenId: true,
+        orgScopedAgentTokens: {
+          where: { revokedAt: null },
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            name: true,
+            metadata: true,
+            lastSeenAt: true,
+            lastSeenVersion: true,
+            lastSeenLabels: true,
+            lastSeenSource: true,
+            createdAt: true,
+          },
+        },
+        owner: { select: { subscription: { select: { tier: true } } } },
+      },
+    });
+    if (org) {
+      const tier = org.owner.subscription?.tier ?? "free";
+      organizationPayload = {
+        id: org.id,
+        name: org.name,
+        defaultAgentTokenId: org.defaultAgentTokenId,
+        orgGatewaysAllowed: tierAllowsOrgGatewayTokens(tier),
+        connectors: org.orgScopedAgentTokens.map((c) => ({
+          id: c.id,
+          name: c.name,
+          metadata: c.metadata,
+          heartbeat: c.lastSeenAt
+            ? {
+                seenAt: c.lastSeenAt.toISOString(),
+                version: c.lastSeenVersion ?? "unknown",
+                labels: labelsFromJson(c.lastSeenLabels),
+                source: c.lastSeenSource ?? "customer_agent",
+              }
+            : null,
+          createdAt: c.createdAt.toISOString(),
+        })),
+      };
+    }
+  }
+
   const accountTokenHb =
     user.agentLastSeenAt && user.agentToken
       ? {
@@ -70,6 +133,13 @@ export async function GET() {
       candidates.push({ t: new Date(c.heartbeat.seenAt), kind: "connector", hb: c.heartbeat });
     }
   }
+  if (organizationPayload) {
+    for (const c of organizationPayload.connectors) {
+      if (c.heartbeat) {
+        candidates.push({ t: new Date(c.heartbeat.seenAt), kind: "connector", hb: c.heartbeat });
+      }
+    }
+  }
   if (accountTokenHb) {
     candidates.push({ t: new Date(accountTokenHb.seenAt), kind: "account", hb: accountTokenHb });
   }
@@ -78,14 +148,19 @@ export async function GET() {
 
   const managedComputeReady = isManagedExecutionPlane(user.executionPlane);
 
+  const orgConnectorCount = organizationPayload?.connectors.length ?? 0;
+  const hasNamedConnectors = connectors.length > 0 || orgConnectorCount > 0;
+  const hasAnyToken = Boolean(user.agentToken) || hasNamedConnectors;
+
   return NextResponse.json({
     executionPlane: normalizeExecutionPlane(user.executionPlane),
     managedComputeReady,
     hasAccountToken: Boolean(user.agentToken),
-    hasNamedConnectors: connectors.length > 0,
-    hasAnyToken: Boolean(user.agentToken) || connectors.length > 0,
+    hasNamedConnectors,
+    hasAnyToken,
     defaultAgentTokenId: user.defaultAgentTokenId,
     connectors: connectorPayload,
+    organization: organizationPayload,
     accountTokenHeartbeat: accountTokenHb,
     heartbeat: summaryHeartbeat,
   });
