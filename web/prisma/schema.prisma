@@ -1,4 +1,4 @@
-// DataPulse — minimal SaaS schema (Clerk + Stripe + Neon)
+// eltPulse — minimal SaaS schema (Clerk + Stripe + Neon)
 // Extend with workspaces, pipelines, and run history as the product grows.
 
 generator client {
@@ -28,6 +28,23 @@ enum SubscriptionStatus {
   paused
 }
 
+/// Who runs pipeline ingestion for this account. Telemetry (runs, logs) is always stored in eltPulse either way.
+enum ExecutionPlane {
+  /// Customer-operated execution (optional self-hosted agent token, CI, or control-plane API reporting).
+  customer_agent
+  /// eltPulse-operated execution when managed compute is available (roadmap).
+  datapulse_managed
+}
+
+/// How this run’s telemetry was produced / who executed ingestion. Distinct from `triggeredBy` (schedule, webhook, etc.).
+enum RunIngestionExecutor {
+  unspecified
+  customer_agent
+  datapulse_managed
+  /// Logged-in app or session API (`/api/elt/runs`) reporting without the self-hosted agent.
+  customer_control_plane
+}
+
 model User {
   id        String   @id @default(cuid())
   clerkId   String   @unique
@@ -38,8 +55,10 @@ model User {
   runsWebhookUrl String? @db.Text
   /// Secret token for the incoming webhook trigger endpoint (POST /api/webhooks/trigger/:token).
   incomingWebhookToken String? @unique @db.Text
-  /// Secret token for the self-hosted DataPulse agent (polls pending runs, reports back).
+  /// Secret token for the self-hosted eltPulse agent (polls pending runs, reports back). Optional — omit for API-only or managed-only flows.
   agentToken String? @unique @db.Text
+  /// Preferred execution plane; does not require `agentToken` when set to `customer_agent` (CI / app can still report runs).
+  executionPlane ExecutionPlane @default(customer_agent) @map("execution_plane")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -50,7 +69,7 @@ model User {
   connections Connection[]
 }
 
-/// Optional: per-customer GitHub OAuth (BYO org). Disabled when using managed repos under DataPulse’s org only.
+/// Optional: per-customer GitHub OAuth (BYO org). Disabled when using managed repos under eltPulse’s org only.
 model GithubConnection {
   id               String   @id @default(cuid())
   userId           String   @unique
@@ -79,8 +98,10 @@ model Connection {
   connectionType String
   /// Connector key, e.g. "postgres", "bigquery", "snowflake", "github"
   connector   String
-  /// Non-secret config blob (schema, project_id, account, etc.). Secrets stay in env vars.
+  /// Non-secret config blob (schema, project_id, account, etc.).
   config      Json     @default("{}")
+  /// AES-256-GCM ciphertext of JSON `Record<envKey, secretValue>` (catalog keys only). Optional: agent / future managed runners.
+  connectionSecretsEnc String? @map("connection_secrets_enc") @db.Text
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -88,7 +109,7 @@ model Connection {
   @@index([userId])
 }
 
-/// Generated ELT pipeline definitions stored in Neon — no local runner required.
+/// Generated ELT pipeline definitions stored in Neon. Execution is customer-operated (optional agent / API) or eltPulse-managed when enabled.
 model EltPipeline {
   id                  String   @id @default(cuid())
   userId              String
@@ -103,8 +124,8 @@ model EltPipeline {
   sourceConfiguration Json     @default("{}")
   pipelineCode        String   @db.Text
   configYaml          String?  @db.Text
-  /// datapulse_workspace.yaml manifest (DB column name is historical)
-  workspaceYaml       String?  @map("dagsterYaml") @db.Text
+  /// eltPulse workspace manifest (scheduling, monitors, metadata). Stored as YAML text.
+  workspaceYaml       String?  @map("workspace_yaml") @db.Text
   /// Optional: POST run events here for this pipeline only (overrides account default when set).
   runsWebhookUrl      String?  @db.Text
   createdAt           DateTime @default(now())
@@ -130,6 +151,8 @@ model EltPipelineRun {
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   pipelineId    String
   pipeline      EltPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  /// Whether ingestion ran on the customer agent, managed eltPulse worker, or was reported via the control-plane API.
+  ingestionExecutor RunIngestionExecutor @default(unspecified) @map("ingestion_executor")
   status        RunStatus @default(pending)
   environment   String    @default("default")
   correlationId String    @unique

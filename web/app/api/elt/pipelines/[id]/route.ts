@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
@@ -6,8 +7,10 @@ import { prismaSchemaDriftResponse } from "@/lib/db/prisma-schema-drift-response
 import { createPipelineBodySchema, type CreatePipelineBody } from "@/lib/elt/types";
 import { generatePipelineArtifacts, resolveTool } from "@/lib/elt/generate-artifacts";
 import { mergeEltMetadataIntoSourceConfig } from "@/lib/elt/merge-elt-metadata";
+import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-graph";
 import { normalizeRunWebhookUrl } from "@/lib/elt/validate-run-webhook-url";
 import { mergeSourceConfigurationForSourceTypeChange } from "@/lib/elt/merge-source-config-on-type-change";
+import { syncDltDbtWithCanvas } from "@/lib/elt/dbt-canvas";
 
 const canvasPayloadSchema = z.union([
   z.object({
@@ -93,6 +96,7 @@ export async function PUT(req: Request, ctx: Ctx) {
 
   const body = parsed.data;
   const mergedSourceConfiguration = mergeEltMetadataIntoSourceConfig(body);
+  syncDltDbtWithCanvas(mergedSourceConfiguration);
   const bodyMerged = { ...body, sourceConfiguration: mergedSourceConfiguration };
 
   try {
@@ -228,6 +232,26 @@ export async function PATCH(req: Request, ctx: Ctx) {
     if (p.destinationType !== undefined) {
       destinationType = p.destinationType;
     }
+    if (p.canvas !== undefined && p.canvas !== null) {
+      const { nodes: rawNodes, edges: rawEdges } = p.canvas;
+      if (!Array.isArray(rawNodes) || !Array.isArray(rawEdges)) {
+        return NextResponse.json(
+          { error: "Invalid canvas: nodes and edges must be arrays" },
+          { status: 400 }
+        );
+      }
+      const canvasValidation = validatePipelineCanvasGraph(rawNodes as Node[], rawEdges as Edge[], {
+        requireConnectorTypes: true,
+        pipelineSourceType: sourceType,
+        pipelineDestinationType: destinationType,
+      });
+      if (!canvasValidation.ok) {
+        return NextResponse.json(
+          { error: "Canvas validation failed", errors: canvasValidation.errors },
+          { status: 400 }
+        );
+      }
+    }
     if (p.canvas !== undefined) {
       if (p.canvas === null) {
         delete base.canvas;
@@ -235,6 +259,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
         base.canvas = { ...p.canvas, v: 1 };
       }
     }
+
+    syncDltDbtWithCanvas(base);
 
     const tool: CreatePipelineBody["tool"] =
       existing.tool === "dlt" || existing.tool === "sling" ? existing.tool : "auto";

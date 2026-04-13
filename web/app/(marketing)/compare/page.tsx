@@ -4,12 +4,12 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Compare",
   description:
-    "How DataPulse relates to Fivetran, Airbyte, Hevo, and other ELT approaches — managed SaaS, open source, and git-native control planes.",
+    "How eltPulse relates to Fivetran, Airbyte, Hevo, and other ELT approaches — managed SaaS, open source, and git-native control planes.",
 };
 
 type Row = {
   dimension: string;
-  datapulse: string;
+  eltpulse: string;
   fivetran: string;
   airbyte: string;
   hevo: string;
@@ -19,7 +19,7 @@ type Row = {
 const rows: Row[] = [
   {
     dimension: "What it optimizes for",
-    datapulse:
+    eltpulse:
       "Definitions as code, Git review, control plane for pipeline codegen and policy — you choose where jobs run.",
     fivetran:
       "Broad managed connectors and reliability; you operate inside their product and billing model.",
@@ -32,7 +32,7 @@ const rows: Row[] = [
   },
   {
     dimension: "Where pipeline logic lives",
-    datapulse: "Repo-friendly artifacts + UI; built to diff, PR, and export like application code.",
+    eltpulse: "Repo-friendly artifacts + UI; built to diff, PR, and export like application code.",
     fivetran: "Primarily in-product configuration; Git integrations exist but the core model is managed SaaS.",
     airbyte: "Connector configs and syncs in Airbyte; OSS lets you fork and extend.",
     hevo: "In-product pipelines and dashboards; less emphasis on Git-as-source-of-truth.",
@@ -40,7 +40,7 @@ const rows: Row[] = [
   },
   {
     dimension: "Execution & data plane",
-    datapulse:
+    eltpulse:
       "Designed for BYO runners or future managed agents; infra cost with transparent markup is the direction of travel.",
     fivetran: "Runs on Fivetran’s infrastructure; you pay for usage and plan tier.",
     airbyte: "Self-hosted (your compute) or Airbyte Cloud (managed).",
@@ -49,7 +49,7 @@ const rows: Row[] = [
   },
   {
     dimension: "Pricing posture (high level)",
-    datapulse:
+    eltpulse:
       "Usage-oriented (rows, network, compute) with explicit margin on hosted compute — see Pricing & Billing.",
     fivetran: "Consumption (e.g. MAR) and plan-based; enterprise contracts common.",
     airbyte: "Cloud credits / usage; OSS is free, ops cost is yours.",
@@ -58,7 +58,7 @@ const rows: Row[] = [
   },
   {
     dimension: "Open source",
-    datapulse: "Open-source core plus SaaS shell; built on battle-tested open-source sync engines.",
+    eltpulse: "Open-source core plus SaaS shell; built on battle-tested open-source sync engines.",
     fivetran: "Proprietary managed service.",
     airbyte: "OSS core + commercial cloud.",
     hevo: "Proprietary managed service.",
@@ -71,7 +71,7 @@ export default function ComparePage() {
     <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
       <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Marketing</p>
       <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
-        DataPulse and other ELT vendors
+        eltPulse and other ELT vendors
       </h1>
       <p className="mt-4 max-w-3xl text-lg text-slate-600 dark:text-slate-300">
         Buyers compare dozens of tools:{" "}
@@ -79,7 +79,7 @@ export default function ComparePage() {
         <span className="font-medium text-slate-800 dark:text-slate-200">Airbyte</span>,{" "}
         <span className="font-medium text-slate-800 dark:text-slate-200">Hevo</span>, Matillion, Meltano, Stitch,
         Portable, and others. None of them are “wrong” — they optimize for different constraints. This page situates{" "}
-        <span className="font-medium text-slate-800 dark:text-slate-200">DataPulse</span> honestly: a{" "}
+        <span className="font-medium text-slate-800 dark:text-slate-200">eltPulse</span> honestly: a{" "}
         <strong className="font-medium">git-native control plane</strong> for designing, running, and observing data
         pipelines — with transparent usage economics and the ability to run workloads on your own agents.
       </p>
@@ -95,7 +95,7 @@ export default function ComparePage() {
               <th className="sticky left-0 z-10 w-40 bg-slate-50 px-4 py-3 font-semibold text-slate-900 dark:bg-slate-900 dark:text-white">
                 Dimension
               </th>
-              <th className="px-4 py-3 font-semibold text-sky-800 dark:text-sky-200">DataPulse</th>
+              <th className="px-4 py-3 font-semibold text-sky-800 dark:text-sky-200">eltPulse</th>
               <th className="px-4 py-3 font-semibold text-slate-900 dark:text-white">Fivetran</th>
               <th className="px-4 py-3 font-semibold text-slate-900 dark:text-white">Airbyte</th>
               <th className="px-4 py-3 font-semibold text-slate-900 dark:text-white">Hevo</th>
@@ -112,7 +112,7 @@ export default function ComparePage() {
                   {row.dimension}
                 </th>
                 <td className="bg-sky-50/50 px-4 py-3 align-top text-slate-700 dark:bg-sky-950/20 dark:text-slate-300">
-                  {row.datapulse}
+                  {row.eltpulse}
                 </td>
                 <td className="px-4 py-3 align-top text-slate-600 dark:text-slate-400">{row.fivetran}</td>
                 <td className="px-4 py-3 align-top text-slate-600 dark:text-slate-400">{row.airbyte}</td>
@@ -125,7 +125,7 @@ export default function ComparePage() {
       </div>
 
       <section className="mt-12 space-y-4 text-slate-600 dark:text-slate-400">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">When DataPulse is a strong fit</h2>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">When eltPulse is a strong fit</h2>
         <ul className="list-inside list-disc space-y-2">
           <li>You want pipeline definitions to live next to application code: PRs, environments, ownership.</li>
           <li>You want a product layer for connector catalog, smart hints, and pipeline exports — without building it yourself.</li>
@@ -134,7 +134,7 @@ export default function ComparePage() {
         <h2 className="pt-4 text-lg font-semibold text-slate-900 dark:text-white">When to look elsewhere</h2>
         <ul className="list-inside list-disc space-y-2">
           <li>You need the widest managed connector catalog on day one — mature SaaS catalogs still lead on breadth.</li>
-          <li>You want a fully turnkey reverse-ETL or CDP; that is not DataPulse’s core focus today.</li>
+          <li>You want a fully turnkey reverse-ETL or CDP; that is not eltPulse’s core focus today.</li>
           <li>You have no appetite for Git or code artifacts; a UI-only managed tool may feel simpler.</li>
         </ul>
       </section>

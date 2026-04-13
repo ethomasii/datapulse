@@ -1,4 +1,4 @@
-"""DataPulse Authentication - Secure credential management for sensors.
+"""eltPulse Authentication - Secure credential management for sensors.
 
 This module provides secure authentication for cloud services used by sensors,
 supporting various authentication methods and credential storage.

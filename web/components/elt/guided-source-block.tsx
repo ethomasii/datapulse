@@ -57,7 +57,7 @@ export function GuidedSourceBlock({
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/50">
           <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">GitHub advanced settings</h3>
           <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-            Configure how DataPulse syncs this repository. The access token is never stored — set it in your runner environment.
+            Configure how eltPulse syncs this repository. The access token is never stored — set it in your runner environment.
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="block sm:col-span-2">
@@ -160,7 +160,7 @@ export function GuidedSourceBlock({
       <div>
         <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Source connection</h4>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          Same fields as <code className="text-[11px]">SOURCE_CREDENTIALS</code> in the DataPulse connector catalog. Non-secret
+          Same fields as <code className="text-[11px]">SOURCE_CREDENTIALS</code> in the eltPulse connector catalog. Non-secret
           values can be saved with the pipeline; passwords and large secrets are not persisted.
         </p>
         <div className="mt-3">

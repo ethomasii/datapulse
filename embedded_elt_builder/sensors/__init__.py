@@ -1,4 +1,4 @@
-"""DataPulse Sensors - Event-driven pipeline orchestration.
+"""eltPulse Sensors - Event-driven pipeline orchestration.
 
 This module provides sensors that monitor external systems and trigger pipelines
 based on configurable conditions like file counts, data thresholds, etc.
@@ -14,9 +14,19 @@ import os
 
 from ..auth import AuthManager, auth_manager
 
+# Canonical CLI / API monitor type ids (persisted in sensors_config.json).
+_SENSOR_CLASS_TO_TYPE_ID: Dict[str, str] = {
+    "S3FileCountSensor": "s3_file_count",
+    "GCSFileCountSensor": "gcs_file_count",
+    "ADLSFileCountSensor": "adls_file_count",
+    "CSVRowCountSensor": "csv_row_count",
+    "KafkaMessageCountSensor": "kafka_message_count",
+    "SQSMessageCountSensor": "sqs_message_count",
+}
+
 
 class BaseSensor(ABC):
-    """Base class for all DataPulse sensors."""
+    """Base class for all eltPulse sensors."""
 
     def __init__(self, name: str, pipeline_name: str, config: Dict[str, Any]):
         self.name = name
@@ -32,10 +42,13 @@ class BaseSensor(ABC):
 
     def get_status(self) -> Dict[str, Any]:
         """Get current sensor status."""
+        type_id = _SENSOR_CLASS_TO_TYPE_ID.get(
+            self.__class__.__name__, self.__class__.__name__
+        )
         return {
             "name": self.name,
             "pipeline_name": self.pipeline_name,
-            "type": self.__class__.__name__,
+            "type": type_id,
             "last_check": self.last_check.isoformat() if self.last_check else None,
             "config": self.config
         }
@@ -503,16 +516,12 @@ class SensorManager:
 
     def _save_config(self):
         """Save current sensor configurations to file."""
-        # Map class names to type strings
-        type_mapping = {
-            "s3filecount": "s3_file_count",
-            "csvrowcount": "csv_row_count",
-        }
-
         configs = []
         for sensor in self.sensors.values():
-            class_name = sensor.__class__.__name__.replace('Sensor', '').lower()
-            sensor_type = type_mapping.get(class_name, class_name)
+            sensor_type = _SENSOR_CLASS_TO_TYPE_ID.get(
+                sensor.__class__.__name__,
+                sensor.__class__.__name__.replace("Sensor", "").lower(),
+            )
 
             configs.append({
                 "name": sensor.name,

@@ -80,6 +80,7 @@ export async function PATCH(req: Request, { params }: Params) {
 
   const data: Prisma.EltPipelineRunUpdateInput = {
     status: nextStatus as never,
+    ingestionExecutor: "customer_agent",
     logEntries: logEntries as unknown as Prisma.InputJsonValue,
     finishedAt,
     ...(errorSummary !== undefined ? { errorSummary } : {}),

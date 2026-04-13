@@ -96,8 +96,12 @@ export async function PATCH(req: Request, context: RouteContext) {
   const wasTerminal = isTerminal(existing.status);
   const willBeTerminal = isTerminal(nextStatus);
 
+  const promoteExecutor =
+    existing.ingestionExecutor === "unspecified" ? ({ ingestionExecutor: "customer_control_plane" } as const) : {};
+
   const data: Prisma.EltPipelineRunUpdateInput = {
     status: nextStatus,
+    ...promoteExecutor,
     ...(body.logEntries !== undefined || body.appendLog ? { logEntries: logEntries as unknown as Prisma.InputJsonValue } : {}),
     ...(errorSummary !== undefined ? { errorSummary } : {}),
     finishedAt: nextFinishedAt,

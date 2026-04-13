@@ -176,7 +176,7 @@ def run(partition_key: str = None):
         dataset_name="${escapePyString(datasetName)}",
     )
 
-    # REST API configuration (advanced mode) — decoded from DataPulse UI JSON
+    # REST API configuration (advanced mode) — decoded from eltPulse UI JSON
     config = json.loads(base64.b64decode("${b64}").decode("utf-8"))
     source = rest_api_source(config)
 

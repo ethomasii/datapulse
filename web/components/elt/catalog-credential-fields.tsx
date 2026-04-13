@@ -97,7 +97,7 @@ export function CatalogCredentialFields({ fields, values, onPatch }: Props) {
               />
               {f.help ? <p className="mt-1 text-xs text-slate-500">{f.help}</p> : null}
               <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-200">
-                Not saved to DataPulse — use for local .env export only.
+                Not saved to eltPulse — use for local .env export only.
               </p>
             </label>
           );

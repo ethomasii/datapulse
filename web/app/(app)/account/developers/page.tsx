@@ -11,7 +11,7 @@ export default function DevelopersPage() {
       <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">API keys</h2>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-          Personal and service tokens for the DataPulse HTTP API (pipeline CRUD, triggers) will be issued here with
+          Personal and service tokens for the eltPulse HTTP API (pipeline CRUD, triggers) will be issued here with
           scopes and rotation — similar to developer settings in other SaaS products.
         </p>
         <div className="mt-6 rounded-lg border border-dashed border-slate-200 py-10 text-center text-sm text-slate-500 dark:border-slate-700">

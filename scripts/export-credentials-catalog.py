@@ -4,7 +4,7 @@ Export embedded_elt_builder.web.credentials_config to JSON for the Next.js UI.
 Run from repo root:
   python scripts/export-credentials-catalog.py
 
-Upstream parity: https://github.com/eric-thomas-dagster/embedded_elt_builder
+Catalog is generated from this repo’s embedded_elt_builder package.
 """
 
 from __future__ import annotations

@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Bot, Check, Copy, Eye, EyeOff, RefreshCw, RotateCcw, Trash2, Wifi, WifiOff } from "lucide-react";
+import { Bot, Check, Copy, Eye, EyeOff, Loader2, RefreshCw, RotateCcw, Trash2, Wifi, WifiOff } from "lucide-react";
 
 const CONTROL_PLANE_URL =
-  process.env.NEXT_PUBLIC_APP_URL ?? "https://app.datapulse.dev";
+  process.env.NEXT_PUBLIC_APP_URL ?? "https://app.eltpulse.dev";
 
 type Heartbeat = { seenAt: string; version: string; labels: Record<string, string> } | null;
 
@@ -20,6 +20,8 @@ function isRecentlyActive(hb: Heartbeat) {
   return Date.now() - new Date(hb.seenAt).getTime() < 90_000; // 90s grace
 }
 
+type ExecutionPlane = "customer_agent" | "datapulse_managed";
+
 export default function AgentPage() {
   const [hasToken, setHasToken] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -28,6 +30,8 @@ export default function AgentPage() {
   const [heartbeat, setHeartbeat] = useState<Heartbeat>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [executionPlane, setExecutionPlane] = useState<ExecutionPlane>("customer_agent");
+  const [planeSaving, setPlaneSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,12 +42,36 @@ export default function AgentPage() {
       ]);
       const tokenData = await tokenRes.json();
       setHasToken(tokenData.hasToken ?? false);
+      const plane = tokenData.executionPlane as ExecutionPlane | undefined;
+      setExecutionPlane(plane === "datapulse_managed" ? "datapulse_managed" : "customer_agent");
       const hbData = await hbRes.json().catch(() => ({}));
       setHeartbeat(hbData.heartbeat ?? null);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  async function persistPlane(plane: ExecutionPlane) {
+    if (plane === executionPlane) return;
+    setPlaneSaving(true);
+    try {
+      const res = await fetch("/api/elt/account-execution", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ executionPlane: plane }),
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        throw new Error(t || res.statusText);
+      }
+      const data = (await res.json()) as { executionPlane: ExecutionPlane };
+      setExecutionPlane(data.executionPlane === "datapulse_managed" ? "datapulse_managed" : "customer_agent");
+    } catch {
+      await load();
+    } finally {
+      setPlaneSaving(false);
+    }
+  }
 
   useEffect(() => { load(); }, [load]);
 
@@ -90,13 +118,13 @@ export default function AgentPage() {
   const masked = token ? token.slice(0, 8) + "•".repeat(20) + token.slice(-4) : "•".repeat(32);
 
   const dockerCmd = `docker run -d \\
-  --name datapulse-agent \\
+  --name eltpulse-agent \\
   --restart unless-stopped \\
   -e DATAPULSE_AGENT_TOKEN=<YOUR_TOKEN> \\
   -e DATAPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL} \\
-  ghcr.io/datapulse/agent:latest`;
+  ghcr.io/eltpulsehq/agent:latest`;
 
-  const envFileContent = `# DataPulse Agent — .env
+  const envFileContent = `# eltPulse Agent — .env
 DATAPULSE_AGENT_TOKEN=<YOUR_TOKEN>
 DATAPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
 
@@ -118,8 +146,9 @@ DATAPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
             <h1 className="text-xl font-bold text-slate-900 dark:text-white">Self-Hosted Agent</h1>
           </div>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Run a DataPulse agent on your own infrastructure. Your pipeline code and warehouse
-            credentials never leave your network — only run metadata and logs are sent back.
+            The self-hosted agent is <strong className="font-medium text-slate-700 dark:text-slate-300">optional</strong>.
+            Run history and logs always land in eltPulse whether you use an agent, managed compute (when available), or
+            report runs from the app / API.
           </p>
         </div>
         <button
@@ -130,6 +159,50 @@ DATAPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
           <RefreshCw className="h-4 w-4" /> Refresh
         </button>
       </div>
+
+      {/* Execution preference */}
+      <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Who runs ingestion</h2>
+          {planeSaving ? <Loader2 className="h-4 w-4 animate-spin text-slate-400" aria-label="Saving" /> : null}
+        </div>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          This is your account preference. Telemetry is stored either way. You do not need an agent token unless you
+          want a worker in your network to poll pending runs.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            disabled={loading || planeSaving}
+            onClick={() => void persistPlane("customer_agent")}
+            className={`rounded-lg border p-3 text-left text-sm transition ${
+              executionPlane === "customer_agent"
+                ? "border-sky-500 bg-sky-50/80 text-slate-900 dark:border-sky-500 dark:bg-sky-950/30 dark:text-white"
+                : "border-slate-200 text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-600"
+            }`}
+          >
+            <span className="font-medium">You operate execution</span>
+            <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+              Optional agent, CI, or session API — warehouse traffic stays on infrastructure you control.
+            </span>
+          </button>
+          <button
+            type="button"
+            disabled={loading || planeSaving}
+            onClick={() => void persistPlane("datapulse_managed")}
+            className={`rounded-lg border p-3 text-left text-sm transition ${
+              executionPlane === "datapulse_managed"
+                ? "border-sky-500 bg-sky-50/80 text-slate-900 dark:border-sky-500 dark:bg-sky-950/30 dark:text-white"
+                : "border-slate-200 text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-600"
+            }`}
+          >
+            <span className="font-medium">eltPulse-managed</span>
+            <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+              We run ingestion on your behalf when this tier is enabled (roadmap). Same run log UI and webhooks.
+            </span>
+          </button>
+        </div>
+      </section>
 
       {/* Agent status */}
       <div className={`flex items-center gap-3 rounded-xl border p-4 ${
@@ -252,7 +325,7 @@ DATAPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Step 2</p>
           <h3 className="mt-1 text-sm font-semibold text-slate-800 dark:text-white">Create a <code className="text-[12px]">.env</code> file</h3>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 mb-2">
-            Add your agent token and the credentials your pipelines need. Nothing in this file is sent to DataPulse — it stays on your machine.
+            Add your agent token and the credentials your pipelines need. Nothing in this file is sent to eltPulse — it stays on your machine.
           </p>
           <div className="relative">
             <pre className="overflow-x-auto rounded-lg bg-slate-950 p-4 text-[11px] leading-relaxed text-slate-200">
@@ -291,7 +364,7 @@ DATAPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
           </div>
           <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
             Or use <code className="text-[11px]">--env-file .env</code> to load from your env file:{" "}
-            <code className="text-[11px]">docker run -d --env-file .env ghcr.io/datapulse/agent:latest</code>
+            <code className="text-[11px]">docker run -d --env-file .env ghcr.io/eltpulsehq/agent:latest</code>
           </p>
         </div>
 
@@ -312,10 +385,18 @@ DATAPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
         <ul className="mt-3 space-y-1.5 text-xs text-slate-500 dark:text-slate-400 list-inside list-disc">
           <li>Polls <code className="text-[11px]">GET /api/agent/runs?status=pending</code> every few seconds</li>
           <li>Downloads the pipeline manifest (code + config) and executes it locally</li>
+          <li>
+            Loads stored connector secrets (if any) from{" "}
+            <code className="text-[11px]">GET /api/agent/connections</code> and injects them into the run environment —
+            same Bearer token as other agent routes
+          </li>
           <li>Streams log lines back via <code className="text-[11px]">PATCH /api/agent/runs/:id</code></li>
           <li>Reports final status (succeeded / failed) so you see it in the Runs UI</li>
           <li>Sends a heartbeat every 30s — visible as the green &quot;Agent online&quot; indicator above</li>
-          <li>Your warehouse credentials and raw data <strong>never leave your network</strong></li>
+          <li>
+            Execution and warehouse I/O happen on the agent; secrets you save in Connections are encrypted at rest in
+            eltPulse and only returned to your agent over TLS for local use
+          </li>
         </ul>
       </section>
     </div>

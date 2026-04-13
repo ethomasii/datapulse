@@ -76,6 +76,7 @@ export async function POST(req: Request) {
     data: {
       userId: user.id,
       pipelineId: pipeline.id,
+      ingestionExecutor: "customer_control_plane",
       status: body.status,
       environment: body.environment,
       correlationId,

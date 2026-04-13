@@ -8,7 +8,7 @@ export function getResend(): Resend | null {
 
 export function defaultFrom(): { email: string; name: string } {
   return {
-    email: process.env.RESEND_FROM_EMAIL ?? "notifications@datapulse.dev",
-    name: process.env.RESEND_FROM_NAME ?? "DataPulse",
+    email: process.env.RESEND_FROM_EMAIL ?? "notifications@eltpulse.dev",
+    name: process.env.RESEND_FROM_NAME ?? "eltPulse",
   };
 }

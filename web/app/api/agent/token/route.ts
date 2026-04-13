@@ -14,7 +14,10 @@ import { db } from "@/lib/db/client";
 export async function GET() {
   const user = await getCurrentDbUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  return NextResponse.json({ hasToken: Boolean(user.agentToken) });
+  return NextResponse.json({
+    hasToken: Boolean(user.agentToken),
+    executionPlane: user.executionPlane,
+  });
 }
 
 export async function POST() {

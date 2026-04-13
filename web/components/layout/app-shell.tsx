@@ -26,7 +26,7 @@ import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 
-const NAV_COLLAPSED_KEY = "datapulse-nav-collapsed";
+const NAV_COLLAPSED_KEY = "eltpulse-nav-collapsed";
 
 type NavItem = {
   href: string;
@@ -38,10 +38,10 @@ type NavItem = {
 const PRODUCT_NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/builder", label: "Pipelines", icon: Layers },
-  { href: "/orchestration", label: "Sensors", icon: Split },
+  { href: "/orchestration", label: "Monitors", icon: Split },
   { href: "/schedule", label: "Schedules", icon: CalendarClock },
   { href: "/runs", label: "Runs", icon: PlayCircle },
-  { href: "/partitions", label: "Partitions", icon: TableProperties },
+  { href: "/run-slices", label: "Run slices", icon: TableProperties },
   { href: "/connections", label: "Connections", icon: Cable },
   { href: "/webhooks", label: "Webhooks", icon: Webhook },
   { href: "/repos", label: "Repositories", icon: FolderGit2, soon: true },
@@ -173,10 +173,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             collapsed ? "justify-center px-2" : "gap-2 px-4"
           )}
         >
-          <Link href="/dashboard" className="flex items-center gap-2" title="DataPulse">
+          <Link href="/dashboard" className="flex items-center gap-2" title="eltPulse">
             <Activity className="h-6 w-6 shrink-0 text-sky-600" aria-hidden />
             {!collapsed && (
-              <span className="font-semibold text-slate-900 dark:text-slate-100">DataPulse</span>
+              <span className="font-semibold text-slate-900 dark:text-slate-100">eltPulse</span>
             )}
           </Link>
         </div>

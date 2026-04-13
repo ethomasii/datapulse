@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DataPulse Sensor Runner - Execute sensor checks and trigger pipelines."""
+"""eltPulse Sensor Runner - Execute sensor checks and trigger pipelines."""
 
 import sys
 import os
@@ -77,7 +77,7 @@ def trigger_pipeline(pipeline_name: str, metadata: dict):
         logger.info(f"Triggering pipeline: {pipeline_name}")
 
         # For now, we'll use the existing CLI to run the pipeline
-        # In a real implementation, this might integrate with Dagster or another orchestrator
+        # In a real implementation, this might integrate with your orchestrator or runner
 
         # Check if pipeline exists
         pipelines_dir = Path.cwd() / "pipelines"
@@ -133,7 +133,7 @@ def trigger_pipeline(pipeline_name: str, metadata: dict):
 
 def main():
     """Main sensor runner function."""
-    logger.info("Starting DataPulse Sensor Runner")
+    logger.info("Starting eltPulse Sensor Runner")
 
     # Load sensor configurations
     load_sensor_config()

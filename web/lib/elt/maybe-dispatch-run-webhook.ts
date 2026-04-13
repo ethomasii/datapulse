@@ -24,7 +24,7 @@ export async function maybeDispatchRunWebhook(runId: string, userId: string): Pr
 
   const base = appBaseUrl();
   const payload: RunWebhookPayload = {
-    source: "datapulse",
+    source: "eltpulse",
     event,
     correlationId: run.correlationId,
     pipelineId: run.pipelineId,

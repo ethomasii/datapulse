@@ -1,5 +1,5 @@
 {
-  "name": "datapulse-web",
+  "name": "eltpulse-web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -12,9 +12,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "prisma generate",
-    "db:push": "dotenv -e .env.local -o -- prisma db push",
-    "db:migrate": "dotenv -e .env.local -o -- prisma migrate dev",
-    "db:studio": "dotenv -e .env.local -o -- prisma studio"
+    "db:push": "dotenv-cli -e .env.local -- prisma db push",
+    "db:migrate": "dotenv-cli -e .env.local -- prisma migrate dev",
+    "db:studio": "dotenv-cli -e .env.local -- prisma studio"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

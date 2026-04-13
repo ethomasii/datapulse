@@ -47,12 +47,12 @@ export default async function BillingPage() {
           margin stay explicit so you can reason about the bill — no bundled “mystery” compute.
         </p>
         <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
-          If you prefer not to pay for managed execution, you can{" "}
-          <strong className="font-medium text-slate-800 dark:text-slate-200">run your own agent</strong> (in your
-          environment) and use DataPulse as the <strong className="font-medium text-slate-800 dark:text-slate-200">control plane</strong>{" "}
-          — pipelines, policies, and orchestration UI — without us charging for compute you provide. A first-party,
-          fully managed execution agent in our stack is <strong className="font-medium text-slate-800 dark:text-slate-200">on the roadmap</strong>;
-          many teams will start with bring-your-own execution.
+          An <strong className="font-medium text-slate-800 dark:text-slate-200">optional</strong> self-hosted agent is
+          one way to run ingestion on your hardware; run history and telemetry are always stored in eltPulse whether
+          you use an agent, report runs from the app or API, or (when available) choose{" "}
+          <strong className="font-medium text-slate-800 dark:text-slate-200">managed execution</strong> on our stack.
+          Set your preference under <Link href="/agent" className="font-medium text-sky-600 hover:underline dark:text-sky-400">Agent</Link>.
+          Bring-your-own execution avoids compute charges you would otherwise pay for managed tiers.
         </p>
         <p className="mt-3 text-xs text-slate-500 dark:text-slate-500">
           Meters, list prices, and contract terms will be confirmed before any usage-based compute charges go live.

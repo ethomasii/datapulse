@@ -176,10 +176,18 @@ export function TransformNode({ id, data }: NodeProps) {
         </select>
       </label>
       {transformTool === "dbt" ? (
-        <p className="nodrag mb-1 text-[10px] leading-snug text-amber-900/85 dark:text-amber-100/85">
-          There is no repo upload or dbt project link here yet — use{" "}
-          <span className="font-medium text-amber-950 dark:text-amber-50">Notes</span> below for intent, or choose another
-          approach until repositories are connected to this pipeline.
+        <p className="nodrag mb-1 truncate text-[10px] leading-snug text-amber-900/85 dark:text-amber-100/85">
+          {String(data.dbtPackagePath ?? "").trim() ? (
+            <>
+              dbt: <span className="font-mono text-[9px]">{String(data.dbtPackagePath).trim().slice(0, 42)}</span>
+              {String(data.dbtPackagePath).trim().length > 42 ? "…" : ""}
+              {String(data.dbtRunScope ?? "") === "selection" && String(data.dbtSelector ?? "").trim() ? (
+                <span className="text-amber-800 dark:text-amber-200"> · select</span>
+              ) : null}
+            </>
+          ) : (
+            <>dbt: set project path in the inspector →</>
+          )}
         </p>
       ) : null}
       <p className="nodrag mb-1 text-[10px] leading-snug text-slate-500 dark:text-slate-400">

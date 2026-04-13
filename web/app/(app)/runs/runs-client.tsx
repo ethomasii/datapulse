@@ -24,12 +24,27 @@ type RunRow = {
   environment: string;
   correlationId: string;
   triggeredBy: string | null;
+  ingestionExecutor?: string;
   startedAt: string;
   finishedAt: string | null;
   errorSummary: string | null;
   webhookStatus: string | null;
   pipeline: { id: string; name: string };
 };
+
+function telemetrySourceLabel(executor: string) {
+  switch (executor) {
+    case "customer_agent":
+      return "Your agent";
+    case "datapulse_managed":
+      return "eltPulse";
+    case "customer_control_plane":
+      return "App / API";
+    case "unspecified":
+    default:
+      return "—";
+  }
+}
 
 const STATUS_OPTIONS = ["pending", "running", "succeeded", "failed", "cancelled"] as const;
 
@@ -175,11 +190,15 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Runs</h1>
         <p className="mt-2 max-w-3xl text-slate-600 dark:text-slate-300">
           List and filter executions per pipeline (newest first). Logs are structured and scrubbed — we never store raw
-          warehouse credentials. Share the <strong className="font-medium text-slate-800 dark:text-slate-200">correlation ID</strong>{" "}
-          with your runner or CI for support. Optional webhooks fire when a run reaches a terminal state.
+          warehouse credentials. Telemetry is stored here whether ingestion runs on{" "}
+          <strong className="font-medium text-slate-800 dark:text-slate-200">your agent</strong>,{" "}
+          <strong className="font-medium text-slate-800 dark:text-slate-200">eltPulse-managed</strong> compute (when
+          enabled), or the <strong className="font-medium text-slate-800 dark:text-slate-200">app / API</strong>. Share
+          the <strong className="font-medium text-slate-800 dark:text-slate-200">correlation ID</strong> with your
+          runner or CI for support. Optional webhooks fire when a run reaches a terminal state.
         </p>
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-          Schedules and sensors don&apos;t live here — they trigger runs elsewhere (in DataPulse or in an external
+          Schedules and sensors don&apos;t live here — they trigger runs elsewhere (in eltPulse or in an external
           orchestrator). See{" "}
           <Link href="/orchestration" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
             Orchestration
@@ -296,6 +315,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                 <th className="px-3 py-2 font-medium">Pipeline</th>
                 <th className="px-3 py-2 font-medium">Environment</th>
                 <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Telemetry</th>
                 <th className="px-3 py-2 font-medium">Correlation ID</th>
                 <th className="px-3 py-2 font-medium" />
               </tr>
@@ -313,6 +333,9 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                       <StatusGlyph status={r.status} />
                       <span className="capitalize">{r.status}</span>
                     </span>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
+                    {telemetrySourceLabel(r.ingestionExecutor ?? "unspecified")}
                   </td>
                   <td className="max-w-[200px] truncate px-3 py-2 font-mono text-xs text-slate-600 dark:text-slate-400">
                     {r.correlationId}
@@ -365,6 +388,9 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                   <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs dark:bg-slate-800">
                     <StatusGlyph status={detail.run.status} />
                     {detail.run.status}
+                  </span>
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    Telemetry: {telemetrySourceLabel(detail.run.ingestionExecutor ?? "unspecified")}
                   </span>
                   <span className="text-slate-500">{detail.run.pipeline.name}</span>
                   <span className="text-slate-500">· {detail.run.environment}</span>

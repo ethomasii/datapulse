@@ -11,7 +11,7 @@ function FieldList({ title, fields }: { title: string; fields: CatalogCredential
   if (fields.length === 0) {
     return (
       <p className="text-xs text-slate-500 dark:text-slate-400">
-        No credential schema for this connector. Check the DataPulse connector docs for required environment variable names.
+        No credential schema for this connector. Check the eltPulse connector docs for required environment variable names.
       </p>
     );
   }
@@ -33,7 +33,7 @@ function FieldList({ title, fields }: { title: string; fields: CatalogCredential
 
 function buildDotEnvTemplate(sourceType: string, destinationType: string): string {
   const lines: string[] = [
-    "# Paste into .env where you run the DataPulse runner",
+    "# Paste into .env where you run the eltPulse runner",
     "",
   ];
   for (const f of getSourceCredentials(sourceType)) {

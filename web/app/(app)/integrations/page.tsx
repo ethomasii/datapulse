@@ -20,7 +20,7 @@ export default async function IntegrationsPage() {
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Integrations</h1>
         <p className="mt-2 text-slate-600 dark:text-slate-300">
           Connect <strong className="font-medium text-slate-800 dark:text-slate-200">accounts and services</strong>{" "}
-          DataPulse uses alongside your data plane — GitHub (optional BYO), and later Slack, webhooks, email, and
+          eltPulse uses alongside your data plane — GitHub (optional BYO), and later Slack, webhooks, email, and
           notification channels.
         </p>
         <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50/90 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-300">

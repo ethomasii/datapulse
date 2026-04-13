@@ -1,5 +1,5 @@
 /**
- * Canonical layout for managed DataPulse repositories (your GitHub org).
+ * Canonical layout for managed eltPulse repositories (your GitHub org).
  */
 export const DATAPULSE_REPO = {
   root: "datapulse",

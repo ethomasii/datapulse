@@ -5,7 +5,7 @@ import { DocsProse } from "@/components/docs/docs-prose";
 export const metadata: Metadata = {
   title: "Orchestration",
   description:
-    "Native orchestration on DataPulse plus portable definitions for Airflow, Dagster, Prefect, and other engines.",
+    "Schedules, eltPulse monitors, run slices, and portable pipeline definitions for your own runners and orchestrators.",
 };
 
 export default function OrchestrationDocsPage() {
@@ -13,25 +13,32 @@ export default function OrchestrationDocsPage() {
     <DocsProse>
       <h1>Orchestration</h1>
       <p>
-        DataPulse keeps <strong>definitions</strong> and <strong>orchestration</strong> separate: definitions describe
-        what runs (pipelines, code, assets), while orchestration covers when and how work runs — schedules, sensors,
-        partitions, and run policies. We aim to be the <strong>enterprise-grade</strong> place to run that
+        eltPulse keeps <strong>definitions</strong> and <strong>orchestration</strong> separate: definitions describe
+        what runs (pipelines, code, assets), while orchestration covers when and how work runs — schedules, monitors,
+        run slices, and run policies. We aim to be the <strong>enterprise-grade</strong> place to run that
         orchestration end-to-end, while keeping exports and contracts <strong>portable</strong> so you are never locked
-        in. The same artifacts can be driven by DataPulse or by tools you already use — Airflow, Dagster, Prefect, GitHub
+        in. The same artifacts can be driven by eltPulse or by tools you already use — Airflow, Prefect, GitHub
         Actions, or a custom runner — because we want customers who <em>choose</em> us, not customers who are stuck.
       </p>
 
-      <h2>Schedules and sensors</h2>
+      <h2>Schedules and monitors</h2>
       <p>
-        <strong>Schedules</strong> are time-based (cron). <strong>Sensors</strong> react to events (files, webhooks,
+        <strong>Schedules</strong> are time-based (cron). <strong>Monitors</strong> react to events (files, webhooks,
         upstream completions). Both belong in the orchestration layer, not embedded as opaque strings inside EL
         connectors.
       </p>
-
-      <h2>Partitions</h2>
       <p>
-        For backfills and incremental windows, runs can carry a partition key. Generated Python templates reserve a{" "}
-        <code>partition_key</code> path for that pattern.
+        In-product, event triggers are <strong>eltPulse monitors</strong>. They run in eltPulse&apos;s control plane (or
+        an agent you explicitly connect), so anything that touches your cloud accounts — S3, GCS, ADLS, queues, SaaS APIs
+        — needs <strong>credentials or connection profiles</strong> you grant to eltPulse, unlike jobs that only run
+        inside your own VPC with ambient instance roles.
+      </p>
+
+      <h2>Run slices</h2>
+      <p>
+        For backfills and incremental windows, runs can carry a slice key (often exposed as{" "}
+        <code>partition_key</code> in generated Python for compatibility). The Run slices page in the app is where you
+        configure that strategy per pipeline.
       </p>
 
       <h2>Where it appears in the product</h2>

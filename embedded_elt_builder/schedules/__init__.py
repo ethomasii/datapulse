@@ -1,4 +1,4 @@
-"""DataPulse Schedules - Cron-based pipeline orchestration.
+"""eltPulse Schedules - Cron-based pipeline orchestration.
 
 This module provides cron-based scheduling for pipelines, allowing time-based
 triggers for automated pipeline execution.
@@ -24,7 +24,7 @@ class ScheduleResult:
 
 
 class BaseSchedule(ABC):
-    """Base class for all DataPulse schedules."""
+    """Base class for all eltPulse schedules."""
 
     def __init__(self, name: str, pipeline_name: str, cron_expression: str, timezone: str = 'UTC'):
         self.name = name
@@ -152,7 +152,7 @@ class WeeklySchedule(BaseSchedule):
 
 
 class ScheduleManager:
-    """Manager for DataPulse schedules."""
+    """Manager for eltPulse schedules."""
 
     def __init__(self, storage_path: Optional[str] = None):
         self.storage_path = Path(storage_path or os.path.expanduser("~/.datapulse/schedules.json"))

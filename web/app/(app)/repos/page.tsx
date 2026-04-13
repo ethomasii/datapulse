@@ -51,7 +51,7 @@ export default async function ReposPage() {
         ) : (
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
             No personal GitHub OAuth linked yet. The default product targets <strong className="font-medium">managed</strong>{" "}
-            repos under DataPulse&apos;s org (service credentials). For experiments, optional BYO OAuth lives in{" "}
+            repos under eltPulse&apos;s org (service credentials). For experiments, optional BYO OAuth lives in{" "}
             <Link href="/integrations" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
               Integrations
             </Link>
@@ -77,7 +77,7 @@ export default async function ReposPage() {
     <UpcomingFeaturePage
       eyebrow="Product · Git"
       title="Repositories"
-      summary="Pick the default GitHub repository and branch where DataPulse writes pipeline definitions — all under your organization’s GitHub App. Customers keep using DataPulse only; they never need to OAuth to GitHub for the default product."
+      summary="Pick the default GitHub repository and branch where eltPulse writes pipeline definitions — all under your organization’s GitHub App. Customers keep using eltPulse only; they never need to OAuth to GitHub for the default product."
       eta="2026 — GitHub App + commit automation"
       actions={actions}
       focusAreas={[

@@ -1,12 +1,12 @@
 import Link from "next/link";
 
-const repo = "https://github.com/ethomasii/datapulse";
+const repo = "https://github.com/eltpulsehq/eltpulse";
 
 export function MarketingFooter() {
   return (
     <footer className="border-t border-slate-200 bg-slate-50 py-10 dark:border-slate-800 dark:bg-slate-950">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 text-sm text-slate-600 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <p>© {new Date().getFullYear()} DataPulse</p>
+        <p>© {new Date().getFullYear()} eltPulse</p>
         <div className="flex flex-wrap gap-4">
           <Link href="/docs" className="hover:text-slate-900 dark:hover:text-slate-200">
             Docs

@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Cable, Plus, Trash2, ChevronDown, ChevronRight, Check } from "lucide-react";
+import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
+import { Cable, Plus, Trash2, ChevronDown, ChevronRight, Check, Shield } from "lucide-react";
+import { ConnectionStoredSecretsForm } from "@/components/elt/connection-stored-secrets-form";
+import { CopyEnvButton } from "@/components/elt/copy-env-button";
+import { CREDENTIAL_HINTS } from "@/lib/elt/credential-hints";
+import { getDestinationCredentials, getSourceCredentials } from "@/lib/elt/credentials-catalog";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +20,8 @@ type Connection = {
   connector: string;
   config: Record<string, string>;
   updatedAt: string;
+  /** Present when API returns public connection shape (ciphertext never sent to browser). */
+  hasStoredSecrets?: boolean;
 };
 
 // ── Connector lists ──────────────────────────────────────────────────────────
@@ -150,6 +158,81 @@ const TYPE_COLOR: Record<ConnectionType, string> = {
   destination: "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-900/50",
 };
 
+const apiFetch = (input: string, init?: RequestInit) =>
+  fetch(input, { credentials: "same-origin", ...init });
+
+type AuthHintRow = { key: string; label: string; help?: string };
+
+function runnerAuthHints(connectionType: ConnectionType, connector: string): AuthHintRow[] {
+  const key = connector.toLowerCase();
+  if (connectionType === "destination") {
+    const d = getDestinationCredentials(key);
+    if (d.length) return d.map((f) => ({ key: f.key, label: f.label, help: f.help }));
+  } else {
+    const s = getSourceCredentials(key);
+    if (s.length) return s.map((f) => ({ key: f.key, label: f.label, help: f.help }));
+  }
+  const h = CREDENTIAL_HINTS[key];
+  if (h) return h.map((x) => ({ key: x.key, label: x.label, help: x.help }));
+  return [];
+}
+
+function ConnectorRunnerAuthBlock({
+  connectionType,
+  connector,
+}: {
+  connectionType: ConnectionType;
+  connector: string;
+}) {
+  const rows = runnerAuthHints(connectionType, connector);
+  if (rows.length === 0) {
+    return (
+      <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-900/50">
+        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">Authenticate in your runtime</p>
+        <p className="mt-1 text-[11px] leading-snug text-slate-600 dark:text-slate-400">
+          No preset env keys for this connector in the catalog yet. Set whatever your driver expects in the environment
+          where pipelines run, or add a <code className="rounded bg-white px-0.5 font-mono text-[10px] dark:bg-slate-800">credential_profile</code>{" "}
+          key in custom config for Python monitors.
+        </p>
+      </div>
+    );
+  }
+  const template = Object.fromEntries(rows.map((r) => [r.key, ""]));
+  return (
+    <div className="mt-4 rounded-lg border border-emerald-200/80 bg-emerald-50/50 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+      <p className="text-xs font-semibold text-emerald-950 dark:text-emerald-100">Authenticate in your runtime</p>
+      <p className="mt-1 text-[11px] leading-snug text-emerald-900/90 dark:text-emerald-100/90">
+        eltPulse does not store passwords or API keys in connection JSON. Set these variables where this connection is
+        used (local <code className="rounded bg-white/60 px-0.5 dark:bg-emerald-950/50">.env</code>, CI secrets, or your
+        agent host).
+      </p>
+      <ul className="mt-2 space-y-1.5 text-[11px] text-emerald-950 dark:text-emerald-100">
+        {rows.map((r) => (
+          <li key={r.key} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <code className="shrink-0 rounded bg-white/80 px-1 font-mono text-[10px] dark:bg-emerald-950/60">{r.key}</code>
+            <span className="text-emerald-900 dark:text-emerald-200">{r.label}</span>
+            {r.help && r.help.startsWith("http") ? (
+              <a
+                href={r.help}
+                target="_blank"
+                rel="noreferrer"
+                className="text-emerald-800 underline dark:text-emerald-300"
+              >
+                Link
+              </a>
+            ) : r.help ? (
+              <span className="text-emerald-800/80 dark:text-emerald-300/80">{r.help}</span>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3">
+        <CopyEnvButton values={template} className="border-emerald-300 dark:border-emerald-700" />
+      </div>
+    </div>
+  );
+}
+
 // ── Subcomponents ────────────────────────────────────────────────────────────
 
 function ConfigFields({
@@ -196,18 +279,53 @@ function ConnectionRow({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
   const [cfg, setCfg] = useState<Record<string, string>>(conn.config as Record<string, string>);
+  const [secretsDraft, setSecretsDraft] = useState<Record<string, string>>({});
+  const [clearSecrets, setClearSecrets] = useState(false);
+  const [hasSecrets, setHasSecrets] = useState(Boolean(conn.hasStoredSecrets));
 
   const hints = CONNECTOR_CONFIG_HINTS[conn.connector] ?? [];
 
+  useEffect(() => {
+    setCfg(conn.config as Record<string, string>);
+    setHasSecrets(Boolean(conn.hasStoredSecrets));
+    setSecretsDraft({});
+    setClearSecrets(false);
+  }, [conn.id, conn.updatedAt, conn.config, conn.hasStoredSecrets]);
+
   async function save() {
     setSaving(true);
+    setSaveErr(null);
     try {
-      await fetch(`/api/elt/connections/${conn.id}`, {
+      const body: Record<string, unknown> = { config: cfg };
+      if (clearSecrets) {
+        body.secrets = null;
+      } else if (Object.keys(secretsDraft).length > 0) {
+        body.secrets = secretsDraft;
+      }
+      const res = await apiFetch(`/api/elt/connections/${conn.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ config: cfg }),
+        body: JSON.stringify(body),
       });
+      if (res.status === 401) {
+        setSaveErr("Session expired — sign in again.");
+        return;
+      }
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        setSaveErr(typeof j.error === "string" ? j.error : "Save failed");
+        return;
+      }
+      const data = (await res.json().catch(() => ({}))) as {
+        connection?: { hasStoredSecrets?: boolean };
+      };
+      if (typeof data.connection?.hasStoredSecrets === "boolean") {
+        setHasSecrets(data.connection.hasStoredSecrets);
+      }
+      setSecretsDraft({});
+      setClearSecrets(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } finally {
@@ -255,23 +373,46 @@ function ConnectionRow({
           {hints.length > 0 ? (
             <>
               <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-                Non-secret config values only. Passwords, tokens, and keys belong in environment variables — never stored here.
+                Non-secret config values only. Use the encrypted section below for secrets you want eltPulse to store
+                for managed runners and the agent.
               </p>
               <ConfigFields connector={conn.connector} values={cfg} onChange={(k, v) => setCfg((p) => ({ ...p, [k]: v }))} />
-              <button
-                type="button"
-                onClick={save}
-                disabled={saving}
-                className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
-              >
-                {saved ? <><Check className="h-4 w-4" /> Saved</> : saving ? "Saving…" : "Save changes"}
-              </button>
             </>
           ) : (
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              No editable config fields for this connector. Credentials are managed via environment variables.
+              No standard non-secret fields for this connector. You can still store encrypted secrets below, or use
+              environment variables only.
             </p>
           )}
+          <ConnectionStoredSecretsForm
+            connectionType={conn.connectionType}
+            connector={conn.connector}
+            hasStoredSecrets={hasSecrets}
+            draftSecrets={secretsDraft}
+            onDraftChange={setSecretsDraft}
+            clearRequested={clearSecrets}
+            onClearRequested={setClearSecrets}
+          />
+          <ConnectorRunnerAuthBlock connectionType={conn.connectionType} connector={conn.connector} />
+          {saveErr ? (
+            <p className="mt-3 text-xs text-red-600 dark:text-red-400">{saveErr}</p>
+          ) : null}
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
+          >
+            {saved ? (
+              <>
+                <Check className="h-4 w-4" /> Saved
+              </>
+            ) : saving ? (
+              "Saving…"
+            ) : (
+              "Save changes"
+            )}
+          </button>
         </div>
       )}
     </li>
@@ -284,6 +425,8 @@ function CreateConnectionForm({ onCreated }: { onCreated: (c: Connection) => voi
   const [connector, setConnector] = useState("");
   const [name, setName] = useState("");
   const [cfg, setCfg] = useState<Record<string, string>>({});
+  const [secretsDraft, setSecretsDraft] = useState<Record<string, string>>({});
+  const [clearSecrets, setClearSecrets] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -292,10 +435,14 @@ function CreateConnectionForm({ onCreated }: { onCreated: (c: Connection) => voi
   useEffect(() => {
     setConnector("");
     setCfg({});
+    setSecretsDraft({});
+    setClearSecrets(false);
   }, [type]);
 
   useEffect(() => {
     setCfg({});
+    setSecretsDraft({});
+    setClearSecrets(false);
   }, [connector]);
 
   async function submit(e: React.FormEvent) {
@@ -304,12 +451,25 @@ function CreateConnectionForm({ onCreated }: { onCreated: (c: Connection) => voi
     setSaving(true);
     setError("");
     try {
-      const res = await fetch("/api/elt/connections", {
+      const payload: Record<string, unknown> = {
+        name: name.trim(),
+        connectionType: type,
+        connector,
+        config: cfg,
+      };
+      if (Object.keys(secretsDraft).some((k) => secretsDraft[k]?.trim())) {
+        payload.secrets = secretsDraft;
+      }
+      const res = await apiFetch("/api/elt/connections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), connectionType: type, connector, config: cfg }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
+      if (res.status === 401) {
+        setError("You must be signed in to create connections.");
+        return;
+      }
       if (!res.ok) {
         setError(data.error ?? "Failed to create connection");
         return;
@@ -318,6 +478,8 @@ function CreateConnectionForm({ onCreated }: { onCreated: (c: Connection) => voi
       setName("");
       setConnector("");
       setCfg({});
+      setSecretsDraft({});
+      setClearSecrets(false);
       setOpen(false);
     } finally {
       setSaving(false);
@@ -401,6 +563,16 @@ function CreateConnectionForm({ onCreated }: { onCreated: (c: Connection) => voi
             Non-secret config — passwords and tokens belong in environment variables.
           </p>
           <ConfigFields connector={connector} values={cfg} onChange={(k, v) => setCfg((p) => ({ ...p, [k]: v }))} />
+          <ConnectionStoredSecretsForm
+            connectionType={type}
+            connector={connector}
+            hasStoredSecrets={false}
+            draftSecrets={secretsDraft}
+            onDraftChange={setSecretsDraft}
+            clearRequested={clearSecrets}
+            onClearRequested={setClearSecrets}
+          />
+          <ConnectorRunnerAuthBlock connectionType={type} connector={connector} />
         </div>
       )}
 
@@ -427,23 +599,40 @@ function CreateConnectionForm({ onCreated }: { onCreated: (c: Connection) => voi
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ConnectionsPage() {
+  const { isSignedIn } = useUser();
   const [connections, setConnections] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [migrationPending, setMigrationPending] = useState(false);
   const [filter, setFilter] = useState<"all" | ConnectionType>("all");
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const res = await fetch("/api/elt/connections");
+      const res = await apiFetch("/api/elt/connections");
+      if (res.status === 401) {
+        setConnections([]);
+        setLoadError("You are not signed in, or your session expired. Sign in again to load connections.");
+        return;
+      }
       const text = await res.text();
-      if (!text) { setConnections([]); return; }
+      if (!text) {
+        setConnections([]);
+        return;
+      }
       try {
         const data = JSON.parse(text);
+        if (!res.ok) {
+          setConnections([]);
+          setLoadError(typeof data.error === "string" ? data.error : "Could not load connections");
+          return;
+        }
         setConnections((data.connections as Connection[]) ?? []);
         if (data._migrationPending) setMigrationPending(true);
       } catch {
         setConnections([]);
+        setLoadError("Unexpected response from server.");
       }
     } finally {
       setLoading(false);
@@ -453,7 +642,8 @@ export default function ConnectionsPage() {
   useEffect(() => { load(); }, [load]);
 
   async function remove(id: string) {
-    await fetch(`/api/elt/connections/${id}`, { method: "DELETE" });
+    const res = await apiFetch(`/api/elt/connections/${id}`, { method: "DELETE" });
+    if (!res.ok) return;
     setConnections((prev) => prev.filter((c) => c.id !== id));
   }
 
@@ -486,6 +676,50 @@ export default function ConnectionsPage() {
         </div>
         <CreateConnectionForm onCreated={onCreated} />
       </div>
+
+      <div className="rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 dark:border-sky-900/50 dark:bg-sky-950/25">
+        <div className="flex flex-wrap items-start gap-2">
+          <Shield className="mt-0.5 h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden />
+          <div className="min-w-0 flex-1 space-y-1 text-xs leading-snug text-sky-950 dark:text-sky-100">
+            <p className="font-semibold text-sky-900 dark:text-sky-50">Two layers of authentication</p>
+            <p>
+              <strong className="font-medium">1. Your eltPulse account</strong> — this page and the Connections API are
+              only available when you are signed in. Each row is stored under your user id in the database (not public).
+            </p>
+            <p>
+              <strong className="font-medium">2. Connectors (warehouses, clouds, SaaS)</strong> — secrets are never saved
+              in connection JSON. Expand a connection to see recommended <strong className="font-medium">environment variables</strong>{" "}
+              for your runner, or use a secret manager and reference names in your pipeline repo.
+            </p>
+            <p>
+              {isSignedIn ? (
+                <Link href="/account" className="font-medium text-sky-700 underline dark:text-sky-300">
+                  Account &amp; settings
+                </Link>
+              ) : (
+                <>
+                  <Link href="/sign-in" className="font-medium text-sky-700 underline dark:text-sky-300">
+                    Sign in
+                  </Link>
+                  {" · "}
+                  <Link href="/account" className="font-medium text-sky-700 underline dark:text-sky-300">
+                    Account &amp; settings
+                  </Link>
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {loadError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+          {loadError}{" "}
+          <Link href="/sign-in" className="font-semibold underline">
+            Sign in
+          </Link>
+        </div>
+      ) : null}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
@@ -557,7 +791,7 @@ export default function ConnectionsPage() {
             Set <code className="text-[11px]">source_connection</code> or{" "}
             <code className="text-[11px]">destination_connection</code> in a pipeline to use a named connection.
           </li>
-          <li>DataPulse merges the saved config with your pipeline definition at run time.</li>
+          <li>eltPulse merges the saved config with your pipeline definition at run time.</li>
           <li>Secrets (passwords, API keys, service accounts) are never stored — use environment variables.</li>
           <li>Changing a connection here propagates to every pipeline that references it by name.</li>
         </ul>

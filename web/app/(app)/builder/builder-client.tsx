@@ -356,9 +356,9 @@ export function BuilderClient({
       <div>
         <h1 className="text-left text-2xl font-bold text-slate-900 dark:text-white">Pipelines</h1>
         <p className="mt-2 max-w-3xl text-slate-600 dark:text-slate-300">
-          Define connections from sources to destinations. DataPulse handles the sync mechanics, stores your definitions
-          in your workspace, and generates a deployment package you can run anywhere — on DataPulse infrastructure or
-          your own. Logs and run metadata flow back to DataPulse either way so you keep full observability.
+          Define connections from sources to destinations. eltPulse handles the sync mechanics, stores your definitions
+          in your workspace, and generates a deployment package you can run anywhere — on eltPulse infrastructure or
+          your own. Logs and run metadata flow back to eltPulse either way so you keep full observability.
         </p>
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
           When you edit a pipeline, use <strong className="font-medium text-slate-600 dark:text-slate-300">Visual canvas</strong>{" "}
@@ -707,7 +707,7 @@ export function BuilderClient({
               </label>
             )}
 
-            <FormAccordion id="acc-quality" title="Quality, triggers & schedule" subtitle="Tests, sensors, partitions, schedule">
+            <FormAccordion id="acc-quality" title="Quality, triggers & schedule" subtitle="Tests, monitors, run slices, schedule">
               <div className="space-y-5">
 
                 {/* Data tests */}
@@ -727,7 +727,7 @@ export function BuilderClient({
                   />
                 </div>
 
-                {/* Sensors */}
+                {/* Monitors (pipeline notes) */}
                 <div className="rounded-lg border border-sky-100 bg-sky-50/60 p-3 dark:border-sky-900 dark:bg-sky-900/10">
                   <div className="flex items-start justify-between gap-2">
                     <div>
@@ -735,7 +735,7 @@ export function BuilderClient({
                       <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                         Describe which sensors should trigger this pipeline. Managed in{" "}
                         <Link href="/orchestration" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-                          Sensors
+                          Monitors
                         </Link>{" "}
                         — the live sensor engine is decoupled from the pipeline definition.
                       </p>
@@ -756,21 +756,21 @@ export function BuilderClient({
                   />
                 </div>
 
-                {/* Partitions */}
+                {/* Run slices */}
                 <div className="rounded-lg border border-teal-100 bg-teal-50/60 p-3 dark:border-teal-900 dark:bg-teal-900/10">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Partition strategy</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Run slice strategy</span>
                       <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        Note the partition column and granularity here. Configure full partition logic and launch backfills in{" "}
-                        <Link href="/partitions" className="font-medium text-teal-600 hover:underline dark:text-teal-400">
-                          Partitions
+                        Note the slice column and granularity here. Configure full slice logic and launch backfills in{" "}
+                        <Link href="/run-slices" className="font-medium text-teal-600 hover:underline dark:text-teal-400">
+                          Run slices
                         </Link>
                         .
                       </p>
                     </div>
                     <Link
-                      href="/partitions"
+                      href="/run-slices"
                       className="shrink-0 rounded border border-teal-200 bg-white px-2 py-1 text-xs font-medium text-teal-700 hover:bg-teal-50 dark:border-teal-700 dark:bg-slate-900 dark:text-teal-400"
                     >
                       Configure →

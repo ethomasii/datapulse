@@ -14,7 +14,7 @@ export async function GET() {
     return NextResponse.json(
       {
         error:
-          "Customer GitHub OAuth is disabled. Repositories are managed by DataPulse using service credentials.",
+          "Customer GitHub OAuth is disabled. Repositories are managed by eltPulse using service credentials.",
       },
       { status: 404 }
     );

@@ -20,16 +20,16 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   title: {
-    default: "DataPulse — ELT pipelines without the friction",
-    template: "%s | DataPulse",
+    default: "eltPulse — ELT pipelines without the friction",
+    template: "%s | eltPulse",
   },
   description:
-    "Design and ship data pipelines with a git-native control plane. DataPulse handles orchestration, metadata, and observability — run on our infrastructure or yours.",
+    "Design and ship data pipelines with a git-native control plane. eltPulse handles orchestration, metadata, and observability — run on our infrastructure or yours.",
   openGraph: {
     type: "website",
     locale: "en_US",
-    siteName: "DataPulse",
-    title: "DataPulse",
+    siteName: "eltPulse",
+    title: "eltPulse",
     description: "ELT builder and control plane for modern data teams.",
   },
 };

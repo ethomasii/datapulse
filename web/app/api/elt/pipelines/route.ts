@@ -4,6 +4,7 @@ import { db } from "@/lib/db/client";
 import { prismaSchemaDriftResponse } from "@/lib/db/prisma-schema-drift-response";
 import { createPipelineBodySchema } from "@/lib/elt/types";
 import { generatePipelineArtifacts, resolveTool } from "@/lib/elt/generate-artifacts";
+import { syncDltDbtWithCanvas } from "@/lib/elt/dbt-canvas";
 import { mergeEltMetadataIntoSourceConfig } from "@/lib/elt/merge-elt-metadata";
 import { normalizeRunWebhookUrl } from "@/lib/elt/validate-run-webhook-url";
 
@@ -51,6 +52,7 @@ export async function POST(req: Request) {
 
   const body = parsed.data;
   const mergedSourceConfiguration = mergeEltMetadataIntoSourceConfig(body);
+  syncDltDbtWithCanvas(mergedSourceConfiguration);
   const bodyMerged = { ...body, sourceConfiguration: mergedSourceConfiguration };
   const resolvedTool = resolveTool(bodyMerged);
 

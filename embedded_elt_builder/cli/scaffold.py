@@ -39,7 +39,7 @@ def scaffold():
 @click.option("--destination", "destination_type", required=True, help="Destination type (e.g., 'snowflake', 'bigquery')")
 @click.option("--repo-path", default=".", help="Path to the ELT pipelines repository")
 @click.option("--description", help="Pipeline description")
-@click.option("--group", "group_name", help="Dagster asset group name")
+@click.option("--group", "group_name", help="Pipeline group label (workspace metadata)")
 @click.option("--schedule", "cron_schedule", help="Cron schedule (e.g., '0 2 * * *')")
 @click.option("--interactive/--no-interactive", default=True, help="Interactively configure source options")
 @click.option("--git-commit/--no-git-commit", default=True, help="Auto-commit to git")
@@ -140,7 +140,7 @@ def create(
         click.echo(f"   3. Test locally: python -m pipelines.{tool}.{name}.pipeline")
     else:
         click.echo(f"   3. Test locally: sling run -r {pipeline_dir.relative_to(repo_path_obj)}/replication.yaml")
-    click.echo(f"   4. Deploy with Dagster")
+    click.echo(f"   4. Deploy with the eltPulse agent, your runner, or your own orchestration")
 
 
 def _prompt_for_configuration(config_fields: List[dict]) -> dict:

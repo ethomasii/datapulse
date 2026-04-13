@@ -24,8 +24,8 @@ export default function HelpPage() {
             <div>
               <p className="font-semibold text-slate-900 dark:text-white">Orchestration</p>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                Native orchestration on DataPulse plus portable definitions if you prefer Airflow, Dagster, Prefect, or
-                another engine — enterprise choice without lock-in.
+                Schedules and eltPulse sensors in our product, plus portable definitions if you prefer Airflow, Prefect,
+                or another engine — choice without lock-in.
               </p>
             </div>
           </Link>
@@ -66,7 +66,7 @@ export default function HelpPage() {
             <p className="font-semibold text-slate-900 dark:text-white">Contact support</p>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
               Dedicated support channels (in-app messaging, email) will appear here by tier. Until then, use your
-              existing DataPulse contact path.
+              existing eltPulse contact path.
             </p>
           </div>
         </li>

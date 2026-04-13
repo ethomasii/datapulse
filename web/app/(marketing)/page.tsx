@@ -13,7 +13,7 @@ const features = [
     icon: Layers,
     title: "Any source, any destination",
     description:
-      "Scaffold REST and database pipelines with smart defaults. DataPulse picks the right sync engine automatically.",
+      "Scaffold REST and database pipelines with smart defaults. eltPulse picks the right sync engine automatically.",
   },
   {
     icon: GitBranch,
@@ -42,13 +42,13 @@ export default function HomePage() {
         <div className="mx-auto max-w-3xl text-center">
           <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-200">
             <Sparkles className="h-3.5 w-3.5" aria-hidden />
-            Now shipping as DataPulse
+            Now shipping as eltPulse
           </p>
           <h1 className="text-balance text-4xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-5xl">
             ELT pipelines without the friction
           </h1>
           <p className="mt-6 text-lg text-slate-600 dark:text-slate-300">
-            DataPulse is the{" "}
+            eltPulse is the{" "}
             <span className="font-medium text-slate-800 dark:text-slate-200">control plane</span> for designing,
             running, and observing data pipelines — on our infrastructure or yours. You own the code; we handle the
             orchestration.
@@ -62,7 +62,7 @@ export default function HomePage() {
               <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
             <Link
-              href="https://github.com/ethomasii/datapulse"
+              href="https://github.com/eltpulsehq/eltpulse"
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm font-medium text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline dark:text-slate-300 dark:hover:text-white"

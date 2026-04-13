@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Roadmap",
-  description: "What we are building for DataPulse — execution, Git, and team features.",
+  description: "What we are building for eltPulse — execution, Git, and team features.",
 };
 
 type Status = "shipped" | "in-progress" | "planned" | "research";
@@ -33,7 +33,7 @@ const ITEMS: {
   {
     status: "in-progress",
     title: "Managed Git commits",
-    desc: "Push generated files into customer repos under the DataPulse GitHub org via app installation tokens.",
+    desc: "Push generated files into customer repos under the eltPulse GitHub org via app installation tokens.",
   },
   {
     status: "in-progress",
@@ -80,7 +80,7 @@ export default function RoadmapPage() {
     <div className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
       <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Roadmap</h1>
       <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
-        Priorities for DataPulse. Timelines shift with customer demand; we publish this page so expectations stay
+        Priorities for eltPulse. Timelines shift with customer demand; we publish this page so expectations stay
         aligned — the same reason we keep a public roadmap on{" "}
         <a
           href="https://servicepulse.dev/roadmap"
@@ -111,7 +111,7 @@ export default function RoadmapPage() {
       <div className="mt-14 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-6 dark:border-slate-700 dark:bg-slate-900/40">
         <p className="text-sm text-slate-700 dark:text-slate-300">
           Want something bumped? Read <Link href="/docs">the docs</Link> and reach out through your account channel
-          when support is wired — for now, use the contact path you already have with the team shipping DataPulse.
+          when support is wired — for now, use the contact path you already have with the team shipping eltPulse.
         </p>
       </div>
     </div>

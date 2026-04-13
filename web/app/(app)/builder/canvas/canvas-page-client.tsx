@@ -32,6 +32,8 @@ import {
   getCanvasFromSourceConfig,
   stripCanvasFromSourceConfig,
 } from "@/lib/elt/canvas-source-config";
+import { chooseTool } from "@/lib/elt/choose-tool";
+import { enrichTransformNodesFromDltDbt } from "@/lib/elt/dbt-canvas";
 import { attachCanvasToSourceConfiguration } from "@/lib/elt/merge-canvas-into-source-config";
 import { minimalSourceConfigurationForNewPipeline } from "@/lib/elt/minimal-source-configuration";
 import { ensureGithubReposForForm } from "@/lib/elt/normalize-source-configuration";
@@ -62,6 +64,8 @@ export function CanvasPageClient() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pipelineSourceType, setPipelineSourceType] = useState("");
   const [pipelineDestinationType, setPipelineDestinationType] = useState("");
+  /** Resolved runner: dlt emits post-load dbt in Python; sling does not. */
+  const [pipelineTool, setPipelineTool] = useState<"dlt" | "sling">("dlt");
   const [bindingsBusy, setBindingsBusy] = useState(false);
   const [bindingsError, setBindingsError] = useState<string | null>(null);
 
@@ -227,9 +231,10 @@ export function CanvasPageClient() {
     setDetailLoading(true);
     setSaveError(null);
     setBindingsError(null);
-    setPipelineSourceType("");
-    setPipelineDestinationType("");
-    setLoadedGraph(null);
+      setPipelineSourceType("");
+      setPipelineDestinationType("");
+      setPipelineTool("dlt");
+      setLoadedGraph(null);
     setLoadedSig("loading");
     setSourceConfigText("");
     setSourceConfigError(null);
@@ -238,9 +243,13 @@ export function CanvasPageClient() {
       const res = await fetch(`/api/elt/pipelines/${id}`, { signal: ac.signal });
       if (!res.ok) throw new Error("Could not load pipeline");
       const data = await res.json();
-      const row = data.pipeline as { sourceType?: string; destinationType?: string };
+      const row = data.pipeline as { sourceType?: string; destinationType?: string; tool?: string };
       setPipelineSourceType(typeof row.sourceType === "string" ? row.sourceType : "");
       setPipelineDestinationType(typeof row.destinationType === "string" ? row.destinationType : "");
+      const st0 = typeof row.sourceType === "string" ? row.sourceType : "github";
+      const dt0 = typeof row.destinationType === "string" ? row.destinationType : "duckdb";
+      const t = row.tool;
+      setPipelineTool(t === "dlt" || t === "sling" ? t : chooseTool(st0, dt0));
       const cfg = (data.pipeline.sourceConfiguration ?? {}) as Record<string, unknown>;
       lastFullSourceConfigRef.current = { ...cfg };
       const st = typeof row.sourceType === "string" ? row.sourceType : "github";
@@ -248,7 +257,11 @@ export function CanvasPageClient() {
       hydrateFormFromSourceConfig(cfg, st, dt);
       const canvas = getCanvasFromSourceConfig(cfg);
       if (canvas && Array.isArray(canvas.nodes) && Array.isArray(canvas.edges)) {
-        const g = { nodes: canvas.nodes as Node[], edges: canvas.edges as Edge[] };
+        const rawDbt = cfg.dlt_dbt;
+        const dbtObj =
+          rawDbt && typeof rawDbt === "object" && !Array.isArray(rawDbt) ? (rawDbt as Record<string, unknown>) : null;
+        const nodes = enrichTransformNodesFromDltDbt(canvas.nodes as Node[], dbtObj);
+        const g = { nodes, edges: canvas.edges as Edge[] };
         setLoadedGraph(g);
         setLoadedSig(JSON.stringify({ nodes: g.nodes, edges: g.edges }));
       } else {
@@ -309,6 +322,12 @@ export function CanvasPageClient() {
           throw new Error(msg);
         }
         if (data.pipeline) {
+          const prow = data.pipeline as { tool?: string; sourceType?: string; destinationType?: string };
+          if (typeof prow.tool === "string" && (prow.tool === "dlt" || prow.tool === "sling")) {
+            setPipelineTool(prow.tool);
+          } else if (typeof prow.sourceType === "string" && typeof prow.destinationType === "string") {
+            setPipelineTool(chooseTool(prow.sourceType, prow.destinationType));
+          }
           if (typeof data.pipeline.sourceType === "string") {
             setPipelineSourceType(data.pipeline.sourceType);
           }
@@ -409,8 +428,14 @@ export function CanvasPageClient() {
         body: JSON.stringify({ canvas: { nodes, edges, v: 1 } }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(typeof err.error === "string" ? err.error : JSON.stringify(err));
+        const err = (await res.json().catch(() => ({}))) as { error?: string; errors?: string[] };
+        const detail =
+          Array.isArray(err.errors) && err.errors.length > 0
+            ? err.errors.join(" ")
+            : typeof err.error === "string"
+              ? err.error
+              : JSON.stringify(err);
+        throw new Error(detail);
       }
       const data = (await res.json().catch(() => ({}))) as {
         pipeline?: { sourceConfiguration?: Record<string, unknown> };
@@ -521,6 +546,7 @@ export function CanvasPageClient() {
             key={focus.nodeId}
             nodeId={focus.nodeId}
             initialData={focus.data}
+            pipelineTool={pipelineTool}
             onPatch={(p) => canvasControlRef.current?.patchNodeData(focus.nodeId, p)}
           />
         </div>

@@ -1,4 +1,4 @@
-"""CLI commands for managing DataPulse schedules."""
+"""CLI commands for managing eltPulse schedules."""
 
 import click
 import json
@@ -22,7 +22,7 @@ console = Console()
 
 @click.group()
 def schedules():
-    """Manage DataPulse schedules for time-based pipeline orchestration.
+    """Manage eltPulse schedules for time-based pipeline orchestration.
 
     Schedules use cron expressions to automatically trigger pipelines at
     specified times or intervals.
@@ -144,7 +144,7 @@ def list(output_json: bool):
         console.print("[yellow]No schedules registered[/yellow]")
         return
 
-    console.print(f"\n[bold]DataPulse Schedules[/bold] ({len(schedules)} total)\n")
+    console.print(f"\n[bold]eltPulse Schedules[/bold] ({len(schedules)} total)\n")
 
     table = Table(box=box.SIMPLE_HEAD)
     table.add_column("Name", style="bold")

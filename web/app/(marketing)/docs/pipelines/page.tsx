@@ -4,7 +4,7 @@ import { DocsProse } from "@/components/docs/docs-prose";
 
 export const metadata: Metadata = {
   title: "Pipelines",
-  description: "Sources, destinations, tools, and exports in DataPulse.",
+  description: "Sources, destinations, tools, and exports in eltPulse.",
 };
 
 export default function PipelinesDocsPage() {
@@ -13,7 +13,7 @@ export default function PipelinesDocsPage() {
       <h1>Pipelines</h1>
       <p>
         A <strong>pipeline</strong> is a named definition from a <strong>source type</strong> to a{" "}
-        <strong>destination type</strong>. DataPulse resolves the right sync engine automatically based on your source
+        <strong>destination type</strong>. eltPulse resolves the right sync engine automatically based on your source
         and destination combination.
       </p>
 
@@ -27,7 +27,7 @@ export default function PipelinesDocsPage() {
       <h2>Artifacts</h2>
       <ul>
         <li>
-          <strong>Sync runner</strong> — the executable artifact DataPulse generates for your pipeline.
+          <strong>Sync runner</strong> — the executable artifact eltPulse generates for your pipeline.
         </li>
         <li>
           <strong>config.yaml</strong> — Serialized source/destination configuration for reproducibility.

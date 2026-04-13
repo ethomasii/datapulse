@@ -1,4 +1,4 @@
-"""CLI commands for managing DataPulse sensors."""
+"""CLI commands for managing eltPulse sensors."""
 
 import click
 import json
@@ -20,7 +20,7 @@ console = Console()
 
 @click.group()
 def sensors():
-    """Manage DataPulse sensors for event-driven pipeline orchestration.
+    """Manage eltPulse sensors for event-driven pipeline orchestration.
 
     Sensors monitor external systems and automatically trigger pipelines when
     conditions are met (e.g., file count thresholds, data volume, message queues).
@@ -148,7 +148,7 @@ def list(output_json: bool):
         console.print("[yellow]No sensors registered[/yellow]")
         return
 
-    console.print(f"\n[bold]DataPulse Sensors[/bold] ({len(sensors)} total)\n")
+    console.print(f"\n[bold]eltPulse Sensors[/bold] ({len(sensors)} total)\n")
 
     table = Table(box=box.SIMPLE_HEAD)
     table.add_column("Name", style="bold")

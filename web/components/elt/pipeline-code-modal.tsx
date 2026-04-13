@@ -20,7 +20,7 @@ const TAB_META: Record<Tab, { label: string; file: string; description: string }
     label: "Sync runner",
     file: DATAPULSE_REPO.syncRunnerFile,
     description:
-      "Executable sync definition for this pipeline. Run on your own infra or let DataPulse manage it — same code either way.",
+      "Executable sync definition for this pipeline. Run on your own infra or let eltPulse manage it — same code either way.",
   },
   config: {
     label: "Connection config",
@@ -32,7 +32,7 @@ const TAB_META: Record<Tab, { label: string; file: string; description: string }
     label: "Workspace manifest",
     file: DATAPULSE_REPO.workspaceFile,
     description:
-      "DataPulse orchestration metadata: scheduling, quality checks, sensors, and partition settings.",
+      "eltPulse orchestration metadata: scheduling, quality checks, monitors, and run slice settings.",
   },
 };
 
@@ -148,8 +148,8 @@ export function PipelineCodeModal({
         <div className="border-b border-sky-100 bg-sky-50/60 px-5 py-2 dark:border-sky-900/40 dark:bg-sky-900/10">
           <p className="text-xs text-sky-800 dark:text-sky-300">
             <strong className="font-semibold">Run anywhere.</strong>{" "}
-            Deploy to your own infrastructure and point the runner at the DataPulse API for logs and
-            observability — or let DataPulse run it for you. Either way, you own the code.
+            Deploy to your own infrastructure and point the runner at the eltPulse API for logs and
+            observability — or let eltPulse run it for you. Either way, you own the code.
           </p>
         </div>
 

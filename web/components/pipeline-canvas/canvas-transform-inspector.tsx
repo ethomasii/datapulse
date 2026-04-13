@@ -11,25 +11,44 @@ type Props = {
   /** Snapshot when the node was selected; remount via `key={nodeId}` when switching nodes. */
   initialData: Record<string, unknown>;
   onPatch: (patch: Record<string, unknown>) => void;
+  /** Codegen embeds post-load dbt only for dlt Python pipelines. */
+  pipelineTool: "dlt" | "sling";
 };
 
-export function CanvasTransformInspector({ nodeId, initialData, onPatch }: Props) {
+export function CanvasTransformInspector({ nodeId, initialData, onPatch, pipelineTool }: Props) {
   const [label, setLabel] = useState(() => String(initialData.label ?? ""));
   const [hint, setHint] = useState(() => String(initialData.hint ?? ""));
   const [transformTool, setTransformTool] = useState(() => String(initialData.transformTool ?? ""));
+  const [dbtPackagePath, setDbtPackagePath] = useState(() => String(initialData.dbtPackagePath ?? ""));
+  const [dbtDatasetName, setDbtDatasetName] = useState(() => String(initialData.dbtDatasetName ?? ""));
+  const [dbtRepositoryBranch, setDbtRepositoryBranch] = useState(() => String(initialData.dbtRepositoryBranch ?? ""));
+  const [dbtRunScope, setDbtRunScope] = useState(() =>
+    String(initialData.dbtRunScope ?? "all") === "selection" ? "selection" : "all"
+  );
+  const [dbtSelector, setDbtSelector] = useState(() => String(initialData.dbtSelector ?? ""));
 
   useEffect(() => {
     setLabel(String(initialData.label ?? ""));
     setHint(String(initialData.hint ?? ""));
     setTransformTool(String(initialData.transformTool ?? ""));
+    setDbtPackagePath(String(initialData.dbtPackagePath ?? ""));
+    setDbtDatasetName(String(initialData.dbtDatasetName ?? ""));
+    setDbtRepositoryBranch(String(initialData.dbtRepositoryBranch ?? ""));
+    setDbtRunScope(String(initialData.dbtRunScope ?? "all") === "selection" ? "selection" : "all");
+    setDbtSelector(String(initialData.dbtSelector ?? ""));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- remount or nodeId change defines a new snapshot
   }, [nodeId]);
+
+  function patchDbt(partial: Record<string, unknown>) {
+    onPatch(partial);
+  }
 
   return (
     <div className="space-y-4">
       <p className="text-xs text-slate-600 dark:text-slate-400">
         Transform step for this pipeline — use <strong className="font-medium text-slate-800 dark:text-slate-200">Save to pipeline</strong>{" "}
-        on the toolbar to persist the graph.
+        on the toolbar to persist the graph. dbt settings sync into{" "}
+        <code className="rounded bg-slate-100 px-1 text-[10px] dark:bg-slate-800">source_configuration.dlt_dbt</code> for codegen.
       </p>
       <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
         Approach
@@ -49,12 +68,111 @@ export function CanvasTransformInspector({ nodeId, initialData, onPatch }: Props
           ))}
         </select>
       </label>
-      {transformTool === "dbt" ? (
+
+      {transformTool === "dbt" && pipelineTool === "sling" ? (
         <p className="rounded-lg border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-xs leading-snug text-amber-950 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
-          There is no repo upload or dbt project link in the product yet — use <strong className="font-medium">Notes</strong>{" "}
-          for what you plan to run, or pick another approach until a repository can be attached to this pipeline.
+          This pipeline is generated as <strong className="font-medium">Sling</strong> YAML. Post-load dbt is wired for{" "}
+          <strong className="font-medium">dlt</strong> Python pipelines only (dlt&apos;s dbt runner). Use{" "}
+          <strong className="font-medium">Notes</strong> to document a separate dbt job, switch the pipeline tool to dlt where
+          applicable, or run dbt in CI against the same warehouse.
         </p>
       ) : null}
+
+      {transformTool === "dbt" && pipelineTool === "dlt" ? (
+        <div className="space-y-3 rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-3 dark:border-amber-800/50 dark:bg-amber-950/20">
+          <p className="text-[11px] leading-snug text-amber-950 dark:text-amber-100">
+            Reference a <strong className="font-medium">dbt project</strong> (local path or git URL). After extract/load, codegen
+            appends a <code className="rounded bg-white/70 px-1 text-[10px] dark:bg-amber-950/60">dlt.dbt.package</code> step. See{" "}
+            <a
+              className="font-medium text-sky-700 underline dark:text-sky-300"
+              href="https://dlthub.com/docs/dlt-ecosystem/transformations/dbt"
+              target="_blank"
+              rel="noreferrer"
+            >
+              dlt + dbt
+            </a>
+            .
+          </p>
+          <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
+            dbt project path or git URL
+            <input
+              type="text"
+              className={fieldClass}
+              value={dbtPackagePath}
+              onChange={(e) => {
+                const v = e.target.value;
+                setDbtPackagePath(v);
+                patchDbt({ dbtPackagePath: v });
+              }}
+              placeholder="e.g. ./dbt_project or https://github.com/org/dbt-analytics"
+              autoComplete="off"
+            />
+          </label>
+          <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
+            Output dataset / schema (optional)
+            <input
+              type="text"
+              className={fieldClass}
+              value={dbtDatasetName}
+              onChange={(e) => {
+                const v = e.target.value;
+                setDbtDatasetName(v);
+                patchDbt({ dbtDatasetName: v });
+              }}
+              placeholder="Defaults to pipeline_name_dbt"
+              autoComplete="off"
+            />
+          </label>
+          <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
+            Git branch / tag / commit (optional)
+            <input
+              type="text"
+              className={fieldClass}
+              value={dbtRepositoryBranch}
+              onChange={(e) => {
+                const v = e.target.value;
+                setDbtRepositoryBranch(v);
+                patchDbt({ dbtRepositoryBranch: v });
+              }}
+              placeholder="main"
+              autoComplete="off"
+            />
+          </label>
+          <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
+            dbt run scope
+            <select
+              className={fieldClass}
+              value={dbtRunScope}
+              onChange={(e) => {
+                const v = e.target.value === "selection" ? "selection" : "all";
+                setDbtRunScope(v);
+                patchDbt({ dbtRunScope: v });
+              }}
+            >
+              <option value="all">Full package (run_all — seed, sources tests, run)</option>
+              <option value="selection">Selection only (extra --select on the run step)</option>
+            </select>
+          </label>
+          {dbtRunScope === "selection" ? (
+            <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
+              dbt selector
+              <input
+                type="text"
+                className={fieldClass}
+                value={dbtSelector}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setDbtSelector(v);
+                  patchDbt({ dbtSelector: v });
+                }}
+                placeholder="e.g. my_mart+ or tag:nightly"
+                autoComplete="off"
+              />
+            </label>
+          ) : null}
+        </div>
+      ) : null}
+
       <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
         Label on diagram
         <input

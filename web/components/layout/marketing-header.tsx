@@ -11,7 +11,7 @@ export function MarketingHeader() {
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="flex shrink-0 items-center gap-2 font-semibold text-slate-900 dark:text-slate-100">
           <Activity className="h-6 w-6 text-sky-600" aria-hidden />
-          DataPulse
+          eltPulse
         </Link>
         <nav className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 text-sm font-medium text-slate-600 dark:text-slate-300 sm:gap-x-6">
           <Link href="/docs" className="hover:text-slate-900 dark:hover:text-white">

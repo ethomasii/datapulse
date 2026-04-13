@@ -2,8 +2,9 @@
  * Starter `sourceConfiguration` when creating a pipeline from the visual canvas or builder.
  * Field defaults mirror `embedded_elt_builder/web/credentials_config.py` (`SOURCE_CONFIGURATIONS`).
  *
- * Optional post-load dbt (codegen appends dlt dbt runner when enabled):
- * `dlt_dbt: { enabled: true, package_path: "path/to/dbt_project", dataset_name?: "output_dataset" }`
+ * Optional post-load dbt for **dlt** pipelines (codegen appends dlt dbt runner when enabled). The canvas
+ * inspector syncs into `dlt_dbt`:
+ * `{ enabled, package_path, dataset_name?, package_repository_branch?, run_scope: "all"|"selection", selector? }`
  * @see https://dlthub.com/docs/dlt-ecosystem/transformations/dbt
  */
 

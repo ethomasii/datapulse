@@ -3,7 +3,7 @@ import type { PipelineRequest } from "./types";
 import { DATAPULSE_REPO, pipelineModuleSegment } from "./datapulse-repo-layout";
 
 /**
- * YAML fragment stored alongside generated pipeline code — DataPulse workspace metadata only.
+ * YAML fragment stored alongside generated pipeline code — eltPulse workspace metadata only.
  */
 export function generateDatapulseWorkspaceYaml(request: PipelineRequest): string {
   const mod = pipelineModuleSegment(request.name);
@@ -62,8 +62,8 @@ export function generateDatapulseWorkspaceYaml(request: PipelineRequest): string
   };
 
   const header =
-    "# DataPulse workspace manifest (v1)\n" +
-    "# Describes how this pipeline fits in a managed DataPulse repository layout.\n\n";
+    "# eltPulse workspace manifest (v1)\n" +
+    "# Describes how this pipeline fits in a managed eltPulse repository layout.\n\n";
 
   return header + YAML.stringify(doc);
 }

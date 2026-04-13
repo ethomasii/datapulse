@@ -5,7 +5,7 @@ import { ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Documentation",
-  description: "Learn how DataPulse helps you design, store, and ship ELT pipelines.",
+  description: "Learn how eltPulse helps you design, store, and ship ELT pipelines.",
 };
 
 const CARDS = [
@@ -22,7 +22,7 @@ const CARDS = [
   {
     href: "/docs/orchestration",
     title: "Orchestration",
-    desc: "What runs vs when: native orchestration and portable exports for Airflow, Dagster, Prefect, and more.",
+    desc: "What runs vs when: schedules, eltPulse sensors, and portable exports for other orchestrators.",
   },
   {
     href: "/docs/integrations",
@@ -46,7 +46,7 @@ export default function DocsOverviewPage() {
     <DocsProse>
       <h1>Documentation</h1>
       <p className="text-lg text-slate-600 dark:text-slate-400">
-        DataPulse is the hosted control plane for defining ingestion pipelines, keeping definitions in your workspace,
+        eltPulse is the hosted control plane for defining ingestion pipelines, keeping definitions in your workspace,
         and exporting runnable artifacts into repositories you control. These guides mirror how we structure product docs
         on{" "}
         <a href="https://servicepulse.dev/docs" target="_blank" rel="noreferrer">

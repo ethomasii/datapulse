@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Pricing",
   description:
-    "DataPulse pricing — from a free trial to self-hosted Enterprise. Usage-based, transparent, and designed for data teams of every size.",
+    "eltPulse pricing — from a free trial to self-hosted Enterprise. Usage-based, transparent, and designed for data teams of every size.",
 };
 
 const tiers = [
@@ -18,7 +18,7 @@ const tiers = [
       "Up to 3 pipelines",
       "Full pipeline builder (sources, destinations, quality checks)",
       "Connections catalog",
-      "Sensors, schedules & partitions",
+      "Monitors, schedules & run slices",
       "Community support",
     ],
     cta: { href: "/sign-up", label: "Start free" },
@@ -57,7 +57,7 @@ const tiers = [
       "Dedicated Slack channel",
       "Custom row + egress rates",
     ],
-    cta: { href: "mailto:hello@datapulse.dev", label: "Talk to us" },
+    cta: { href: "mailto:hello@eltpulse.dev", label: "Talk to us" },
     highlighted: false,
     badge: null,
   },
@@ -66,17 +66,17 @@ const tiers = [
     price: "Custom",
     period: "",
     description:
-      "Run DataPulse entirely on your own infrastructure — we ship the Docker image, you run it, and telemetry / metadata reports back to our control plane. Like Dagster+ for your stack.",
+      "Run eltPulse entirely on your own infrastructure — we ship the Docker image, you run it, and telemetry / metadata reports back to our control plane.",
     features: [
       "Everything in Team",
-      "Self-hosted DataPulse agent (Docker)",
+      "Self-hosted eltPulse agent (Docker)",
       "Metadata & run logs reported to control plane",
       "Air-gapped option (metadata stays on-prem)",
       "SLA-backed uptime commitment",
       "Dedicated onboarding & security review",
       "Custom connector development",
     ],
-    cta: { href: "mailto:hello@datapulse.dev", label: "Contact enterprise sales" },
+    cta: { href: "mailto:hello@eltpulse.dev", label: "Contact enterprise sales" },
     highlighted: false,
     badge: "Self-hosted",
   },
@@ -88,7 +88,7 @@ export default function PricingPage() {
       <div className="text-center">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-white sm:text-4xl">Pricing</h1>
         <p className="mt-4 max-w-2xl mx-auto text-slate-600 dark:text-slate-300">
-          DataPulse is built around{" "}
+          eltPulse is built around{" "}
           <strong className="font-semibold text-slate-800 dark:text-slate-200">usage</strong>, not just seats. Start
           free, scale on Pro or Team, or run everything on{" "}
           <strong className="font-semibold text-slate-800 dark:text-slate-200">your own infra</strong> on Enterprise.
@@ -115,13 +115,13 @@ export default function PricingPage() {
           <li>
             <strong className="font-medium text-slate-800 dark:text-slate-200">Hosted compute</strong> is cost-plus:
             infrastructure pass-through with a transparent{" "}
-            <strong className="font-medium">15% markup</strong>. Or run your own runners and pay DataPulse only for
+            <strong className="font-medium">15% markup</strong>. Or run your own runners and pay eltPulse only for
             the control plane.
           </li>
           <li>
             <strong className="font-medium text-slate-800 dark:text-slate-200">Enterprise self-hosted</strong> means
-            your data never leaves your network — DataPulse only receives pipeline metadata, run status, and logs.
-            Think Dagster+ or Prefect Cloud, but for your ELT layer.
+            your data never leaves your network — eltPulse only receives pipeline metadata, run status, and logs.
+            Think hosted orchestration control plane, but scoped to your ELT layer and repo layout.
           </li>
         </ul>
         <p className="mt-4 rounded-lg border border-dashed border-slate-300 bg-white/80 px-4 py-3 text-sm text-slate-600 dark:border-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
@@ -192,18 +192,18 @@ export default function PricingPage() {
           Enterprise self-hosted — how it works
         </h2>
         <p className="mt-2 text-sm text-violet-900/80 dark:text-violet-200/80">
-          DataPulse ships a Docker image you deploy into your VPC or on-prem environment. Your pipeline code, warehouse
+          eltPulse ships a Docker image you deploy into your VPC or on-prem environment. Your pipeline code, warehouse
           credentials, and raw data never leave your network. The agent sends only run metadata (status, row counts,
-          timing, sanitized logs) back to the DataPulse control plane so you get full observability in the UI, webhooks,
+          timing, sanitized logs) back to the eltPulse control plane so you get full observability in the UI, webhooks,
           and alerting — without giving us access to your data.
         </p>
         <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-violet-800/80 dark:text-violet-200/70">
           <li>Passes most enterprise security reviews out of the box (data never leaves your infra)</li>
           <li>Optionally run fully air-gapped — metadata reporting can be disabled for the strictest environments</li>
-          <li>DataPulse team provides a dedicated onboarding, custom SLA, and connector engineering support</li>
+          <li>eltPulse team provides a dedicated onboarding, custom SLA, and connector engineering support</li>
         </ul>
         <Link
-          href="mailto:hello@datapulse.dev"
+          href="mailto:hello@eltpulse.dev"
           className="mt-4 inline-flex rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-600"
         >
           Talk to enterprise sales →
@@ -213,7 +213,7 @@ export default function PricingPage() {
       <p className="mt-10 text-center text-sm text-slate-500 dark:text-slate-400">
         Evaluating against Fivetran, Airbyte, or Hevo?{" "}
         <Link href="/compare" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-          See how DataPulse compares
+          See how eltPulse compares
         </Link>
         .
       </p>

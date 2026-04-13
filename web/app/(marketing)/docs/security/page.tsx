@@ -4,7 +4,7 @@ import { DocsProse } from "@/components/docs/docs-prose";
 
 export const metadata: Metadata = {
   title: "Security & data",
-  description: "How DataPulse handles authentication, storage, and secrets.",
+  description: "How eltPulse handles authentication, storage, and secrets.",
 };
 
 export default function SecurityDocsPage() {
@@ -32,7 +32,7 @@ export default function SecurityDocsPage() {
       <h2>Secrets</h2>
       <p>
         Source and destination credentials belong in your execution environment (CI, runner, local `.env`), not in
-        DataPulse — unless you explicitly use an optional integration that stores tokens server-side (e.g. BYO GitHub).
+        eltPulse — unless you explicitly use an optional integration that stores tokens server-side (e.g. BYO GitHub).
       </p>
 
       <h2>Billing</h2>

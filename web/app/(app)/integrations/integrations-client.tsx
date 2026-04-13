@@ -67,7 +67,7 @@ export function IntegrationsClient({
   }, [searchParams, clearParams, router]);
 
   async function disconnect() {
-    if (!confirm("Remove the saved GitHub token from DataPulse?")) return;
+    if (!confirm("Remove the saved GitHub token from eltPulse?")) return;
     setDisconnecting(true);
     try {
       const res = await fetch("/api/integrations/github", { method: "DELETE" });
@@ -115,14 +115,14 @@ export function IntegrationsClient({
       <section className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Managed repositories</h2>
         <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
-          In the default product, <strong>customers do not sign in to GitHub</strong>. DataPulse provisions a private
+          In the default product, <strong>customers do not sign in to GitHub</strong>. eltPulse provisions a private
           repository per workspace under <strong>our</strong> GitHub organization and uses service credentials (GitHub
           App installation or machine user) to create branches, commits, and PRs. You control org policy, retention,
           and what is exposed in the product UI—similar to the original builder’s hosted model, with you operating the
           backing org.
         </p>
         <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
-          Pipeline definitions you author in DataPulse are stored in Neon today; wiring automated commits into the
+          Pipeline definitions you author in eltPulse are stored in Neon today; wiring automated commits into the
           managed repo is the next backend step (reuse{" "}
           <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">GITHUB_APP_ID</code> / installation
           tokens server-side—not end-user OAuth).
@@ -233,45 +233,48 @@ export function IntegrationsClient({
           ServicePulse
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
+          <strong className="font-medium text-slate-800 dark:text-slate-200">Using ServicePulse does not go through
+          eltPulse.</strong> Open{" "}
           <a
             href={getServicePulseBaseUrl()}
             target="_blank"
             rel="noreferrer"
             className="font-medium text-sky-600 hover:underline dark:text-sky-400"
           >
-            ServicePulse
+            {getServicePulseBaseUrl()}
           </a>{" "}
-          is the companion product in the same family as DataPulse. Link the two when you want run visibility or
-          handoffs from pipelines into ServicePulse workflows — starting with a shared origin hint (no secrets) and{" "}
+          in your browser (or use the button below) and sign in there the same way you would any other app. eltPulse
+          only adds optional links here for convenience. For automation,{" "}
           <Link href="/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
             run webhooks
           </Link>{" "}
-          that identify DataPulse in the JSON body.
+          can point at ServicePulse when you configure a URL on the Runs page.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
           <a
             href={getServicePulseBaseUrl()}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+            className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
           >
-            Open ServicePulse
-            <ExternalLink className="h-4 w-4 opacity-70" aria-hidden />
+            Go to ServicePulse
+            <ExternalLink className="h-4 w-4 opacity-90" aria-hidden />
           </a>
           <a
             href={servicePulseDatapulseHandoffUrl()}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+            title="Experimental: passes this eltPulse site URL as a query param when ServicePulse implements the landing page."
           >
-            Continue in ServicePulse
-            <ExternalLink className="h-4 w-4 opacity-90" aria-hidden />
+            Open with eltPulse context
+            <ExternalLink className="h-4 w-4 opacity-70" aria-hidden />
           </a>
         </div>
         <p className="mt-3 text-xs text-slate-500 dark:text-slate-500">
-          Handoff URL includes <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">datapulse_origin</code>{" "}
-          (this app’s <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">NEXT_PUBLIC_APP_URL</code>). Override
-          ServicePulse’s base with{" "}
+          The second link is optional cross-product wiring (adds <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">datapulse_origin</code> from{" "}
+          <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">NEXT_PUBLIC_APP_URL</code>). If that page does not
+          exist on ServicePulse yet, use the main link only. Non-production ServicePulse: set{" "}
           <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">NEXT_PUBLIC_SERVICEPULSE_URL</code>.
         </p>
       </section>

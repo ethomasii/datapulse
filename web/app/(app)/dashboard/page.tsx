@@ -57,7 +57,7 @@ export default async function DashboardPage() {
           </div>
           <h2 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">Repositories</h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Private repos under DataPulse&apos;s GitHub org—no customer GitHub login required.
+            Private repos under eltPulse&apos;s GitHub org—no customer GitHub login required.
           </p>
         </Link>
 

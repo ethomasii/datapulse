@@ -1,8 +1,8 @@
-const UA = "DataPulse-Runs/1";
+const UA = "eltPulse-Runs/1";
 
 export type RunWebhookPayload = {
   /** Lets multi-product receivers (e.g. ServicePulse) identify the emitter. */
-  source?: "datapulse";
+  source?: "eltpulse";
   event: "run.succeeded" | "run.failed" | "run.cancelled";
   correlationId: string;
   pipelineId: string;
@@ -12,7 +12,7 @@ export type RunWebhookPayload = {
   errorSummary: string | null;
   startedAt: string;
   finishedAt: string | null;
-  /** Deep link in DataPulse (no secrets). */
+  /** Deep link in eltPulse (no secrets). */
   runUrl: string;
 };
 

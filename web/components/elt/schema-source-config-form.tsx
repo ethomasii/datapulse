@@ -19,7 +19,7 @@ type Props = {
 };
 
 /**
- * Renders `SOURCE_CONFIGURATIONS[sourceType]` from the DataPulse connector catalog
+ * Renders `SOURCE_CONFIGURATIONS[sourceType]` from the eltPulse connector catalog
  * (via credentials-catalog.json).
  */
 export function SchemaSourceConfigForm({ sourceType, fields, value, onChange }: Props) {
@@ -38,9 +38,9 @@ export function SchemaSourceConfigForm({ sourceType, fields, value, onChange }: 
           Source · {sourceType}
         </h3>
         <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-          Fields sourced from the DataPulse connector catalog (
+          Fields sourced from the eltPulse connector catalog (
           <code className="text-[11px]">SOURCE_CONFIGURATIONS</code>). Credentials use the env panel — not stored in
-          DataPulse.
+          eltPulse.
         </p>
       </div>
 

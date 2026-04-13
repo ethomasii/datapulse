@@ -16,6 +16,13 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
+  const pathname = req.nextUrl.pathname ?? "";
+  // App Router API handlers use `getCurrentDbUser()` / `auth()` and return JSON 401.
+  // Do not redirect unauthenticated API calls to the HTML sign-in page (breaks `fetch` + JSON clients).
+  if (pathname.startsWith("/api/") || pathname.startsWith("/trpc")) {
+    return NextResponse.next();
+  }
+
   if (!isPublicRoute(req)) {
     const { userId } = await auth();
     if (!userId) {

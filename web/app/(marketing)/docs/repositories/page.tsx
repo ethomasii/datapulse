@@ -28,8 +28,8 @@ export default function RepositoriesDocsPage() {
       <h2>Workspace manifest</h2>
       <p>
         Generated <code>datapulse_workspace.yaml</code> (stored alongside definitions in the app) describes scheduling
-        hints, retries, and a logical code location for automation — consumable by DataPulse or by an external
-        orchestrator (Airflow, Dagster, Prefect, etc.) if you prefer to run triggers outside our control plane.
+        hints, retries, and a logical code location for automation — consumable by eltPulse or by an external
+        orchestrator (Airflow, Prefect, etc.) if you prefer to run triggers outside our control plane.
       </p>
 
       <h2>Status</h2>

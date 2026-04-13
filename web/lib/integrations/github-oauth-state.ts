@@ -8,7 +8,7 @@ function secret(): string {
   return s;
 }
 
-/** CSRF-safe OAuth state bound to the DataPulse DB user id. */
+/** CSRF-safe OAuth state bound to the eltPulse DB user id. */
 export function createGithubOAuthState(userId: string): string {
   const nonce = randomBytes(24).toString("hex");
   const sig = createHmac("sha256", secret())

@@ -4,7 +4,7 @@ import { DocsProse } from "@/components/docs/docs-prose";
 
 export const metadata: Metadata = {
   title: "Getting started",
-  description: "Create an account and your first pipeline in DataPulse.",
+  description: "Create an account and your first pipeline in eltPulse.",
 };
 
 export default function GettingStartedDocsPage() {
@@ -12,7 +12,7 @@ export default function GettingStartedDocsPage() {
     <DocsProse>
       <h1>Getting started</h1>
       <p>
-        DataPulse uses <strong>Clerk</strong> for authentication. After you sign up, we provision a user row in our
+        eltPulse uses <strong>Clerk</strong> for authentication. After you sign up, we provision a user row in our
         database and you land on the <Link href="/dashboard">dashboard</Link>.
       </p>
 
