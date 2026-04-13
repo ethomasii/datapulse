@@ -2,51 +2,51 @@
 
 This document describes how we want **self-hosted execution** to feel for customers: similar in spirit to [Dagster+ hybrid agents](https://docs.dagster.io/deployment/dagster-plus/hybrid) (ECS, Kubernetes, Docker/local), but with **egress-only** connectivity to the eltPulse control plane.
 
-**Canonical code** for the gateway lives in **[`eltpulsehq/integrations` → `agent/`](https://github.com/eltpulsehq/integrations/tree/main/agent)** (same repo as Docker/K8s/ECS samples). The container is **`ghcr.io/eltpulsehq/agent:latest`**, built by that repo’s GitHub Actions. This file is the in-repo product map.
+**Canonical gateway implementation** lives in **[`eltpulsehq/integrations` → `gateway/`](https://github.com/eltpulsehq/integrations/tree/main/gateway)** (same repo as Docker/K8s/ECS samples). The container image is **`ghcr.io/eltpulsehq/gateway:latest`**, built by that repo’s GitHub Actions. This file is the in-repo product map.
 
-## Control plane vs agent
+## Control plane vs gateway
 
 | Piece | Role |
 |--------|------|
 | **eltPulse app** (this repo / Vercel) | Auth, pipelines, runs, secrets references, webhooks, **no** inbound connections to customer networks. |
-| **Gateway agent** (eltpulsehq) | Long-lived process in **your** VPC/cluster/laptop: **outbound HTTPS** to `GET /api/agent/*`, polls pending runs, pulls connection secrets, executes ingestion, reports heartbeats and run status. |
+| **Gateway** (customer infra) | Long-lived process in **your** VPC/cluster/laptop: **outbound HTTPS** to the control plane’s **`/api/agent/*`** routes, polls pending runs, pulls connection secrets, executes ingestion, reports heartbeats and run status. |
 
-No inbound firewall rules are required for the control plane to reach the agent. The agent only **egresses** to eltPulse (and to data sources/warehouses you configure).
+No inbound firewall rules are required for the control plane to reach your network. The gateway only **egresses** to eltPulse (and to data sources/warehouses you configure).
 
 ## Runtime matrix (target shape)
 
-Same **agent binary / image** and **Bearer token**; different **where** you run it:
+Same **gateway image** and **Bearer token**; different **where** you run it:
 
 | Runtime | When to use | How we document it (eltpulsehq) |
 |---------|-------------|----------------------------------|
-| **ECS agent** | AWS, Fargate or EC2-backed tasks, IAM-scoped | Task definition, service, secrets, egress SG to eltPulse + data plane. |
-| **Kubernetes agent** | K8s clusters, Helm/GitOps | Deployment, `ELTPULSE_*` env, optional NetworkPolicy egress-only. |
-| **Local agent** | Dev laptops, air-gapped jump hosts, CI | Docker Compose or `docker run` — see [`gateways/local`](https://github.com/eltpulsehq/integrations/tree/main/gateways/local), [`gateways/docker`](https://github.com/eltpulsehq/integrations/tree/main/gateways/docker), and source [`agent/`](https://github.com/eltpulsehq/integrations/tree/main/agent). Image **`ghcr.io/eltpulsehq/agent:latest`** is built from [`eltpulsehq/integrations`](https://github.com/eltpulsehq/integrations); verify with `docker pull`. |
+| **ECS** | AWS, Fargate or EC2-backed tasks, IAM-scoped | Task definition, service, secrets, egress SG to eltPulse + data plane. |
+| **Kubernetes** | K8s clusters, Helm/GitOps | Deployment, `ELTPULSE_*` env, optional NetworkPolicy egress-only. |
+| **Local / Docker** | Dev laptops, air-gapped jump hosts, CI | Docker Compose or `docker run` — see [`gateways/local`](https://github.com/eltpulsehq/integrations/tree/main/gateways/local), [`gateways/docker`](https://github.com/eltpulsehq/integrations/tree/main/gateways/docker), and source [`gateway/`](https://github.com/eltpulsehq/integrations/tree/main/gateway). Image **`ghcr.io/eltpulsehq/gateway:latest`**; verify with `docker pull`. |
 
-Each runtime is **documentation + example manifests** (and the **agent** image build) in [`eltpulsehq/integrations`](https://github.com/eltpulsehq/integrations), not duplicated in `embedded_elt_builder`.
+Each runtime is **documentation + example manifests** (and the **gateway** image build) in [`eltpulsehq/integrations`](https://github.com/eltpulsehq/integrations), not duplicated in `embedded_elt_builder`.
 
 ## Egress-only posture
 
-- Agent initiates TLS to the app URL (`NEXT_PUBLIC_APP_URL` / production host).
-- Optional: allowlist URLs for warehouses and sources; **no** listener required on the agent host for eltPulse.
+- Gateway initiates TLS to the app URL (`NEXT_PUBLIC_APP_URL` / production host).
+- Optional: allowlist URLs for warehouses and sources; **no** listener required on the gateway host for eltPulse.
 - Tokens are created in the app (**Gateway** page); never commit secrets to Git.
 
 ## Relation to Dagster hybrid (conceptual)
 
-- **Dagster+**: hybrid agent runs in your infra; control plane orchestrates; multiple agent backends (ECS, K8s, Docker, local).
-- **eltPulse**: gateway agent runs in your infra; **same** API contract everywhere; we standardize on **HTTPS egress + Bearer token** and document ECS/K8s/local as **deployment profiles** of one agent.
+- **Dagster+**: hybrid worker runs in your infra; control plane orchestrates; multiple backends (ECS, K8s, Docker, local).
+- **eltPulse**: **gateway** runs in your infra; **same** HTTP contract everywhere; we standardize on **HTTPS egress + Bearer token** and document ECS/K8s/local as **deployment profiles** of one gateway.
 
 ## Repositories (github.com/eltpulsehq)
 
 | Repo / artifact | Purpose |
 |-----------------|--------|
-| [`eltpulsehq/integrations`](https://github.com/eltpulsehq/integrations) | **Gateway agent** source (`agent/`), **`ghcr.io/eltpulsehq/agent:latest`** publish workflow, and **`gateways/`** (Docker, K8s, ECS, Terraform). |
+| [`eltpulsehq/integrations`](https://github.com/eltpulsehq/integrations) | **Gateway** source (`gateway/`), **`ghcr.io/eltpulsehq/gateway:latest`** publish workflow, and **`gateways/`** (Docker, K8s, ECS, Terraform). |
 
 The same tree lives under `integrations/` in this monorepo; publish from there to `eltpulsehq/integrations`.
 
 ## API surface (stable for all runtimes)
 
-All agents use the same routes (Bearer = gateway token from the app):
+The gateway uses the same routes (Bearer = token from the app **Gateway** page):
 
 - `GET /api/agent/manifest`
 - `GET /api/agent/runs`
@@ -54,7 +54,7 @@ All agents use the same routes (Bearer = gateway token from the app):
 - `POST /api/agent/heartbeat`
 - `PATCH /api/agent/runs/:id`
 
-See the in-app **Gateway** page and OpenAPI-style notes in agent source for details.
+See the in-app **Gateway** page and [`eltpulsehq/integrations` → `gateway/`](https://github.com/eltpulsehq/integrations/tree/main/gateway) for implementation notes.
 
 ## Organization workspaces (Clerk org)
 

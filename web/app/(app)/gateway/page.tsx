@@ -309,7 +309,7 @@ export default function GatewayPage() {
   --restart unless-stopped \\
   -e ELTPULSE_AGENT_TOKEN=<YOUR_TOKEN> \\
   -e ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL} \\
-  ghcr.io/eltpulsehq/agent:latest`;
+  ghcr.io/eltpulsehq/gateway:latest`;
 
   const envFileContent = `# eltPulse gateway — .env
 ELTPULSE_AGENT_TOKEN=<YOUR_TOKEN>
@@ -344,7 +344,7 @@ ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
             A <strong className="font-medium text-slate-800 dark:text-slate-200">gateway</strong> is only required when
             execution or credentials must stay on <em>your</em> network—private VPC datastores, air-gapped sources, or
             policy that forbids eltPulse from touching the data plane. Then use a gateway (Bearer token) so a process
-            you control talks to our API; routes are <code className="text-[11px]">/api/agent/*</code> to match the open-source connector image.
+            you control talks to our API; routes are <code className="text-[11px]">/api/agent/*</code> to match the open-source gateway image.
           </p>
           {executionPlane === "customer_agent" ? (
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
