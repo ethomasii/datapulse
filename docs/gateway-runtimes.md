@@ -21,7 +21,7 @@ Same **agent binary / image** and **Bearer token**; different **where** you run 
 |---------|-------------|----------------------------------|
 | **ECS agent** | AWS, Fargate or EC2-backed tasks, IAM-scoped | Task definition, service, secrets, egress SG to eltPulse + data plane. |
 | **Kubernetes agent** | K8s clusters, Helm/GitOps | Deployment, `ELTPULSE_*` env, optional NetworkPolicy egress-only. |
-| **Local agent** | Dev laptops, air-gapped jump hosts, CI | Docker or bare metal; same env vars as today’s `ghcr.io/eltpulsehq/agent`. |
+| **Local agent** | Dev laptops, air-gapped jump hosts, CI | Docker Compose or `docker run` — see [`eltpulsehq/integrations` → `gateways/local`](https://github.com/eltpulsehq/integrations/tree/main/gateways/local) and [`gateways/docker`](https://github.com/eltpulsehq/integrations/tree/main/gateways/docker). Image **`ghcr.io/eltpulsehq/agent:latest`** is published from [`eltpulsehq/agent`](https://github.com/eltpulsehq/agent) when CI is wired; verify with `docker pull`. |
 
 Each runtime is **documentation + example manifests** in [`eltpulsehq/integrations`](https://github.com/eltpulsehq/integrations) (and the [`agent`](https://github.com/eltpulsehq/agent) image), not duplicated in `embedded_elt_builder`.
 
