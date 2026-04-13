@@ -1,0 +1,14 @@
+---
+description: After meaningful code or asset changes, commit and push unless the user opts out.
+alwaysApply: true
+---
+
+# Git: commit and push
+
+When you finish a task that changes the codebase (source, config, assets, migrations), **commit and push to `main`** (or the branch the user is on) unless they explicitly asked not to or the repo is in a broken state.
+
+- Use a clear conventional-style subject line (e.g. `feat(web):`, `fix:`, `chore:`).
+- Stage only what belongs to the task; do not commit secrets (`.env.local`, keys).
+- If `git push` fails (auth, network), report the error and leave the commit local.
+
+Do not end a coding session with uncommitted work when the user wanted changes landed on the remote.
