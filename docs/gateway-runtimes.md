@@ -41,9 +41,9 @@ Each runtime is **documentation + example manifests** in [`eltpulsehq/integratio
 | Repo / artifact | Purpose |
 |-----------------|--------|
 | [`eltpulsehq/agent`](https://github.com/eltpulsehq/agent) | Reference gateway implementation and container image (`ghcr.io/eltpulsehq/agent`). |
-| [`eltpulsehq/integrations`](https://github.com/eltpulsehq/integrations) | **Integrations hub:** Docker/K8s/ECS/CI/GitOps examples, recipes, optional libraries, OpenAPI pointers—mirrors the [ServicePulse integrations](https://github.com/servicepulsehq/integrations) layout. |
+| [`eltpulsehq/integrations`](https://github.com/eltpulsehq/integrations) | **Customer-facing integrations:** `gateways/` (Docker Compose, Kubernetes, ECS JSON, Terraform ECS) + CI examples. |
 
-A **scaffold** for that repo also exists under `integrations/` in this monorepo so you can copy or subtree it into `eltpulsehq/integrations` until publishing is fully split.
+The same tree lives under `integrations/` in this monorepo; publish from there to `eltpulsehq/integrations`.
 
 ## API surface (stable for all runtimes)
 
