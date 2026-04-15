@@ -8,6 +8,8 @@ interface Schedule {
   name: string;
   type: string;
   pipeline_name: string;
+  /** When set (newer storage), individual pipeline targets for this schedule. */
+  pipeline_names?: string[];
   cron_expression: string;
   timezone: string;
   last_run: string | null;
@@ -222,7 +224,13 @@ export default function SchedulePage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-500">Pipeline: {schedule.pipeline_name}</span>
+                    <span className="text-sm text-slate-500">
+                      Pipelines:{' '}
+                      {(schedule.pipeline_names?.length
+                        ? schedule.pipeline_names
+                        : [schedule.pipeline_name]
+                      ).join(', ')}
+                    </span>
                     <button
                       onClick={() => deleteSchedule(schedule.name)}
                       className="p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
@@ -301,9 +309,20 @@ export default function SchedulePage() {
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+type PipelineRow = {
+  id: string;
+  name: string;
+  tool: string;
+  enabled: boolean;
+  sourceType: string;
+  destinationType: string;
+};
+
 function CreateScheduleForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [name, setName] = useState('');
-  const [pipelineName, setPipelineName] = useState('');
+  const [pipelines, setPipelines] = useState<PipelineRow[]>([]);
+  const [pipelinesLoading, setPipelinesLoading] = useState(true);
+  const [selectedPipelineNames, setSelectedPipelineNames] = useState<string[]>([]);
   const [type, setType] = useState('');
   const [cronExpr, setCronExpr] = useState('');
   const [intervalMinutes, setIntervalMinutes] = useState('60');
@@ -313,6 +332,32 @@ function CreateScheduleForm({ onClose, onSuccess }: { onClose: () => void; onSuc
   const [timezone, setTimezone] = useState('UTC');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/elt/pipelines', { credentials: 'same-origin' });
+        const data = (await res.json()) as { pipelines?: PipelineRow[] };
+        if (!cancelled && res.ok && Array.isArray(data.pipelines)) {
+          setPipelines(data.pipelines);
+        }
+      } catch {
+        if (!cancelled) setPipelines([]);
+      } finally {
+        if (!cancelled) setPipelinesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const togglePipelineName = (pipelineName: string) => {
+    setSelectedPipelineNames((prev) =>
+      prev.includes(pipelineName) ? prev.filter((n) => n !== pipelineName) : [...prev, pipelineName].sort()
+    );
+  };
 
   const toggleDay = (idx: number) => {
     setDaysOfWeek(prev =>
@@ -333,13 +378,17 @@ function CreateScheduleForm({ onClose, onSuccess }: { onClose: () => void; onSuc
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (selectedPipelineNames.length === 0) {
+      setError('Select at least one pipeline');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
       const response = await fetch('/api/schedules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, pipelineName, type, config: buildConfig() })
+        body: JSON.stringify({ name, pipelineNames: selectedPipelineNames, type, config: buildConfig() })
       });
       const data = await response.json();
       if (response.ok) {
@@ -372,16 +421,47 @@ function CreateScheduleForm({ onClose, onSuccess }: { onClose: () => void; onSuc
             />
           </div>
 
-          {/* Pipeline */}
+          {/* Pipelines — names align with CLI / generated folders; id shown for correlation with runs API */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Pipeline Name</label>
-            <input
-              type="text"
-              value={pipelineName}
-              onChange={e => setPipelineName(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md dark:border-slate-600 dark:bg-slate-800"
-              required
-            />
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              Pipelines on this schedule
+            </label>
+            <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+              Select one or more. Names match your workspace pipelines (the same identifier used for local ELT layout).
+            </p>
+            {pipelinesLoading ? (
+              <div className="rounded-md border border-slate-200 px-3 py-4 text-sm text-slate-500 dark:border-slate-600">
+                Loading pipelines…
+              </div>
+            ) : pipelines.length === 0 ? (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+                No pipelines found. Create one in the Builder first, then return here.
+              </div>
+            ) : (
+              <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-300 p-2 dark:border-slate-600">
+                {pipelines.map((p) => (
+                  <label
+                    key={p.id}
+                    className="flex cursor-pointer items-start gap-2 rounded px-1 py-1 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/80"
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={selectedPipelineNames.includes(p.name)}
+                      onChange={() => togglePipelineName(p.name)}
+                    />
+                    <span className="min-w-0">
+                      <span className="font-medium text-slate-900 dark:text-slate-100">{p.name}</span>
+                      <span className="mt-0.5 block font-mono text-[11px] text-slate-500 dark:text-slate-400">{p.id}</span>
+                      <span className="mt-0.5 block text-xs text-slate-500">
+                        {p.sourceType} → {p.destinationType} ({p.tool})
+                        {!p.enabled ? ' · disabled' : ''}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Type */}

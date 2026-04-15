@@ -3,7 +3,7 @@
 import click
 import json
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 from rich.console import Console
 from rich.table import Table
 from rich import box
@@ -29,10 +29,15 @@ def schedules():
 
     \b
     Examples:
-        # Cron-based schedules
+        # Cron-based schedules (one or more pipeline names after the schedule name)
         elt schedules create daily_backup my_pipeline \\
             --type cron \\
             --config cron_expression="0 2 * * *",timezone=America/New_York
+
+        # Same time, multiple pipelines
+        elt schedules create nightly_load sales_pipeline finance_pipeline \\
+            --type cron \\
+            --config cron_expression="0 3 * * *",timezone=UTC
 
         # Interval-based schedules (every N minutes)
         elt schedules create hourly_check my_pipeline \\
@@ -59,7 +64,7 @@ def schedules():
 
 @schedules.command()
 @click.argument("name")
-@click.argument("pipeline_name")
+@click.argument("pipelines", nargs=-1, required=True)
 @click.option("--type", "schedule_type", required=True,
               type=click.Choice([
                   "cron", "interval", "daily", "weekly"
@@ -67,8 +72,10 @@ def schedules():
               help="Type of schedule to create")
 @click.option("--config", required=True,
               help="Schedule configuration as key=value pairs (comma-separated)")
-def create(name: str, pipeline_name: str, schedule_type: str, config: str):
+def create(name: str, pipelines: Tuple[str, ...], schedule_type: str, config: str):
     """Create a new schedule.
+
+    PIPELINES: one or more pipeline names (folder names) to run on this schedule.
 
     CONFIG should be comma-separated key=value pairs.
 
@@ -116,13 +123,18 @@ def create(name: str, pipeline_name: str, schedule_type: str, config: str):
             console.print(f"[red]✗[/red] Missing required config: {', '.join(required)}")
             return
 
+        pipeline_names = [p for p in pipelines if p and str(p).strip()]
+        if not pipeline_names:
+            console.print("[red]✗[/red] Provide at least one pipeline name")
+            return
+
         # Create and register schedule
-        schedule = create_schedule(schedule_type, name, pipeline_name, config_dict)
+        schedule = create_schedule(schedule_type, name, pipeline_names, config_dict)
         schedule_manager.register_schedule(schedule)
 
         console.print(f"[green]✓[/green] Created schedule '{name}'")
         console.print(f"   Type: {schedule_type}")
-        console.print(f"   Pipeline: {pipeline_name}")
+        console.print(f"   Pipeline(s): {', '.join(pipeline_names)}")
         console.print(f"   Config: {config_dict}")
 
     except Exception as e:
@@ -164,10 +176,16 @@ def list(output_json: bool):
             except:
                 pass
 
+        pipelines_display = schedule.get("pipeline_names")
+        if isinstance(pipelines_display, list) and pipelines_display:
+            pipe_cell = ", ".join(str(p) for p in pipelines_display)
+        else:
+            pipe_cell = str(schedule.get("pipeline_name", ""))
+
         table.add_row(
             schedule["name"],
             schedule["type"],
-            schedule["pipeline_name"],
+            pipe_cell,
             schedule["cron_expression"],
             next_run
         )
@@ -186,7 +204,11 @@ def status():
 
     for schedule in schedules:
         console.print(f"\n[bold]{schedule['name']}[/bold] ({schedule['type']})")
-        console.print(f"   Pipeline: {schedule['pipeline_name']}")
+        pnames = schedule.get("pipeline_names")
+        if isinstance(pnames, list) and pnames:
+            console.print(f"   Pipelines: {', '.join(str(p) for p in pnames)}")
+        else:
+            console.print(f"   Pipeline: {schedule['pipeline_name']}")
         console.print(f"   Cron Expression: {schedule['cron_expression']}")
         console.print(f"   Timezone: {schedule['timezone']}")
         console.print(f"   Last Run: {schedule.get('last_run', 'Never')}")
@@ -274,7 +296,7 @@ def update(name: str, config: str):
         new_schedule = create_schedule(
             schedule.__class__.__name__.lower().replace('schedule', ''),
             name,
-            schedule.pipeline_name,
+            list(schedule.pipeline_names),
             old_status
         )
 

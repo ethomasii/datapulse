@@ -45,28 +45,49 @@ export async function GET() {
   }
 }
 
+function normalizePipelineNames(body: Record<string, unknown>): string[] {
+  const fromArray = body.pipelineNames;
+  if (Array.isArray(fromArray) && fromArray.length > 0) {
+    return fromArray
+      .filter((p): p is string => typeof p === "string" && p.trim().length > 0)
+      .map((p) => p.trim());
+  }
+  const legacy = body.pipelineName;
+  if (typeof legacy === "string" && legacy.trim()) {
+    return [legacy.trim()];
+  }
+  return [];
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { name, pipelineName, type, config } = body;
+    const body = (await request.json()) as Record<string, unknown>;
+    const { name, type, config } = body;
 
-    if (!name || !pipelineName || !type || !config) {
+    const pipelineNames = normalizePipelineNames(body);
+
+    if (!name || typeof name !== "string" || !pipelineNames.length || !type || !config) {
       return NextResponse.json(
-        { error: 'Missing required fields: name, pipelineName, type, config' },
+        {
+          error:
+            "Missing required fields: name, type, config, and pipelineNames (non-empty array) or pipelineName (string)",
+        },
         { status: 400 }
       );
     }
 
     // Build config string — handle arrays (days_of_week) specially
-    const configParts = Object.entries(config).map(([key, value]) => {
+    const configParts = Object.entries(config as Record<string, unknown>).map(([key, value]) => {
       if (Array.isArray(value)) {
-        return `${key}=[${(value as number[]).join(',')}]`;
+        return `${key}=[${(value as number[]).join(",")}]`;
       }
       return `${key}=${value}`;
     });
-    const configStr = configParts.join(',');
+    const configStr = configParts.join(",");
 
-    const command = `python -m embedded_elt_builder.cli.main schedules create "${name}" "${pipelineName}" --type ${type} --config "${configStr}"`;
+    const q = (s: string) => `"${String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+    const pipelineArgs = pipelineNames.map(q).join(" ");
+    const command = `python -m embedded_elt_builder.cli.main schedules create ${q(name)} ${pipelineArgs} --type ${type} --config ${q(configStr)}`;
 
     const { stdout, stderr } = await runCliCommand(command);
 

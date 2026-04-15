@@ -23,12 +23,26 @@ class ScheduleResult:
     metadata: Dict[str, Any]
 
 
+def _pipeline_names_from_storage(data: Dict[str, Any]) -> List[str]:
+    """Load pipeline name list from persisted schedule JSON (supports legacy single field)."""
+    raw = data.get("pipeline_names")
+    if isinstance(raw, list) and raw:
+        return [str(p).strip() for p in raw if str(p).strip()]
+    legacy = data.get("pipeline_name")
+    if legacy is not None and str(legacy).strip():
+        return [str(legacy).strip()]
+    return []
+
+
 class BaseSchedule(ABC):
     """Base class for all eltPulse schedules."""
 
-    def __init__(self, name: str, pipeline_name: str, cron_expression: str, timezone: str = 'UTC'):
+    def __init__(self, name: str, pipeline_names: List[str], cron_expression: str, timezone: str = 'UTC'):
         self.name = name
-        self.pipeline_name = pipeline_name
+        cleaned = [p.strip() for p in pipeline_names if p and str(p).strip()]
+        if not cleaned:
+            raise ValueError("At least one pipeline name is required")
+        self.pipeline_names = cleaned
         self.cron_expression = cron_expression
         self.timezone = timezone
         self.last_run = None
@@ -50,11 +64,17 @@ class BaseSchedule(ABC):
         """Check if the schedule should trigger at the given time."""
         pass
 
+    @property
+    def pipeline_name(self) -> str:
+        """Backward-compatible single string (joined) for CLIs and legacy consumers."""
+        return ", ".join(self.pipeline_names)
+
     def get_status(self) -> Dict[str, Any]:
         """Get current schedule status."""
         return {
             "name": self.name,
             "pipeline_name": self.pipeline_name,
+            "pipeline_names": list(self.pipeline_names),
             "type": self.__class__.__name__,
             "cron_expression": self.cron_expression,
             "timezone": self.timezone,
@@ -96,10 +116,10 @@ class CronSchedule(BaseSchedule):
 class IntervalSchedule(BaseSchedule):
     """Interval-based schedule (every N minutes/hours/days)."""
 
-    def __init__(self, name: str, pipeline_name: str, interval_minutes: int, timezone: str = 'UTC'):
+    def __init__(self, name: str, pipeline_names: List[str], interval_minutes: int, timezone: str = 'UTC'):
         # Convert interval to cron expression
         cron_expression = f"*/{interval_minutes} * * * *"
-        super().__init__(name, pipeline_name, cron_expression, timezone)
+        super().__init__(name, pipeline_names, cron_expression, timezone)
         self.interval_minutes = interval_minutes
 
     def should_run(self, current_time: Optional[datetime] = None) -> ScheduleResult:
@@ -112,9 +132,9 @@ class IntervalSchedule(BaseSchedule):
 class DailySchedule(BaseSchedule):
     """Daily schedule at a specific time."""
 
-    def __init__(self, name: str, pipeline_name: str, hour: int, minute: int = 0, timezone: str = 'UTC'):
+    def __init__(self, name: str, pipeline_names: List[str], hour: int, minute: int = 0, timezone: str = 'UTC'):
         cron_expression = f"{minute} {hour} * * *"
-        super().__init__(name, pipeline_name, cron_expression, timezone)
+        super().__init__(name, pipeline_names, cron_expression, timezone)
         self.hour = hour
         self.minute = minute
 
@@ -131,11 +151,11 @@ class DailySchedule(BaseSchedule):
 class WeeklySchedule(BaseSchedule):
     """Weekly schedule on specific days at a specific time."""
 
-    def __init__(self, name: str, pipeline_name: str, days_of_week: List[int], hour: int, minute: int = 0, timezone: str = 'UTC'):
+    def __init__(self, name: str, pipeline_names: List[str], days_of_week: List[int], hour: int, minute: int = 0, timezone: str = 'UTC'):
         # days_of_week: 0=Monday, 6=Sunday
         dow_str = ','.join(str(d) for d in days_of_week)
         cron_expression = f"{minute} {hour} * * {dow_str}"
-        super().__init__(name, pipeline_name, cron_expression, timezone)
+        super().__init__(name, pipeline_names, cron_expression, timezone)
         self.days_of_week = days_of_week
         self.hour = hour
         self.minute = minute
@@ -187,11 +207,14 @@ class ScheduleManager:
     def _deserialize_schedule(self, data: Dict[str, Any]) -> Optional[BaseSchedule]:
         """Deserialize a schedule from stored data."""
         schedule_type = data.get('type', '').lower()
+        pipeline_names = _pipeline_names_from_storage(data)
+        if not pipeline_names:
+            return None
 
         if schedule_type == 'cronschedule':
             schedule = CronSchedule(
                 data['name'],
-                data['pipeline_name'],
+                pipeline_names,
                 data['cron_expression'],
                 data.get('timezone', 'UTC')
             )
@@ -202,7 +225,7 @@ class ScheduleManager:
                 interval = int(cron_parts[0][2:])
                 schedule = IntervalSchedule(
                     data['name'],
-                    data['pipeline_name'],
+                    pipeline_names,
                     interval,
                     data.get('timezone', 'UTC')
                 )
@@ -215,7 +238,7 @@ class ScheduleManager:
                 hour = int(cron_parts[1])
                 schedule = DailySchedule(
                     data['name'],
-                    data['pipeline_name'],
+                    pipeline_names,
                     hour,
                     minute,
                     data.get('timezone', 'UTC')
@@ -231,7 +254,7 @@ class ScheduleManager:
                 days_of_week = [int(d) for d in days_str.split(',')]
                 schedule = WeeklySchedule(
                     data['name'],
-                    data['pipeline_name'],
+                    pipeline_names,
                     days_of_week,
                     hour,
                     minute,
@@ -272,13 +295,14 @@ class ScheduleManager:
         for schedule in self.schedules.values():
             result = schedule.should_run(current_time)
             if result.should_trigger:
-                triggered.append({
-                    'schedule_name': schedule.name,
-                    'pipeline_name': schedule.pipeline_name,
-                    'message': f"Scheduled run triggered by {schedule.__class__.__name__}",
-                    'metadata': result.metadata,
-                    'timestamp': datetime.now().isoformat()
-                })
+                for pn in schedule.pipeline_names:
+                    triggered.append({
+                        'schedule_name': schedule.name,
+                        'pipeline_name': pn,
+                        'message': f"Scheduled run triggered by {schedule.__class__.__name__}",
+                        'metadata': {**result.metadata, 'pipeline_names': list(schedule.pipeline_names)},
+                        'timestamp': datetime.now().isoformat()
+                    })
 
         # Save updated schedule states
         self.save_schedules()
@@ -290,28 +314,28 @@ class ScheduleManager:
 schedule_manager = ScheduleManager()
 
 
-def create_schedule(schedule_type: str, name: str, pipeline_name: str, config: Dict[str, Any]) -> BaseSchedule:
+def create_schedule(schedule_type: str, name: str, pipeline_names: List[str], config: Dict[str, Any]) -> BaseSchedule:
     """Factory function to create schedules."""
     schedule_type = schedule_type.lower()
 
     if schedule_type == 'cron':
         return CronSchedule(
             name,
-            pipeline_name,
+            pipeline_names,
             config['cron_expression'],
             config.get('timezone', 'UTC')
         )
     elif schedule_type == 'interval':
         return IntervalSchedule(
             name,
-            pipeline_name,
+            pipeline_names,
             config['interval_minutes'],
             config.get('timezone', 'UTC')
         )
     elif schedule_type == 'daily':
         return DailySchedule(
             name,
-            pipeline_name,
+            pipeline_names,
             config['hour'],
             config.get('minute', 0),
             config.get('timezone', 'UTC')
@@ -319,7 +343,7 @@ def create_schedule(schedule_type: str, name: str, pipeline_name: str, config: D
     elif schedule_type == 'weekly':
         return WeeklySchedule(
             name,
-            pipeline_name,
+            pipeline_names,
             config['days_of_week'],
             config['hour'],
             config.get('minute', 0),
