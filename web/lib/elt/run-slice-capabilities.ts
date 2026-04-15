@@ -2,7 +2,7 @@
  * Which run-slice strategies the product should expose per source type.
  *
  * Date/key slices create separate runs (`triggeredBy: backfill:partition:...`). They only reduce
- * data moved when the generated pipeline or gateway **uses** that value to filter the load — which
+ * data moved when the generated pipeline or gateway **uses** that value to filter the load -- which
  * not every stock template does.
  */
 
@@ -23,16 +23,16 @@ const DATE_AND_KEY_DEFAULT: RunSliceCapability = {
   mode: "date_and_key",
   label: "Date & key slices available",
   detail:
-    "Backfills create one run per slice; your gateway or customized Python must apply the slice (e.g. from triggeredBy) to filter loads — the app only records runs.",
+    "Backfills create one run per slice; your gateway or customized Python must apply the slice (e.g. from triggeredBy) to filter loads -- the app only records runs.",
 };
 
 const DATE_AND_KEY_GITHUB: RunSliceCapability = {
-  mode: “date_and_key”,
-  label: “Date slices supported (since filter)”,
+  mode: "date_and_key",
+  label: "Date slices supported (since filter)",
   detail:
-    “The generated GitHub pipeline passes a date partition key as `since` to `github_reactions`, filtering issues, “ +
-    “PRs, and reactions to items updated on or after that date — matching how Dagster and other orchestrators backfill “ +
-    “by date range. Use an ISO date (e.g. 2024-01-01) as your slice key.”,
+    "The generated GitHub pipeline passes a date partition key as `since` to `github_reactions`, filtering issues, " +
+    "PRs, and reactions to items updated on or after that date -- matching how Dagster and other orchestrators backfill " +
+    "by date range. Use an ISO date (e.g. 2024-01-01) as your slice key.",
 };
 
 const NONE_ONLY_REST: RunSliceCapability = {
@@ -40,7 +40,7 @@ const NONE_ONLY_REST: RunSliceCapability = {
   label: "Full runs only (stock pipeline)",
   detail:
     "The stock REST `rest_api_source` template does not pass the partition key into the API request. Run slices " +
-    "would only create separate run records unless you extend the generated code. Use “None”, or customize the " +
+    "would only create separate run records unless you extend the generated code. Use \"None\", or customize the " +
     "pipeline to honor `partition_key` / run metadata.",
 };
 

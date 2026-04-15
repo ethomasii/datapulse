@@ -63,12 +63,9 @@ import dlt
 from dlt.sources.github import github_reactions
 
 def run(partition_key: str = None):
-    """Run the GitHub pipeline.
-
-    partition_key: optional ISO date string (e.g. "2024-01-01") used as a `since` filter
-    so only items updated on or after that date are fetched — enabling date-based backfills
-    and incremental loads exactly as you would in Dagster or Prefect.
-    """
+    # partition_key: optional ISO date string, e.g. 2024-01-01
+    # When provided it is passed as `since` to github_reactions so only items
+    # updated on or after that date are fetched (date-based incremental load).
 
     # Resolve the GitHub PAT from the environment
     github_token = os.environ.get("${escapePyString(tokenEnv)}")
@@ -81,7 +78,7 @@ def run(partition_key: str = None):
         dataset_name="${escapePyString(datasetName)}",
     )
 
-    # Build source kwargs — inject `since` when a partition key (date) is provided
+    # Build source kwargs -- inject since when a partition key (date) is provided
     source_kwargs = dict(
         owner="${escapePyString(repoOwner)}",
         name="${escapePyString(repoName)}",
@@ -90,7 +87,6 @@ def run(partition_key: str = None):
         access_token=github_token,
     )
     if partition_key:
-        # partition_key is expected to be an ISO date, e.g. "2024-01-01"
         source_kwargs["since"] = partition_key
 
     source = github_reactions(**source_kwargs)
