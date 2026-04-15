@@ -3,7 +3,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Loader2, Play, Plus, Trash2, Code2, RefreshCw, Pencil, Plug, Waypoints, Webhook, Workflow } from "lucide-react";
+import {
+  Loader2,
+  Play,
+  Plus,
+  Trash2,
+  Code2,
+  RefreshCw,
+  Pencil,
+  Plug,
+  Waypoints,
+  Webhook,
+  Workflow,
+  History,
+} from "lucide-react";
 import { RelatedLinks } from "@/components/ui/related-links";
 import {
   DESTINATION_GROUPS,
@@ -577,6 +590,13 @@ export function BuilderClient({
                       >
                         <Workflow className="h-4 w-4" /> Canvas
                       </Link>
+                      <Link
+                        href={`/runs?pipeline=${encodeURIComponent(p.id)}`}
+                        className="mr-2 inline-flex items-center gap-1 text-amber-700 hover:underline dark:text-amber-400"
+                        title="Run history for this pipeline (all slices)"
+                      >
+                        <History className="h-4 w-4" /> Runs
+                      </Link>
                       <button
                         type="button"
                         onClick={() => openDetail(p.id)}
@@ -658,6 +678,16 @@ export function BuilderClient({
                 <Workflow className="h-3.5 w-3.5" aria-hidden />
                 Visual canvas
               </Link>
+              {editingId ? (
+                <Link
+                  href={`/runs?pipeline=${encodeURIComponent(editingId)}`}
+                  className="inline-flex items-center gap-1 rounded-md px-3 py-1 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                  title="All runs for this pipeline (every slice)"
+                >
+                  <History className="h-3.5 w-3.5" aria-hidden />
+                  Run history
+                </Link>
+              ) : null}
             </div>
           </div>
           {formMode === "json" && schemaFields.length === 0 ? (

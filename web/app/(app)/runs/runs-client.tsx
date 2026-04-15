@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -25,6 +25,8 @@ import { RunTelemetryTableCells, RunTelemetryView } from "@/components/elt/run-t
 import { formatBytes, formatRows, parseRunTelemetry } from "@/lib/elt/run-telemetry";
 import { RelatedLinks } from "@/components/ui/related-links";
 import { BarChart } from "@/components/ui/bar-chart";
+import { parseSliceFromTriggeredBy } from "@/lib/elt/slice-trigger";
+
 type PipelineOpt = { id: string; name: string };
 
 type RunRow = {
@@ -69,6 +71,28 @@ function SortIcon({ col, sortCol, sortDir }: { col: SortCol; sortCol: SortCol; s
     : <ArrowDown className="ml-1 inline h-3 w-3 text-sky-600" />;
 }
 
+function SliceCell({ triggeredBy }: { triggeredBy: string | null }) {
+  const parsed = parseSliceFromTriggeredBy(triggeredBy);
+  if (parsed) {
+    return (
+      <span className="font-mono text-xs text-teal-700 dark:text-teal-300" title={`${parsed.column} = ${parsed.value}`}>
+        {parsed.value}
+      </span>
+    );
+  }
+  if (!triggeredBy) {
+    return <span className="text-xs text-slate-400 dark:text-slate-500">—</span>;
+  }
+  return (
+    <span
+      className="block max-w-[140px] truncate font-mono text-[11px] text-slate-500 dark:text-slate-400"
+      title={triggeredBy}
+    >
+      {triggeredBy}
+    </span>
+  );
+}
+
 function StatusGlyph({ status }: { status: string }) {
   switch (status) {
     case "succeeded":
@@ -89,10 +113,17 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
   const runIdFromUrl = searchParams.get("run");
   const statusFromUrl = searchParams.get("status");
 
+  const pipelineIds = useMemo(() => new Set(initialPipelines.map((p) => p.id)), [initialPipelines]);
+  /** Pipeline filter from `?pipeline=` when it matches a known pipeline. */
+  const pipelineFilterId = useMemo(() => {
+    const raw = searchParams.get("pipeline");
+    if (!raw || !pipelineIds.has(raw)) return "";
+    return raw;
+  }, [searchParams, pipelineIds]);
+
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [pipelineId, setPipelineId] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [environmentFilter, setEnvironmentFilter] = useState("");
   const [detail, setDetail] = useState<{
@@ -123,7 +154,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
     setError(null);
     try {
       const q = new URLSearchParams();
-      if (pipelineId) q.set("pipelineId", pipelineId);
+      if (pipelineFilterId) q.set("pipelineId", pipelineFilterId);
       if (statusFilter) q.set("status", statusFilter);
       if (environmentFilter.trim()) q.set("environment", environmentFilter.trim());
       const res = await fetch(`/api/elt/runs?${q.toString()}`);
@@ -135,7 +166,20 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
     } finally {
       setLoading(false);
     }
-  }, [pipelineId, statusFilter, environmentFilter]);
+  }, [pipelineFilterId, statusFilter, environmentFilter]);
+
+  function runsPathWithQuery(next: URLSearchParams) {
+    const s = next.toString();
+    return s ? `/runs?${s}` : "/runs";
+  }
+
+  function setPipelineFilterInUrl(nextPipelineId: string) {
+    const q = new URLSearchParams(searchParams.toString());
+    q.delete("run");
+    if (nextPipelineId) q.set("pipeline", nextPipelineId);
+    else q.delete("pipeline");
+    router.replace(runsPathWithQuery(q), { scroll: false });
+  }
 
   useEffect(() => {
     void loadRuns();
@@ -172,11 +216,15 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
   }, [runIdFromUrl]);
 
   async function openDetail(id: string) {
-    router.push(`/runs?run=${encodeURIComponent(id)}`, { scroll: false });
+    const q = new URLSearchParams(searchParams.toString());
+    q.set("run", id);
+    router.push(runsPathWithQuery(q), { scroll: false });
   }
 
   function closeDetail() {
-    router.push("/runs", { scroll: false });
+    const q = new URLSearchParams(searchParams.toString());
+    q.delete("run");
+    router.replace(runsPathWithQuery(q), { scroll: false });
   }
 
   async function runDemo() {
@@ -323,7 +371,14 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Runs</h1>
         <p className="mt-2 max-w-3xl text-slate-600 dark:text-slate-300">
-          List and filter executions per pipeline (newest first). Push <strong className="font-medium text-slate-800 dark:text-slate-200">live telemetry</strong>{" "}
+          List and filter executions per pipeline (newest first). Open a pipeline from{" "}
+          <Link href="/builder" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+            Pipelines
+          </Link>{" "}
+          and use <strong className="font-medium text-slate-800 dark:text-slate-200">Runs</strong> to jump here with{" "}
+          <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">?pipeline=…</code> so you see the full
+          history for that line (every slice is still one row). Push{" "}
+          <strong className="font-medium text-slate-800 dark:text-slate-200">live telemetry</strong>{" "}
           (rows, bytes, progress, phase) via the same PATCH as logs — gateway and managed workers use identical fields.
           Logs are structured and scrubbed — we never store raw warehouse credentials. Telemetry is stored here whether
           ingestion runs on{" "}
@@ -365,7 +420,12 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
             samples.
           </span>
           <Link
-            href="/runs?status=running"
+            href={(() => {
+              const q = new URLSearchParams();
+              if (pipelineFilterId) q.set("pipeline", pipelineFilterId);
+              q.set("status", "running");
+              return `/runs?${q}`;
+            })()}
             className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500"
           >
             Running only
@@ -416,12 +476,24 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Filters</h2>
+        {pipelineFilterId ? (
+          <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+            Showing runs for{" "}
+            <strong className="font-medium text-slate-800 dark:text-slate-200">
+              {initialPipelines.find((p) => p.id === pipelineFilterId)?.name ?? "this pipeline"}
+            </strong>
+            .{" "}
+            <Link href="/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+              Clear pipeline filter
+            </Link>
+          </p>
+        ) : null}
         <div className="mt-3 flex flex-wrap gap-4">
           <label className="block">
             <span className="text-xs text-slate-500">Pipeline</span>
             <select
-              value={pipelineId}
-              onChange={(e) => setPipelineId(e.target.value)}
+              value={pipelineFilterId}
+              onChange={(e) => setPipelineFilterInUrl(e.target.value)}
               className="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
             >
               <option value="">All pipelines</option>
@@ -503,8 +575,20 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
         <p className="text-slate-500">Loading runs…</p>
       ) : runs.length === 0 ? (
         <p className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-slate-600 dark:border-slate-700 dark:text-slate-400">
-          No runs yet. Connect your runner to the API (same session or future API tokens) or click{" "}
-          <strong className="font-medium">Record sample run</strong> to seed demo data.
+          {pipelineFilterId ? (
+            <>
+              No runs yet for this pipeline. Trigger a run from your gateway or orchestrator, or use{" "}
+              <Link href="/run-slices" className="font-medium text-teal-600 hover:underline dark:text-teal-400">
+                Run slices
+              </Link>{" "}
+              for backfills.
+            </>
+          ) : (
+            <>
+              No runs yet. Connect your runner to the API (same session or future API tokens) or click{" "}
+              <strong className="font-medium">Record sample run</strong> to seed demo data.
+            </>
+          )}
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
@@ -519,6 +603,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                     </button>
                   </th>
                 ))}
+                <th className="px-3 py-2 font-medium text-slate-600 dark:text-slate-400">Slice</th>
                 <th className="px-3 py-2 font-medium">Gateway</th>
                 <th className="px-3 py-2 font-medium">Progress</th>
                 <th className="px-3 py-2 font-medium">
@@ -543,15 +628,18 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                     {new Date(r.startedAt).toLocaleString()}
                   </td>
                   <td className="px-3 py-2 font-medium text-slate-900 dark:text-white">{r.pipeline.name}</td>
-                  <td className="max-w-[140px] truncate px-3 py-2 text-slate-600 dark:text-slate-300" title={r.targetAgentToken?.name ?? "Any gateway"}>
-                    {r.targetAgentToken?.name ?? "Any"}
-                  </td>
                   <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{r.environment}</td>
                   <td className="px-3 py-2">
                     <span className="inline-flex items-center gap-1.5">
                       <StatusGlyph status={r.status} />
                       <span className="capitalize">{r.status}</span>
                     </span>
+                  </td>
+                  <td className="max-w-[150px] px-3 py-2 align-top">
+                    <SliceCell triggeredBy={r.triggeredBy} />
+                  </td>
+                  <td className="max-w-[140px] truncate px-3 py-2 text-slate-600 dark:text-slate-300" title={r.targetAgentToken?.name ?? "Any gateway"}>
+                    {r.targetAgentToken?.name ?? "Any"}
                   </td>
                   <RunTelemetryTableCells telemetryRaw={r.telemetry} />
                   <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
@@ -621,6 +709,13 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                     Telemetry: {telemetrySourceLabel(detail.run.ingestionExecutor ?? "unspecified")}
                   </span>
                   <span className="text-slate-500">{detail.run.pipeline.name}</span>
+                  <Link
+                    href={`/runs?pipeline=${encodeURIComponent(detail.run.pipeline.id)}`}
+                    className="ml-2 text-xs font-medium text-sky-600 hover:underline dark:text-sky-400"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    All runs for pipeline
+                  </Link>
                   <span className="text-slate-500">· {detail.run.environment}</span>
                   {detail.run.targetAgentToken ? (
                     <span className="text-slate-500">· Gateway: {detail.run.targetAgentToken.name}</span>
