@@ -70,8 +70,6 @@ export default function RunSlicesPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const selectedPipeline = pipelines.find(p => p.id === selected) ?? null;
-
   return (
     <div className="w-full min-w-0 max-w-5xl mx-auto space-y-8">
       {/* Header */}
@@ -86,8 +84,8 @@ export default function RunSlicesPage() {
           backfills over any range of slice values. Each slice launches an independent run you can
           monitor in{' '}
           <Link href="/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">Runs</Link>.
-          Slice types shown here match what the stock generated pipeline can honor; connectors like GitHub and generic
-          REST do not apply partition keys in generated code, so date/key slices are disabled until you customize the loader.
+          Slice types shown here match what the stock generated pipeline can honor. Click any pipeline row to
+          configure its slice type — only generic REST API sources require custom code to honor partition keys.
         </p>
       </div>
 

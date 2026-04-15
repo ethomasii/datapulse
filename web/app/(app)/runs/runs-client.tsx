@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertCircle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   CheckCircle2,
   ChevronRight,
   ClipboardCopy,
@@ -56,6 +59,16 @@ function telemetrySourceLabel(executor: string) {
 
 const STATUS_OPTIONS = ["pending", "running", "succeeded", "failed", "cancelled"] as const;
 
+type SortCol = "startedAt" | "pipeline" | "status" | "environment" | "rows" | "bytes";
+type SortDir = "asc" | "desc";
+
+function SortIcon({ col, sortCol, sortDir }: { col: SortCol; sortCol: SortCol; sortDir: SortDir }) {
+  if (col !== sortCol) return <ArrowUpDown className="ml-1 inline h-3 w-3 text-slate-400" />;
+  return sortDir === "asc"
+    ? <ArrowUp className="ml-1 inline h-3 w-3 text-sky-600" />
+    : <ArrowDown className="ml-1 inline h-3 w-3 text-sky-600" />;
+}
+
 function StatusGlyph({ status }: { status: string }) {
   switch (status) {
     case "succeeded":
@@ -91,6 +104,19 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
   } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [demoBusy, setDemoBusy] = useState(false);
+  const [sortCol, setSortCol] = useState<SortCol>("startedAt");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  function toggleSort(col: SortCol) {
+    setSortCol((prev) => {
+      if (prev === col) {
+        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+        return col;
+      }
+      setSortDir("desc");
+      return col;
+    });
+  }
 
   const loadRuns = useCallback(async () => {
     setLoading(true);
@@ -259,6 +285,37 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
   const hasChartData = runs.some((r) => {
     const key = new Date(r.startedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
     return key in runsPerDay;
+  });
+
+  const sortedRuns = [...runs].sort((a, b) => {
+    let cmp = 0;
+    switch (sortCol) {
+      case "startedAt":
+        cmp = new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime();
+        break;
+      case "pipeline":
+        cmp = a.pipeline.name.localeCompare(b.pipeline.name);
+        break;
+      case "status":
+        cmp = a.status.localeCompare(b.status);
+        break;
+      case "environment":
+        cmp = a.environment.localeCompare(b.environment);
+        break;
+      case "rows": {
+        const aRows = parseRunTelemetry(a.telemetry).summary.rowsLoaded ?? 0;
+        const bRows = parseRunTelemetry(b.telemetry).summary.rowsLoaded ?? 0;
+        cmp = aRows - bRows;
+        break;
+      }
+      case "bytes": {
+        const aBytes = parseRunTelemetry(a.telemetry).summary.bytesLoaded ?? 0;
+        const bBytes = parseRunTelemetry(b.telemetry).summary.bytesLoaded ?? 0;
+        cmp = aBytes - bBytes;
+        break;
+      }
+    }
+    return sortDir === "asc" ? cmp : -cmp;
   });
 
   return (
@@ -454,21 +511,33 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
               <tr>
-                <th className="px-3 py-2 font-medium">Started</th>
-                <th className="px-3 py-2 font-medium">Pipeline</th>
+                {(["startedAt", "pipeline", "environment", "status"] as SortCol[]).map((col) => (
+                  <th key={col} className="px-3 py-2 font-medium">
+                    <button type="button" onClick={() => toggleSort(col)} className="inline-flex items-center whitespace-nowrap hover:text-sky-600">
+                      {col === "startedAt" ? "Started" : col === "pipeline" ? "Pipeline" : col === "environment" ? "Environment" : "Status"}
+                      <SortIcon col={col} sortCol={sortCol} sortDir={sortDir} />
+                    </button>
+                  </th>
+                ))}
                 <th className="px-3 py-2 font-medium">Gateway</th>
-                <th className="px-3 py-2 font-medium">Environment</th>
-                <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2 font-medium">Progress</th>
-                <th className="px-3 py-2 font-medium">Rows</th>
-                <th className="px-3 py-2 font-medium">Bytes</th>
+                <th className="px-3 py-2 font-medium">
+                  <button type="button" onClick={() => toggleSort("rows")} className="inline-flex items-center hover:text-sky-600">
+                    Rows<SortIcon col="rows" sortCol={sortCol} sortDir={sortDir} />
+                  </button>
+                </th>
+                <th className="px-3 py-2 font-medium">
+                  <button type="button" onClick={() => toggleSort("bytes")} className="inline-flex items-center hover:text-sky-600">
+                    Bytes<SortIcon col="bytes" sortCol={sortCol} sortDir={sortDir} />
+                  </button>
+                </th>
                 <th className="px-3 py-2 font-medium">Source</th>
                 <th className="px-3 py-2 font-medium">Correlation ID</th>
                 <th className="px-3 py-2 font-medium" />
               </tr>
             </thead>
             <tbody>
-              {runs.map((r) => (
+              {sortedRuns.map((r) => (
                 <tr key={r.id} className="border-b border-slate-100 dark:border-slate-800">
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-400">
                     {new Date(r.startedAt).toLocaleString()}
