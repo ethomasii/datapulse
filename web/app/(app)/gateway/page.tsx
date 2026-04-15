@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Copy, Eye, EyeOff, Loader2, Plus, RefreshCw, Star, Trash2, Waypoints, Wifi, WifiOff } from "lucide-react";
+import { Check, Copy, Eye, EyeOff, Layers, Loader2, Play, Plus, RefreshCw, Star, Trash2, Waypoints, Webhook, Wifi, WifiOff } from "lucide-react";
+import { RelatedLinks } from "@/components/ui/related-links";
 
 const CONTROL_PLANE_URL =
   process.env.NEXT_PUBLIC_APP_URL ?? "https://app.eltpulse.dev";
@@ -527,7 +528,7 @@ ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
               <textarea
                 value={newOrgConnectorMeta}
                 onChange={(e) => setNewOrgConnectorMeta(e.target.value)}
-                placeholder='Optional metadata JSON, e.g. {"cloud":"aws"}'
+                placeholder='e.g. {"cloud":"aws"} or {"pipelineRunIsolation":"spawn"}'
                 rows={2}
                 className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 font-mono text-xs dark:border-slate-700 dark:bg-slate-950"
               />
@@ -754,7 +755,11 @@ ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
         <div className="mt-4 space-y-2 rounded-lg border border-dashed border-slate-200 p-3 dark:border-slate-700">
           <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">Generate a new token</p>
           <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            Label this gateway (e.g. region or environment). Optional JSON metadata is for your own tags — not secrets.
+            Label this gateway (e.g. region or environment). Optional JSON metadata can include{" "}
+            <code className="text-[10px]">pipelineRunIsolation</code> /{" "}
+            <code className="text-[10px]">monitorCheckIsolation</code> (<code className="text-[10px]">inline</code> or{" "}
+            <code className="text-[10px]">spawn</code>) so the manifest tells your dispatcher to fork ECS/K8s jobs vs
+            running in-process — not secrets.
           </p>
           <input
             type="text"
@@ -766,7 +771,7 @@ ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
           <textarea
             value={newConnectorMeta}
             onChange={(e) => setNewConnectorMeta(e.target.value)}
-            placeholder='Optional metadata JSON, e.g. {"cloud":"aws","site":"on-prem"}'
+            placeholder='e.g. {"cloud":"aws"} or {"pipelineRunIsolation":"spawn","monitorCheckIsolation":"spawn"}'
             rows={2}
             className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 font-mono text-xs dark:border-slate-700 dark:bg-slate-950"
           />
@@ -865,6 +870,13 @@ ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
       </section>
         </>
       ) : null}
+
+      <RelatedLinks links={[
+        { href: "/runs", icon: Play, label: "Runs", desc: "Live telemetry and history for every pipeline execution" },
+        { href: "/builder", icon: Layers, label: "Pipelines", desc: "Define source → destination connections" },
+        { href: "/orchestration", icon: Waypoints, label: "Orchestration", desc: "Schedule sensors that trigger runs automatically" },
+        { href: "/webhooks", icon: Webhook, label: "Webhooks", desc: "Fire notifications when runs reach a terminal state" },
+      ]} />
     </div>
   );
 }

@@ -9,13 +9,18 @@ import {
   ChevronRight,
   ClipboardCopy,
   ExternalLink,
+  Layers,
   Loader2,
   Play,
   RefreshCw,
+  Waypoints,
   Webhook,
   X,
   XCircle,
 } from "lucide-react";
+import { RunTelemetryTableCells, RunTelemetryView } from "@/components/elt/run-telemetry-view";
+import { formatBytes, formatRows, parseRunTelemetry } from "@/lib/elt/run-telemetry";
+import { RelatedLinks } from "@/components/ui/related-links";
 type PipelineOpt = { id: string; name: string };
 
 type RunRow = {
@@ -29,6 +34,7 @@ type RunRow = {
   finishedAt: string | null;
   errorSummary: string | null;
   webhookStatus: string | null;
+  telemetry?: unknown;
   pipeline: { id: string; name: string };
   targetAgentToken?: { id: string; name: string } | null;
 };
@@ -67,6 +73,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
   const router = useRouter();
   const searchParams = useSearchParams();
   const runIdFromUrl = searchParams.get("run");
+  const statusFromUrl = searchParams.get("status");
 
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,6 +84,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
   const [detail, setDetail] = useState<{
     run: RunRow & {
       logEntries: unknown;
+      telemetry?: unknown;
       updatedAt: string;
     };
   } | null>(null);
@@ -105,6 +113,14 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
   useEffect(() => {
     void loadRuns();
   }, [loadRuns]);
+
+  useEffect(() => {
+    if (typeof statusFromUrl === "string" && statusFromUrl.length > 0) {
+      setStatusFilter(statusFromUrl);
+    }
+  }, [statusFromUrl]);
+
+  const activeRunCount = runs.filter((r) => r.status === "pending" || r.status === "running").length;
 
   useEffect(() => {
     if (!runIdFromUrl) {
@@ -142,12 +158,24 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
     setDemoBusy(true);
     setError(null);
     try {
+      // Randomize metrics so each sample run looks distinct
+      const totalRows = Math.floor(Math.random() * 90_000) + 5_000;
+      const totalBytes = Math.floor(totalRows * (Math.random() * 200 + 100));
+      const midRows = Math.floor(totalRows * (0.35 + Math.random() * 0.25));
+      const midBytes = Math.floor(totalBytes * (0.35 + Math.random() * 0.25));
+      const midProgress = Math.floor(40 + Math.random() * 25);
+      const phases = ["orders", "customers", "products", "events", "sessions", "transactions"];
+      const resource = phases[Math.floor(Math.random() * phases.length)];
+      const environments = ["demo", "staging", "dev"];
+      const env = environments[Math.floor(Math.random() * environments.length)];
+
       const create = await fetch("/api/elt/runs", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pipelineId: p.id,
-          environment: "demo",
+          environment: env,
           triggeredBy: "manual:sample",
           status: "running",
         }),
@@ -156,24 +184,34 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
       const { run } = (await create.json()) as { run: { id: string } };
       await fetch(`/api/elt/runs/${run.id}`, {
         method: "PATCH",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          appendLog: { level: "info", message: "Starting sync (sample run)." },
+          status: "running",
+          appendLog: { level: "info", message: `Starting sync on ${resource} (sample run).` },
+          telemetrySummary: { currentPhase: "extract", currentResource: resource, progress: 5 },
+          appendTelemetrySample: { progress: 5, rows: 0, bytes: 0, phase: "extract", resource },
         }),
       });
       await fetch(`/api/elt/runs/${run.id}`, {
         method: "PATCH",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          appendLog: { level: "info", message: "Rows processed: (demo — no warehouse credentials logged)." },
+          appendLog: { level: "info", message: `Rows processed so far: ${midRows.toLocaleString()} (sample).` },
+          telemetrySummary: { currentPhase: "load", currentResource: resource, progress: midProgress, rowsLoaded: midRows, bytesLoaded: midBytes },
+          appendTelemetrySample: { progress: midProgress, rows: midRows, bytes: midBytes, phase: "load", resource },
         }),
       });
       await fetch(`/api/elt/runs/${run.id}`, {
         method: "PATCH",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           status: "succeeded",
-          appendLog: { level: "info", message: "Completed successfully." },
+          appendLog: { level: "info", message: `Completed successfully. ${totalRows.toLocaleString()} rows loaded.` },
+          telemetrySummary: { currentPhase: "done", currentResource: resource, progress: 100, rowsLoaded: totalRows, bytesLoaded: totalBytes },
+          appendTelemetrySample: { progress: 100, rows: totalRows, bytes: totalBytes, phase: "done", resource },
         }),
       });
       await loadRuns();
@@ -190,8 +228,10 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Runs</h1>
         <p className="mt-2 max-w-3xl text-slate-600 dark:text-slate-300">
-          List and filter executions per pipeline (newest first). Logs are structured and scrubbed — we never store raw
-          warehouse credentials. Telemetry is stored here whether ingestion runs on{" "}
+          List and filter executions per pipeline (newest first). Push <strong className="font-medium text-slate-800 dark:text-slate-200">live telemetry</strong>{" "}
+          (rows, bytes, progress, phase) via the same PATCH as logs — gateway and managed workers use identical fields.
+          Logs are structured and scrubbed — we never store raw warehouse credentials. Telemetry is stored here whether
+          ingestion runs on{" "}
           <strong className="font-medium text-slate-800 dark:text-slate-200">your gateway</strong>,{" "}
           <strong className="font-medium text-slate-800 dark:text-slate-200">eltPulse-managed</strong> compute (when
           enabled), or the <strong className="font-medium text-slate-800 dark:text-slate-200">app / API</strong>. Share
@@ -207,6 +247,22 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
           for how definitions stay separate from scheduling, and why you can run the same exports on or off platform.
         </p>
       </div>
+
+      {activeRunCount > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+          <span>
+            <strong className="font-semibold">{activeRunCount}</strong> run{activeRunCount === 1 ? "" : "s"} currently{" "}
+            <span className="font-medium">pending or running</span> — open details for live charts when your runner sends
+            samples.
+          </span>
+          <Link
+            href="/runs?status=running"
+            className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500"
+          >
+            Running only
+          </Link>
+        </div>
+      )}
 
       <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
         <Webhook className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
@@ -294,6 +350,40 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
         </div>
       </section>
 
+      {/* Aggregate stats strip */}
+      {!loading && runs.length > 0 && (() => {
+        const succeeded = runs.filter((r) => r.status === "succeeded").length;
+        const failed = runs.filter((r) => r.status === "failed").length;
+        const active = runs.filter((r) => r.status === "pending" || r.status === "running").length;
+        let totalRows = 0;
+        let totalBytes = 0;
+        for (const r of runs) {
+          const { summary } = parseRunTelemetry(r.telemetry);
+          if (summary.rowsLoaded) totalRows += summary.rowsLoaded;
+          if (summary.bytesLoaded) totalBytes += summary.bytesLoaded;
+        }
+        const successRate = runs.length > 0 ? Math.round((succeeded / runs.length) * 100) : 0;
+        const stats = [
+          { label: "Showing", value: runs.length.toString() },
+          { label: "Succeeded", value: succeeded.toString(), highlight: "text-emerald-700 dark:text-emerald-400" },
+          { label: "Failed", value: failed.toString(), highlight: failed > 0 ? "text-red-600 dark:text-red-400" : undefined },
+          { label: "Active", value: active.toString(), highlight: active > 0 ? "text-sky-600 dark:text-sky-400" : undefined },
+          { label: "Success rate", value: `${successRate}%` },
+          { label: "Total rows", value: formatRows(totalRows) },
+          { label: "Total bytes", value: formatBytes(totalBytes) },
+        ];
+        return (
+          <div className="flex flex-wrap gap-3">
+            {stats.map(({ label, value, highlight }) => (
+              <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-2 dark:border-slate-700 dark:bg-slate-900">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+                <div className={`mt-0.5 font-mono text-sm font-semibold ${highlight ?? "text-slate-900 dark:text-white"}`}>{value}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       {error && (
         <p className="text-sm text-red-600 dark:text-red-400" role="alert">
           {error}
@@ -309,7 +399,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-          <table className="w-full min-w-[640px] text-left text-sm">
+          <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
               <tr>
                 <th className="px-3 py-2 font-medium">Started</th>
@@ -317,7 +407,10 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                 <th className="px-3 py-2 font-medium">Gateway</th>
                 <th className="px-3 py-2 font-medium">Environment</th>
                 <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Telemetry</th>
+                <th className="px-3 py-2 font-medium">Progress</th>
+                <th className="px-3 py-2 font-medium">Rows</th>
+                <th className="px-3 py-2 font-medium">Bytes</th>
+                <th className="px-3 py-2 font-medium">Source</th>
                 <th className="px-3 py-2 font-medium">Correlation ID</th>
                 <th className="px-3 py-2 font-medium" />
               </tr>
@@ -339,6 +432,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                       <span className="capitalize">{r.status}</span>
                     </span>
                   </td>
+                  <RunTelemetryTableCells telemetryRaw={r.telemetry} />
                   <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
                     {telemetrySourceLabel(r.ingestionExecutor ?? "unspecified")}
                   </td>
@@ -361,6 +455,13 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
         </div>
       )}
 
+      <RelatedLinks links={[
+        { href: "/builder", icon: Layers, label: "Pipelines", desc: "Create or edit source → destination connections" },
+        { href: "/orchestration", icon: Play, label: "Orchestration", desc: "Schedule sensors that trigger these runs" },
+        { href: "/gateway", icon: Waypoints, label: "Gateway & execution", desc: "Connect your runner or use eltPulse-managed workers" },
+        { href: "/webhooks", icon: Webhook, label: "Webhooks", desc: "Fire notifications when a run reaches a terminal state" },
+      ]} />
+
       {(runIdFromUrl || detailLoading) && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
@@ -370,7 +471,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
           onClick={closeDetail}
         >
           <div
-            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-900"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4">
@@ -389,6 +490,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
               <p className="mt-4 text-slate-500">Loading…</p>
             ) : (
               <div className="mt-4 space-y-4 text-sm">
+                {/* Status badges */}
                 <div className="flex flex-wrap gap-2">
                   <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs dark:bg-slate-800">
                     <StatusGlyph status={detail.run.status} />
@@ -405,6 +507,43 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                     <span className="text-slate-500">· Gateway: any</span>
                   )}
                 </div>
+
+                {/* Timing info */}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/60">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Started</div>
+                    <div className="mt-0.5 text-xs text-slate-700 dark:text-slate-200">
+                      {new Date(detail.run.startedAt).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/60">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Finished</div>
+                    <div className="mt-0.5 text-xs text-slate-700 dark:text-slate-200">
+                      {detail.run.finishedAt ? new Date(detail.run.finishedAt).toLocaleString() : "—"}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/60">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Duration</div>
+                    <div className="mt-0.5 font-mono text-xs text-slate-700 dark:text-slate-200">
+                      {(() => {
+                        const end = detail.run.finishedAt ? new Date(detail.run.finishedAt).getTime() : Date.now();
+                        const ms = end - new Date(detail.run.startedAt).getTime();
+                        if (ms < 0) return "—";
+                        const s = Math.floor(ms / 1000);
+                        if (s < 60) return `${s}s`;
+                        return `${Math.floor(s / 60)}m ${s % 60}s`;
+                      })()}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/60">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Triggered by</div>
+                    <div className="mt-0.5 truncate text-xs text-slate-700 dark:text-slate-200" title={detail.run.triggeredBy ?? "—"}>
+                      {detail.run.triggeredBy ?? "—"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Correlation ID */}
                 <div>
                   <span className="text-xs font-medium uppercase text-slate-500">Correlation ID</span>
                   <div className="mt-1 flex items-center gap-2">
@@ -424,6 +563,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                     Give this to support with your CI job name so we can trace end-to-end.
                   </p>
                 </div>
+
                 {detail.run.errorSummary && (
                   <div>
                     <span className="text-xs font-medium uppercase text-red-600 dark:text-red-400">Error (sanitized)</span>
@@ -432,6 +572,9 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                     </pre>
                   </div>
                 )}
+
+                <RunTelemetryView telemetryRaw={detail.run.telemetry} />
+
                 <div>
                   <span className="text-xs font-medium uppercase text-slate-500">Structured logs</span>
                   <pre className="mt-1 max-h-64 overflow-auto rounded-lg bg-slate-50 p-3 font-mono text-xs text-slate-800 dark:bg-slate-950 dark:text-slate-200">

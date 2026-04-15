@@ -10,12 +10,16 @@ import {
   EyeOff,
   ExternalLink,
   Info,
+  Layers,
   Loader2,
+  Play,
   RefreshCw,
   ShieldAlert,
+  Waypoints,
   Webhook,
   Zap,
 } from 'lucide-react';
+import { RelatedLinks } from "@/components/ui/related-links";
 
 type PipelineRow = { id: string; name: string; webhookUrl: string | null };
 
@@ -355,6 +359,13 @@ export default function WebhooksPage() {
 }`}
         </pre>
       </section>
+
+      <RelatedLinks links={[
+        { href: "/runs", icon: Play, label: "Runs", desc: "View the executions that fire these webhooks" },
+        { href: "/builder", icon: Layers, label: "Pipelines", desc: "Set per-pipeline webhook URL overrides" },
+        { href: "/orchestration", icon: Waypoints, label: "Orchestration", desc: "Sensors and schedules that trigger runs" },
+        { href: "/gateway", icon: Webhook, label: "Gateway & execution", desc: "Configure where ingestion runs" },
+      ]} />
     </div>
   );
 }

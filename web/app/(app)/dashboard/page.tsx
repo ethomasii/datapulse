@@ -1,61 +1,147 @@
 import Link from "next/link";
-import { ArrowRight, FolderGit2, Layers, Plug, UserCog, Waypoints } from "lucide-react";
 import { requireDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
 import { isManagedExecutionPlane } from "@/lib/elt/execution-plane";
 import { formatBytes, formatRows, parseRunTelemetry } from "@/lib/elt/run-telemetry";
+import { ONBOARDING_STEPS } from "@/lib/onboarding/config";
+import { OnboardingChecklist } from "@/components/onboarding/checklist";
 
-function formatAgentSeen(iso: Date | null, source: string | null) {
-  if (!iso) return { line: "No heartbeat yet", sub: "Optional self-hosted or managed worker." };
-  const delta = Date.now() - iso.getTime();
-  const ago =
-    delta < 60_000
-      ? `${Math.floor(delta / 1000)}s ago`
-      : delta < 3_600_000
-        ? `${Math.floor(delta / 60_000)}m ago`
-        : `${Math.floor(delta / 3_600_000)}h ago`;
-  const who = source === "eltpulse_managed" ? "eltPulse-managed" : "Your gateway";
-  return { line: `${who} · ${ago}`, sub: "Heartbeats stored in eltPulse." };
+function dayKey(d: Date): string {
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function lastNDays(n: number): string[] {
+  const days: string[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push(dayKey(d));
+  }
+  return days;
+}
+
+type BarChartProps = {
+  days: string[];
+  values: number[];
+  label: string;
+  barClass: string;
+  formatter?: (n: number) => string;
+};
+
+function BarChart({ days, values, label, barClass, formatter }: BarChartProps) {
+  const max = Math.max(...values, 1);
+  const w = 480;
+  const h = 90;
+  const padLeft = 48;
+  const padRight = 8;
+  const padTop = 8;
+  const padBottom = 22;
+  const plotW = w - padLeft - padRight;
+  const plotH = h - padTop - padBottom;
+  const slotW = plotW / days.length;
+  const barW = Math.max(4, slotW - 4);
+
+  return (
+    <div>
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <svg
+        width="100%"
+        viewBox={`0 0 ${w} ${h}`}
+        style={{ maxWidth: w }}
+        role="img"
+        aria-label={label}
+        className="overflow-visible"
+      >
+        {[0, 0.5, 1].map((frac) => {
+          const y = padTop + (1 - frac) * plotH;
+          return (
+            <g key={frac}>
+              <line x1={padLeft} x2={padLeft + plotW} y1={y} y2={y} stroke="currentColor" strokeWidth="0.5" className="text-slate-200 dark:text-slate-700" strokeDasharray="3,3" />
+              <text x={(padLeft - 5).toString()} y={y.toFixed(1)} textAnchor="end" dominantBaseline="middle" fontSize="8" className="fill-slate-400 dark:fill-slate-500">
+                {formatter ? formatter(Math.round(max * frac)) : Math.round(max * frac).toString()}
+              </text>
+            </g>
+          );
+        })}
+        {days.map((day, i) => {
+          const barH = (values[i] / max) * plotH;
+          const x = padLeft + i * slotW + (slotW - barW) / 2;
+          const y = padTop + plotH - barH;
+          return <rect key={day} x={x.toFixed(1)} y={y.toFixed(1)} width={barW.toFixed(1)} height={Math.max(0, barH).toFixed(1)} rx="2" className={barClass} />;
+        })}
+        {[0, Math.floor(days.length / 2), days.length - 1].map((i) => {
+          const x = padLeft + i * slotW + slotW / 2;
+          return <text key={i} x={x.toFixed(1)} y={(h - 5).toString()} textAnchor="middle" fontSize="8" className="fill-slate-400 dark:fill-slate-500">{days[i]}</text>;
+        })}
+      </svg>
+    </div>
+  );
 }
 
 export default async function DashboardPage() {
   const user = await requireDbUser();
-  const namedAgents = await db.agentToken.findMany({
-    where: { userId: user.id, revokedAt: null },
-    select: { lastSeenAt: true, lastSeenSource: true },
+
+  const CHART_DAYS = 14;
+  const chartCutoff = new Date();
+  chartCutoff.setDate(chartCutoff.getDate() - CHART_DAYS + 1);
+  chartCutoff.setHours(0, 0, 0, 0);
+
+  const [pipelineCount, connectionCount, anyRun, activeRuns, recentFinished, chartRuns, namedAgents] =
+    await Promise.all([
+      db.eltPipeline.count({ where: { userId: user.id } }),
+      db.connection.count({ where: { userId: user.id } }),
+      db.eltPipelineRun.findFirst({ where: { userId: user.id }, select: { id: true } }),
+      db.eltPipelineRun.findMany({
+        where: { userId: user.id, status: { in: ["pending", "running"] } },
+        orderBy: { startedAt: "desc" },
+        take: 8,
+        include: { pipeline: { select: { name: true } } },
+      }),
+      db.eltPipelineRun.findMany({
+        where: { userId: user.id, status: { in: ["succeeded", "failed", "cancelled"] } },
+        orderBy: { startedAt: "desc" },
+        take: 5,
+        include: { pipeline: { select: { name: true } } },
+      }),
+      db.eltPipelineRun.findMany({
+        where: { userId: user.id, startedAt: { gte: chartCutoff } },
+        orderBy: { startedAt: "asc" },
+        select: { startedAt: true, status: true, telemetry: true },
+      }),
+      db.agentToken.findMany({
+        where: { userId: user.id, revokedAt: null },
+        select: { lastSeenAt: true, lastSeenSource: true },
+      }),
+    ]);
+
+  // Onboarding: compute which steps are done
+  const hasGateway =
+    !!user.agentToken ||
+    namedAgents.length > 0 ||
+    isManagedExecutionPlane(user.executionPlane);
+  const completedIds = ONBOARDING_STEPS.map((s) => s.id).filter((id) => {
+    if (id === "pipeline") return pipelineCount > 0;
+    if (id === "connection") return connectionCount > 0;
+    if (id === "gateway") return hasGateway;
+    if (id === "run") return !!anyRun;
+    if (id === "webhook") return !!user.runsWebhookUrl;
+    return false;
   });
-  type Best = { at: Date; src: string | null };
-  let best: Best | null = null;
-  for (const t of namedAgents) {
-    if (t.lastSeenAt && (!best || t.lastSeenAt > best.at)) {
-      best = { at: t.lastSeenAt, src: t.lastSeenSource };
-    }
+  const showOnboarding = !user.onboardingDismissedAt;
+
+  // Build per-day aggregates for charts
+  const days = lastNDays(CHART_DAYS);
+  const runsPerDay = Object.fromEntries(days.map((d) => [d, 0]));
+  const rowsPerDay = Object.fromEntries(days.map((d) => [d, 0]));
+  for (const r of chartRuns) {
+    const key = dayKey(new Date(r.startedAt));
+    if (key in runsPerDay) runsPerDay[key]++;
+    const tel = parseRunTelemetry(r.telemetry as unknown);
+    if (tel.summary.rowsLoaded && key in rowsPerDay) rowsPerDay[key] += tel.summary.rowsLoaded;
   }
-  if (user.agentLastSeenAt && user.agentToken) {
-    if (!best || user.agentLastSeenAt > best.at) {
-      best = { at: user.agentLastSeenAt, src: user.agentLastSeenSource };
-    }
-  }
-  const agentSeen = formatAgentSeen(best?.at ?? null, best?.src ?? null);
-  const executionHint = isManagedExecutionPlane(user.executionPlane)
-    ? "Execution: eltPulse-managed (connectivity, ingestion, run metrics)"
-    : "Execution: your infrastructure";
-  const [pipelineCount, enabledCount, activeRuns, recentFinished] = await Promise.all([
-    db.eltPipeline.count({ where: { userId: user.id } }),
-    db.eltPipeline.count({ where: { userId: user.id, enabled: true } }),
-    db.eltPipelineRun.findMany({
-      where: { userId: user.id, status: { in: ["pending", "running"] } },
-      orderBy: { startedAt: "desc" },
-      take: 8,
-      include: { pipeline: { select: { name: true } } },
-    }),
-    db.eltPipelineRun.findMany({
-      where: { userId: user.id, status: { in: ["succeeded", "failed", "cancelled"] } },
-      orderBy: { startedAt: "desc" },
-      take: 5,
-      include: { pipeline: { select: { name: true } } },
-    }),
-  ]);
+  const runsValues = days.map((d) => runsPerDay[d]);
+  const rowsValues = days.map((d) => rowsPerDay[d]);
+  const hasChartData = chartRuns.length > 0;
 
   return (
     <div className="w-full min-w-0 space-y-10">
@@ -67,121 +153,47 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <Link
-          href="/builder"
-          className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-sky-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-sky-700"
-        >
-          <div className="flex items-center justify-between">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300">
-              <Layers className="h-5 w-5" aria-hidden />
-            </span>
-            <ArrowRight
-              className="h-5 w-5 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-sky-600 dark:group-hover:text-sky-400"
-              aria-hidden
-            />
-          </div>
-          <h2 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">Pipelines</h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            {pipelineCount === 0
-              ? "Create your first source → destination connection."
-              : `${pipelineCount} definition${pipelineCount === 1 ? "" : "s"} · ${enabledCount} enabled`}
-          </p>
-        </Link>
+      {showOnboarding && <OnboardingChecklist completedIds={completedIds} />}
 
-        <Link
-          href="/repos"
-          className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-800"
-        >
-          <div className="flex items-center justify-between">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
-              <FolderGit2 className="h-5 w-5" aria-hidden />
-            </span>
-            <ArrowRight
-              className="h-5 w-5 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-emerald-600 dark:group-hover:text-emerald-400"
-              aria-hidden
-            />
-          </div>
-          <h2 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">Repositories</h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Private repos under eltPulse&apos;s GitHub org—no customer GitHub login required.
-          </p>
-        </Link>
+      {/* Activity charts */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+            Activity — last {CHART_DAYS} days
+          </h2>
+          <Link href="/runs" className="text-sm font-medium text-sky-600 hover:underline dark:text-sky-400">
+            All runs →
+          </Link>
+        </div>
 
-        <Link
-          href="/gateway"
-          className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-cyan-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-cyan-800"
-        >
-          <div className="flex items-center justify-between">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-100 text-cyan-900 dark:bg-cyan-950 dark:text-cyan-200">
-              <Waypoints className="h-5 w-5" aria-hidden />
-            </span>
-            <ArrowRight
-              className="h-5 w-5 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-cyan-600 dark:group-hover:text-cyan-400"
-              aria-hidden
-            />
-          </div>
-          <h2 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">Gateway &amp; execution</h2>
-          <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-cyan-800 dark:text-cyan-200">
-            {executionHint}
+        {!hasChartData ? (
+          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+            No runs in the last {CHART_DAYS} days. Click{" "}
+            <strong className="font-medium">Record sample run</strong> on the{" "}
+            <Link href="/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+              Runs page
+            </Link>{" "}
+            to seed data.
           </p>
-          <p className="mt-1 text-sm font-medium text-slate-700 dark:text-slate-200">{agentSeen.line}</p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{agentSeen.sub}</p>
-        </Link>
-
-        <Link
-          href="/integrations"
-          className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-violet-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-violet-800"
-        >
-          <div className="flex items-center justify-between">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200">
-              <Plug className="h-5 w-5" aria-hidden />
-            </span>
-            <ArrowRight
-              className="h-5 w-5 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-violet-600 dark:group-hover:text-violet-400"
-              aria-hidden
-            />
+        ) : (
+          <div className="mt-6 grid gap-8 lg:grid-cols-2">
+            <BarChart days={days} values={runsValues} label="Runs per day" barClass="fill-sky-500 dark:fill-sky-400" formatter={(n) => n.toString()} />
+            <BarChart days={days} values={rowsValues} label="Rows ingested per day" barClass="fill-emerald-500 dark:fill-emerald-400" formatter={formatRows} />
           </div>
-          <h2 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">Integrations</h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            How we host code, plus optional connectors—not the primary sign-in path.
-          </p>
-        </Link>
-
-        <Link
-          href="/account"
-          className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-600"
-        >
-          <div className="flex items-center justify-between">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200">
-              <UserCog className="h-5 w-5" aria-hidden />
-            </span>
-            <ArrowRight
-              className="h-5 w-5 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-slate-600 dark:group-hover:text-slate-300"
-              aria-hidden
-            />
-          </div>
-          <h2 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">Account &amp; Settings</h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Profile, billing, notifications, developers, org, audit.
-          </p>
-        </Link>
+        )}
       </section>
 
+      {/* Runs & telemetry */}
       <section className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Runs &amp; telemetry</h2>
-          <Link
-            href="/runs"
-            className="text-sm font-medium text-sky-600 hover:underline dark:text-sky-400"
-          >
+          <Link href="/runs" className="text-sm font-medium text-sky-600 hover:underline dark:text-sky-400">
             Open Runs →
           </Link>
         </div>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
           Live <strong className="font-medium text-slate-800 dark:text-slate-200">rows / bytes / progress</strong> when
-          your gateway or worker PATCHes <code className="text-xs">/api/agent/runs/:id</code> (same shape as the app
-          API).
+          your gateway or worker PATCHes <code className="text-xs">/api/agent/runs/:id</code>.
         </p>
 
         <div className="mt-6 grid gap-8 lg:grid-cols-2">
@@ -243,25 +255,6 @@ export default async function DashboardPage() {
             )}
           </div>
         </div>
-      </section>
-
-      <section className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 p-6 dark:border-slate-700 dark:bg-slate-900/40">
-        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">What’s next</h2>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-          Team activity and richer charts can extend this strip. Define syncs in{" "}
-          <Link href="/builder" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-            Pipelines
-          </Link>
-          ; managed Git storage is described under{" "}
-          <Link href="/integrations" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-            Integrations
-          </Link>{" "}
-          and{" "}
-          <Link href="/repos" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-            Repositories
-          </Link>
-          .
-        </p>
       </section>
     </div>
   );
