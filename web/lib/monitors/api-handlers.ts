@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { PipelineExecutionHost, Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
@@ -9,6 +9,18 @@ import {
 } from "@/lib/monitors/monitor-types";
 import { runMonitorChecksForUser } from "@/lib/monitors/run-monitors";
 
+const EXECUTION_HOSTS = new Set<PipelineExecutionHost>([
+  "inherit",
+  "eltpulse_managed",
+  "customer_gateway",
+]);
+
+function parseExecutionHost(value: unknown): PipelineExecutionHost | null {
+  return typeof value === "string" && EXECUTION_HOSTS.has(value as PipelineExecutionHost)
+    ? (value as PipelineExecutionHost)
+    : null;
+}
+
 export async function monitorsGET() {
   const user = await getCurrentDbUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,12 +28,15 @@ export async function monitorsGET() {
   const rows = await db.eltMonitor.findMany({
     where: { userId: user.id },
     orderBy: { updatedAt: "desc" },
+    include: { pipeline: { select: { id: true, name: true } } },
   });
 
   const sensors = rows.map((row) => ({
     name: row.name,
     type: row.type,
-    pipeline_name: row.pipelineName,
+    pipeline_id: row.pipelineId,
+    pipeline_name: row.pipeline.name,
+    execution_host: row.executionHost,
     config: row.config as Record<string, unknown>,
     last_check: row.lastCheckAt?.toISOString(),
   }));
@@ -41,16 +56,24 @@ export async function monitorsPOST(request: NextRequest) {
   }
 
   const name = typeof body.name === "string" ? body.name.trim() : "";
-  const pipelineName = typeof body.pipelineName === "string" ? body.pipelineName.trim() : "";
+  const pipelineId = typeof body.pipelineId === "string" ? body.pipelineId.trim() : "";
   const type = typeof body.type === "string" ? body.type.trim() : "";
   const connectionId = typeof body.connectionId === "string" ? body.connectionId.trim() : "";
   const configIn = body.config;
 
-  if (!name || !pipelineName || !type || !configIn || typeof configIn !== "object" || Array.isArray(configIn)) {
+  if (!name || !pipelineId || !type || !configIn || typeof configIn !== "object" || Array.isArray(configIn)) {
     return NextResponse.json(
-      { error: "Missing required fields: name, pipelineName, type, config" },
+      { error: "Missing required fields: name, pipelineId, type, config" },
       { status: 400 }
     );
+  }
+
+  const pipelineRow = await db.eltPipeline.findFirst({
+    where: { id: pipelineId, userId: user.id },
+    select: { id: true },
+  });
+  if (!pipelineRow) {
+    return NextResponse.json({ error: "Pipeline not found" }, { status: 404 });
   }
 
   const config: Record<string, unknown> = { ...(configIn as Record<string, unknown>) };
@@ -91,15 +114,18 @@ export async function monitorsPOST(request: NextRequest) {
     resolvedConnectionId = connection.id;
   }
 
+  const executionHost = parseExecutionHost(body.executionHost) ?? "inherit";
+
   try {
     await db.eltMonitor.create({
       data: {
         userId: user.id,
         name,
-        pipelineName,
+        pipelineId,
         type,
         config: config as Prisma.InputJsonValue,
         connectionId: resolvedConnectionId,
+        executionHost,
       },
     });
   } catch (e: unknown) {
@@ -141,6 +167,45 @@ export async function monitorsCheckPOST(request: NextRequest) {
     output: "",
     hasErrors: errors.length > 0,
     errors: errText,
+  });
+}
+
+export async function monitorsPATCH(name: string, request: NextRequest) {
+  const user = await getCurrentDbUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  if (!name) {
+    return NextResponse.json({ error: "Monitor name is required" }, { status: 400 });
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const host = parseExecutionHost(body.executionHost);
+  if (!host) {
+    return NextResponse.json(
+      { error: "executionHost must be inherit, eltpulse_managed, or customer_gateway" },
+      { status: 400 }
+    );
+  }
+
+  const result = await db.eltMonitor.updateMany({
+    where: { userId: user.id, name },
+    data: { executionHost: host },
+  });
+
+  if (result.count === 0) {
+    return NextResponse.json({ error: "Monitor not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({
+    success: true,
+    message: `Monitor '${name}' updated`,
+    executionHost: host,
   });
 }
 

@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import { getAgentAuthContext } from "@/lib/agent/auth";
 import { db } from "@/lib/db/client";
+import { parseExecutorHintsFromAgentTokenMetadata } from "@/lib/agent/executor-hints";
 import {
   AGENT_MANIFEST_VERSION,
   HEARTBEAT_INTERVAL_SECONDS,
@@ -52,8 +53,11 @@ export async function GET(req: Request) {
         id: true,
         name: true,
         type: true,
-        pipelineName: true,
+        pipelineId: true,
+        pipeline: { select: { name: true } },
+        config: true,
         connectionId: true,
+        executionHost: true,
         lastCheckAt: true,
         lastTriggeredAt: true,
         updatedAt: true,
@@ -73,13 +77,19 @@ export async function GET(req: Request) {
         ? { id: ownedOrg.id, name: ownedOrg.name }
         : null;
 
+  const executorHints = ctx.agentTokenRow
+    ? parseExecutorHintsFromAgentTokenMetadata(ctx.agentTokenRow.metadata)
+    : { pipelineRunIsolation: "inline" as const, monitorCheckIsolation: "inline" as const };
+
   return NextResponse.json({
     version: AGENT_MANIFEST_VERSION,
     controlPlane: {
       baseUrl: base,
     },
+    executorHints,
     billing: {
       planTier: ctx.planTier,
+      executionPlane: ctx.user.executionPlane,
       sensorCheckIntervalSeconds,
       runsPollIntervalSeconds: RUNS_POLL_INTERVAL_SECONDS,
       heartbeatIntervalSeconds: HEARTBEAT_INTERVAL_SECONDS,
@@ -87,7 +97,19 @@ export async function GET(req: Request) {
     organization: organizationPayload,
     workloads: {
       pipelines,
-      monitors,
+      monitors: monitors.map((m) => ({
+        id: m.id,
+        name: m.name,
+        type: m.type,
+        pipelineId: m.pipelineId,
+        pipelineName: m.pipeline.name,
+        config: m.config,
+        connectionId: m.connectionId,
+        executionHost: m.executionHost,
+        lastCheckAt: m.lastCheckAt,
+        lastTriggeredAt: m.lastTriggeredAt,
+        updatedAt: m.updatedAt,
+      })),
     },
   });
 }

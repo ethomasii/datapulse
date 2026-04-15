@@ -1,9 +1,12 @@
 import { ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
 import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
-import type { Connection, EltMonitor } from "@prisma/client";
+import type { Connection, EltMonitor, ExecutionPlane } from "@prisma/client";
+import { monitorEvaluatesOnControlPlane } from "@/lib/agent/monitor-execution";
 import { resolveNewRunExecution } from "@/lib/agent/run-execution";
 import { db } from "@/lib/db/client";
 import { parseStoredConnectionSecrets } from "@/lib/elt/connection-secrets-store";
+import type { CronMonitorScaleOptions } from "@/lib/monitors/cron-scale";
+import { stableMonitorShard } from "@/lib/monitors/cron-scale";
 import { resolveSensorCheckIntervalSeconds } from "@/lib/plans/agent-schedule";
 
 export type TriggeredSensorRow = {
@@ -36,6 +39,15 @@ async function sensorIntervalSecondsByUserId(userIds: string[]): Promise<Map<str
     );
   }
   return map;
+}
+
+async function executionPlaneByUserId(userIds: string[]): Promise<Map<string, ExecutionPlane>> {
+  if (userIds.length === 0) return new Map();
+  const users = await db.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, executionPlane: true },
+  });
+  return new Map(users.map((u) => [u.id, u.executionPlane]));
 }
 
 function connectionHints(conn: Pick<Connection, "config">): Record<string, string> {
@@ -170,7 +182,10 @@ async function checkSqsMessageCount(
 }
 
 async function runOneMonitorCheck(
-  monitor: EltMonitor & { connection: Connection | null }
+  monitor: EltMonitor & {
+    connection: Connection | null;
+    pipeline: { id: string; name: string };
+  }
 ): Promise<{ shouldTrigger: boolean; message: string; metadata: Record<string, unknown> }> {
   const cfg = asConfig(monitor.config);
   const type = monitor.type;
@@ -216,20 +231,20 @@ async function runOneMonitorCheck(
   };
 }
 
-async function enqueuePipelineRun(
+export async function enqueuePipelineRunForMonitor(
   userId: string,
-  pipelineName: string,
+  pipelineId: string,
   monitorName: string
 ): Promise<{ ok: true; runId: string } | { ok: false; reason: string }> {
   const pipeline = await db.eltPipeline.findFirst({
-    where: { userId, name: pipelineName },
-    select: { id: true, enabled: true, defaultTargetAgentTokenId: true, executionHost: true },
+    where: { id: pipelineId, userId },
+    select: { id: true, enabled: true, name: true, defaultTargetAgentTokenId: true, executionHost: true },
   });
   if (!pipeline) {
-    return { ok: false, reason: `Pipeline "${pipelineName}" not found` };
+    return { ok: false, reason: "Pipeline not found" };
   }
   if (!pipeline.enabled) {
-    return { ok: false, reason: `Pipeline "${pipelineName}" is disabled` };
+    return { ok: false, reason: `Pipeline "${pipeline.name}" is disabled` };
   }
 
   const actor = await db.user.findUnique({
@@ -271,14 +286,26 @@ export async function runMonitorChecksForUser(
   errors: string[];
   checked: number;
 }> {
+  const actor = await db.user.findUnique({
+    where: { id: userId },
+    select: { executionPlane: true },
+  });
+  const userPlane = actor?.executionPlane ?? "eltpulse_managed";
+
   const rows = await db.eltMonitor.findMany({
     where: { userId },
-    include: { connection: true },
+    include: {
+      connection: true,
+      pipeline: { select: { id: true, name: true } },
+    },
     orderBy: { name: "asc" },
   });
 
   const filtered = options?.pipelineFilter
-    ? rows.filter((r) => r.pipelineName === options.pipelineFilter)
+    ? rows.filter(
+        (r) =>
+          r.pipeline.name === options.pipelineFilter || r.pipeline.id === options.pipelineFilter
+      )
     : rows;
 
   const intervalByUser = await sensorIntervalSecondsByUserId(
@@ -288,8 +315,12 @@ export async function runMonitorChecksForUser(
   const triggeredSensors: TriggeredSensorRow[] = [];
   const errors: string[] = [];
   const now = new Date();
+  let checked = 0;
 
   for (const m of filtered) {
+    if (!monitorEvaluatesOnControlPlane(m.executionHost, userPlane)) {
+      continue;
+    }
     const minSec = intervalByUser.get(m.userId) ?? 600;
     if (m.lastCheckAt) {
       const elapsed = (now.getTime() - m.lastCheckAt.getTime()) / 1000;
@@ -297,6 +328,7 @@ export async function runMonitorChecksForUser(
         continue;
       }
     }
+    checked += 1;
     try {
       const result = await runOneMonitorCheck(m);
       await db.eltMonitor.update({
@@ -305,7 +337,7 @@ export async function runMonitorChecksForUser(
       });
 
       if (result.shouldTrigger) {
-        const q = await enqueuePipelineRun(m.userId, m.pipelineName, m.name);
+        const q = await enqueuePipelineRunForMonitor(m.userId, m.pipelineId, m.name);
         if (q.ok) {
           await db.eltMonitor.update({
             where: { id: m.id },
@@ -313,7 +345,7 @@ export async function runMonitorChecksForUser(
           });
           triggeredSensors.push({
             sensorName: m.name,
-            pipelineName: m.pipelineName,
+            pipelineName: m.pipeline.name,
             message: result.message,
             metadata: result.metadata,
             timestamp: now.toISOString(),
@@ -332,29 +364,48 @@ export async function runMonitorChecksForUser(
     }
   }
 
-  return { triggeredSensors, errors, checked: filtered.length };
+  return { triggeredSensors, errors, checked };
 }
 
 /** Cron: evaluate every stored monitor across all users. */
-export async function runMonitorChecksForAllUsers(): Promise<{
+export async function runMonitorChecksForAllUsers(options?: CronMonitorScaleOptions): Promise<{
   triggeredSensors: TriggeredSensorRow[];
   errors: string[];
   users: number;
   monitors: number;
+  cloudEvaluated: number;
+  skippedByShard: number;
+  stoppedEarly: boolean;
+  shard: { index: number; count: number };
 }> {
   const rows = await db.eltMonitor.findMany({
-    include: { connection: true },
+    include: {
+      connection: true,
+      pipeline: { select: { id: true, name: true } },
+    },
   });
 
   const intervalByUser = await sensorIntervalSecondsByUserId(Array.from(new Set(rows.map((r) => r.userId))));
+  const planeByUser = await executionPlaneByUserId(Array.from(new Set(rows.map((r) => r.userId))));
 
   const triggeredSensors: TriggeredSensorRow[] = [];
   const errors: string[] = [];
   const now = new Date();
   const userIds = new Set<string>();
+  const shardCount = Math.max(1, Math.min(64, options?.shardCount ?? 1));
+  const shardIndex = Math.max(0, Math.min(shardCount - 1, options?.shardIndex ?? 0));
+  const maxElapsedMs = options?.maxElapsedMs;
+  const startedAt = Date.now();
+  let skippedByShard = 0;
+  let cloudEvaluated = 0;
+  let stoppedEarly = false;
 
   for (const m of rows) {
     userIds.add(m.userId);
+    const userPlane = planeByUser.get(m.userId) ?? "eltpulse_managed";
+    if (!monitorEvaluatesOnControlPlane(m.executionHost, userPlane)) {
+      continue;
+    }
     const minSec = intervalByUser.get(m.userId) ?? 600;
     if (m.lastCheckAt) {
       const elapsed = (now.getTime() - m.lastCheckAt.getTime()) / 1000;
@@ -362,6 +413,15 @@ export async function runMonitorChecksForAllUsers(): Promise<{
         continue;
       }
     }
+    if (shardCount > 1 && stableMonitorShard(m.userId, m.id, shardCount) !== shardIndex) {
+      skippedByShard += 1;
+      continue;
+    }
+    if (maxElapsedMs != null && Date.now() - startedAt >= maxElapsedMs) {
+      stoppedEarly = true;
+      break;
+    }
+    cloudEvaluated += 1;
     try {
       const result = await runOneMonitorCheck(m);
       await db.eltMonitor.update({
@@ -370,7 +430,7 @@ export async function runMonitorChecksForAllUsers(): Promise<{
       });
 
       if (result.shouldTrigger) {
-        const q = await enqueuePipelineRun(m.userId, m.pipelineName, m.name);
+        const q = await enqueuePipelineRunForMonitor(m.userId, m.pipelineId, m.name);
         if (q.ok) {
           await db.eltMonitor.update({
             where: { id: m.id },
@@ -378,7 +438,7 @@ export async function runMonitorChecksForAllUsers(): Promise<{
           });
           triggeredSensors.push({
             sensorName: m.name,
-            pipelineName: m.pipelineName,
+            pipelineName: m.pipeline.name,
             message: result.message,
             metadata: result.metadata,
             timestamp: now.toISOString(),
@@ -402,5 +462,9 @@ export async function runMonitorChecksForAllUsers(): Promise<{
     errors,
     users: userIds.size,
     monitors: rows.length,
+    cloudEvaluated,
+    skippedByShard,
+    stoppedEarly,
+    shard: { index: shardIndex, count: shardCount },
   };
 }

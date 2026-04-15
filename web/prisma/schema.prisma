@@ -182,7 +182,7 @@ model GithubConnection {
   @@index([userId])
 }
 
-/// Named, reusable connection profile (source or destination). Referenced by pipelines by name.
+/// Named, reusable connection profile (source or destination). Referenced by monitors and pipelines (FK).
 model Connection {
   id          String   @id @default(cuid())
   userId      String
@@ -203,19 +203,24 @@ model Connection {
   @@unique([userId, name])
   @@index([userId])
   eltMonitors EltMonitor[]
+  pipelinesAsSource      EltPipeline[] @relation("PipelineSourceConnection")
+  pipelinesAsDestination EltPipeline[] @relation("PipelineDestinationConnection")
 }
 
-/// eltPulse cloud monitor (S3/SQS/etc.) — evaluated by the control plane cron, not local CLI files.
+/// eltPulse monitor — evaluated on the control plane and/or your gateway depending on `executionHost` + account plane.
 model EltMonitor {
   id               String    @id @default(cuid())
   userId           String
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   name             String
-  pipelineName     String
+  pipelineId       String    @map("pipeline_id")
+  pipeline         EltPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   type             String
   config           Json      @default("{}")
   connectionId     String?
   connection       Connection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  /// Hybrid: inherit account plane, force eltPulse cron, or force gateway-side evaluation only.
+  executionHost    PipelineExecutionHost @default(inherit) @map("execution_host")
   lastCheckAt      DateTime?
   lastTriggeredAt  DateTime?
   createdAt        DateTime  @default(now())
@@ -223,6 +228,7 @@ model EltMonitor {
 
   @@unique([userId, name])
   @@index([userId])
+  @@index([pipelineId])
   @@map("EltMonitor")
 }
 
@@ -250,12 +256,21 @@ model EltPipeline {
   defaultTargetAgentToken   AgentToken? @relation("PipelineDefaultGateway", fields: [defaultTargetAgentTokenId], references: [id], onDelete: SetNull)
   /// Hybrid execution: inherit account/org plane, force managed, or force customer gateway for new runs.
   executionHost PipelineExecutionHost @default(inherit) @map("execution_host")
+  /// Saved source Connection row (non-secret config + optional secrets on Connection).
+  sourceConnectionId String? @map("source_connection_id")
+  sourceConnection   Connection? @relation("PipelineSourceConnection", fields: [sourceConnectionId], references: [id], onDelete: SetNull)
+  /// Saved destination Connection row.
+  destinationConnectionId String? @map("destination_connection_id")
+  destinationConnection   Connection? @relation("PipelineDestinationConnection", fields: [destinationConnectionId], references: [id], onDelete: SetNull)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
   @@unique([userId, name, tool])
   @@index([userId])
+  @@index([sourceConnectionId])
+  @@index([destinationConnectionId])
   runs EltPipelineRun[]
+  eltMonitors EltMonitor[]
 }
 
 enum RunStatus {
@@ -286,6 +301,8 @@ model EltPipelineRun {
   finishedAt    DateTime?
   /// JSON array: [{ "at": ISO string, "level": "info"|"warn"|"error", "message": string }]
   logEntries    Json      @default("[]")
+  /// JSON { "summary": { rowsLoaded?, bytesLoaded?, progress?, currentPhase?, currentResource?, updatedAt? }, "samples": [...] } — live + historical telemetry (gateway / managed worker PATCH).
+  telemetry     Json      @default("{}")
   /// Sanitized error text for UI — never store connection strings or API keys here.
   errorSummary  String?   @db.Text
   webhookSentAt DateTime?

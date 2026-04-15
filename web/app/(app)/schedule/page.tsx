@@ -316,7 +316,7 @@ function CreateScheduleForm({ onClose, onSuccess }: { onClose: () => void; onSuc
   const [name, setName] = useState('');
   const [pipelines, setPipelines] = useState<PipelineRow[]>([]);
   const [pipelinesLoading, setPipelinesLoading] = useState(true);
-  const [selectedPipelineNames, setSelectedPipelineNames] = useState<string[]>([]);
+  const [selectedPipelineIds, setSelectedPipelineIds] = useState<string[]>([]);
   const [type, setType] = useState('');
   const [cronExpr, setCronExpr] = useState('');
   const [intervalMinutes, setIntervalMinutes] = useState('60');
@@ -347,9 +347,9 @@ function CreateScheduleForm({ onClose, onSuccess }: { onClose: () => void; onSuc
     };
   }, []);
 
-  const togglePipelineName = (pipelineName: string) => {
-    setSelectedPipelineNames((prev) =>
-      prev.includes(pipelineName) ? prev.filter((n) => n !== pipelineName) : [...prev, pipelineName].sort()
+  const togglePipelineId = (pipelineId: string) => {
+    setSelectedPipelineIds((prev) =>
+      prev.includes(pipelineId) ? prev.filter((n) => n !== pipelineId) : [...prev, pipelineId].sort()
     );
   };
 
@@ -372,7 +372,7 @@ function CreateScheduleForm({ onClose, onSuccess }: { onClose: () => void; onSuc
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedPipelineNames.length === 0) {
+    if (selectedPipelineIds.length === 0) {
       setError('Select at least one pipeline');
       return;
     }
@@ -382,7 +382,8 @@ function CreateScheduleForm({ onClose, onSuccess }: { onClose: () => void; onSuc
       const response = await fetch('/api/schedules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, pipelineNames: selectedPipelineNames, type, config: buildConfig() })
+        credentials: 'same-origin',
+        body: JSON.stringify({ name, pipelineIds: selectedPipelineIds, type, config: buildConfig() })
       });
       const data = await response.json();
       if (response.ok) {
@@ -421,7 +422,9 @@ function CreateScheduleForm({ onClose, onSuccess }: { onClose: () => void; onSuc
               Pipelines on this schedule
             </label>
             <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
-              Select one or more. Names match your workspace pipelines (the same identifier used for local ELT layout).
+              Select one or more by stable id. The server resolves the current pipeline name for the CLI. Note: the
+              local schedules file still stores names; if you rename a pipeline later, recreate or edit that schedule so
+              names stay in sync (monitors in the app use ids and are rename-safe).
             </p>
             {pipelinesLoading ? (
               <div className="rounded-md border border-slate-200 px-3 py-4 text-sm text-slate-500 dark:border-slate-600">
@@ -441,8 +444,8 @@ function CreateScheduleForm({ onClose, onSuccess }: { onClose: () => void; onSuc
                     <input
                       type="checkbox"
                       className="mt-1"
-                      checked={selectedPipelineNames.includes(p.name)}
-                      onChange={() => togglePipelineName(p.name)}
+                      checked={selectedPipelineIds.includes(p.id)}
+                      onChange={() => togglePipelineId(p.id)}
                     />
                     <span className="min-w-0">
                       <span className="font-medium text-slate-900 dark:text-slate-100">{p.name}</span>
