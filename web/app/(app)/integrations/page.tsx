@@ -17,7 +17,7 @@ export default async function IntegrationsPage() {
   const defaultRepoLabel = formatDefaultRepoLabel(ghRow);
 
   return (
-    <div className="w-full min-w-0 max-w-3xl space-y-8">
+    <div className="w-full min-w-0 max-w-3xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Integrations</h1>
         <p className="mt-2 text-slate-600 dark:text-slate-300">

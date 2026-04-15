@@ -137,7 +137,7 @@ export default function WebhooksPage() {
   const triggerUrl = newToken ? `${appBase}/api/webhooks/trigger/${newToken}` : null;
 
   return (
-    <div className="w-full min-w-0 max-w-4xl space-y-10">
+    <div className="w-full min-w-0 max-w-4xl mx-auto space-y-10">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div>

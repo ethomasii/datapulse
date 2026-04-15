@@ -4,7 +4,7 @@ import { RelatedLinks } from "@/components/ui/related-links";
 
 export default function HelpPage() {
   return (
-    <div className="w-full min-w-0 max-w-2xl">
+    <div className="w-full min-w-0 max-w-2xl mx-auto">
       <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/40 dark:text-sky-100">
         <LifeBuoy className="h-3.5 w-3.5" aria-hidden />
         Help center (preview)
