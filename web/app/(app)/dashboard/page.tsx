@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { ArrowRight, FolderGit2, Layers, Plug, Waypoints } from "lucide-react";
+import { ArrowRight, FolderGit2, Layers, Plug, UserCog, Waypoints } from "lucide-react";
 import { requireDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
 import { isManagedExecutionPlane } from "@/lib/elt/execution-plane";
+import { formatBytes, formatRows, parseRunTelemetry } from "@/lib/elt/run-telemetry";
 
 function formatAgentSeen(iso: Date | null, source: string | null) {
   if (!iso) return { line: "No heartbeat yet", sub: "Optional self-hosted or managed worker." };
@@ -39,9 +40,21 @@ export default async function DashboardPage() {
   const executionHint = isManagedExecutionPlane(user.executionPlane)
     ? "Execution: eltPulse-managed (connectivity, ingestion, run metrics)"
     : "Execution: your infrastructure";
-  const [pipelineCount, enabledCount] = await Promise.all([
+  const [pipelineCount, enabledCount, activeRuns, recentFinished] = await Promise.all([
     db.eltPipeline.count({ where: { userId: user.id } }),
     db.eltPipeline.count({ where: { userId: user.id, enabled: true } }),
+    db.eltPipelineRun.findMany({
+      where: { userId: user.id, status: { in: ["pending", "running"] } },
+      orderBy: { startedAt: "desc" },
+      take: 8,
+      include: { pipeline: { select: { name: true } } },
+    }),
+    db.eltPipelineRun.findMany({
+      where: { userId: user.id, status: { in: ["succeeded", "failed", "cancelled"] } },
+      orderBy: { startedAt: "desc" },
+      take: 5,
+      include: { pipeline: { select: { name: true } } },
+    }),
   ]);
 
   return (
@@ -140,22 +153,102 @@ export default async function DashboardPage() {
           className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-600"
         >
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium uppercase tracking-wide text-slate-500">Account &amp; Settings</span>
+            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200">
+              <UserCog className="h-5 w-5" aria-hidden />
+            </span>
             <ArrowRight
-              className="h-5 w-5 text-slate-400 transition group-hover:translate-x-0.5 dark:group-hover:text-slate-300"
+              className="h-5 w-5 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-slate-600 dark:group-hover:text-slate-300"
               aria-hidden
             />
           </div>
-          <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
+          <h2 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">Account &amp; Settings</h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             Profile, billing, notifications, developers, org, audit.
           </p>
         </Link>
       </section>
 
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Runs &amp; telemetry</h2>
+          <Link
+            href="/runs"
+            className="text-sm font-medium text-sky-600 hover:underline dark:text-sky-400"
+          >
+            Open Runs →
+          </Link>
+        </div>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+          Live <strong className="font-medium text-slate-800 dark:text-slate-200">rows / bytes / progress</strong> when
+          your gateway or worker PATCHes <code className="text-xs">/api/agent/runs/:id</code> (same shape as the app
+          API).
+        </p>
+
+        <div className="mt-6 grid gap-8 lg:grid-cols-2">
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Active now</h3>
+            {activeRuns.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">No pending or running executions.</p>
+            ) : (
+              <ul className="mt-2 space-y-2">
+                {activeRuns.map((r) => {
+                  const tel = parseRunTelemetry((r as { telemetry?: unknown }).telemetry);
+                  const s = tel.summary;
+                  return (
+                    <li key={r.id}>
+                      <Link
+                        href={`/runs?run=${encodeURIComponent(r.id)}`}
+                        className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2 text-sm hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/60"
+                      >
+                        <span className="font-medium text-slate-900 dark:text-white">{r.pipeline.name}</span>
+                        <span className="capitalize text-slate-600 dark:text-slate-400">{r.status}</span>
+                        <span className="w-full font-mono text-xs text-slate-500 dark:text-slate-400">
+                          {s.progress !== undefined ? `${Math.round(s.progress)}%` : "—"} ·{" "}
+                          {s.rowsLoaded !== undefined ? formatRows(s.rowsLoaded) : "—"} rows ·{" "}
+                          {s.bytesLoaded !== undefined ? formatBytes(s.bytesLoaded) : "—"}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Recent finished</h3>
+            {recentFinished.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">No completed runs yet.</p>
+            ) : (
+              <ul className="mt-2 space-y-2">
+                {recentFinished.map((r) => {
+                  const tel = parseRunTelemetry((r as { telemetry?: unknown }).telemetry);
+                  const s = tel.summary;
+                  return (
+                    <li key={r.id}>
+                      <Link
+                        href={`/runs?run=${encodeURIComponent(r.id)}`}
+                        className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2 text-sm hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/60"
+                      >
+                        <span className="font-medium text-slate-900 dark:text-white">{r.pipeline.name}</span>
+                        <span className="capitalize text-slate-600 dark:text-slate-400">{r.status}</span>
+                        <span className="w-full font-mono text-xs text-slate-500 dark:text-slate-400">
+                          {s.rowsLoaded !== undefined ? `${formatRows(s.rowsLoaded)} rows` : "—"} ·{" "}
+                          {s.bytesLoaded !== undefined ? formatBytes(s.bytesLoaded) : "—"}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+      </section>
+
       <section className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 p-6 dark:border-slate-700 dark:bg-slate-900/40">
         <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">What’s next</h2>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-          Run history and team activity will surface here. Define syncs in{" "}
+          Team activity and richer charts can extend this strip. Define syncs in{" "}
           <Link href="/builder" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
             Pipelines
           </Link>
