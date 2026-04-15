@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
           if (current) triggeredSchedules.push(current);
           current = {
             scheduleName: match[1].trim(),
-            pipelineName: match[2].trim(),
+            pipeline: match[2].trim(),
             message: '',
             metadata: {},
             timestamp: new Date().toISOString()

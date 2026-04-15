@@ -24,14 +24,11 @@ class ScheduleResult:
 
 
 def _pipeline_names_from_storage(data: Dict[str, Any]) -> List[str]:
-    """Load pipeline name list from persisted schedule JSON (supports legacy single field)."""
+    """Load pipeline name list from persisted schedule JSON."""
     raw = data.get("pipeline_names")
-    if isinstance(raw, list) and raw:
-        return [str(p).strip() for p in raw if str(p).strip()]
-    legacy = data.get("pipeline_name")
-    if legacy is not None and str(legacy).strip():
-        return [str(legacy).strip()]
-    return []
+    if not isinstance(raw, list) or not raw:
+        return []
+    return [str(p).strip() for p in raw if str(p).strip()]
 
 
 class BaseSchedule(ABC):
@@ -64,16 +61,10 @@ class BaseSchedule(ABC):
         """Check if the schedule should trigger at the given time."""
         pass
 
-    @property
-    def pipeline_name(self) -> str:
-        """Backward-compatible single string (joined) for CLIs and legacy consumers."""
-        return ", ".join(self.pipeline_names)
-
     def get_status(self) -> Dict[str, Any]:
         """Get current schedule status."""
         return {
             "name": self.name,
-            "pipeline_name": self.pipeline_name,
             "pipeline_names": list(self.pipeline_names),
             "type": self.__class__.__name__,
             "cron_expression": self.cron_expression,
@@ -298,9 +289,9 @@ class ScheduleManager:
                 for pn in schedule.pipeline_names:
                     triggered.append({
                         'schedule_name': schedule.name,
-                        'pipeline_name': pn,
+                        'pipeline': pn,
                         'message': f"Scheduled run triggered by {schedule.__class__.__name__}",
-                        'metadata': {**result.metadata, 'pipeline_names': list(schedule.pipeline_names)},
+                        'metadata': dict(result.metadata),
                         'timestamp': datetime.now().isoformat()
                     })
 

@@ -176,11 +176,8 @@ def list(output_json: bool):
             except:
                 pass
 
-        pipelines_display = schedule.get("pipeline_names")
-        if isinstance(pipelines_display, list) and pipelines_display:
-            pipe_cell = ", ".join(str(p) for p in pipelines_display)
-        else:
-            pipe_cell = str(schedule.get("pipeline_name", ""))
+        pipelines_display = schedule.get("pipeline_names") or []
+        pipe_cell = ", ".join(str(p) for p in pipelines_display) if pipelines_display else "—"
 
         table.add_row(
             schedule["name"],
@@ -204,11 +201,8 @@ def status():
 
     for schedule in schedules:
         console.print(f"\n[bold]{schedule['name']}[/bold] ({schedule['type']})")
-        pnames = schedule.get("pipeline_names")
-        if isinstance(pnames, list) and pnames:
-            console.print(f"   Pipelines: {', '.join(str(p) for p in pnames)}")
-        else:
-            console.print(f"   Pipeline: {schedule['pipeline_name']}")
+        pnames = schedule.get("pipeline_names") or []
+        console.print(f"   Pipelines: {', '.join(str(p) for p in pnames) if pnames else '—'}")
         console.print(f"   Cron Expression: {schedule['cron_expression']}")
         console.print(f"   Timezone: {schedule['timezone']}")
         console.print(f"   Last Run: {schedule.get('last_run', 'Never')}")
@@ -224,7 +218,7 @@ def check(pipeline: str = None):
     results = schedule_manager.check_all_schedules()
 
     if pipeline:
-        results = [r for r in results if r["pipeline_name"] == pipeline]
+        results = [r for r in results if r["pipeline"] == pipeline]
 
     if not results:
         console.print("[green]✓[/green] No schedules triggered")
@@ -233,7 +227,7 @@ def check(pipeline: str = None):
     console.print(f"[yellow]⏰ {len(results)} schedule(s) triggered[/yellow]\n")
 
     for result in results:
-        console.print(f"[bold]{result['schedule_name']}[/bold] → {result['pipeline_name']}")
+        console.print(f"[bold]{result['schedule_name']}[/bold] → {result['pipeline']}")
         console.print(f"   {result['message']}")
         console.print(f"   Metadata: {result['metadata']}")
         console.print(f"   Time: {result['timestamp']}")

@@ -45,32 +45,23 @@ export async function GET() {
   }
 }
 
-function normalizePipelineNames(body: Record<string, unknown>): string[] {
-  const fromArray = body.pipelineNames;
-  if (Array.isArray(fromArray) && fromArray.length > 0) {
-    return fromArray
-      .filter((p): p is string => typeof p === "string" && p.trim().length > 0)
-      .map((p) => p.trim());
-  }
-  const legacy = body.pipelineName;
-  if (typeof legacy === "string" && legacy.trim()) {
-    return [legacy.trim()];
-  }
-  return [];
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const { name, type, config } = body;
 
-    const pipelineNames = normalizePipelineNames(body);
+    const rawNames = body.pipelineNames;
+    const pipelineNames =
+      Array.isArray(rawNames) && rawNames.length > 0
+        ? rawNames
+            .filter((p): p is string => typeof p === "string" && p.trim().length > 0)
+            .map((p) => p.trim())
+        : [];
 
     if (!name || typeof name !== "string" || !pipelineNames.length || !type || !config) {
       return NextResponse.json(
         {
-          error:
-            "Missing required fields: name, type, config, and pipelineNames (non-empty array) or pipelineName (string)",
+          error: "Missing required fields: name, type, config, and pipelineNames (non-empty array of strings)",
         },
         { status: 400 }
       );

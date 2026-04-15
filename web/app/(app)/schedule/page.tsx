@@ -7,9 +7,7 @@ import Link from "next/link";
 interface Schedule {
   name: string;
   type: string;
-  pipeline_name: string;
-  /** When set (newer storage), individual pipeline targets for this schedule. */
-  pipeline_names?: string[];
+  pipeline_names: string[];
   cron_expression: string;
   timezone: string;
   last_run: string | null;
@@ -18,7 +16,7 @@ interface Schedule {
 
 interface TriggeredSchedule {
   scheduleName: string;
-  pipelineName: string;
+  pipeline: string;
   message: string;
   metadata: Record<string, any>;
   timestamp: string;
@@ -166,7 +164,7 @@ export default function SchedulePage() {
                   <div>
                     <span className="font-medium text-violet-900 dark:text-violet-100">{s.scheduleName}</span>
                     <span className="mx-2 text-violet-600">→</span>
-                    <span className="text-violet-800 dark:text-violet-200">{s.pipelineName}</span>
+                    <span className="text-violet-800 dark:text-violet-200">{s.pipeline}</span>
                   </div>
                   <span className="text-xs text-violet-600 dark:text-violet-400">
                     {new Date(s.timestamp).toLocaleString()}
@@ -225,11 +223,7 @@ export default function SchedulePage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-slate-500">
-                      Pipelines:{' '}
-                      {(schedule.pipeline_names?.length
-                        ? schedule.pipeline_names
-                        : [schedule.pipeline_name]
-                      ).join(', ')}
+                      Pipelines: {(schedule.pipeline_names ?? []).join(', ') || '—'}
                     </span>
                     <button
                       onClick={() => deleteSchedule(schedule.name)}
