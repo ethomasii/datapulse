@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { CalendarClock, Clock, PlayCircle, Plus, Trash2, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 import Link from "next/link";
+import { PipelineMultiPicker } from "@/components/elt/pipeline-pickers";
 
 interface Schedule {
   name: string;
@@ -400,7 +401,7 @@ function CreateScheduleForm({ onClose, onSuccess }: { onClose: () => void; onSuc
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Create Schedule</h3>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -426,39 +427,12 @@ function CreateScheduleForm({ onClose, onSuccess }: { onClose: () => void; onSuc
               local schedules file still stores names; if you rename a pipeline later, recreate or edit that schedule so
               names stay in sync (monitors in the app use ids and are rename-safe).
             </p>
-            {pipelinesLoading ? (
-              <div className="rounded-md border border-slate-200 px-3 py-4 text-sm text-slate-500 dark:border-slate-600">
-                Loading pipelines…
-              </div>
-            ) : pipelines.length === 0 ? (
-              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-                No pipelines found. Create one in the Builder first, then return here.
-              </div>
-            ) : (
-              <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-300 p-2 dark:border-slate-600">
-                {pipelines.map((p) => (
-                  <label
-                    key={p.id}
-                    className="flex cursor-pointer items-start gap-2 rounded px-1 py-1 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/80"
-                  >
-                    <input
-                      type="checkbox"
-                      className="mt-1"
-                      checked={selectedPipelineIds.includes(p.id)}
-                      onChange={() => togglePipelineId(p.id)}
-                    />
-                    <span className="min-w-0">
-                      <span className="font-medium text-slate-900 dark:text-slate-100">{p.name}</span>
-                      <span className="mt-0.5 block font-mono text-[11px] text-slate-500 dark:text-slate-400">{p.id}</span>
-                      <span className="mt-0.5 block text-xs text-slate-500">
-                        {p.sourceType} → {p.destinationType} ({p.tool})
-                        {!p.enabled ? ' · disabled' : ''}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
+            <PipelineMultiPicker
+              pipelines={pipelines}
+              selectedIds={selectedPipelineIds}
+              onToggle={togglePipelineId}
+              loading={pipelinesLoading}
+            />
           </div>
 
           {/* Type */}

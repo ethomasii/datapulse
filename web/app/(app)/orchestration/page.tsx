@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { FileJson, Layers, PlayCircle, Split, Plus, Trash2, CheckCircle, AlertCircle, RefreshCw, Waypoints } from "lucide-react";
 import Link from "next/link";
 import { RelatedLinks } from "@/components/ui/related-links";
+import { PipelineSinglePicker } from "@/components/elt/pipeline-pickers";
 
 interface MonitorRow {
   name: string;
@@ -419,6 +420,10 @@ function CreateMonitorForm({ onClose, onSuccess }: { onClose: () => void; onSucc
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.pipelineId.trim()) {
+      setError("Select a pipeline");
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -453,7 +458,7 @@ function CreateMonitorForm({ onClose, onSuccess }: { onClose: () => void; onSucc
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Create monitor</h3>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -477,26 +482,12 @@ function CreateMonitorForm({ onClose, onSuccess }: { onClose: () => void; onSucc
             <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
               Linked by stable id — renaming the pipeline in the builder does not break this monitor.
             </p>
-            {pipelinesLoading ? (
-              <div className="rounded-md border border-slate-200 px-3 py-3 text-sm text-slate-500 dark:border-slate-600">
-                Loading pipelines…
-              </div>
-            ) : (
-              <select
-                value={formData.pipelineId}
-                onChange={(e) => setFormData((prev) => ({ ...prev, pipelineId: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md dark:border-slate-600 dark:bg-slate-800"
-                required
-              >
-                <option value="">Select a pipeline…</option>
-                {pipelines.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.sourceType} → {p.destinationType})
-                    {!p.enabled ? ' — disabled' : ''}
-                  </option>
-                ))}
-              </select>
-            )}
+            <PipelineSinglePicker
+              pipelines={pipelines}
+              value={formData.pipelineId}
+              onChange={(pipelineId) => setFormData((prev) => ({ ...prev, pipelineId }))}
+              loading={pipelinesLoading}
+            />
           </div>
 
           <div>
