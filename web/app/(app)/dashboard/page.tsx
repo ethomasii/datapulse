@@ -87,7 +87,7 @@ export default async function DashboardPage() {
   const hasChartData = chartRuns.length > 0;
 
   return (
-    <div className="w-full min-w-0 space-y-10">
+    <div className="w-full min-w-0 max-w-7xl mx-auto space-y-10">
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Dashboard</h1>
         <p className="mt-2 text-slate-600 dark:text-slate-300">

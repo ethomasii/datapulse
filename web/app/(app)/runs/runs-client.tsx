@@ -262,7 +262,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
   });
 
   return (
-    <div className="w-full min-w-0 space-y-8">
+    <div className="w-full min-w-0 max-w-7xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Runs</h1>
         <p className="mt-2 max-w-3xl text-slate-600 dark:text-slate-300">

@@ -732,7 +732,7 @@ export function CanvasPageClient() {
   const showDockedInspector = pipelines.length > 0 && Boolean(selectedId) && !detailLoading;
 
   return (
-    <div className={clsx("space-y-6", showDockedInspector && "lg:pr-[380px]")}>
+    <div className={clsx("w-full min-w-0 max-w-7xl mx-auto space-y-6", showDockedInspector && "lg:pr-[380px]")}>
       <h1 className="text-left text-2xl font-bold text-slate-900 dark:text-white">Visual pipeline canvas</h1>
 
       <div className="w-full min-w-0 space-y-4">
