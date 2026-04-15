@@ -30,6 +30,8 @@ export type TelemetrySample = {
 export type RunTelemetry = {
   summary: TelemetrySummary;
   samples: TelemetrySample[];
+  /** Numeric rollup was inferred from structured log lines (no telemetry summary on the run). */
+  derivedFromLogs?: boolean;
 };
 
 function finiteNonNeg(n: unknown): number | undefined {
@@ -89,16 +91,81 @@ export function emptyRunTelemetry(): RunTelemetry {
   return { summary: {}, samples: [] };
 }
 
+function summaryRollupIsEmpty(s: TelemetrySummary): boolean {
+  return (
+    s.rowsLoaded === undefined &&
+    s.bytesLoaded === undefined &&
+    s.progress === undefined &&
+    s.updatedAt === undefined &&
+    s.currentPhase === undefined &&
+    s.currentResource === undefined
+  );
+}
+
+/**
+ * Best-effort rollup when runners only appended human-readable log lines (no telemetry PATCH).
+ * Prefers a final "N rows loaded" line; otherwise the largest "rows processed so far" value.
+ */
+export function deriveTelemetrySummaryFromLogEntries(rawLogs: unknown): TelemetrySummary | null {
+  if (!Array.isArray(rawLogs) || rawLogs.length === 0) return null;
+  let rowsFinal: number | undefined;
+  let maxRowsSoFar = 0;
+  let sawSoFar = false;
+  let lastAt: string | undefined;
+
+  for (const entry of rawLogs) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const at = typeof (entry as { at?: unknown }).at === "string" ? (entry as { at: string }).at : undefined;
+    const message =
+      typeof (entry as { message?: unknown }).message === "string" ? (entry as { message: string }).message : "";
+    if (!message) continue;
+    if (at) lastAt = at;
+
+    const completed = message.match(/\b([\d,]+)\s*rows\s+loaded\b/i);
+    if (completed) {
+      const n = Number.parseInt(completed[1].replace(/,/g, ""), 10);
+      if (Number.isFinite(n) && n >= 0) rowsFinal = n;
+    }
+    const soFar = message.match(/rows\s+processed\s+so\s+far:\s*([\d,]+)/i);
+    if (soFar) {
+      const n = Number.parseInt(soFar[1].replace(/,/g, ""), 10);
+      if (Number.isFinite(n) && n >= 0) {
+        sawSoFar = true;
+        maxRowsSoFar = Math.max(maxRowsSoFar, n);
+      }
+    }
+  }
+
+  const out: TelemetrySummary = {};
+  if (rowsFinal !== undefined) out.rowsLoaded = rowsFinal;
+  else if (sawSoFar) out.rowsLoaded = maxRowsSoFar;
+  if (lastAt) out.updatedAt = lastAt;
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+/** Parse stored telemetry; unwrap JSON strings; accept legacy rollup fields at the JSON root. */
 export function parseRunTelemetry(raw: unknown): RunTelemetry {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+  let v: unknown = raw;
+  if (typeof v === "string") {
+    try {
+      v = JSON.parse(v) as unknown;
+    } catch {
+      return emptyRunTelemetry();
+    }
+  }
+  if (!v || typeof v !== "object" || Array.isArray(v)) {
     return emptyRunTelemetry();
   }
-  const o = raw as Record<string, unknown>;
+  const o = v as Record<string, unknown>;
   const summaryRaw = o.summary;
-  const summary =
+  let summary =
     summaryRaw && typeof summaryRaw === "object" && !Array.isArray(summaryRaw)
       ? sanitizeSummary(summaryRaw as Record<string, unknown>)
       : {};
+  if (summaryRollupIsEmpty(summary)) {
+    const fromRoot = sanitizeSummary(o);
+    if (!summaryRollupIsEmpty(fromRoot)) summary = fromRoot;
+  }
   const samplesRaw = o.samples;
   const samples: TelemetrySample[] = [];
   if (Array.isArray(samplesRaw)) {
@@ -109,6 +176,36 @@ export function parseRunTelemetry(raw: unknown): RunTelemetry {
     }
   }
   return { summary, samples: samples.slice(-TELEMETRY_SAMPLES_MAX) };
+}
+
+function inferSummaryFromSamples(samples: TelemetrySample[]): TelemetrySummary | null {
+  if (samples.length === 0) return null;
+  const last = samples[samples.length - 1];
+  const out: TelemetrySummary = {};
+  if (typeof last.rows === "number") out.rowsLoaded = last.rows;
+  if (typeof last.bytes === "number") out.bytesLoaded = last.bytes;
+  if (typeof last.progress === "number") out.progress = last.progress;
+  if (typeof last.at === "string" && last.at) out.updatedAt = last.at;
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+/**
+ * Telemetry for UI: parsed JSON; if rollup is empty, fill from the last sample and/or structured logs.
+ */
+export function effectiveRunTelemetry(telemetryRaw: unknown, logEntriesRaw: unknown): RunTelemetry {
+  const base = parseRunTelemetry(telemetryRaw);
+  if (!summaryRollupIsEmpty(base.summary)) return base;
+  const fromSamples = inferSummaryFromSamples(base.samples);
+  if (fromSamples) {
+    return { summary: { ...base.summary, ...fromSamples }, samples: base.samples };
+  }
+  const fromLogs = deriveTelemetrySummaryFromLogEntries(logEntriesRaw);
+  if (!fromLogs) return base;
+  return {
+    summary: { ...base.summary, ...fromLogs },
+    samples: base.samples,
+    derivedFromLogs: true,
+  };
 }
 
 export type TelemetryPatchInput = {

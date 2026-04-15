@@ -21,6 +21,7 @@ import {
 import { RunTelemetryTableCells, RunTelemetryView } from "@/components/elt/run-telemetry-view";
 import { formatBytes, formatRows, parseRunTelemetry } from "@/lib/elt/run-telemetry";
 import { RelatedLinks } from "@/components/ui/related-links";
+import { BarChart } from "@/components/ui/bar-chart";
 type PipelineOpt = { id: string; name: string };
 
 type RunRow = {
@@ -182,7 +183,15 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
       });
       if (!create.ok) throw new Error(await create.text());
       const { run } = (await create.json()) as { run: { id: string } };
-      await fetch(`/api/elt/runs/${run.id}`, {
+
+      const assertPatchOk = async (res: Response, step: string) => {
+        if (!res.ok) {
+          const body = await res.text();
+          throw new Error(`${step} failed (${res.status}): ${body.slice(0, 400)}`);
+        }
+      };
+
+      const patch1 = await fetch(`/api/elt/runs/${run.id}`, {
         method: "PATCH",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
@@ -193,7 +202,8 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
           appendTelemetrySample: { progress: 5, rows: 0, bytes: 0, phase: "extract", resource },
         }),
       });
-      await fetch(`/api/elt/runs/${run.id}`, {
+      await assertPatchOk(patch1, "Sample run step 1");
+      const patch2 = await fetch(`/api/elt/runs/${run.id}`, {
         method: "PATCH",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
@@ -203,7 +213,8 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
           appendTelemetrySample: { progress: midProgress, rows: midRows, bytes: midBytes, phase: "load", resource },
         }),
       });
-      await fetch(`/api/elt/runs/${run.id}`, {
+      await assertPatchOk(patch2, "Sample run step 2");
+      const patch3 = await fetch(`/api/elt/runs/${run.id}`, {
         method: "PATCH",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
@@ -214,6 +225,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
           appendTelemetrySample: { progress: 100, rows: totalRows, bytes: totalBytes, phase: "done", resource },
         }),
       });
+      await assertPatchOk(patch3, "Sample run step 3");
       await loadRuns();
       await openDetail(run.id);
     } catch (e) {
@@ -222,6 +234,32 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
       setDemoBusy(false);
     }
   }
+
+  // Build 14-day chart data from the loaded runs
+  const CHART_DAYS = 14;
+  const chartDays = (() => {
+    const days: string[] = [];
+    for (let i = CHART_DAYS - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      days.push(d.toLocaleDateString(undefined, { month: "short", day: "numeric" }));
+    }
+    return days;
+  })();
+  const runsPerDay = Object.fromEntries(chartDays.map((d) => [d, 0]));
+  const rowsPerDay = Object.fromEntries(chartDays.map((d) => [d, 0]));
+  for (const r of runs) {
+    const key = new Date(r.startedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    if (key in runsPerDay) runsPerDay[key]++;
+    const { summary } = parseRunTelemetry(r.telemetry);
+    if (summary.rowsLoaded && key in rowsPerDay) rowsPerDay[key] += summary.rowsLoaded;
+  }
+  const chartRunValues = chartDays.map((d) => runsPerDay[d]);
+  const chartRowValues = chartDays.map((d) => rowsPerDay[d]);
+  const hasChartData = runs.some((r) => {
+    const key = new Date(r.startedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    return key in runsPerDay;
+  });
 
   return (
     <div className="w-full min-w-0 space-y-8">
@@ -247,6 +285,20 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
           for how definitions stay separate from scheduling, and why you can run the same exports on or off platform.
         </p>
       </div>
+
+      {/* 14-day activity charts */}
+      {hasChartData && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Activity — last {CHART_DAYS} days</h2>
+            <span className="text-xs text-slate-400 dark:text-slate-500">Based on current filter</span>
+          </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <BarChart days={chartDays} values={chartRunValues} label="Runs per day" barClass="fill-sky-500 dark:fill-sky-400" formatter={(n) => n.toString()} />
+            <BarChart days={chartDays} values={chartRowValues} label="Rows ingested per day" barClass="fill-emerald-500 dark:fill-emerald-400" formatter={formatRows} />
+          </div>
+        </section>
+      )}
 
       {activeRunCount > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
@@ -573,7 +625,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                   </div>
                 )}
 
-                <RunTelemetryView telemetryRaw={detail.run.telemetry} />
+                <RunTelemetryView telemetryRaw={detail.run.telemetry} logEntriesRaw={detail.run.logEntries} />
 
                 <div>
                   <span className="text-xs font-medium uppercase text-slate-500">Structured logs</span>

@@ -2,9 +2,10 @@ import Link from "next/link";
 import { requireDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
 import { isManagedExecutionPlane } from "@/lib/elt/execution-plane";
-import { formatBytes, formatRows, parseRunTelemetry } from "@/lib/elt/run-telemetry";
+import { effectiveRunTelemetry, formatBytes, formatRows } from "@/lib/elt/run-telemetry";
 import { ONBOARDING_STEPS } from "@/lib/onboarding/config";
 import { OnboardingChecklist } from "@/components/onboarding/checklist";
+import { BarChart } from "@/components/ui/bar-chart";
 
 function dayKey(d: Date): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -18,64 +19,6 @@ function lastNDays(n: number): string[] {
     days.push(dayKey(d));
   }
   return days;
-}
-
-type BarChartProps = {
-  days: string[];
-  values: number[];
-  label: string;
-  barClass: string;
-  formatter?: (n: number) => string;
-};
-
-function BarChart({ days, values, label, barClass, formatter }: BarChartProps) {
-  const max = Math.max(...values, 1);
-  const w = 480;
-  const h = 90;
-  const padLeft = 48;
-  const padRight = 8;
-  const padTop = 8;
-  const padBottom = 22;
-  const plotW = w - padLeft - padRight;
-  const plotH = h - padTop - padBottom;
-  const slotW = plotW / days.length;
-  const barW = Math.max(4, slotW - 4);
-
-  return (
-    <div>
-      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
-      <svg
-        width="100%"
-        viewBox={`0 0 ${w} ${h}`}
-        style={{ maxWidth: w }}
-        role="img"
-        aria-label={label}
-        className="overflow-visible"
-      >
-        {[0, 0.5, 1].map((frac) => {
-          const y = padTop + (1 - frac) * plotH;
-          return (
-            <g key={frac}>
-              <line x1={padLeft} x2={padLeft + plotW} y1={y} y2={y} stroke="currentColor" strokeWidth="0.5" className="text-slate-200 dark:text-slate-700" strokeDasharray="3,3" />
-              <text x={(padLeft - 5).toString()} y={y.toFixed(1)} textAnchor="end" dominantBaseline="middle" fontSize="8" className="fill-slate-400 dark:fill-slate-500">
-                {formatter ? formatter(Math.round(max * frac)) : Math.round(max * frac).toString()}
-              </text>
-            </g>
-          );
-        })}
-        {days.map((day, i) => {
-          const barH = (values[i] / max) * plotH;
-          const x = padLeft + i * slotW + (slotW - barW) / 2;
-          const y = padTop + plotH - barH;
-          return <rect key={day} x={x.toFixed(1)} y={y.toFixed(1)} width={barW.toFixed(1)} height={Math.max(0, barH).toFixed(1)} rx="2" className={barClass} />;
-        })}
-        {[0, Math.floor(days.length / 2), days.length - 1].map((i) => {
-          const x = padLeft + i * slotW + slotW / 2;
-          return <text key={i} x={x.toFixed(1)} y={(h - 5).toString()} textAnchor="middle" fontSize="8" className="fill-slate-400 dark:fill-slate-500">{days[i]}</text>;
-        })}
-      </svg>
-    </div>
-  );
 }
 
 export default async function DashboardPage() {
@@ -106,7 +49,7 @@ export default async function DashboardPage() {
       db.eltPipelineRun.findMany({
         where: { userId: user.id, startedAt: { gte: chartCutoff } },
         orderBy: { startedAt: "asc" },
-        select: { startedAt: true, status: true, telemetry: true },
+        select: { startedAt: true, status: true, telemetry: true, logEntries: true },
       }),
       db.agentToken.findMany({
         where: { userId: user.id, revokedAt: null },
@@ -136,8 +79,8 @@ export default async function DashboardPage() {
   for (const r of chartRuns) {
     const key = dayKey(new Date(r.startedAt));
     if (key in runsPerDay) runsPerDay[key]++;
-    const tel = parseRunTelemetry(r.telemetry as unknown);
-    if (tel.summary.rowsLoaded && key in rowsPerDay) rowsPerDay[key] += tel.summary.rowsLoaded;
+    const tel = effectiveRunTelemetry(r.telemetry as unknown, r.logEntries as unknown);
+    if (tel.summary.rowsLoaded !== undefined && key in rowsPerDay) rowsPerDay[key] += tel.summary.rowsLoaded;
   }
   const runsValues = days.map((d) => runsPerDay[d]);
   const rowsValues = days.map((d) => rowsPerDay[d]);
@@ -204,7 +147,7 @@ export default async function DashboardPage() {
             ) : (
               <ul className="mt-2 space-y-2">
                 {activeRuns.map((r) => {
-                  const tel = parseRunTelemetry((r as { telemetry?: unknown }).telemetry);
+                  const tel = effectiveRunTelemetry(r.telemetry, r.logEntries);
                   const s = tel.summary;
                   return (
                     <li key={r.id}>
@@ -233,7 +176,7 @@ export default async function DashboardPage() {
             ) : (
               <ul className="mt-2 space-y-2">
                 {recentFinished.map((r) => {
-                  const tel = parseRunTelemetry((r as { telemetry?: unknown }).telemetry);
+                  const tel = effectiveRunTelemetry(r.telemetry, r.logEntries);
                   const s = tel.summary;
                   return (
                     <li key={r.id}>

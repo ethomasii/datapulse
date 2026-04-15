@@ -1,7 +1,7 @@
 "use client";
 
 import type { RunTelemetry, TelemetrySample } from "@/lib/elt/run-telemetry";
-import { formatBytes, formatRows, parseRunTelemetry } from "@/lib/elt/run-telemetry";
+import { effectiveRunTelemetry, formatBytes, formatRows } from "@/lib/elt/run-telemetry";
 
 function pickSeries(samples: TelemetrySample[]): { values: number[]; label: string; formatter: (n: number) => string } {
   const hasRows = samples.some((s) => typeof s.rows === "number");
@@ -187,6 +187,15 @@ function TelemetryChart({ samples }: { samples: TelemetrySample[] }) {
 export function RunTelemetrySummaryCards({ telemetry }: { telemetry: RunTelemetry }) {
   const s = telemetry.summary;
   return (
+    <div className="space-y-2">
+      {telemetry.derivedFromLogs ? (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+          No telemetry rollup was stored for this run. Row counts below are{" "}
+          <span className="font-semibold">parsed from structured log lines</span> (best effort). For live charts and
+          exact bytes/progress, PATCH <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/60">telemetrySummary</code> /{" "}
+          <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/60">appendTelemetrySample</code> from your runner.
+        </p>
+      ) : null}
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
         <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Rows</div>
@@ -229,11 +238,19 @@ export function RunTelemetrySummaryCards({ telemetry }: { telemetry: RunTelemetr
         </div>
       )}
     </div>
+    </div>
   );
 }
 
-export function RunTelemetryView({ telemetryRaw }: { telemetryRaw: unknown }) {
-  const telemetry = parseRunTelemetry(telemetryRaw);
+export function RunTelemetryView({
+  telemetryRaw,
+  logEntriesRaw,
+}: {
+  telemetryRaw: unknown;
+  /** When present, used to infer row counts if telemetry summary is empty. */
+  logEntriesRaw?: unknown;
+}) {
+  const telemetry = effectiveRunTelemetry(telemetryRaw, logEntriesRaw);
 
   return (
     <div className="space-y-3">
@@ -253,7 +270,7 @@ export function RunTelemetryView({ telemetryRaw }: { telemetryRaw: unknown }) {
 }
 
 export function RunTelemetryTableCells({ telemetryRaw }: { telemetryRaw: unknown }) {
-  const { summary } = parseRunTelemetry(telemetryRaw);
+  const { summary } = effectiveRunTelemetry(telemetryRaw, undefined);
   return (
     <>
       <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-200">
