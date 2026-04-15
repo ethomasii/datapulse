@@ -6,10 +6,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  // Neon migrations: set DIRECT_URL to a non-pooled connection and uncomment:
-  // directUrl = env("DIRECT_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  /// Neon: use the non-pooled “direct” connection string. For local Postgres, set to the same value as `DATABASE_URL`.
+  directUrl = env("DIRECT_URL")
 }
 
 enum PlanTier {
@@ -79,6 +79,8 @@ model User {
   agentLastSeenLabels  Json      @default("{}") @map("agent_last_seen_labels")
   /// `customer_agent` = your process with Bearer token; `eltpulse_managed` = eltPulse-operated worker (SaaS / dedicated).
   agentLastSeenSource  String?   @map("agent_last_seen_source")
+  /// Set when user clicks "Dismiss" on the dashboard onboarding checklist.
+  onboardingDismissedAt DateTime? @map("onboarding_dismissed_at")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
