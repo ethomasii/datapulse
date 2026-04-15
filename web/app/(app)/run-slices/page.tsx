@@ -16,6 +16,7 @@ import {
   Waypoints,
 } from 'lucide-react';
 import { RelatedLinks } from "@/components/ui/related-links";
+import { SliceCoveragePanel } from "@/components/elt/slice-coverage-panel";
 import { getRunSliceCapability } from "@/lib/elt/run-slice-capabilities";
 
 // ─── Column hints ─────────────────────────────────────────────────────────────
@@ -208,18 +209,21 @@ export default function RunSlicesPage() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-3">
-          {pipelines.map(p => (
-            <PipelinePartitionRow
-              key={p.id}
-              pipeline={p}
-              expanded={selected === p.id}
-              onToggle={() => setSelected(prev => prev === p.id ? null : p.id)}
-              onSaved={load}
-              onError={setError}
-            />
-          ))}
-        </div>
+        <>
+          <SliceCoveragePanel pipelines={pipelines} />
+          <div className="space-y-3">
+            {pipelines.map(p => (
+              <PipelinePartitionRow
+                key={p.id}
+                pipeline={p}
+                expanded={selected === p.id}
+                onToggle={() => setSelected(prev => prev === p.id ? null : p.id)}
+                onSaved={load}
+                onError={setError}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       {/* Concept reference */}
@@ -243,6 +247,14 @@ export default function RunSlicesPage() {
           </div>
         </div>
       </section>
+
+      {pipelines.length > 0 ? (
+        <RelatedLinks links={[
+          { href: "/runs", icon: Play, label: "Runs", desc: "Full run history and live telemetry for every execution" },
+          { href: "/builder", icon: Layers, label: "Pipelines", desc: "Define the source → destination connections being backfilled" },
+          { href: "/gateway", icon: Waypoints, label: "Gateway & execution", desc: "Configure where backfill runs execute" },
+        ]} />
+      ) : null}
     </div>
   );
 }
@@ -707,11 +719,6 @@ function PartitionEditor({
         </div>
       )}
 
-      <RelatedLinks links={[
-        { href: "/runs", icon: Play, label: "Runs", desc: "Full run history and live telemetry for every execution" },
-        { href: "/builder", icon: Layers, label: "Pipelines", desc: "Define the source → destination connections being backfilled" },
-        { href: "/gateway", icon: Waypoints, label: "Gateway & execution", desc: "Configure where backfill runs execute" },
-      ]} />
     </div>
   );
 }

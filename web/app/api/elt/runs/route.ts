@@ -20,7 +20,7 @@ export async function GET(req: Request) {
     ? (statusRaw.split(",").filter((s): s is RunStatus => valid.has(s)) as RunStatus[])
     : undefined;
   const environment = url.searchParams.get("environment") ?? undefined;
-  const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? 50) || 50));
+  const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit") ?? 50) || 50));
 
   const where: Prisma.EltPipelineRunWhereInput = {
     userId: user.id,
