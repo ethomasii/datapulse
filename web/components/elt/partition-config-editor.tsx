@@ -331,7 +331,14 @@ export function PartitionConfigEditor({
 
   return (
     <div className="space-y-6">
-      <p className="text-xs text-slate-500 dark:text-slate-400">{cap.detail}</p>
+      <div className="rounded-lg border border-teal-100 bg-teal-50/60 px-4 py-3 dark:border-teal-900 dark:bg-teal-900/10">
+        <p className="text-xs text-slate-600 dark:text-slate-300">{cap.detail}</p>
+        {"mechanism" in cap && (cap as { mechanism?: string }).mechanism ? (
+          <p className="mt-1.5 font-mono text-[11px] text-teal-700 dark:text-teal-400">
+            ↳ {(cap as { mechanism?: string }).mechanism}
+          </p>
+        ) : null}
+      </div>
       <div>
         <h3 className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Run slice configuration</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

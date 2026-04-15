@@ -188,11 +188,10 @@ function PipelinePartitionCard({
         </span>
         <span className="text-xs text-slate-400">→</span>
         <span className="text-xs text-slate-500 dark:text-slate-400">{pipeline.destinationType}</span>
-        {cap.mode === "none_only" ? (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
-            {cap.label}
-          </span>
-        ) : hasPartition ? (
+        <span className="rounded-full bg-teal-50 px-2 py-0.5 font-mono text-[10px] text-teal-700 dark:bg-teal-900/20 dark:text-teal-400" title={cap.detail}>
+          {cap.label}
+        </span>
+        {hasPartition ? (
           <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-800 dark:bg-teal-900/30 dark:text-teal-300">
             {cfg!.type === 'date' ? `Date · ${cfg!.column} / ${cfg!.granularity}` : `Key · ${cfg!.column}`}
           </span>
