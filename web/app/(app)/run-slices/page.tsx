@@ -4,8 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertCircle,
-  ChevronDown,
-  ChevronRight,
   Database,
   Layers,
   Loader2,
@@ -35,7 +33,6 @@ type PipelineSummary = {
 export default function RunSlicesPage() {
   const [pipelines, setPipelines] = useState<PipelineSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -119,13 +116,11 @@ export default function RunSlicesPage() {
       ) : (
         <>
           <SliceCoveragePanel pipelines={pipelines} />
-          <div className="space-y-3">
+          <div className="space-y-6">
             {pipelines.map(p => (
-              <PipelinePartitionRow
+              <PipelinePartitionCard
                 key={p.id}
                 pipeline={p}
-                expanded={selected === p.id}
-                onToggle={() => setSelected(prev => prev === p.id ? null : p.id)}
                 onSaved={load}
                 onError={setError}
               />
@@ -167,18 +162,14 @@ export default function RunSlicesPage() {
   );
 }
 
-// ─── Per-pipeline row ─────────────────────────────────────────────────────────
+// ─── Per-pipeline card (always expanded) ──────────────────────────────────────
 
-function PipelinePartitionRow({
+function PipelinePartitionCard({
   pipeline,
-  expanded,
-  onToggle,
   onSaved,
   onError,
 }: {
   pipeline: PipelineSummary;
-  expanded: boolean;
-  onToggle: () => void;
   onSaved: () => void;
   onError: (msg: string) => void;
 }) {
@@ -189,52 +180,44 @@ function PipelinePartitionRow({
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center justify-between px-5 py-4 text-left"
-      >
-        <div className="flex items-center gap-3">
-          <Layers className="h-4 w-4 shrink-0 text-slate-400" />
-          <span className="font-medium text-slate-900 dark:text-white">{pipeline.name}</span>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-            {pipeline.sourceType}
+      <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+        <Layers className="h-4 w-4 shrink-0 text-slate-400" />
+        <span className="font-semibold text-slate-900 dark:text-white">{pipeline.name}</span>
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          {pipeline.sourceType}
+        </span>
+        <span className="text-xs text-slate-400">→</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">{pipeline.destinationType}</span>
+        {cap.mode === "none_only" ? (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
+            {cap.label}
           </span>
-          {cap.mode === "none_only" ? (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
-              {cap.label}
-            </span>
-          ) : hasPartition ? (
-            <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-800 dark:bg-teal-900/30 dark:text-teal-300">
-              {cfg!.type === 'date' ? `Date · ${cfg!.column} / ${cfg!.granularity}` : `Key · ${cfg!.column}`}
-            </span>
-          ) : (
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800">
-              No run slice
-            </span>
-          )}
-          {unsupportedSavedSlice ? (
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
-              Saved slice config not used — save to clear
-            </span>
-          ) : null}
-        </div>
-        {expanded ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
-      </button>
-
-      {expanded && (
-        <div className="border-t border-slate-100 px-5 pb-6 pt-4 dark:border-slate-800">
-          <PartitionConfigEditor
-            key={pipeline.id}
-            pipelineId={pipeline.id}
-            sourceType={pipeline.sourceType}
-            seed={pipeline.partitionConfig ?? EMPTY_PARTITION}
-            showBackfill
-            onSaved={onSaved}
-            onError={onError}
-          />
-        </div>
-      )}
+        ) : hasPartition ? (
+          <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-800 dark:bg-teal-900/30 dark:text-teal-300">
+            {cfg!.type === 'date' ? `Date · ${cfg!.column} / ${cfg!.granularity}` : `Key · ${cfg!.column}`}
+          </span>
+        ) : (
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800">
+            No slice configured
+          </span>
+        )}
+        {unsupportedSavedSlice && (
+          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+            Saved config not used — save to clear
+          </span>
+        )}
+      </div>
+      <div className="px-5 pb-6 pt-5">
+        <PartitionConfigEditor
+          key={pipeline.id}
+          pipelineId={pipeline.id}
+          sourceType={pipeline.sourceType}
+          seed={pipeline.partitionConfig ?? EMPTY_PARTITION}
+          showBackfill
+          onSaved={onSaved}
+          onError={onError}
+        />
+      </div>
     </div>
   );
 }
