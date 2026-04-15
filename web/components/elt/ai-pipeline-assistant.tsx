@@ -19,22 +19,14 @@ const STARTER_PROMPTS = [
   'What sources do you support?',
 ];
 
-const FOLLOW_UPS: Record<string, string[]> = {
-  github: ['What resources can I load?', 'How do I set up incremental loading?', 'What env vars do I need?'],
-  stripe: ['Can I load subscriptions too?', 'How far back can I backfill?', 'What is the start_date format?'],
-  rest_api: ['How do I handle pagination?', 'What if my API needs OAuth?', 'Can I load multiple endpoints?'],
-  database: ['Can I use CDC / replication?', 'How do I pick which tables to sync?', 'What destinations are supported?'],
-  general: ['Show me all supported sources', 'What destinations are available?', 'How does incremental loading work?'],
-};
-
-function getFollowUps(text: string): string[] {
-  const lower = text.toLowerCase();
-  if (lower.includes('github')) return FOLLOW_UPS.github;
-  if (lower.includes('stripe') || lower.includes('shopify') || lower.includes('hubspot')) return FOLLOW_UPS.stripe;
-  if (lower.includes('rest') || lower.includes('api') || lower.includes('endpoint')) return FOLLOW_UPS.rest_api;
-  if (lower.includes('postgres') || lower.includes('mysql') || lower.includes('database') || lower.includes('sling')) return FOLLOW_UPS.database;
-  return FOLLOW_UPS.general;
-}
+// Follow-ups only shown when the AI responds with info/questions (no pipeline generated yet)
+const FOLLOW_UPS = [
+  'Show me all supported sources',
+  'What destinations are available?',
+  'How does incremental loading work?',
+  'Sync Stripe payments to BigQuery',
+  'Pull HubSpot contacts into Postgres',
+];
 
 // ── Markdown renderer ─────────────────────────────────────────────────────────
 
@@ -195,7 +187,8 @@ export function AiPipelineAssistant({
   };
 
   const lastMsg = messages[messages.length - 1];
-  const followUps = lastMsg?.role === 'assistant' ? getFollowUps(lastMsg.content) : [];
+  // Only show follow-ups when the last response was informational (no pipeline generated)
+  const showFollowUps = lastMsg?.role === 'assistant' && !lastMsg.savePayload && !loading;
   const panelW = expanded ? 'w-[720px]' : 'w-[420px]';
   const panelH = expanded ? 'h-[640px]' : 'h-[520px]';
 
@@ -333,10 +326,10 @@ export function AiPipelineAssistant({
             )}
           </div>
 
-          {/* Follow-up suggestions */}
-          {followUps.length > 0 && !loading && (
+          {/* Follow-up suggestions — only for informational responses */}
+          {showFollowUps && (
             <div className="flex flex-wrap gap-1.5 border-t border-slate-800 px-4 py-2">
-              {followUps.map((f) => (
+              {FOLLOW_UPS.map((f) => (
                 <button
                   key={f}
                   onClick={() => void sendMessage(f)}
