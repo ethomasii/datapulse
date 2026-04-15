@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import {
   Activity,
+  BookOpen,
   Cable,
   CalendarClock,
   ChevronLeft,
@@ -22,6 +23,7 @@ import {
   Waypoints,
   Webhook,
 } from "lucide-react";
+import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
 import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -39,6 +41,7 @@ type NavItem = {
 const PRODUCT_NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/builder", label: "Pipelines", icon: Layers },
+  { href: "/sources", label: "Source Registry", icon: BookOpen },
   { href: "/orchestration", label: "Monitors", icon: Split },
   { href: "/schedule", label: "Schedules", icon: CalendarClock },
   { href: "/runs", label: "Runs", icon: PlayCircle },
@@ -233,6 +236,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
         <main className="min-h-0 min-w-0 w-full flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
       </div>
+      <AiPipelineAssistant />
     </div>
   );
 }
