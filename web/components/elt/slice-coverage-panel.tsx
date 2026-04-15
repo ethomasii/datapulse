@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Calendar, CheckCircle2, Loader2, Play, RefreshCw, XCircle } from "lucide-react";
 import { latestRunPerSlice, parseSliceFromTriggeredBy, type RunRowForSlice } from "@/lib/elt/slice-trigger";
 
@@ -11,6 +11,35 @@ type PipelineOption = {
   sourceType: string;
   partitionConfig?: { type: string; column: string; granularity: string; description: string };
 };
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+function addDaysLocal(d: Date, days: number): Date {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() + days);
+  return x;
+}
+
+function toISODateLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Min/max day values already seen in backfill runs for this partition column. */
+function sliceDayBoundsFromRuns(runs: RunRowForSlice[], partitionCol: string): { min: string | null; max: string | null } {
+  const col = partitionCol.trim();
+  let min: string | null = null;
+  let max: string | null = null;
+  for (const r of runs) {
+    const p = parseSliceFromTriggeredBy(r.triggeredBy);
+    if (!p || p.column !== col || !ISO_DAY.test(p.value)) continue;
+    if (min === null || p.value < min) min = p.value;
+    if (max === null || p.value > max) max = p.value;
+  }
+  return { min, max };
+}
 
 function dateRangeDay(start: string, end: string): string[] {
   const dates: string[] = [];
@@ -74,6 +103,8 @@ export function SliceCoveragePanel({
   const [manualValue, setManualValue] = useState("");
   const [gapStart, setGapStart] = useState("");
   const [gapEnd, setGapEnd] = useState("");
+  /** When pipeline + date partition column change, seed From/To once so missing days show without manual entry. */
+  const gapRangeKeyRef = useRef<string>("");
 
   const pipeline = useMemo(() => pipelines.find((p) => p.id === pipelineId) ?? null, [pipelines, pipelineId]);
 
@@ -117,6 +148,26 @@ export function SliceCoveragePanel({
     if (col) setManualColumn(col);
   }, [pipeline?.partitionConfig?.column, pipelineId]);
 
+  const isDatePartition = pipeline?.partitionConfig?.type === "date";
+  const partitionCol = pipeline?.partitionConfig?.column?.trim();
+
+  useEffect(() => {
+    const key = `${pipelineId}|${partitionCol ?? ""}`;
+    if (!pipelineId || !isDatePartition || !partitionCol) {
+      if (!pipelineId) {
+        setGapStart("");
+        setGapEnd("");
+        gapRangeKeyRef.current = "";
+      }
+      return;
+    }
+    if (gapRangeKeyRef.current === key) return;
+    gapRangeKeyRef.current = key;
+    const today = new Date();
+    setGapEnd(toISODateLocal(today));
+    setGapStart(toISODateLocal(addDaysLocal(today, -29)));
+  }, [pipelineId, isDatePartition, partitionCol]);
+
   const sliceMap = useMemo(() => latestRunPerSlice(runs), [runs]);
   const sliceRows = useMemo(() => {
     const rows = Array.from(sliceMap.values());
@@ -132,9 +183,6 @@ export function SliceCoveragePanel({
     () => runs.filter((r) => !parseSliceFromTriggeredBy(r.triggeredBy)).length,
     [runs]
   );
-
-  const partitionCol = pipeline?.partitionConfig?.column?.trim();
-  const isDatePartition = pipeline?.partitionConfig?.type === "date";
 
   const gapDays = useMemo(() => {
     if (!isDatePartition || !partitionCol || !gapStart || !gapEnd) return [];
@@ -199,6 +247,27 @@ export function SliceCoveragePanel({
       setError(e instanceof Error ? e.message : "Bulk queue failed");
     } finally {
       setBulkQueueBusy(false);
+    }
+  }
+
+  function setRollingDayWindow(dayCount: number) {
+    const today = new Date();
+    setGapEnd(toISODateLocal(today));
+    setGapStart(toISODateLocal(addDaysLocal(today, -(dayCount - 1))));
+  }
+
+  function applySuggestRangeFromRuns() {
+    if (!partitionCol) return;
+    const { min, max } = sliceDayBoundsFromRuns(runs, partitionCol);
+    const today = toISODateLocal(new Date());
+    if (min && max) {
+      setGapStart(min);
+      setGapEnd(max > today ? max : today);
+    } else if (min) {
+      setGapStart(min);
+      setGapEnd(today);
+    } else {
+      setRollingDayWindow(30);
     }
   }
 
@@ -428,8 +497,10 @@ export function SliceCoveragePanel({
             <div className="mt-6 rounded-xl border border-dashed border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/60">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Day coverage (date slices)</h3>
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Uses your saved partition column <span className="font-mono">{partitionCol}</span>. Days with no slice
-                run, or latest run not succeeded, are highlighted.
+                Uses your saved partition column <span className="font-mono">{partitionCol}</span>.{" "}
+                <strong className="font-medium text-slate-600 dark:text-slate-300">From / To</strong> default to the last
+                30 days ending today when you select this pipeline — widen the range or use quick presets to see older
+                gaps. Days with no slice run, or whose latest run did not succeed, are highlighted.
               </p>
               <div className="mt-3 flex flex-wrap gap-3">
                 <div>
@@ -450,6 +521,41 @@ export function SliceCoveragePanel({
                     className="mt-1 rounded border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
                   />
                 </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Quick range
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setRollingDayWindow(7)}
+                  className="rounded border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  Last 7 days
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRollingDayWindow(30)}
+                  className="rounded border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  Last 30 days
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRollingDayWindow(90)}
+                  className="rounded border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  Last 90 days
+                </button>
+                <button
+                  type="button"
+                  onClick={applySuggestRangeFromRuns}
+                  disabled={!runs.length}
+                  className="rounded border border-teal-200 bg-teal-50 px-2 py-1 text-[11px] font-medium text-teal-900 hover:bg-teal-100 disabled:opacity-50 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-100 dark:hover:bg-teal-900/50"
+                  title="Set From/To from earliest and latest day seen in backfill runs for this column (or last 30 days if none)"
+                >
+                  Fit to runs
+                </button>
               </div>
               {gapDays.length > 0 ? (
                 <>
@@ -483,6 +589,21 @@ export function SliceCoveragePanel({
                       </div>
                     );
                   })()}
+                  <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                    {(() => {
+                      const missingN = gapDays.filter((d) => d.missing).length;
+                      const failedN = gapDays.filter((d) => !d.missing && d.row?.status === "failed").length;
+                      const okN = gapDays.filter((d) => d.ok).length;
+                      return (
+                        <>
+                          In this window: <span className="font-medium text-slate-700 dark:text-slate-300">{gapDays.length}</span>{" "}
+                          days · <span className="font-medium text-amber-800 dark:text-amber-300">{missingN}</span> missing ·{" "}
+                          <span className="font-medium text-red-700 dark:text-red-400">{failedN}</span> failed ·{" "}
+                          <span className="font-medium text-emerald-800 dark:text-emerald-300">{okN}</span> succeeded
+                        </>
+                      );
+                    })()}
+                  </p>
                   <ul className="mt-4 max-h-48 space-y-1 overflow-y-auto rounded border border-slate-100 p-2 text-xs dark:border-slate-800">
                     {gapDays.map(({ day, row, missing, ok }) => (
                       <li

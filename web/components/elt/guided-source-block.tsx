@@ -57,11 +57,14 @@ export function GuidedSourceBlock({
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/50">
           <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">GitHub advanced settings</h3>
           <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-            Configure how eltPulse syncs this repository. The access token is never stored — set it in your runner environment.
+            Generated code reads the token from the <strong className="font-medium text-slate-700 dark:text-slate-300">environment variable name</strong>{" "}
+            you set below (default <code className="font-mono text-[11px]">GITHUB_TOKEN</code>). That name is what
+            matters for eltPulse, your gateway, or CI — the variable must exist at run time. The PAT field under
+            &quot;Source connection&quot; is the same secret for export only; it is not saved in the database.
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="block sm:col-span-2">
-              <span className="text-xs text-slate-600 dark:text-slate-400">PAT env var name</span>
+              <span className="text-xs text-slate-600 dark:text-slate-400">PAT env var name (runtime)</span>
               <input
                 value={String(sourceCfg.github_token_env ?? "GITHUB_TOKEN")}
                 onChange={(e) =>
@@ -69,6 +72,10 @@ export function GuidedSourceBlock({
                 }
                 className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1.5 font-mono text-sm dark:border-slate-600 dark:bg-slate-900"
               />
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                Use a valid env var name (letters, numbers, underscores). Must match what you configure on the machine
+                that runs <code className="font-mono text-[10px]">pipeline.py</code>.
+              </p>
             </label>
             <label className="block">
               <span className="text-xs text-slate-600 dark:text-slate-400">Items per page (1–100)</span>
