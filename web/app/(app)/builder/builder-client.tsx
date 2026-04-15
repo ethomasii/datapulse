@@ -1047,6 +1047,30 @@ export function BuilderClient({
                           onError={setError}
                         />
                       </div>
+                      {runSliceCapability.mode !== "none_only" ? (
+                        <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50/80 px-3 py-2.5 text-xs text-sky-950 dark:border-sky-800 dark:bg-sky-950/35 dark:text-sky-100">
+                          <p className="font-semibold text-sky-900 dark:text-sky-200">From / To dates (missing days)</p>
+                          <p className="mt-1 leading-relaxed text-sky-900/90 dark:text-sky-100/90">
+                            They are <strong className="font-medium">not</strong> on this page. Open{" "}
+                            <Link
+                              href={`/run-slices?pipeline=${encodeURIComponent(editingId)}`}
+                              className="font-medium text-sky-700 underline hover:no-underline dark:text-sky-300"
+                            >
+                              Run slices
+                            </Link>
+                            , choose this pipeline, then scroll to <strong className="font-medium">Day coverage</strong>{" "}
+                            under <strong className="font-medium">Slice coverage</strong> — that is where the calendar
+                            From/To, quick ranges (7/30/90 days), and missing/failed counts appear. Set{" "}
+                            <strong className="font-medium">Slice type</strong> to <strong className="font-medium">Date</strong>{" "}
+                            above (not &quot;None&quot;), pick your partition column, and click <strong className="font-medium">Save config</strong>{" "}
+                            first; otherwise Day coverage has no date column to use.
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="mt-3 text-xs text-amber-800 dark:text-amber-200/90">
+                          Day-by-day slice coverage in Run slices is limited for this source type; see the warning above.
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
