@@ -33,6 +33,7 @@ import {
 import { EltLoadingState } from "@/components/elt/elt-loading-state";
 import { PipelineCodeModal } from "@/components/elt/pipeline-code-modal";
 import { getRunSliceCapability } from "@/lib/elt/run-slice-capabilities";
+import { PartitionConfigEditor } from "@/components/elt/partition-config-editor";
 
 type PipelineExecutionHost = "inherit" | "eltpulse_managed" | "customer_gateway";
 
@@ -899,25 +900,25 @@ export function BuilderClient({
                   />
                 </div>
 
-                {/* Run slices — intent + notes; detailed column/granularity on Run slices */}
+                {/* Run slices — intent + notes; partition column saved here when editing an existing pipeline */}
                 <div className="rounded-lg border border-teal-100 bg-teal-50/60 p-3 dark:border-teal-900 dark:bg-teal-900/10">
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Runs: full load or sliced?</span>
                       <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        Choose how you plan to execute this pipeline. You can change this later. Technical slice column and
-                        backfills are configured on{" "}
+                        Choose how you plan to execute this pipeline. You can change this later. After you save the pipeline,
+                        set the slice column and granularity below, or use{" "}
                         <Link href="/run-slices" className="font-medium text-teal-600 hover:underline dark:text-teal-400">
                           Run slices
-                        </Link>
-                        .
+                        </Link>{" "}
+                        for backfills and coverage across all pipelines.
                       </p>
                     </div>
                     <Link
                       href="/run-slices"
                       className="shrink-0 rounded border border-teal-200 bg-white px-2 py-1 text-xs font-medium text-teal-700 hover:bg-teal-50 dark:border-teal-700 dark:bg-slate-900 dark:text-teal-400"
                     >
-                      Configure →
+                      All pipelines →
                     </Link>
                   </div>
                   <div className="mt-3 space-y-2">
@@ -948,8 +949,8 @@ export function BuilderClient({
                       <span>
                         <span className="font-medium">Sliced loads (date or key)</span>
                         <span className="mt-0.5 block text-xs font-normal text-slate-500 dark:text-slate-400">
-                          You plan separate runs per slice (e.g. one day at a time). Set the partition column and launch
-                          backfills on Run slices; your runner must honor{" "}
+                          You plan separate runs per slice (e.g. one day at a time). Save the pipeline, then set the
+                          partition column below (or on Run slices). Launch backfills from Run slices; your runner must honor{" "}
                           <code className="rounded bg-teal-100 px-0.5 text-[11px] dark:bg-teal-900/60">triggeredBy</code>{" "}
                           or custom code.
                         </span>
@@ -971,6 +972,33 @@ export function BuilderClient({
                       {runSliceCapability.detail}
                     </p>
                   ) : null}
+
+                  {editingId ? (
+                    <div className="mt-4 rounded-lg border border-teal-200/80 bg-white/80 p-3 dark:border-teal-800 dark:bg-slate-950/40">
+                      <p className="text-xs font-medium text-slate-700 dark:text-slate-300">Slice column &amp; granularity</p>
+                      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                        Saved to <code className="font-mono text-[11px]">sourceConfiguration._partitionConfig</code>. Use{" "}
+                        <Link href="/run-slices" className="text-teal-600 hover:underline dark:text-teal-400">
+                          Run slices
+                        </Link>{" "}
+                        to launch backfills and view slice coverage.
+                      </p>
+                      <div className="mt-3">
+                        <PartitionConfigEditor
+                          key={editingId}
+                          pipelineId={editingId}
+                          sourceType={sourceType}
+                          showBackfill={false}
+                          onSaved={() => void load()}
+                          onError={setError}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                      Save the pipeline once to configure slice column and granularity here.
+                    </p>
+                  )}
                 </div>
 
                 {/* Schedule */}
