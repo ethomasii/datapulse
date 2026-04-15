@@ -22,8 +22,7 @@ export function generateSlingReplication(request: PipelineRequest): Record<strin
 
   // Build stream defaults:
   //   - If a date or key partition is configured, use incremental mode with update_key
-  //     so that partition_key passed at run time maps to the incremental range --
-  //     matching Dagster's sling_assets partitions_def + update_key pattern.
+  //     so the slice value passed at run time maps to the incremental range (Sling incremental + update_key).
   //   - Otherwise fall back to full-refresh so a plain run always works.
   const streamDefaults: Record<string, unknown> = {
     object: "{stream_schema}.{stream_table}",

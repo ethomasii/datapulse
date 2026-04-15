@@ -229,15 +229,22 @@ export function SliceCoveragePanel({
         <div>
           <div className="inline-flex items-center gap-2 text-teal-600 dark:text-teal-400">
             <Calendar className="h-5 w-5" aria-hidden />
-            <span className="text-sm font-semibold uppercase tracking-wide">Slice coverage</span>
+            <span className="text-sm font-semibold uppercase tracking-wide">Per-slice status</span>
           </div>
-          <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">Partition-style coverage</h2>
+          <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">Slice coverage</h2>
           <p className="mt-2 max-w-3xl text-sm text-slate-600 dark:text-slate-300">
-            Like Dagster&apos;s asset partitions: one row per <strong className="font-medium text-slate-800 dark:text-slate-200">slice</strong>{" "}
-            (partition value), showing the <strong className="font-medium text-slate-800 dark:text-slate-200">latest run</strong> only — even if
-            you re-ran the same day many times. Only runs with{" "}
+            <strong className="font-medium text-slate-800 dark:text-slate-200">What you see:</strong> one row per slice
+            value (e.g. one day or one key), with the <strong className="font-medium text-slate-800 dark:text-slate-200">latest</strong>{" "}
+            run status — not every historical attempt (open{" "}
+            <Link href="/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+              Runs
+            </Link>{" "}
+            with <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">?pipeline=…</code> for the full log).
+            Only runs launched as backfills with{" "}
             <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">triggeredBy: backfill:partition:…</code>{" "}
-            appear here. Re-run failed slices, queue missing days (date pipelines), or use the bulk actions below. Your
+            count here. <strong className="font-medium text-slate-800 dark:text-slate-200">Missing / failed:</strong> for
+            date slices, set a From/To range in <strong className="font-medium text-slate-800 dark:text-slate-200">Day coverage</strong>{" "}
+            below — amber days never ran, red days&apos; latest run did not succeed — then queue or bulk-queue. Your
             runner must honor <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">triggeredBy</code>.
           </p>
         </div>
@@ -279,10 +286,10 @@ export function SliceCoveragePanel({
 
       {pipeline && pipeline.partitionConfig?.type === "key" && (
         <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100">
-          <strong className="font-medium">Key slices:</strong> unlike Dagster date grids, we do not list every possible
-          key up front — each key appears here after at least one{" "}
+          <strong className="font-medium">Key slices:</strong> eltPulse does not guess every possible key — each key
+          appears here after at least one{" "}
           <code className="font-mono text-[11px]">backfill:partition:…</code> run. Use the backfill launcher in the
-          pipeline row below or <strong className="font-medium">Queue one slice</strong> to add keys.
+          pipeline section below or <strong className="font-medium">Queue one slice</strong> to add keys.
         </p>
       )}
 
@@ -342,7 +349,11 @@ export function SliceCoveragePanel({
                         <td className="px-3 py-2 text-right">
                           <div className="flex flex-wrap justify-end gap-2">
                             <Link
-                              href={`/runs?run=${encodeURIComponent(row.id)}&pipeline=${encodeURIComponent(pipelineId)}`}
+                              href={
+                                pipelineId
+                                  ? `/runs?run=${encodeURIComponent(row.id)}&pipeline=${encodeURIComponent(pipelineId)}`
+                                  : `/runs?run=${encodeURIComponent(row.id)}`
+                              }
                               className="text-xs font-medium text-sky-600 hover:underline dark:text-sky-400"
                             >
                               Details

@@ -18,7 +18,7 @@ export async function GET(_req: Request, context: RouteContext) {
   const run = await db.eltPipelineRun.findFirst({
     where: { id, userId: user.id },
     include: {
-      pipeline: { select: { name: true, tool: true } },
+      pipeline: { select: { id: true, name: true, tool: true } },
       targetAgentToken: { select: { id: true, name: true } },
     },
   });
@@ -83,7 +83,7 @@ export async function PATCH(req: Request, context: RouteContext) {
   const run = await db.eltPipelineRun.update({
     where: { id },
     data,
-    include: { pipeline: { select: { name: true } } },
+    include: { pipeline: { select: { id: true, name: true } } },
   });
 
   if (patch.willBeTerminal && !patch.wasTerminal) {

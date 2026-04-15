@@ -601,7 +601,7 @@ export function BuilderClient({
                       <Link
                         href={`/run-slices?pipeline=${encodeURIComponent(p.id)}`}
                         className="mr-2 inline-flex items-center gap-1 text-teal-700 hover:underline dark:text-teal-400"
-                        title="Latest status per slice — backfills, gaps, re-run failed (Dagster-style partitions)"
+                        title="Latest status per slice, gaps, and re-runs (Run slices coverage)"
                       >
                         <TableProperties className="h-4 w-4" /> Slices
                       </Link>

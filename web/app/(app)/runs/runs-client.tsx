@@ -489,13 +489,13 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
               </Link>
             </p>
             <div className="rounded-lg border border-teal-200 bg-teal-50/80 px-3 py-2 text-xs text-teal-950 dark:border-teal-800 dark:bg-teal-950/25 dark:text-teal-100">
-              <strong className="font-medium">Partition-style view:</strong> latest status per slice (backfill runs
-              only), fill missing days, bulk re-run failed — open{" "}
+              <strong className="font-medium">Latest per slice:</strong> one row per slice value (backfill runs only),
+              missing days, re-run failed — open{" "}
               <Link
                 href={`/run-slices?pipeline=${encodeURIComponent(pipelineFilterId)}`}
                 className="font-semibold text-teal-800 underline hover:no-underline dark:text-teal-200"
               >
-                Slice coverage for this pipeline
+                Run slices — coverage
               </Link>
               .
             </div>
@@ -721,21 +721,25 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                   <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     Telemetry: {telemetrySourceLabel(detail.run.ingestionExecutor ?? "unspecified")}
                   </span>
-                  <span className="text-slate-500">{detail.run.pipeline.name}</span>
-                  <Link
-                    href={`/runs?pipeline=${encodeURIComponent(detail.run.pipeline.id)}`}
-                    className="ml-2 text-xs font-medium text-sky-600 hover:underline dark:text-sky-400"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    All runs for pipeline
-                  </Link>
-                  <Link
-                    href={`/run-slices?pipeline=${encodeURIComponent(detail.run.pipeline.id)}`}
-                    className="ml-2 text-xs font-medium text-teal-600 hover:underline dark:text-teal-400"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    Slice coverage
-                  </Link>
+                  <span className="text-slate-500">{detail.run.pipeline?.name ?? "Pipeline"}</span>
+                  {typeof detail.run.pipeline?.id === "string" && detail.run.pipeline.id.length > 0 ? (
+                    <>
+                      <Link
+                        href={`/runs?pipeline=${encodeURIComponent(detail.run.pipeline.id)}`}
+                        className="ml-2 text-xs font-medium text-sky-600 hover:underline dark:text-sky-400"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        All runs for pipeline
+                      </Link>
+                      <Link
+                        href={`/run-slices?pipeline=${encodeURIComponent(detail.run.pipeline.id)}`}
+                        className="ml-2 text-xs font-medium text-teal-600 hover:underline dark:text-teal-400"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Slice coverage
+                      </Link>
+                    </>
+                  ) : null}
                   <span className="text-slate-500">· {detail.run.environment}</span>
                   {detail.run.targetAgentToken ? (
                     <span className="text-slate-500">· Gateway: {detail.run.targetAgentToken.name}</span>

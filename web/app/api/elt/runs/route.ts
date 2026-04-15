@@ -111,7 +111,7 @@ export async function POST(req: Request) {
       triggeredBy: body.triggeredBy ?? null,
       targetAgentTokenId,
     },
-    include: { pipeline: { select: { name: true } } },
+    include: { pipeline: { select: { id: true, name: true } } },
   });
 
   return NextResponse.json({ run }, { status: 201 });

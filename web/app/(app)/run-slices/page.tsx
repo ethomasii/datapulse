@@ -82,16 +82,16 @@ export default function RunSlicesPage() {
         </div>
         <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Run slices & backfills</h1>
         <p className="mt-3 text-slate-600 dark:text-slate-300">
-          The <strong className="font-medium text-slate-800 dark:text-slate-200">Partition-style coverage</strong> block
-          below is the Dagster-like view: <strong className="font-medium text-slate-800 dark:text-slate-200">latest status per slice</strong>, not
-          every historical attempt (use{" "}
+          Start with <strong className="font-medium text-slate-800 dark:text-slate-200">Slice coverage</strong> (first
+          block): pick a pipeline to see <strong className="font-medium text-slate-800 dark:text-slate-200">latest status per slice</strong>{" "}
+          for dlt/Sling-style backfills, queue missing or failed slices, and (for date columns) scan a day range for gaps.
+          Every run attempt still lives under{" "}
           <Link href="/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
             Runs
           </Link>{" "}
-          with <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">?pipeline=…</code> for the full log).
-          Configure column and granularity in each pipeline row, launch backfills from the editor, fill date gaps in
-          coverage, and re-queue failed or missing slices — same as partition backfill / materialize, as long as your
-          runner honors <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">triggeredBy</code>.
+          (<code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">?pipeline=…</code>). Expand a pipeline
+          below to edit slice column, launch range backfills, and wire{" "}
+          <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">triggeredBy</code> the way your runner expects.
         </p>
       </div>
 
