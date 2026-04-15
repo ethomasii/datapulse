@@ -58,11 +58,20 @@ function generateGithubPipeline(request: PipelineRequest): string {
 ${escapePyString(desc)}
 """
 
+import os
 import dlt
 from dlt.sources.github import github_reactions
 
 def run(partition_key: str = None):
-    """Run the GitHub pipeline. partition_key is reserved for incremental / scheduled runs."""
+    """Run the GitHub pipeline.
+
+    partition_key: optional ISO date string (e.g. "2024-01-01") used as a `since` filter
+    so only items updated on or after that date are fetched — enabling date-based backfills
+    and incremental loads exactly as you would in Dagster or Prefect.
+    """
+
+    # Resolve the GitHub PAT from the environment
+    github_token = os.environ.get("${escapePyString(tokenEnv)}")
 
     # Configure the pipeline
     ${destinationComment}
@@ -72,13 +81,19 @@ def run(partition_key: str = None):
         dataset_name="${escapePyString(datasetName)}",
     )
 
-    # Load GitHub data — set ${escapePyString(tokenEnv)} (PAT with repo read) or dlt secrets for github
-    source = github_reactions(
+    # Build source kwargs — inject `since` when a partition key (date) is provided
+    source_kwargs = dict(
         owner="${escapePyString(repoOwner)}",
         name="${escapePyString(repoName)}",
         items_per_page=${itemsPerPage},
         max_items=${maxItemsPy},  # None = load all (within API limits)
+        access_token=github_token,
     )
+    if partition_key:
+        # partition_key is expected to be an ISO date, e.g. "2024-01-01"
+        source_kwargs["since"] = partition_key
+
+    source = github_reactions(**source_kwargs)
 
     # Select which resources to load
     resources_to_load = [${resourceList}]
@@ -88,7 +103,7 @@ def run(partition_key: str = None):
     info = pipeline.run(
         source,
         write_disposition="${escapePyString(request.writeDisposition ?? "append")}",
-        loader_file_format="${escapePyString(request.fileFormat ?? "parquet")}"  # File format for file-based destinations
+        loader_file_format="${escapePyString(request.fileFormat ?? "parquet")}"
     )
 
     print(f"Pipeline completed: {info}")${dltDbtRunnerBeforeReturn(request)}

@@ -17,7 +17,7 @@ export type RunSliceCapability = {
 };
 
 /** Stock generators do not pass `partition_key` into the actual source load for these connectors. */
-const NONE_ONLY_SOURCES = new Set<string>(["github", "rest_api"]);
+const NONE_ONLY_SOURCES = new Set<string>(["rest_api"]);
 
 const DATE_AND_KEY_DEFAULT: RunSliceCapability = {
   mode: "date_and_key",
@@ -26,13 +26,13 @@ const DATE_AND_KEY_DEFAULT: RunSliceCapability = {
     "Backfills create one run per slice; your gateway or customized Python must apply the slice (e.g. from triggeredBy) to filter loads — the app only records runs.",
 };
 
-const NONE_ONLY_GITHUB: RunSliceCapability = {
-  mode: "none_only",
-  label: "Full runs only (stock pipeline)",
+const DATE_AND_KEY_GITHUB: RunSliceCapability = {
+  mode: “date_and_key”,
+  label: “Date slices supported (since filter)”,
   detail:
-    "The stock GitHub dlt pipeline does not apply partition keys to `github_reactions` — run slices would only " +
-    "create labeled runs unless you customize the Python to filter by slice. Use “None”, or switch to a database, " +
-    "file, or object-storage source if you need first-class date/key backfills without custom code.",
+    “The generated GitHub pipeline passes a date partition key as `since` to `github_reactions`, filtering issues, “ +
+    “PRs, and reactions to items updated on or after that date — matching how Dagster and other orchestrators backfill “ +
+    “by date range. Use an ISO date (e.g. 2024-01-01) as your slice key.”,
 };
 
 const NONE_ONLY_REST: RunSliceCapability = {
@@ -46,8 +46,8 @@ const NONE_ONLY_REST: RunSliceCapability = {
 
 export function getRunSliceCapability(sourceType: string): RunSliceCapability {
   const s = sourceType.toLowerCase().trim();
+  if (s === "github") return DATE_AND_KEY_GITHUB;
   if (!NONE_ONLY_SOURCES.has(s)) return DATE_AND_KEY_DEFAULT;
-  if (s === "github") return NONE_ONLY_GITHUB;
   return NONE_ONLY_REST;
 }
 
