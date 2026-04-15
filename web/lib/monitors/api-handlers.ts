@@ -21,15 +21,31 @@ function parseExecutionHost(value: unknown): PipelineExecutionHost | null {
     : null;
 }
 
+const PRISMA_CLIENT_STALE_HINT =
+  "Prisma client is out of sync with schema. Stop the dev server (it locks the query engine on Windows), then in the web folder run: npx prisma generate && npx prisma migrate deploy";
+
+function isStalePipelineRelationError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return msg.includes("Unknown field `pipeline`") && msg.includes("EltMonitor");
+}
+
 export async function monitorsGET() {
   const user = await getCurrentDbUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const rows = await db.eltMonitor.findMany({
-    where: { userId: user.id },
-    orderBy: { updatedAt: "desc" },
-    include: { pipeline: { select: { id: true, name: true } } },
-  });
+  let rows;
+  try {
+    rows = await db.eltMonitor.findMany({
+      where: { userId: user.id },
+      orderBy: { updatedAt: "desc" },
+      include: { pipeline: { select: { id: true, name: true } } },
+    });
+  } catch (e) {
+    if (isStalePipelineRelationError(e)) {
+      return NextResponse.json({ error: PRISMA_CLIENT_STALE_HINT }, { status: 503 });
+    }
+    throw e;
+  }
 
   const sensors = rows.map((row) => ({
     name: row.name,
