@@ -16,8 +16,8 @@ type Props = {
   connectionType: "source" | "destination";
   /** The connector key of the current pipeline (e.g. "postgres", "snowflake") */
   connector: string;
-  /** Called when user picks a saved connection — passes its non-secret config */
-  onSelect: (config: Record<string, string>) => void;
+  /** Called when user picks a saved connection — non-secret config plus row id for pipeline FK. */
+  onSelect: (selection: { id: string; config: Record<string, string> }) => void;
   /** Current connection field values — used to pre-fill the "save" form */
   currentValues: Record<string, string>;
 };
@@ -142,7 +142,13 @@ export function ConnectionPicker({ connectionType, connector, onSelect, currentV
                     <button
                       type="button"
                       onClick={() => {
-                        onSelect(c.config);
+                        const flat: Record<string, string> = {};
+                        const raw = c.config as Record<string, unknown>;
+                        for (const [k, v] of Object.entries(raw ?? {})) {
+                          if (v === undefined || v === null) continue;
+                          flat[k] = typeof v === "string" ? v : String(v);
+                        }
+                        onSelect({ id: c.id, config: flat });
                         setOpen(false);
                       }}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"

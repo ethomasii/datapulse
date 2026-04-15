@@ -1,29 +1,21 @@
 /**
  * PATCH /api/agent/runs/:id
  *
- * Agent reports run progress, log lines, and final status.
+ * Agent reports run progress, logs, **telemetry** (rows/bytes/progress samples), and final status.
  * Authenticated by Bearer agentToken.
  *
- * Body (all optional):
- *   status?: "running" | "succeeded" | "failed" | "cancelled"
- *   appendLog?: { level: "info"|"warn"|"error", message: string }
- *   logEntries?: Array<{ at: string, level: string, message: string }>
- *   errorSummary?: string | null
- *   finishedAt?: string | null
+ * Body (all optional; zod-validated, same shape as `PATCH /api/elt/runs/:id`):
+ *   status, appendLog, logEntries, errorSummary, finishedAt,
+ *   telemetrySummary, appendTelemetrySample, telemetrySamples
  */
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
 import { getAgentAuthContext } from "@/lib/agent/auth";
 import { agentCanMutateRun } from "@/lib/agent/gateway-routing";
+import { applyPatchRunBody } from "@/lib/elt/apply-run-patch";
 import { maybeDispatchRunWebhook } from "@/lib/elt/maybe-dispatch-run-webhook";
-import { sanitizeForRunStorage } from "@/lib/elt/run-log-sanitize";
-
-type LogEntry = { at: string; level: string; message: string };
-
-function isTerminal(s: string) {
-  return s === "succeeded" || s === "failed" || s === "cancelled";
-}
+import { patchRunBodySchema } from "@/lib/elt/run-types";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -44,56 +36,38 @@ export async function PATCH(req: Request, { params }: Params) {
     );
   }
 
-  let body: Record<string, unknown>;
+  let json: unknown;
   try {
-    body = await req.json();
+    json = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  let logEntries: LogEntry[] = Array.isArray(existing.logEntries)
-    ? (existing.logEntries as unknown as LogEntry[])
-    : [];
-
-  if (body.appendLog && typeof body.appendLog === "object") {
-    const l = body.appendLog as Record<string, string>;
-    logEntries = [
-      ...logEntries,
-      { at: new Date().toISOString(), level: l.level ?? "info", message: sanitizeForRunStorage(l.message ?? "", 4000) },
-    ].slice(-500);
+  const parsed = patchRunBodySchema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
+  const body = parsed.data;
 
-  if (Array.isArray(body.logEntries)) {
-    logEntries = (body.logEntries as LogEntry[]).map((e) => ({
-      ...e,
-      message: sanitizeForRunStorage(e.message, 4000),
-    }));
-  }
+  const patch = applyPatchRunBody(
+    {
+      status: existing.status,
+      logEntries: existing.logEntries,
+      telemetry: (existing as { telemetry?: unknown }).telemetry,
+      finishedAt: existing.finishedAt,
+    },
+    body
+  );
 
-  const nextStatus = (typeof body.status === "string" ? body.status : existing.status) as string;
-  const wasTerminal = isTerminal(existing.status);
-  const willBeTerminal = isTerminal(nextStatus);
-
-  let finishedAt = existing.finishedAt;
-  if (body.finishedAt !== undefined) {
-    finishedAt = body.finishedAt ? new Date(body.finishedAt as string) : null;
-  } else if (willBeTerminal && !existing.finishedAt) {
-    finishedAt = new Date();
-  }
-
-  const errorSummary =
-    body.errorSummary === undefined
-      ? undefined
-      : body.errorSummary === null
-        ? null
-        : sanitizeForRunStorage(String(body.errorSummary));
+  const logTouched = body.logEntries !== undefined || body.appendLog !== undefined;
 
   const data: Prisma.EltPipelineRunUpdateInput = {
-    status: nextStatus as never,
+    status: patch.nextStatus as never,
     ingestionExecutor: "customer_agent",
-    logEntries: logEntries as unknown as Prisma.InputJsonValue,
-    finishedAt,
-    ...(errorSummary !== undefined ? { errorSummary } : {}),
+    ...(logTouched ? { logEntries: patch.logEntries as unknown as Prisma.InputJsonValue } : {}),
+    ...(patch.telemetryJson !== undefined ? { telemetry: patch.telemetryJson } : {}),
+    ...(patch.errorSummary !== undefined ? { errorSummary: patch.errorSummary } : {}),
+    finishedAt: patch.nextFinishedAt,
   };
 
   const run = await db.eltPipelineRun.update({
@@ -102,7 +76,7 @@ export async function PATCH(req: Request, { params }: Params) {
     include: { pipeline: { select: { name: true } } },
   });
 
-  if (willBeTerminal && !wasTerminal) {
+  if (patch.willBeTerminal && !patch.wasTerminal) {
     await maybeDispatchRunWebhook(run.id, user.id);
   }
 

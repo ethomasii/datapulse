@@ -31,8 +31,24 @@ export default function SecurityDocsPage() {
 
       <h2>Secrets</h2>
       <p>
-        Source and destination credentials belong in your execution environment (CI, runner, local `.env`), not in
-        eltPulse — unless you explicitly use an optional integration that stores tokens server-side (e.g. BYO GitHub).
+        Source and destination credentials for <strong>running ingestion</strong> usually live in your execution
+        environment (CI, runner, local <code>.env</code>), not in eltPulse UI — unless you use an optional integration that
+        stores tokens server-side (e.g. BYO GitHub).
+      </p>
+
+      <h2>Connections (saved profiles)</h2>
+      <p>
+        The <Link href="/connections">Connections</Link> page stores <strong>named profiles</strong> per user: connector
+        type, non-secret <code>config</code>, and optionally <strong>encrypted secrets</strong> for use by trusted
+        runtimes. Pipelines link saved profiles by id; generated artifacts may include resolved names for runners.{" "}
+        <strong>Monitors</strong> can require
+        a matching connection so S3/SQS checks know which credential profile to use.
+      </p>
+      <p>
+        A gateway using a valid Bearer token may call <code>GET /api/agent/connections</code> and receive{" "}
+        <strong>decrypted</strong> secret key/value pairs for that user&apos;s connections — only deploy gateways you
+        trust with that data. See <Link href="/docs/concepts">Concepts</Link> and <Link href="/docs/gateway">Gateway</Link>
+        .
       </p>
 
       <h2>Billing</h2>
@@ -42,7 +58,8 @@ export default function SecurityDocsPage() {
       </p>
 
       <p>
-        <Link href="/privacy">Privacy policy</Link> · <Link href="/terms">Terms</Link>
+        <Link href="/docs/concepts">Concepts</Link> · <Link href="/privacy">Privacy policy</Link> ·{" "}
+        <Link href="/terms">Terms</Link>
       </p>
     </DocsProse>
   );

@@ -13,7 +13,8 @@ export default function IntegrationsDocsPage() {
       <h1>Integrations</h1>
       <p>
         The <Link href="/integrations">Integrations</Link> area covers how eltPulse connects to external systems on
-        your behalf.
+        your behalf. For how <Link href="/connections">Connections</Link> relate to pipelines, monitors, and gateways, see{" "}
+        <Link href="/docs/concepts">Concepts</Link>.
       </p>
 
       <h2>Managed GitHub (default)</h2>
@@ -53,7 +54,8 @@ export default function IntegrationsDocsPage() {
       </p>
 
       <p>
-        <Link href="/roadmap">Roadmap</Link> · <Link href="/docs/security">Security &amp; data</Link>
+        <Link href="/roadmap">Roadmap</Link> · <Link href="/docs/gateway">Gateway</Link> ·{" "}
+        <Link href="/docs/security">Security &amp; data</Link>
       </p>
     </DocsProse>
   );

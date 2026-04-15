@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { unstable_noStore as noStore } from "next/cache";
+import { resolveCronMonitorScale } from "@/lib/monitors/cron-scale";
 import { runMonitorChecksForAllUsers } from "@/lib/monitors/run-monitors";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,10 @@ export const maxDuration = 120;
  * and enqueues pipeline runs when conditions match.
  *
  * Same auth pattern as ServicePulse: `Authorization: Bearer ${CRON_SECRET}` (set in Vercel env).
+ *
+ * Optional scaling (see `docs/control-plane-scaling.md`):
+ * - Query `?shard=0&shards=4` (or env `CRON_MONITOR_SHARD_*`) to evaluate disjoint monitor subsets in parallel crons.
+ * - Query `budgetMs=90000` or env `CRON_MONITOR_MAX_MS` to stop early and continue on the next tick.
  */
 export async function GET(request: Request) {
   noStore();
@@ -30,7 +35,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await runMonitorChecksForAllUsers();
+    const scale = resolveCronMonitorScale(request.url, process.env);
+    const result = await runMonitorChecksForAllUsers(scale);
     return NextResponse.json({
       ok: true,
       ...result,

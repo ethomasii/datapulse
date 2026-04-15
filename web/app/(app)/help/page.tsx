@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { BookOpen, CalendarClock, LifeBuoy, Mail } from "lucide-react";
+import { BookOpen, CalendarClock, Layers, LifeBuoy, Mail, Play, Waypoints } from "lucide-react";
+import { RelatedLinks } from "@/components/ui/related-links";
 
 export default function HelpPage() {
   return (
@@ -77,6 +78,14 @@ export default function HelpPage() {
           ← Back to dashboard
         </Link>
       </p>
+
+      <div className="mt-8">
+        <RelatedLinks links={[
+          { href: "/runs", icon: Play, label: "Runs", desc: "View execution history and live telemetry" },
+          { href: "/builder", icon: Layers, label: "Pipelines", desc: "Define source → destination connections" },
+          { href: "/orchestration", icon: Waypoints, label: "Orchestration", desc: "Schedules and event-driven sensors" },
+        ]} />
+      </div>
     </div>
   );
 }

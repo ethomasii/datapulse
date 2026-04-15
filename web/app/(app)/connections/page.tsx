@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
-import { Cable, Plus, Trash2, ChevronDown, ChevronRight, Check, Shield } from "lucide-react";
+import { Cable, Layers, Play, Plus, Trash2, ChevronDown, ChevronRight, Check, Shield, Waypoints } from "lucide-react";
+import { RelatedLinks } from "@/components/ui/related-links";
 import { ConnectionStoredSecretsForm } from "@/components/elt/connection-stored-secrets-form";
 import { CopyEnvButton } from "@/components/elt/copy-env-button";
 import { CREDENTIAL_HINTS } from "@/lib/elt/credential-hints";
@@ -671,7 +672,8 @@ export default function ConnectionsPage() {
             </div>
           )}
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Define sources and destinations once, then reference them by name in any pipeline. Non-secret config only — passwords and tokens stay in your environment.
+            Define sources and destinations once, then attach them to pipelines from the builder (stored as foreign keys).
+            Non-secret config only — passwords and tokens stay in your environment.
           </p>
         </div>
         <CreateConnectionForm onCreated={onCreated} />
@@ -788,14 +790,20 @@ export default function ConnectionsPage() {
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">How connections work</h3>
         <ul className="mt-2 space-y-1 text-xs text-slate-500 dark:text-slate-400 list-inside list-disc">
           <li>
-            Set <code className="text-[11px]">source_connection</code> or{" "}
-            <code className="text-[11px]">destination_connection</code> in a pipeline to use a named connection.
+            Pipelines can reference a saved profile via <code className="text-[11px]">sourceConnectionId</code> /{" "}
+            <code className="text-[11px]">destinationConnectionId</code> (pick a saved row in the pipeline builder).
           </li>
           <li>eltPulse merges the saved config with your pipeline definition at run time.</li>
           <li>Secrets (passwords, API keys, service accounts) are never stored — use environment variables.</li>
-          <li>Changing a connection here propagates to every pipeline that references it by name.</li>
+          <li>Deleting a connection clears the link on pipelines that pointed at it (FK set null).</li>
         </ul>
       </div>
+
+      <RelatedLinks links={[
+        { href: "/builder", icon: Layers, label: "Pipelines", desc: "Pick saved connections in source and destination forms" },
+        { href: "/runs", icon: Play, label: "Runs", desc: "View executions that used these credentials" },
+        { href: "/gateway", icon: Waypoints, label: "Gateway & execution", desc: "Configure where pipelines run" },
+      ]} />
     </div>
   );
 }

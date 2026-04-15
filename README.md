@@ -1,14 +1,13 @@
-# eltPulse
+# DataPulse
 
-**eltPulse** is the product name for this repo: an ELT builder and (growing) hosted control plane. The open-source core is the Python **embedded_elt_builder** package (CLI + FastAPI UI). The **SaaS shell** lives in **`web/`** — a [Next.js](https://nextjs.org/) app with the same shape as ServicePulse (App Router, Clerk, Prisma, Stripe, Resend, Vercel). Public source: [github.com/eltpulsehq/eltpulse](https://github.com/eltpulsehq/eltpulse).
+**DataPulse** is the product name for this repo: an ELT builder and (growing) hosted control plane. The open-source core is the Python **embedded_elt_builder** package (CLI + FastAPI UI). The **SaaS shell** lives in **`web/`** — a [Next.js](https://nextjs.org/) app with the same shape as ServicePulse (App Router, Clerk, Prisma, Stripe, Resend, Vercel). Intended home: [github.com/ethomasii/datapulse](https://github.com/ethomasii/datapulse).
 
 ## Repo layout
 
 | Path | What it is |
 |------|------------|
 | `embedded_elt_builder/` | Python package: `elt` CLI, pipeline generator, FastAPI/Jinja web UI |
-| `web/` | eltPulse marketing site + authenticated dashboard (Neon/Postgres via Prisma) |
-| `integrations/` | **[github.com/eltpulsehq/integrations](https://github.com/eltpulsehq/integrations)** — `gateway/` (source + GHCR image) and `gateways/` (Docker, K8s, ECS, Terraform) |
+| `web/` | DataPulse marketing site + authenticated dashboard (Neon/Postgres via Prisma) |
 
 ### SaaS stack (`web/`)
 
@@ -29,7 +28,7 @@ npm run dev                   # http://localhost:3000
 
 ### ELT Builder in the browser (`/builder`)
 
-The **Next.js app** includes a native ELT Builder (React + API routes + Prisma). Pipeline definitions and generated `pipeline.py` / `replication.yaml` / workspace metadata text are stored in **Neon** — no FastAPI process required. One command: `cd web && npm run dev`, then open **http://localhost:3000/builder** (after signing in). Run **`npx prisma db push`** after pulling so the `EltPipeline` table exists.
+The **Next.js app** includes a native ELT Builder (React + API routes + Prisma). Pipeline definitions and generated `pipeline.py` / `replication.yaml` / `dagster.yaml` text are stored in **Neon** — no FastAPI process required. One command: `cd web && npm run dev`, then open **http://localhost:3000/builder** (after signing in). Run **`npx prisma db push`** after pulling so the `EltPipeline` table exists.
 
 The original **Python** package (`embedded_elt_builder/`) remains available for **`elt` CLI** users and as the reference implementation for generators; parity with every CLI feature is incremental.
 
@@ -90,8 +89,8 @@ A powerful tool for creating, managing, and deploying ELT pipelines using [dlt](
 
 ```bash
 # Clone the repository
-git clone https://github.com/eltpulsehq/eltpulse.git
-cd eltpulse
+git clone https://github.com/ethomasii/datapulse.git
+cd datapulse
 
 # Install dependencies (using uv or pip)
 uv pip install -e .
@@ -228,7 +227,7 @@ elt validate
 ```
 
 Validates:
-- Required files exist (workspace metadata file `dagster.yaml` where applicable, `pipeline.py` / `replication.yaml`)
+- Required files exist (dagster.yaml, pipeline.py/replication.yaml)
 - YAML syntax is valid
 - Required fields are present
 - Cron schedules are valid
@@ -286,20 +285,18 @@ pipelines/                  # Generated pipelines (gitignored)
 │   └── {pipeline_name}/
 │       ├── pipeline.py    # Pipeline code
 │       ├── config.yaml    # dlt configuration
-│       └── dagster.yaml   # Workspace / orchestration hints (legacy filename; see below)
+│       └── dagster.yaml   # Dagster metadata
 └── sling/
     └── {replication_name}/
         ├── replication.yaml  # Sling replication config
-        └── dagster.yaml      # Workspace / orchestration hints (legacy filename; see below)
+        └── dagster.yaml      # Dagster metadata
 ```
-
-> **Independence:** eltPulse is **not** affiliated with, endorsed by, or part of any third-party orchestration product. The `dagster.yaml` filename is historical in this codebase; it stores **eltPulse workspace metadata** (scheduling, groups, tags), not an integration with another vendor’s software.
 
 ## Pipeline Configuration
 
-### Workspace metadata (`dagster.yaml`)
+### dagster.yaml Format
 
-Each generated pipeline may include a `dagster.yaml` file containing **eltPulse** workspace metadata (scheduling, ownership, tags, etc.):
+Each pipeline includes a `dagster.yaml` file for Dagster metadata:
 
 ```yaml
 enabled: true
@@ -365,6 +362,25 @@ Test database and API connections before creating pipelines:
 - Sortable columns
 - Customizable column visibility
 - Pagination support
+
+## Integration with Dagster
+
+This tool is designed to work with the [dagster_elt_project](https://github.com/eric-thomas-dagster/dagster_elt_project) component, which:
+
+1. Discovers pipelines from a GitHub repository
+2. Creates Dagster assets for each pipeline
+3. Executes dlt and Sling pipelines
+4. Captures metadata (row counts, data sizes, source code links)
+5. Organizes assets by kinds for filtering
+
+### Workflow
+
+1. **Create pipelines** using the embedded_elt_builder (CLI or Web UI)
+2. **Commit and push** to GitHub
+3. **Deploy** dagster_elt_project to Dagster Cloud
+4. **Configure** the component to point to your pipelines repository
+5. **Run** the refresh sensor to discover new pipelines
+6. **Execute** pipelines as Dagster assets
 
 ## Configuration
 
@@ -435,6 +451,7 @@ Contributions welcome! Please open an issue or submit a pull request.
 
 For questions or issues:
 - Open an issue on GitHub
+- Check the [dagster_elt_project](https://github.com/eric-thomas-dagster/dagster_elt_project) for deployment documentation
 
 ---
 

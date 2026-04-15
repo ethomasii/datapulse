@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Loader2, Plus, Trash2, Code2, RefreshCw, Pencil, Workflow } from "lucide-react";
+import { Loader2, Play, Plus, Trash2, Code2, RefreshCw, Pencil, Plug, Waypoints, Webhook, Workflow } from "lucide-react";
+import { RelatedLinks } from "@/components/ui/related-links";
 import {
   DESTINATION_GROUPS,
   SOURCE_GROUPS,
@@ -106,6 +107,9 @@ export function BuilderClient({
   const [connectionValues, setConnectionValues] = useState<Record<string, string>>(() =>
     emptyConnectionValuesForTypes("github", "duckdb")
   );
+  /** Saved Connection rows linked to this pipeline (persisted as FKs; not stored in source_configuration). */
+  const [sourceConnectionId, setSourceConnectionId] = useState<string | null>(null);
+  const [destinationConnectionId, setDestinationConnectionId] = useState<string | null>(null);
 
   function patchConnection(key: string, value: string) {
     setConnectionValues((prev) => ({ ...prev, [key]: value }));
@@ -187,6 +191,7 @@ export function BuilderClient({
     setSourceCfg(minimal);
     setSourceJson(JSON.stringify(fields.length > 0 ? minimal : {}, null, 2));
     setConnectionValues(emptyConnectionValuesForTypes(t, d));
+    setSourceConnectionId(null);
   }
 
   function mergeCanvasForSubmit(built: Record<string, unknown>): Record<string, unknown> {
@@ -232,6 +237,8 @@ export function BuilderClient({
           tool: "auto" as const,
           description: description || undefined,
           sourceConfiguration,
+          sourceConnectionId: sourceConnectionId ?? null,
+          destinationConnectionId: destinationConnectionId ?? null,
           tests,
           sensors,
           partitionsNote,
@@ -259,6 +266,8 @@ export function BuilderClient({
         setScheduleTimezone("UTC");
         setPipelineWebhookUrl("");
         setCanvasGraph(null);
+        setSourceConnectionId(null);
+        setDestinationConnectionId(null);
         resetConnectorForNewSourceType("github", "duckdb");
       } else {
         setEditingId(null);
@@ -293,6 +302,8 @@ export function BuilderClient({
     setScheduleTimezone("UTC");
     setPipelineWebhookUrl("");
     setCanvasGraph(null);
+    setSourceConnectionId(null);
+    setDestinationConnectionId(null);
     resetConnectorForNewSourceType("github", "duckdb");
   }
 
@@ -331,6 +342,8 @@ export function BuilderClient({
       description: string | null;
       sourceConfiguration: Record<string, unknown>;
       runsWebhookUrl?: string | null;
+      sourceConnectionId?: string | null;
+      destinationConnectionId?: string | null;
     };
     setEditingId(id);
     setName(p.name);
@@ -347,6 +360,8 @@ export function BuilderClient({
       ...connection,
     });
     setSourceJson(JSON.stringify(cfg, null, 2));
+    setSourceConnectionId(p.sourceConnectionId ?? null);
+    setDestinationConnectionId(p.destinationConnectionId ?? null);
 
     setTests(eltLinesFromConfig("elt_tests", cfg));
     setSensors(eltLinesFromConfig("elt_sensors", cfg));
@@ -684,6 +699,8 @@ export function BuilderClient({
                           setSourceType(t);
                           if (!editingId && showCreateForm) {
                             resetConnectorForNewSourceType(t, destinationType);
+                          } else {
+                            setSourceConnectionId(null);
                           }
                         }}
                         className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-950 dark:text-white"
@@ -709,6 +726,7 @@ export function BuilderClient({
                           if (!editingId && showCreateForm) {
                             setConnectionValues(emptyConnectionValuesForTypes(sourceType, d));
                           }
+                          setDestinationConnectionId(null);
                         }}
                         className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-950 dark:text-white"
                       >
@@ -753,7 +771,10 @@ export function BuilderClient({
                       connectionType="source"
                       connector={sourceType}
                       currentValues={connectionValues}
-                      onSelect={(cfg) => setConnectionValues((prev) => ({ ...prev, ...cfg }))}
+                      onSelect={({ id, config }) => {
+                        setSourceConnectionId(id);
+                        setConnectionValues((prev) => ({ ...prev, ...config }));
+                      }}
                     />
                   </div>
                   <GuidedSourceBlock
@@ -782,7 +803,10 @@ export function BuilderClient({
                       connectionType="destination"
                       connector={destinationType}
                       currentValues={connectionValues}
-                      onSelect={(cfg) => setConnectionValues((prev) => ({ ...prev, ...cfg }))}
+                      onSelect={({ id, config }) => {
+                        setDestinationConnectionId(id);
+                        setConnectionValues((prev) => ({ ...prev, ...config }));
+                      }}
                     />
                   </div>
                   <GuidedDestinationBlock
@@ -1045,6 +1069,13 @@ export function BuilderClient({
           onClose={() => setDetail(null)}
         />
       )}
+
+      <RelatedLinks links={[
+        { href: "/runs", icon: Play, label: "Runs", desc: "Trigger and monitor pipeline executions with live telemetry" },
+        { href: "/connections", icon: Plug, label: "Connections", desc: "Manage saved source and destination credentials" },
+        { href: "/gateway", icon: Waypoints, label: "Gateway & execution", desc: "Configure where pipelines run" },
+        { href: "/webhooks", icon: Webhook, label: "Webhooks", desc: "Get notified when runs reach a terminal state" },
+      ]} />
     </div>
   );
 }

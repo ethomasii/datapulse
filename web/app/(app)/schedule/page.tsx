@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CalendarClock, Clock, PlayCircle, Plus, Trash2, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { CalendarClock, Clock, Layers, Play, PlayCircle, Plus, Trash2, CheckCircle, AlertCircle, RefreshCw, Waypoints, Webhook } from "lucide-react";
 import Link from "next/link";
+import { RelatedLinks } from "@/components/ui/related-links";
 import { PipelineMultiPicker } from "@/components/elt/pipeline-pickers";
 
 interface Schedule {
@@ -296,6 +297,13 @@ export default function SchedulePage() {
           </Link>
         </p>
       </section>
+
+      <RelatedLinks links={[
+        { href: "/orchestration", icon: Waypoints, label: "Orchestration", desc: "Event-driven sensors that trigger runs on data arrival" },
+        { href: "/runs", icon: Play, label: "Runs", desc: "View executions triggered by these schedules" },
+        { href: "/builder", icon: Layers, label: "Pipelines", desc: "Define the source → destination connections being scheduled" },
+        { href: "/webhooks", icon: Webhook, label: "Webhooks", desc: "Get notified when scheduled runs finish" },
+      ]} />
     </div>
   );
 }

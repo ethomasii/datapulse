@@ -13,7 +13,9 @@ import {
   Play,
   RotateCcw,
   TableProperties,
+  Waypoints,
 } from 'lucide-react';
+import { RelatedLinks } from "@/components/ui/related-links";
 
 // ─── Column hints ─────────────────────────────────────────────────────────────
 
@@ -639,6 +641,12 @@ function PartitionEditor({
           )}
         </div>
       )}
+
+      <RelatedLinks links={[
+        { href: "/runs", icon: Play, label: "Runs", desc: "Full run history and live telemetry for every execution" },
+        { href: "/builder", icon: Layers, label: "Pipelines", desc: "Define the source → destination connections being backfilled" },
+        { href: "/gateway", icon: Waypoints, label: "Gateway & execution", desc: "Configure where backfill runs execute" },
+      ]} />
     </div>
   );
 }

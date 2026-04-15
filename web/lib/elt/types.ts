@@ -30,6 +30,10 @@ export const createPipelineBodySchema = z.object({
   defaultTargetAgentTokenId: z.string().min(1).nullable().optional(),
   /** Where new runs execute by default for this pipeline (hybrid). */
   executionHost: z.enum(["inherit", "eltpulse_managed", "customer_gateway"]).optional(),
+  /** FK to saved source Connection (must match `sourceType` connector). Null clears. */
+  sourceConnectionId: z.string().min(1).nullable().optional(),
+  /** FK to saved destination Connection (must match `destinationType`). Null clears. */
+  destinationConnectionId: z.string().min(1).nullable().optional(),
 });
 
 export type CreatePipelineBody = z.infer<typeof createPipelineBodySchema>;

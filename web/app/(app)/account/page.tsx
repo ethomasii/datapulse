@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { CreditCard, Bell, Users, Code2 } from "lucide-react";
 import { requireDbUser } from "@/lib/auth/server";
 import type { Metadata } from "next";
+import { RelatedLinks } from "@/components/ui/related-links";
 
 export const metadata: Metadata = {
   title: "Profile",
@@ -49,6 +51,15 @@ export default async function AccountProfilePage() {
         </Link>
         .
       </p>
+
+      <div className="mt-8">
+        <RelatedLinks links={[
+          { href: "/account/billing", icon: CreditCard, label: "Billing", desc: "Invoices, payment methods, and plan management" },
+          { href: "/account/notifications", icon: Bell, label: "Notifications", desc: "Configure email and channel alert preferences" },
+          { href: "/account/developers", icon: Code2, label: "Developers", desc: "API tokens, webhook secrets, and audit log" },
+          { href: "/team", icon: Users, label: "Team", desc: "Invite members and manage organization access" },
+        ]} />
+      </div>
     </>
   );
 }

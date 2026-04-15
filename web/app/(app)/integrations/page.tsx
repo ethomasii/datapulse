@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { FolderGit2, Layers, Webhook } from "lucide-react";
 import { Suspense } from "react";
+import { RelatedLinks } from "@/components/ui/related-links";
 import { requireDbUser } from "@/lib/auth/server";
 import {
   formatDefaultRepoLabel,
@@ -45,6 +47,12 @@ export default async function IntegrationsPage() {
           githubTableMissing={githubTableMissing}
         />
       </Suspense>
+
+      <RelatedLinks links={[
+        { href: "/repos", icon: FolderGit2, label: "Repositories", desc: "Pick the GitHub repo where pipeline definitions are stored" },
+        { href: "/builder", icon: Layers, label: "Pipelines", desc: "Define source → destination connections" },
+        { href: "/webhooks", icon: Webhook, label: "Webhooks", desc: "Fire HTTP notifications when runs finish" },
+      ]} />
     </div>
   );
 }

@@ -7,6 +7,10 @@ import { prismaSchemaDriftResponse } from "@/lib/db/prisma-schema-drift-response
 import { createPipelineBodySchema, type CreatePipelineBody } from "@/lib/elt/types";
 import { generatePipelineArtifacts, resolveTool } from "@/lib/elt/generate-artifacts";
 import { mergeEltMetadataIntoSourceConfig } from "@/lib/elt/merge-elt-metadata";
+import {
+  preparePipelinePersistenceAndArtifacts,
+  stripLegacyPipelineConnectionKeys,
+} from "@/lib/elt/pipeline-connection-fks";
 import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-graph";
 import { normalizeRunWebhookUrl } from "@/lib/elt/validate-run-webhook-url";
 import { mergeSourceConfigurationForSourceTypeChange } from "@/lib/elt/merge-source-config-on-type-change";
@@ -34,6 +38,8 @@ const pipelinePatchSchema = z
     sourceConfiguration: z.record(z.string(), z.any()).optional(),
     defaultTargetAgentTokenId: z.union([z.string().min(1), z.null()]).optional(),
     executionHost: z.enum(["inherit", "eltpulse_managed", "customer_gateway"]).optional(),
+    sourceConnectionId: z.union([z.string().min(1), z.null()]).optional(),
+    destinationConnectionId: z.union([z.string().min(1), z.null()]).optional(),
   })
   .refine(
     (d) =>
@@ -43,7 +49,9 @@ const pipelinePatchSchema = z
       d.destinationType !== undefined ||
       d.sourceConfiguration !== undefined ||
       d.defaultTargetAgentTokenId !== undefined ||
-      d.executionHost !== undefined,
+      d.executionHost !== undefined ||
+      d.sourceConnectionId !== undefined ||
+      d.destinationConnectionId !== undefined,
     { message: "No updatable fields" }
   );
 
@@ -107,6 +115,11 @@ export async function PUT(req: Request, ctx: Ctx) {
   const mergedSourceConfiguration = mergeEltMetadataIntoSourceConfig(body);
   syncDltDbtWithCanvas(mergedSourceConfiguration);
   const bodyMerged = { ...body, sourceConfiguration: mergedSourceConfiguration };
+  const prepared = await preparePipelinePersistenceAndArtifacts(user.id, bodyMerged, mergedSourceConfiguration);
+  if (!prepared.ok) {
+    return NextResponse.json({ error: prepared.message }, { status: 400 });
+  }
+  const bodyForArtifacts = prepared.artifactBody;
 
   try {
     const existing = await db.eltPipeline.findFirst({
@@ -116,14 +129,14 @@ export async function PUT(req: Request, ctx: Ctx) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const resolvedTool = resolveTool(bodyMerged);
+    const resolvedTool = resolveTool(bodyForArtifacts);
 
-    if (existing.name !== bodyMerged.name || existing.tool !== resolvedTool) {
+    if (existing.name !== bodyForArtifacts.name || existing.tool !== resolvedTool) {
       const conflict = await db.eltPipeline.findUnique({
         where: {
           userId_name_tool: {
             userId: user.id,
-            name: bodyMerged.name,
+            name: bodyForArtifacts.name,
             tool: resolvedTool,
           },
         },
@@ -137,7 +150,7 @@ export async function PUT(req: Request, ctx: Ctx) {
       }
     }
 
-    const { pipelineCode, configYaml, workspaceYaml } = generatePipelineArtifacts(bodyMerged);
+    const { pipelineCode, configYaml, workspaceYaml } = generatePipelineArtifacts(bodyForArtifacts);
 
     let runsWebhookUrl: string | null | undefined;
     if (body.runsWebhookUrl !== undefined) {
@@ -166,13 +179,15 @@ export async function PUT(req: Request, ctx: Ctx) {
     const row = await db.eltPipeline.update({
       where: { id: existing.id },
       data: {
-        name: bodyMerged.name,
+        name: bodyForArtifacts.name,
         tool: resolvedTool,
-        sourceType: bodyMerged.sourceType,
-        destinationType: bodyMerged.destinationType,
-        description: bodyMerged.description ?? null,
-        groupName: bodyMerged.groupName ?? null,
-        sourceConfiguration: mergedSourceConfiguration as object,
+        sourceType: bodyForArtifacts.sourceType,
+        destinationType: bodyForArtifacts.destinationType,
+        description: bodyForArtifacts.description ?? null,
+        groupName: bodyForArtifacts.groupName ?? null,
+        sourceConfiguration: prepared.persistedSourceConfiguration as object,
+        sourceConnectionId: prepared.sourceConnectionId,
+        destinationConnectionId: prepared.destinationConnectionId,
         pipelineCode,
         configYaml,
         workspaceYaml,
@@ -219,7 +234,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
     p.destinationType === undefined &&
     p.sourceConfiguration === undefined &&
     p.defaultTargetAgentTokenId === undefined &&
-    p.executionHost === undefined;
+    p.executionHost === undefined &&
+    p.sourceConnectionId === undefined &&
+    p.destinationConnectionId === undefined;
 
   const onlyDefaultGateway =
     p.defaultTargetAgentTokenId !== undefined &&
@@ -228,7 +245,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
     typeof p.enabled !== "boolean" &&
     p.sourceType === undefined &&
     p.destinationType === undefined &&
-    p.sourceConfiguration === undefined;
+    p.sourceConfiguration === undefined &&
+    p.sourceConnectionId === undefined &&
+    p.destinationConnectionId === undefined;
 
   const onlyExecutionHost =
     p.executionHost !== undefined &&
@@ -237,7 +256,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
     typeof p.enabled !== "boolean" &&
     p.sourceType === undefined &&
     p.destinationType === undefined &&
-    p.sourceConfiguration === undefined;
+    p.sourceConfiguration === undefined &&
+    p.sourceConnectionId === undefined &&
+    p.destinationConnectionId === undefined;
 
   try {
     if (onlyExecutionHost) {
@@ -322,22 +343,41 @@ export async function PATCH(req: Request, ctx: Ctx) {
       }
     }
 
-    let base = { ...(existing.sourceConfiguration as Record<string, unknown>) };
+    let base = stripLegacyPipelineConnectionKeys({
+      ...(existing.sourceConfiguration as Record<string, unknown>),
+    });
     let sourceType = existing.sourceType;
     let destinationType = existing.destinationType;
 
     if (p.sourceConfiguration !== undefined) {
-      base = { ...(p.sourceConfiguration as Record<string, unknown>) };
+      base = stripLegacyPipelineConnectionKeys({
+        ...(p.sourceConfiguration as Record<string, unknown>),
+      });
     }
 
     if (p.sourceType !== undefined) {
       sourceType = p.sourceType;
       if (p.sourceConfiguration === undefined) {
-        base = mergeSourceConfigurationForSourceTypeChange(base, p.sourceType);
+        base = stripLegacyPipelineConnectionKeys(
+          mergeSourceConfigurationForSourceTypeChange(base, p.sourceType)
+        );
       }
     }
     if (p.destinationType !== undefined) {
       destinationType = p.destinationType;
+    }
+
+    let nextSourceConnectionId = existing.sourceConnectionId ?? null;
+    let nextDestinationConnectionId = existing.destinationConnectionId ?? null;
+    if (p.sourceConnectionId !== undefined) {
+      nextSourceConnectionId = p.sourceConnectionId;
+    } else if (p.sourceType !== undefined) {
+      nextSourceConnectionId = null;
+    }
+    if (p.destinationConnectionId !== undefined) {
+      nextDestinationConnectionId = p.destinationConnectionId;
+    } else if (p.destinationType !== undefined) {
+      nextDestinationConnectionId = null;
     }
     if (p.canvas !== undefined && p.canvas !== null) {
       const { nodes: rawNodes, edges: rawEdges } = p.canvas;
@@ -371,16 +411,23 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
     const tool: CreatePipelineBody["tool"] =
       existing.tool === "dlt" || existing.tool === "sling" ? existing.tool : "auto";
-    const bodyMerged: CreatePipelineBody = {
+    const syntheticBody: CreatePipelineBody = {
       name: existing.name,
       sourceType,
       destinationType,
       tool,
       description: existing.description ?? undefined,
       groupName: existing.groupName ?? undefined,
+      sourceConnectionId: nextSourceConnectionId,
+      destinationConnectionId: nextDestinationConnectionId,
       sourceConfiguration: base,
     };
-    const { pipelineCode, configYaml, workspaceYaml } = generatePipelineArtifacts(bodyMerged);
+    const preparedPatch = await preparePipelinePersistenceAndArtifacts(user.id, syntheticBody, base);
+    if (!preparedPatch.ok) {
+      return NextResponse.json({ error: preparedPatch.message }, { status: 400 });
+    }
+
+    const { pipelineCode, configYaml, workspaceYaml } = generatePipelineArtifacts(preparedPatch.artifactBody);
 
     const row = await db.eltPipeline.update({
       where: { id: existing.id },
@@ -388,7 +435,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
         ...(p.enabled !== undefined ? { enabled: p.enabled } : {}),
         sourceType,
         destinationType,
-        sourceConfiguration: base as object,
+        sourceConnectionId: preparedPatch.sourceConnectionId,
+        destinationConnectionId: preparedPatch.destinationConnectionId,
+        sourceConfiguration: preparedPatch.persistedSourceConfiguration as object,
         pipelineCode,
         configYaml,
         workspaceYaml,

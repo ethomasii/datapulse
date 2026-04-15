@@ -49,10 +49,16 @@ export default function GettingStartedDocsPage() {
       <h2>Next</h2>
       <ul>
         <li>
+          <Link href="/docs/concepts">Concepts</Link> — pipelines, runs, connections, monitors, gateways.
+        </li>
+        <li>
           <Link href="/docs/pipelines">Pipelines — concepts</Link>
         </li>
         <li>
           <Link href="/integrations">Integrations (app)</Link>
+        </li>
+        <li>
+          <Link href="/docs/gateway">Gateway — self-hosted runner</Link>
         </li>
       </ul>
     </DocsProse>

@@ -38,6 +38,9 @@ pyproject.toml
 
 # eltPulse web (Next.js)
 web/node_modules/
+
+# Gateway integration package (local npm install)
+integrations/gateway/node_modules/
 web/.next/
 web/.env.local
 web/.vercel

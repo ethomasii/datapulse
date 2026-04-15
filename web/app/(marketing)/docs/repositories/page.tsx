@@ -39,7 +39,7 @@ export default function RepositoriesDocsPage() {
       </p>
 
       <p>
-        <Link href="/repos">Repositories (app preview)</Link>
+        <Link href="/repos">Repositories (app preview)</Link> · <Link href="/docs/concepts">Concepts</Link>
       </p>
     </DocsProse>
   );

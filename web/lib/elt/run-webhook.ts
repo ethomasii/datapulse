@@ -14,6 +14,8 @@ export type RunWebhookPayload = {
   finishedAt: string | null;
   /** Deep link in eltPulse (no secrets). */
   runUrl: string;
+  /** Final rollup if the runner reported metrics (rows/bytes/progress). */
+  telemetrySummary?: Record<string, unknown>;
 };
 
 export async function deliverRunWebhook(url: string, payload: RunWebhookPayload): Promise<{ ok: boolean; httpStatus?: number }> {

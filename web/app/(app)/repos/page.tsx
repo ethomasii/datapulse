@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { FolderGit2, Plug } from "lucide-react";
+import { FolderGit2, Layers, Plug } from "lucide-react";
 import { requireDbUser } from "@/lib/auth/server";
 import { UpcomingFeaturePage } from "@/components/app/upcoming-feature-page";
 import { formatDefaultRepoLabel, getGithubConnectionForUser } from "@/lib/db/github-connection-query";
+import { RelatedLinks } from "@/components/ui/related-links";
 
 export default async function ReposPage() {
   const user = await requireDbUser();
@@ -108,6 +109,14 @@ export default async function ReposPage() {
           for the target layout.
         </>,
       ]}
-    />
+    >
+      <div className="mt-10">
+        <RelatedLinks links={[
+          { href: "/integrations", icon: Plug, label: "Integrations", desc: "Connect your GitHub account for BYO repo mode" },
+          { href: "/builder", icon: Layers, label: "Pipelines", desc: "Export pipeline code to your repository" },
+          { href: "/builder", icon: FolderGit2, label: "Code export", desc: "Copy YAML artifacts from the pipeline Code modal" },
+        ]} />
+      </div>
+    </UpcomingFeaturePage>
   );
 }

@@ -3,14 +3,10 @@ import type { Prisma } from "@prisma/client";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
 import { maybeDispatchRunWebhook } from "@/lib/elt/maybe-dispatch-run-webhook";
-import { sanitizeForRunStorage } from "@/lib/elt/run-log-sanitize";
-import { patchRunBodySchema, type LogEntry } from "@/lib/elt/run-types";
+import { applyPatchRunBody } from "@/lib/elt/apply-run-patch";
+import { patchRunBodySchema } from "@/lib/elt/run-types";
 
 type RouteContext = { params: { id: string } };
-
-function isTerminal(status: string): boolean {
-  return status === "succeeded" || status === "failed" || status === "cancelled";
-}
 
 export async function GET(_req: Request, context: RouteContext) {
   const user = await getCurrentDbUser();
@@ -61,53 +57,27 @@ export async function PATCH(req: Request, context: RouteContext) {
 
   const body = parsed.data;
 
-  let logEntries: LogEntry[] = Array.isArray(existing.logEntries)
-    ? (existing.logEntries as unknown as LogEntry[])
-    : [];
-
-  if (body.appendLog) {
-    const line: LogEntry = {
-      at: new Date().toISOString(),
-      level: body.appendLog.level,
-      message: sanitizeForRunStorage(body.appendLog.message, 4000),
-    };
-    logEntries = [...logEntries, line].slice(-500);
-  }
-
-  if (body.logEntries) {
-    logEntries = body.logEntries.map((e) => ({
-      ...e,
-      message: sanitizeForRunStorage(e.message, 4000),
-    }));
-  }
-
-  const errorSummary =
-    body.errorSummary === undefined
-      ? undefined
-      : body.errorSummary === null
-        ? null
-        : sanitizeForRunStorage(body.errorSummary);
-
-  const nextStatus = body.status ?? existing.status;
-  let nextFinishedAt = existing.finishedAt;
-  if (body.finishedAt !== undefined) {
-    nextFinishedAt = body.finishedAt ? new Date(body.finishedAt) : null;
-  } else if (isTerminal(nextStatus) && !existing.finishedAt) {
-    nextFinishedAt = new Date();
-  }
-
-  const wasTerminal = isTerminal(existing.status);
-  const willBeTerminal = isTerminal(nextStatus);
+  const patch = applyPatchRunBody(
+    {
+      status: existing.status,
+      logEntries: existing.logEntries,
+      telemetry: (existing as { telemetry?: unknown }).telemetry,
+      finishedAt: existing.finishedAt,
+    },
+    body
+  );
 
   const promoteExecutor =
     existing.ingestionExecutor === "unspecified" ? ({ ingestionExecutor: "customer_control_plane" } as const) : {};
 
+  const logTouched = body.logEntries !== undefined || body.appendLog !== undefined;
   const data: Prisma.EltPipelineRunUpdateInput = {
-    status: nextStatus,
+    status: patch.nextStatus as never,
     ...promoteExecutor,
-    ...(body.logEntries !== undefined || body.appendLog ? { logEntries: logEntries as unknown as Prisma.InputJsonValue } : {}),
-    ...(errorSummary !== undefined ? { errorSummary } : {}),
-    finishedAt: nextFinishedAt,
+    ...(logTouched ? { logEntries: patch.logEntries as unknown as Prisma.InputJsonValue } : {}),
+    ...(patch.telemetryJson !== undefined ? { telemetry: patch.telemetryJson } : {}),
+    ...(patch.errorSummary !== undefined ? { errorSummary: patch.errorSummary } : {}),
+    finishedAt: patch.nextFinishedAt,
   };
 
   const run = await db.eltPipelineRun.update({
@@ -116,7 +86,7 @@ export async function PATCH(req: Request, context: RouteContext) {
     include: { pipeline: { select: { name: true } } },
   });
 
-  if (willBeTerminal && !wasTerminal) {
+  if (patch.willBeTerminal && !patch.wasTerminal) {
     await maybeDispatchRunWebhook(run.id, user.id);
   }
 

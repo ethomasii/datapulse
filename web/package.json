@@ -12,9 +12,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "prisma generate",
-    "db:push": "dotenv-cli -e .env.local -- prisma db push",
-    "db:migrate": "dotenv-cli -e .env.local -- prisma migrate dev",
-    "db:studio": "dotenv-cli -e .env.local -- prisma studio"
+    "db:push": "npx dotenv-cli -e .env.local -- prisma db push",
+    "db:migrate": "npx dotenv-cli -e .env.local -- prisma migrate dev",
+    "db:migrate:deploy": "npx dotenv-cli -e .env.local -- prisma migrate deploy",
+    "db:studio": "npx dotenv-cli -e .env.local -- prisma studio"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.758.0",

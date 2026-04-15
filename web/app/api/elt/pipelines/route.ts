@@ -6,6 +6,7 @@ import { createPipelineBodySchema } from "@/lib/elt/types";
 import { generatePipelineArtifacts, resolveTool } from "@/lib/elt/generate-artifacts";
 import { syncDltDbtWithCanvas } from "@/lib/elt/dbt-canvas";
 import { mergeEltMetadataIntoSourceConfig } from "@/lib/elt/merge-elt-metadata";
+import { preparePipelinePersistenceAndArtifacts } from "@/lib/elt/pipeline-connection-fks";
 import { assertUserOwnsGatewayToken } from "@/lib/agent/gateway-routing";
 import { normalizeRunWebhookUrl } from "@/lib/elt/validate-run-webhook-url";
 
@@ -57,7 +58,12 @@ export async function POST(req: Request) {
   const mergedSourceConfiguration = mergeEltMetadataIntoSourceConfig(body);
   syncDltDbtWithCanvas(mergedSourceConfiguration);
   const bodyMerged = { ...body, sourceConfiguration: mergedSourceConfiguration };
-  const resolvedTool = resolveTool(bodyMerged);
+  const prepared = await preparePipelinePersistenceAndArtifacts(user.id, bodyMerged, mergedSourceConfiguration);
+  if (!prepared.ok) {
+    return NextResponse.json({ error: prepared.message }, { status: 400 });
+  }
+  const bodyForArtifacts = prepared.artifactBody;
+  const resolvedTool = resolveTool(bodyForArtifacts);
 
   try {
     const existing = await db.eltPipeline.findUnique({
@@ -77,7 +83,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { pipelineCode, configYaml, workspaceYaml } = generatePipelineArtifacts(bodyMerged);
+    const { pipelineCode, configYaml, workspaceYaml } = generatePipelineArtifacts(bodyForArtifacts);
 
     let runsWebhookUrl: string | null = null;
     try {
@@ -104,13 +110,15 @@ export async function POST(req: Request) {
     const row = await db.eltPipeline.create({
       data: {
         userId: user.id,
-        name: bodyMerged.name,
+        name: bodyForArtifacts.name,
         tool: resolvedTool,
-        sourceType: bodyMerged.sourceType,
-        destinationType: bodyMerged.destinationType,
-        description: bodyMerged.description ?? null,
-        groupName: bodyMerged.groupName ?? null,
-        sourceConfiguration: mergedSourceConfiguration as object,
+        sourceType: bodyForArtifacts.sourceType,
+        destinationType: bodyForArtifacts.destinationType,
+        description: bodyForArtifacts.description ?? null,
+        groupName: bodyForArtifacts.groupName ?? null,
+        sourceConfiguration: prepared.persistedSourceConfiguration as object,
+        sourceConnectionId: prepared.sourceConnectionId,
+        destinationConnectionId: prepared.destinationConnectionId,
         pipelineCode,
         configYaml,
         workspaceYaml,

@@ -1,4 +1,5 @@
 import { db } from "@/lib/db/client";
+import { parseRunTelemetry } from "@/lib/elt/run-telemetry";
 import { deliverRunWebhook, type RunWebhookPayload } from "@/lib/elt/run-webhook";
 
 function appBaseUrl(): string {
@@ -23,6 +24,8 @@ export async function maybeDispatchRunWebhook(runId: string, userId: string): Pr
     run.status === "succeeded" ? "run.succeeded" : run.status === "failed" ? "run.failed" : "run.cancelled";
 
   const base = appBaseUrl();
+  const tel = parseRunTelemetry((run as { telemetry?: unknown }).telemetry);
+  const hasSummary = Object.keys(tel.summary).length > 0;
   const payload: RunWebhookPayload = {
     source: "eltpulse",
     event,
@@ -35,6 +38,7 @@ export async function maybeDispatchRunWebhook(runId: string, userId: string): Pr
     startedAt: run.startedAt.toISOString(),
     finishedAt: run.finishedAt?.toISOString() ?? null,
     runUrl: `${base}/runs?run=${run.id}`,
+    ...(hasSummary ? { telemetrySummary: tel.summary as Record<string, unknown> } : {}),
   };
 
   const r = await deliverRunWebhook(webhookUrl, payload);

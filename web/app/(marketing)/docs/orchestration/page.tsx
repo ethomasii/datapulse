@@ -28,10 +28,16 @@ export default function OrchestrationDocsPage() {
         connectors.
       </p>
       <p>
-        In-product, event triggers are <strong>eltPulse monitors</strong>. They run in eltPulse&apos;s control plane (or
-        a gateway you explicitly connect), so anything that touches your cloud accounts — S3, GCS, ADLS, queues, SaaS APIs
-        — needs <strong>credentials or connection profiles</strong> you grant to eltPulse, unlike jobs that only run
-        inside your own VPC with ambient instance roles.
+        In-product, event triggers are <strong>eltPulse monitors</strong>. Each monitor has its own{" "}
+        <strong>Runs on</strong> setting (inherit account plane, always eltPulse-managed cron, or always your gateway):
+        when checks are customer-side, your gateway evaluates S3/SQS (or your custom worker) and{" "}
+        <code>POST</code>s results to the control plane; when eltPulse-managed, the cloud cron evaluates them. Monitors
+        link to a saved <Link href="/connections">connection</Link> when the monitor type needs cloud API credentials.
+      </p>
+      <p>
+        <strong>Run checks</strong> in the app only runs monitors that eltPulse is allowed to evaluate in the cloud;
+        gateway-only monitors are skipped there. See <Link href="/docs/concepts">Concepts</Link> for how monitors relate
+        to pipelines and connections, and <Link href="/docs/gateway">Gateway</Link> for the agent API.
       </p>
 
       <h2>Run slices</h2>
@@ -52,12 +58,19 @@ export default function OrchestrationDocsPage() {
         <li>
           <Link href="/runs">Runs</Link> (signed in) — execution history reported by your runner or CI.
         </li>
+        <li>
+          <Link href="/gateway">Gateway</Link> (signed in) — tokens and defaults for self-hosted execution.
+        </li>
+        <li>
+          <Link href="/docs/gateway">Gateway (docs)</Link> — how the agent process works and how to deploy it.
+        </li>
       </ul>
 
       <h2>Roadmap</h2>
       <p>
         First-class schedule and sensor experiences in the product, deeper native orchestration, and ongoing
-        interoperability with external engines are tracked on the <Link href="/roadmap">roadmap</Link>.
+        interoperability with external engines are tracked on the <Link href="/roadmap">roadmap</Link>. For targeting and
+        data model details, see <Link href="/docs/concepts">Concepts</Link>.
       </p>
     </DocsProse>
   );

@@ -15,14 +15,29 @@ const CARDS = [
     desc: "Sign in, create your first pipeline, export artifacts.",
   },
   {
+    href: "/docs/concepts",
+    title: "Concepts",
+    desc: "Pipelines, runs, connections, monitors, gateways — and how to route work to a specific gateway.",
+  },
+  {
     href: "/docs/pipelines",
     title: "Pipelines",
     desc: "Sources, destinations, generated code, and workspace manifests.",
   },
   {
+    href: "/docs/runs",
+    title: "Runs",
+    desc: "Structured logs, telemetry (rows/bytes/progress), PATCH contract for gateway and app.",
+  },
+  {
     href: "/docs/orchestration",
     title: "Orchestration",
     desc: "What runs vs when: schedules, eltPulse sensors, and portable exports for other orchestrators.",
+  },
+  {
+    href: "/docs/gateway",
+    title: "Gateway",
+    desc: "Self-hosted connector: tokens, env vars, /api/agent/* contract, Docker and cloud runtimes.",
   },
   {
     href: "/docs/integrations",
@@ -76,9 +91,8 @@ export default function DocsOverviewPage() {
       <h2>Product map</h2>
       <ul>
         <li>
-          <strong>App (signed in)</strong> — Pipelines builder, Integrations, Account &amp; Settings, and upcoming Runs /
-          Repositories
-          / Team.
+          <strong>App (signed in)</strong> — Pipelines builder, Connections, Monitors / Schedule, Gateway, Runs,
+          Integrations, Account &amp; Settings, Repositories / Team.
         </li>
         <li>
           <strong>Storage</strong> — Definitions and generated text live in Postgres (Neon) per user until you sync to

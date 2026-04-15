@@ -25,7 +25,7 @@ export const RUNS_POLL_INTERVAL_SECONDS = 5;
 export const HEARTBEAT_INTERVAL_SECONDS = 30;
 
 /** Manifest schema version — bump when response shape changes. */
-export const AGENT_MANIFEST_VERSION = 1;
+export const AGENT_MANIFEST_VERSION = 2;
 
 /**
  * Org-level override (e.g. enterprise) wins over tier when set and ≥ 30s.
