@@ -20,6 +20,11 @@ export function mergeEltMetadataIntoSourceConfig(body: CreatePipelineBody): Reco
     else delete base.elt_sensors;
   }
 
+  if (body.sliceIntent !== undefined) {
+    if (body.sliceIntent === "full" || body.sliceIntent === "sliced") base.elt_slice_intent = body.sliceIntent;
+    else delete base.elt_slice_intent;
+  }
+
   if (body.partitionsNote !== undefined) {
     if (body.partitionsNote.trim()) base.elt_partitions_note = body.partitionsNote.trim();
     else delete base.elt_partitions_note;

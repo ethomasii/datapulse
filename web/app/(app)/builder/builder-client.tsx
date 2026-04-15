@@ -96,6 +96,7 @@ export function BuilderClient({
 
   const [tests, setTests] = useState("");
   const [sensors, setSensors] = useState("");
+  const [sliceIntent, setSliceIntent] = useState<"full" | "sliced">("full");
   const [partitionsNote, setPartitionsNote] = useState("");
   const [otherNotes, setOtherNotes] = useState("");
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
@@ -243,6 +244,7 @@ export function BuilderClient({
           destinationConnectionId: destinationConnectionId ?? null,
           tests,
           sensors,
+          sliceIntent,
           partitionsNote,
           otherNotes,
           scheduleEnabled,
@@ -261,6 +263,7 @@ export function BuilderClient({
         setShowCreateForm(false);
         setTests("");
         setSensors("");
+        setSliceIntent("full");
         setPartitionsNote("");
         setOtherNotes("");
         setScheduleEnabled(false);
@@ -297,6 +300,7 @@ export function BuilderClient({
     setFormMode("structured");
     setTests("");
     setSensors("");
+    setSliceIntent("full");
     setPartitionsNote("");
     setOtherNotes("");
     setScheduleEnabled(false);
@@ -367,6 +371,8 @@ export function BuilderClient({
 
     setTests(eltLinesFromConfig("elt_tests", cfg));
     setSensors(eltLinesFromConfig("elt_sensors", cfg));
+    const rawIntent = cfg.elt_slice_intent;
+    setSliceIntent(rawIntent === "sliced" ? "sliced" : "full");
     setPartitionsNote(typeof cfg.elt_partitions_note === "string" ? cfg.elt_partitions_note : "");
     setOtherNotes(typeof cfg.elt_other_notes === "string" ? cfg.elt_other_notes : "");
     setScheduleEnabled(Boolean(cfg.schedule_enabled));
@@ -893,13 +899,14 @@ export function BuilderClient({
                   />
                 </div>
 
-                {/* Run slices */}
+                {/* Run slices — intent + notes; detailed column/granularity on Run slices */}
                 <div className="rounded-lg border border-teal-100 bg-teal-50/60 p-3 dark:border-teal-900 dark:bg-teal-900/10">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Run slice strategy</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Runs: full load or sliced?</span>
                       <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        Note the slice column and granularity here. Configure full slice logic and launch backfills in{" "}
+                        Choose how you plan to execute this pipeline. You can change this later. Technical slice column and
+                        backfills are configured on{" "}
                         <Link href="/run-slices" className="font-medium text-teal-600 hover:underline dark:text-teal-400">
                           Run slices
                         </Link>
@@ -913,12 +920,51 @@ export function BuilderClient({
                       Configure →
                     </Link>
                   </div>
+                  <div className="mt-3 space-y-2">
+                    <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-800 dark:text-slate-200">
+                      <input
+                        type="radio"
+                        name="sliceIntent"
+                        className="mt-0.5"
+                        checked={sliceIntent === "full"}
+                        onChange={() => setSliceIntent("full")}
+                      />
+                      <span>
+                        <span className="font-medium">Full load each run</span>
+                        <span className="mt-0.5 block text-xs font-normal text-slate-500 dark:text-slate-400">
+                          Default. Each run loads everything this pipeline is configured to pull (no per-day / per-key
+                          slice unless you add backfill runs later).
+                        </span>
+                      </span>
+                    </label>
+                    <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-800 dark:text-slate-200">
+                      <input
+                        type="radio"
+                        name="sliceIntent"
+                        className="mt-0.5"
+                        checked={sliceIntent === "sliced"}
+                        onChange={() => setSliceIntent("sliced")}
+                      />
+                      <span>
+                        <span className="font-medium">Sliced loads (date or key)</span>
+                        <span className="mt-0.5 block text-xs font-normal text-slate-500 dark:text-slate-400">
+                          You plan separate runs per slice (e.g. one day at a time). Set the partition column and launch
+                          backfills on Run slices; your runner must honor{" "}
+                          <code className="rounded bg-teal-100 px-0.5 text-[11px] dark:bg-teal-900/60">triggeredBy</code>{" "}
+                          or custom code.
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                  <label className="mt-3 block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Notes <span className="font-normal text-slate-500">(optional)</span>
+                  </label>
                   <textarea
                     value={partitionsNote}
                     onChange={(e) => setPartitionsNote(e.target.value)}
                     rows={2}
                     placeholder="e.g. date partition on event_date (daily, UTC); backfill from 2024-01-01"
-                    className="mt-2 w-full rounded border border-teal-200 bg-white px-2 py-1.5 text-xs dark:border-teal-800 dark:bg-slate-900 dark:text-white"
+                    className="mt-1 w-full rounded border border-teal-200 bg-white px-2 py-1.5 text-xs dark:border-teal-800 dark:bg-slate-900 dark:text-white"
                   />
                   {runSliceCapability.mode === "none_only" ? (
                     <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">

@@ -17,6 +17,8 @@ export const createPipelineBodySchema = z.object({
   tests: z.string().max(16000).optional(),
   /** One sensor / event trigger per line. */
   sensors: z.string().max(16000).optional(),
+  /** Whether you plan full loads or slice-partitioned backfills (stored as `elt_slice_intent` in source config). */
+  sliceIntent: z.enum(["full", "sliced"]).optional(),
   /** Partition strategy (time window, key, backfill notes). */
   partitionsNote: z.string().max(8000).optional(),
   /** Catch-all: SLAs, ownership, links to external orchestration. */
