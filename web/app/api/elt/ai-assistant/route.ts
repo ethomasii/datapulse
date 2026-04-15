@@ -10,27 +10,27 @@ import type { CreatePipelineBody } from "@/lib/elt/types";
 const MODEL = "claude-sonnet-4-6";
 const MAX_TOKENS = 4096;
 
-const SYSTEM_PROMPT = `You are the eltPulse Pipeline Builder AI — an expert data engineering assistant that helps users design and generate ELT pipelines using dlt (data load tool) and Sling.
+const SYSTEM_PROMPT = `You are the eltPulse Pipeline Builder AI — an expert data engineering assistant that helps users design and generate ELT pipelines.
 
 Your job:
 1. Understand what data the user wants to move (source → destination)
-2. Identify the best source from the dlt verified registry or Sling database connectors
+2. Identify the best source connector from the eltPulse registry
 3. Ask clarifying questions to gather required configuration (credentials, tables, date ranges, etc.)
 4. Generate a complete, ready-to-run pipeline configuration
 5. For REST APIs: help the user identify the right endpoint, auth method, and pagination
 
 Key rules:
-- Always prefer dlt verified sources over generic REST API when a match exists
-- For database-to-database moves, use Sling (better CDC and incremental support)
-- For SaaS APIs (Stripe, GitHub, Hubspot, etc.), always use dlt verified sources
-- Always mention that partition_key enables incremental backfills when the source supports it
+- Always prefer verified connectors over generic REST API when a match exists
+- For database-to-database moves, use database pipeline mode (better CDC and incremental support)
+- For SaaS APIs (Stripe, GitHub, Hubspot, etc.), always use the verified connector
+- Always mention that incremental loading enables efficient backfills when the source supports it
 - Keep responses concise — ask ONE clarifying question at a time, not five at once
 - When you have enough info, call generate_pipeline to produce the config
 
 Available source types: ${Object.values(SOURCE_GROUPS).flat().join(", ")}
 Available destination types: ${Object.values(DESTINATION_GROUPS).flat().join(", ")}
 
-dlt verified sources with rich support: ${DLT_HUB_SOURCES.map(s => `${s.slug} (${s.name})`).join(", ")}
+Verified connectors with rich support: ${DLT_HUB_SOURCES.map(s => `${s.slug} (${s.name})`).join(", ")}
 
 When generating REST API configs, help identify:
 - The base URL and endpoint path
@@ -42,7 +42,7 @@ When generating REST API configs, help identify:
 const TOOLS: Anthropic.Tool[] = [
   {
     name: "search_sources",
-    description: "Search the dlt verified source registry and built-in source catalog for sources matching a query. Use this to find the right source for a user's data.",
+    description: "Search the eltPulse connector registry for sources matching a query. Use this to find the right source for a user's data.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -70,7 +70,7 @@ const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "list_registry",
-    description: "List all available sources grouped by category from the dlt verified registry.",
+    description: "List all available sources grouped by category from the eltPulse connector registry.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -176,7 +176,7 @@ function toolSearchSources(query: string) {
       matches.length > 0
         ? `Best match: ${matches[0].name} (slug: ${matches[0].slug}). It supports ${matches[0].incremental ? "incremental loading" : "full refresh only"}.`
         : catalogMatches.length > 0
-          ? `Found in catalog: ${catalogMatches[0]}. No dlt verified source — will use generic template.`
+          ? `Found in catalog: ${catalogMatches[0]}. Will use generic pipeline template.`
           : "No matching source found. Consider using rest_api for custom HTTP APIs.",
   };
 }
@@ -200,7 +200,7 @@ function toolGetSourceDetails(slug: string) {
       required_params: verified.params,
       incremental: verified.incremental,
       docs_url: verified.docsUrl,
-      install_command: `dlt init ${verified.slug} <destination>`,
+      connector_slug: verified.slug,
       tool: chooseTool(slug, "duckdb"),
     };
   }
@@ -382,6 +382,7 @@ export async function POST(request: Request) {
   let iterationCount = 0;
   const MAX_ITERATIONS = 8;
 
+  try {
   while (iterationCount < MAX_ITERATIONS) {
     iterationCount++;
 
@@ -478,4 +479,12 @@ export async function POST(request: Request) {
     message: "I've reached the limit of my reasoning steps. Please try rephrasing your request.",
     savePayload: undefined,
   });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[ai-assistant] error:", msg);
+    return NextResponse.json(
+      { message: `Something went wrong: ${msg}`, savePayload: undefined },
+      { status: 500 }
+    );
+  }
 }

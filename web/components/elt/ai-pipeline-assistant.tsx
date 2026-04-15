@@ -225,7 +225,7 @@ export function AiPipelineAssistant({
             </div>
             <div className="flex-1">
               <p className="text-sm font-semibold text-white">AI Pipeline Builder</p>
-              <p className="text-[11px] text-slate-400">Powered by Claude + dlt Hub</p>
+              <p className="text-[11px] text-slate-400">Powered by Claude · eltPulse</p>
             </div>
             <button
               onClick={() => setExpanded((v) => !v)}

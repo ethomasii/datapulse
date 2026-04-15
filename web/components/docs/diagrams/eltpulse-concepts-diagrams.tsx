@@ -212,7 +212,7 @@ export function ArchitectureEgressDiagram() {
           Run workers (optional)
         </text>
         <text x="166" y="252" textAnchor="middle" className="fill-current text-[9px] opacity-75">
-          ECS / K8s Job / docker — dlt, Sling, your code
+          ECS / K8s Job / docker — eltPulse connectors, your code
         </text>
 
         <rect x="36" y="306" width="260" height="158" rx="10" fill="currentColor" className="opacity-[0.06]" />

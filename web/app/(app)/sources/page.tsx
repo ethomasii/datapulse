@@ -46,7 +46,7 @@ function SourceCard({ source }: { source: DltHubSource }) {
       <div className="flex items-start justify-between gap-2">
         <div>
           <h3 className="font-semibold text-slate-900 dark:text-white">{source.name}</h3>
-          <code className="text-[10px] text-slate-400 font-mono">dlt init {source.slug}</code>
+          <code className="text-[10px] text-slate-400 font-mono">{source.slug}</code>
         </div>
         <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${CATEGORY_COLORS[source.category] ?? CATEGORY_COLORS.Other}`}>
           {source.category}
@@ -124,14 +124,11 @@ export default function SourcesPage() {
           <BookOpen className="h-6 w-6" aria-hidden />
           <span className="text-sm font-semibold uppercase tracking-wide">Source Registry</span>
         </div>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">dlt Verified Sources</h1>
+        <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Verified Sources</h1>
         <p className="mt-3 text-slate-600 dark:text-slate-300">
-          {DLT_HUB_SOURCES.length} verified dlt sources from{' '}
-          <a href="https://github.com/dlt-hub/verified-sources" target="_blank" rel="noopener noreferrer" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-            dlt-hub/verified-sources
-          </a>
-          . Each source comes with auth, pagination, schema inference, and incremental loading out of the box.
-          Click any source to open the pipeline builder pre-configured for that source, or use the{' '}
+          {DLT_HUB_SOURCES.length} pre-built, verified connectors — each with auth, pagination, schema inference,
+          and incremental loading built in. Click any source to open the pipeline builder pre-configured for it,
+          or use the{' '}
           <span className="inline-flex items-center gap-1 font-medium text-teal-700 dark:text-teal-400">
             <Sparkles className="h-3.5 w-3.5" /> AI Builder
           </span>{' '}
@@ -143,7 +140,7 @@ export default function SourcesPage() {
       <div className="flex flex-wrap gap-4 rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-800 dark:bg-slate-900/40">
         <div className="text-center">
           <p className="text-xl font-bold text-teal-600 dark:text-teal-400">{DLT_HUB_SOURCES.length}</p>
-          <p className="text-xs text-slate-500">Verified sources</p>
+          <p className="text-xs text-slate-500">Connectors</p>
         </div>
         <div className="text-center">
           <p className="text-xl font-bold text-teal-600 dark:text-teal-400">{DLT_HUB_SOURCES.filter(s => s.incremental).length}</p>
@@ -160,7 +157,7 @@ export default function SourcesPage() {
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-400 dark:hover:text-white transition-colors"
           >
-            <ExternalLink className="h-3.5 w-3.5" /> dlt Hub on GitHub
+            <ExternalLink className="h-3.5 w-3.5" /> Connector source code
           </a>
         </div>
       </div>
@@ -227,11 +224,10 @@ export default function SourcesPage() {
         <div className="flex items-start gap-3">
           <RefreshCw className="mt-0.5 h-5 w-5 shrink-0 text-teal-600" />
           <div>
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Database-to-database? Use Sling</h2>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Database-to-database pipelines</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              For Postgres → Snowflake, MySQL → BigQuery, and similar moves, eltPulse uses{' '}
-              <a href="https://slingdata.io" target="_blank" rel="noopener noreferrer" className="text-sky-600 hover:underline dark:text-sky-400">Sling</a>{' '}
-              instead of dlt. Sling gives you row-level incremental replication, CDC from Postgres, and native SQL type mapping.
+              For Postgres → Snowflake, MySQL → BigQuery, and similar moves, eltPulse uses a high-performance
+              replication engine with row-level incremental support, CDC from Postgres, and native SQL type mapping.
               Build a database pipeline from the{' '}
               <Link href="/builder" className="font-medium text-sky-600 hover:underline dark:text-sky-400">Pipeline Builder</Link>{' '}
               and select any database source.

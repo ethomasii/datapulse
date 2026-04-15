@@ -47,8 +47,7 @@ export function CanvasTransformInspector({ nodeId, initialData, onPatch, pipelin
     <div className="space-y-4">
       <p className="text-xs text-slate-600 dark:text-slate-400">
         Transform step for this pipeline — use <strong className="font-medium text-slate-800 dark:text-slate-200">Save to pipeline</strong>{" "}
-        on the toolbar to persist the graph. dbt settings sync into{" "}
-        <code className="rounded bg-slate-100 px-1 text-[10px] dark:bg-slate-800">source_configuration.dlt_dbt</code> for codegen.
+        on the toolbar to persist the graph.
       </p>
       <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
         Approach
@@ -71,27 +70,16 @@ export function CanvasTransformInspector({ nodeId, initialData, onPatch, pipelin
 
       {transformTool === "dbt" && pipelineTool === "sling" ? (
         <p className="rounded-lg border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-xs leading-snug text-amber-950 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
-          This pipeline is generated as <strong className="font-medium">Sling</strong> YAML. Post-load dbt is wired for{" "}
-          <strong className="font-medium">dlt</strong> Python pipelines only (dlt&apos;s dbt runner). Use{" "}
-          <strong className="font-medium">Notes</strong> to document a separate dbt job, switch the pipeline tool to dlt where
-          applicable, or run dbt in CI against the same warehouse.
+          Post-load dbt is only available for API and file-based pipelines. For database pipelines, use{" "}
+          <strong className="font-medium">Notes</strong> to document a separate dbt job, or run dbt in CI against the same warehouse.
         </p>
       ) : null}
 
       {transformTool === "dbt" && pipelineTool === "dlt" ? (
         <div className="space-y-3 rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-3 dark:border-amber-800/50 dark:bg-amber-950/20">
           <p className="text-[11px] leading-snug text-amber-950 dark:text-amber-100">
-            Reference a <strong className="font-medium">dbt project</strong> (local path or git URL). After extract/load, codegen
-            appends a <code className="rounded bg-white/70 px-1 text-[10px] dark:bg-amber-950/60">dlt.dbt.package</code> step. See{" "}
-            <a
-              className="font-medium text-sky-700 underline dark:text-sky-300"
-              href="https://dlthub.com/docs/dlt-ecosystem/transformations/dbt"
-              target="_blank"
-              rel="noreferrer"
-            >
-              dlt + dbt
-            </a>
-            .
+            Reference a <strong className="font-medium">dbt project</strong> (local path or git URL). After extract/load,
+            a dbt run step is appended automatically.
           </p>
           <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
             dbt project path or git URL
