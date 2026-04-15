@@ -32,6 +32,7 @@ import {
 } from "@/lib/elt/canvas-source-config";
 import { EltLoadingState } from "@/components/elt/elt-loading-state";
 import { PipelineCodeModal } from "@/components/elt/pipeline-code-modal";
+import { getRunSliceCapability } from "@/lib/elt/run-slice-capabilities";
 
 type PipelineExecutionHost = "inherit" | "eltpulse_managed" | "customer_gateway";
 
@@ -91,6 +92,7 @@ export function BuilderClient({
   );
 
   const schemaFields = useMemo(() => getSourceConfigurationFields(sourceType), [sourceType]);
+  const runSliceCapability = useMemo(() => getRunSliceCapability(sourceType), [sourceType]);
 
   const [tests, setTests] = useState("");
   const [sensors, setSensors] = useState("");
@@ -918,6 +920,11 @@ export function BuilderClient({
                     placeholder="e.g. date partition on event_date (daily, UTC); backfill from 2024-01-01"
                     className="mt-2 w-full rounded border border-teal-200 bg-white px-2 py-1.5 text-xs dark:border-teal-800 dark:bg-slate-900 dark:text-white"
                   />
+                  {runSliceCapability.mode === "none_only" ? (
+                    <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+                      {runSliceCapability.detail}
+                    </p>
+                  ) : null}
                 </div>
 
                 {/* Schedule */}

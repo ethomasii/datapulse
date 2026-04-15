@@ -16,6 +16,7 @@ import {
   Waypoints,
 } from 'lucide-react';
 import { RelatedLinks } from "@/components/ui/related-links";
+import { getRunSliceCapability } from "@/lib/elt/run-slice-capabilities";
 
 // ─── Column hints ─────────────────────────────────────────────────────────────
 
@@ -174,6 +175,8 @@ export default function RunSlicesPage() {
           backfills over any range of slice values. Each slice launches an independent run you can
           monitor in{' '}
           <Link href="/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">Runs</Link>.
+          Slice types shown here match what the stock generated pipeline can honor; connectors like GitHub and generic
+          REST do not apply partition keys in generated code, so date/key slices are disabled until you customize the loader.
         </p>
       </div>
 
@@ -261,6 +264,8 @@ function PipelinePartitionRow({
 }) {
   const cfg = pipeline.partitionConfig;
   const hasPartition = cfg && cfg.type !== 'none';
+  const cap = getRunSliceCapability(pipeline.sourceType);
+  const unsupportedSavedSlice = cap.mode === "none_only" && hasPartition;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
@@ -272,7 +277,14 @@ function PipelinePartitionRow({
         <div className="flex items-center gap-3">
           <Layers className="h-4 w-4 shrink-0 text-slate-400" />
           <span className="font-medium text-slate-900 dark:text-white">{pipeline.name}</span>
-          {hasPartition ? (
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            {pipeline.sourceType}
+          </span>
+          {cap.mode === "none_only" ? (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
+              {cap.label}
+            </span>
+          ) : hasPartition ? (
             <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-800 dark:bg-teal-900/30 dark:text-teal-300">
               {cfg!.type === 'date' ? `Date · ${cfg!.column} / ${cfg!.granularity}` : `Key · ${cfg!.column}`}
             </span>
@@ -281,13 +293,18 @@ function PipelinePartitionRow({
               No run slice
             </span>
           )}
+          {unsupportedSavedSlice ? (
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+              Saved slice config not used — save to clear
+            </span>
+          ) : null}
         </div>
         {expanded ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
       </button>
 
       {expanded && (
         <div className="border-t border-slate-100 px-5 pb-6 pt-4 dark:border-slate-800">
-          <PartitionEditor pipeline={pipeline} onSaved={onSaved} onError={onError} />
+          <PartitionEditor key={pipeline.id} pipeline={pipeline} onSaved={onSaved} onError={onError} />
         </div>
       )}
     </div>
@@ -305,9 +322,12 @@ function PartitionEditor({
   onSaved: () => void;
   onError: (msg: string) => void;
 }) {
+  const cap = getRunSliceCapability(pipeline.sourceType);
   const init = pipeline.partitionConfig ?? { type: 'none', column: '', granularity: 'day', description: '' };
-  const [type, setType] = useState<PartitionType>(init.type);
-  const [column, setColumn] = useState(init.column);
+  const [type, setType] = useState<PartitionType>(() =>
+    cap.mode === "none_only" ? "none" : init.type
+  );
+  const [column, setColumn] = useState(() => (cap.mode === "none_only" ? "" : init.column));
   const [granularity, setGranularity] = useState(init.granularity || 'day');
   const [description, setDescription] = useState(init.description || '');
   const [saving, setSaving] = useState(false);
@@ -331,7 +351,17 @@ function PartitionEditor({
       const getRes = await fetch(`/api/elt/pipelines/${pipeline.id}`);
       if (!getRes.ok) throw new Error('Failed to fetch pipeline');
       const { pipeline: full } = await getRes.json() as { pipeline: any };
-      const sc = { ...(full.sourceConfiguration ?? {}), _partitionConfig: { type, column: column.trim(), granularity, description: description.trim() } };
+      const effectiveType: PartitionType = cap.mode === "none_only" ? "none" : type;
+      const effectiveColumn = cap.mode === "none_only" ? "" : column.trim();
+      const sc = {
+        ...(full.sourceConfiguration ?? {}),
+        _partitionConfig: {
+          type: effectiveType,
+          column: effectiveColumn,
+          granularity,
+          description: description.trim(),
+        },
+      };
 
       const res = await fetch(`/api/elt/pipelines/${pipeline.id}`, {
         method: 'PATCH',
@@ -407,9 +437,44 @@ function PartitionEditor({
 
   const isDate = type === 'date';
   const canLaunch = previewReady && backfillRows.some(r => r.selected) && (type !== 'none') && column.trim();
+  const slicesDisabled = cap.mode === "none_only";
+
+  if (slicesDisabled) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-lg border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+          <p className="font-medium">Date and key run slices are not available for this source type</p>
+          <p className="mt-2 text-xs leading-relaxed opacity-95">{cap.detail}</p>
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Source: <span className="font-mono">{pipeline.sourceType}</span>. You can still run full loads; each run appears
+          in <Link href="/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">Runs</Link> without
+          slice metadata.
+        </p>
+        {(init.type !== "none" && init.column) || init.description ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-800/60">
+            <p className="text-slate-700 dark:text-slate-200">
+              A slice configuration was saved earlier. Save below to clear it and store &quot;none&quot; so the pipeline
+              metadata matches what the stock loader supports.
+            </p>
+            <button
+              type="button"
+              onClick={() => void saveConfig()}
+              disabled={saving}
+              className="mt-3 inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-500 disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Clear slice config and save
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      <p className="text-xs text-slate-500 dark:text-slate-400">{cap.detail}</p>
       {/* Config form */}
       <div>
         <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Run slice configuration</h3>
