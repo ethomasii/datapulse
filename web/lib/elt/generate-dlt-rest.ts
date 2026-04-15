@@ -2,6 +2,9 @@ import type { PipelineRequest } from "./types";
 import { escapePyString } from "./escape-py";
 import { dltDbtRunnerBeforeReturn } from "./generate-dlt-dbt-append";
 
+// SWC/webpack misparses Python triple-quotes inside JS template literals.
+const PY3Q = '"""';
+
 function destinationParts(request: PipelineRequest): { destination: string; destinationComment: string } {
   if (request.destinationInstance) {
     const destination = `${request.destinationType}__${request.destinationInstance}`;
@@ -66,20 +69,20 @@ export function generateRestApiPipeline(request: PipelineRequest): string {
     ? "\n\nThis pipeline uses incremental loading with partition-style runs (cursor / time windows)."
     : "";
 
-  return `"""dlt pipeline: ${escapePyString(request.name)}
+  return `${PY3Q}dlt pipeline: ${escapePyString(request.name)}
 
 ${escapePyString(desc)}${incNote}
-"""
+${PY3Q}
 
 import dlt
 from dlt.sources.rest_api import rest_api_source
 
 def run(partition_key: str = None):
-    """Run the REST API pipeline.
+    ${PY3Q}Run the REST API pipeline.
 
     Args:
         partition_key: Optional incremental run key (e.g. date string) when scheduling backfills.
-    """
+    ${PY3Q}
 
     # Configure the pipeline
     ${destinationComment}
@@ -154,19 +157,23 @@ export function generateRestApiAdvanced(request: PipelineRequest): string {
   const payload = JSON.stringify(advanced);
   const b64 = Buffer.from(payload, "utf8").toString("base64");
 
-  return `"""dlt pipeline: ${escapePyString(request.name)}
+  return `${PY3Q}dlt pipeline: ${escapePyString(request.name)}
 
 ${escapePyString(desc)}
-"""
+${PY3Q}
 
 import base64
 import json
 
 import dlt
+
+// SWC/webpack misparses Python triple-quotes inside JS template literals.
+// Use this constant so the parser never sees ${PY3Q} as a literal in source.
+const PY3Q = '${PY3Q}';
 from dlt.sources.rest_api import rest_api_source
 
 def run(partition_key: str = None):
-    """Run the REST API pipeline."""
+    ${PY3Q}Run the REST API pipeline.${PY3Q}
 
     # Configure the pipeline
     ${destinationComment}

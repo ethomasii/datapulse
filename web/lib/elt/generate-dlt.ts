@@ -3,6 +3,10 @@ import { escapePyString } from "./escape-py";
 import { dltDbtRunnerBeforeReturn } from "./generate-dlt-dbt-append";
 import { generateRestApiAdvanced, generateRestApiPipeline } from "./generate-dlt-rest";
 
+// SWC/webpack misparses Python triple-quotes inside JS template literals.
+// Use this constant so the parser never sees `"""` as a literal in source.
+const PY3Q = '"""';
+
 export function generateDltPipeline(request: PipelineRequest): string {
   const { sourceType } = request;
   if (sourceType === "github") return generateGithubPipeline(request);
@@ -53,10 +57,10 @@ function generateGithubPipeline(request: PipelineRequest): string {
     request.description ||
     `Load GitHub data from ${repoOwner}/${repoName} to ${request.destinationType}`;
 
-  return `"""dlt pipeline: ${escapePyString(request.name)}
+  return `${PY3Q}dlt pipeline: ${escapePyString(request.name)}
 
 ${escapePyString(desc)}
-"""
+${PY3Q}
 
 import os
 import dlt
@@ -64,7 +68,7 @@ from dlt.sources.github import github_reactions
 
 def run(partition_key: str = None):
     # partition_key: optional ISO date string, e.g. 2024-01-01
-    # When provided it is passed as `since` to github_reactions so only items
+    # When provided it is passed as the 'since' arg to github_reactions so only items
     # updated on or after that date are fetched (date-based incremental load).
 
     # Resolve the GitHub PAT from the environment
@@ -131,15 +135,15 @@ function generateGenericPipeline(request: PipelineRequest): string {
 
   const cfgJson = JSON.stringify(request.sourceConfiguration ?? {});
 
-  return `"""dlt pipeline: ${escapePyString(request.name)}
+  return `${PY3Q}dlt pipeline: ${escapePyString(request.name)}
 
 ${escapePyString(desc)}
-"""
+${PY3Q}
 
 import dlt
 
 def run(partition_key: str = None):
-    """Run the pipeline. partition_key is reserved for incremental / scheduled runs."""
+    ${PY3Q}Run the pipeline. partition_key is reserved for incremental / scheduled runs.${PY3Q}
     ${destinationComment}
     pipeline = dlt.pipeline(
         pipeline_name="${escapePyString(request.name)}",
