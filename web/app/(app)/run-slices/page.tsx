@@ -1,7 +1,8 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   AlertCircle,
   Database,
@@ -31,6 +32,10 @@ type PipelineSummary = {
 // --- Main page ---
 
 export default function RunSlicesPage() {
+  const searchParams = useSearchParams();
+  const pipelineRaw = searchParams.get("pipeline");
+  const pipelineFromUrl = pipelineRaw && pipelineRaw.length > 0 ? pipelineRaw : null;
+
   const [pipelines, setPipelines] = useState<PipelineSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,12 +82,16 @@ export default function RunSlicesPage() {
         </div>
         <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Run slices & backfills</h1>
         <p className="mt-3 text-slate-600 dark:text-slate-300">
-          Configure how each pipeline slices its data — by date, key, region, or customer — then run targeted
-          backfills over any range of slice values. Each slice launches an independent run you can
-          monitor in{' '}
-          <Link href="/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">Runs</Link>.
-          Slice types shown here match what the stock generated pipeline can honor. Click any pipeline row to
-          configure its slice type — only generic REST API sources require custom code to honor partition keys.
+          The <strong className="font-medium text-slate-800 dark:text-slate-200">Partition-style coverage</strong> block
+          below is the Dagster-like view: <strong className="font-medium text-slate-800 dark:text-slate-200">latest status per slice</strong>, not
+          every historical attempt (use{" "}
+          <Link href="/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+            Runs
+          </Link>{" "}
+          with <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">?pipeline=…</code> for the full log).
+          Configure column and granularity in each pipeline row, launch backfills from the editor, fill date gaps in
+          coverage, and re-queue failed or missing slices — same as partition backfill / materialize, as long as your
+          runner honors <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">triggeredBy</code>.
         </p>
       </div>
 
@@ -115,7 +124,7 @@ export default function RunSlicesPage() {
         </div>
       ) : (
         <>
-          <SliceCoveragePanel pipelines={pipelines} />
+          <SliceCoveragePanel pipelines={pipelines} initialPipelineId={pipelineFromUrl} />
           <div className="space-y-6">
             {pipelines.map(p => (
               <PipelinePartitionCard

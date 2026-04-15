@@ -54,18 +54,34 @@ function StatusBadge({ status }: { status: string }) {
   }
 }
 
-export function SliceCoveragePanel({ pipelines }: { pipelines: PipelineOption[] }) {
+const MAX_BULK_QUEUE = 90;
+
+export function SliceCoveragePanel({
+  pipelines,
+  initialPipelineId = null,
+}: {
+  pipelines: PipelineOption[];
+  /** From URL query `?pipeline=` — selects this pipeline when it exists in the list. */
+  initialPipelineId?: string | null;
+}) {
   const [pipelineId, setPipelineId] = useState<string>("");
   const [runs, setRuns] = useState<RunRowForSlice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [launchingKey, setLaunchingKey] = useState<string | null>(null);
+  const [bulkQueueBusy, setBulkQueueBusy] = useState(false);
   const [manualColumn, setManualColumn] = useState("");
   const [manualValue, setManualValue] = useState("");
   const [gapStart, setGapStart] = useState("");
   const [gapEnd, setGapEnd] = useState("");
 
   const pipeline = useMemo(() => pipelines.find((p) => p.id === pipelineId) ?? null, [pipelines, pipelineId]);
+
+  useEffect(() => {
+    if (!initialPipelineId) return;
+    if (!pipelines.some((p) => p.id === initialPipelineId)) return;
+    setPipelineId(initialPipelineId);
+  }, [initialPipelineId, pipelines]);
 
   useEffect(() => {
     // If the previously selected pipeline was removed, clear the selection.
@@ -132,33 +148,76 @@ export function SliceCoveragePanel({ pipelines }: { pipelines: PipelineOption[] 
     });
   }, [isDatePartition, partitionCol, gapStart, gapEnd, sliceMap]);
 
+  async function postBackfillSliceRun(column: string, value: string) {
+    if (!pipelineId || !column.trim() || !value.trim()) return;
+    const res = await fetch("/api/elt/runs", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pipelineId,
+        environment: "backfill",
+        triggeredBy: `backfill:partition:${column.trim()}:${value.trim()}`,
+        status: "pending",
+      }),
+    });
+    if (!res.ok) {
+      const d = (await res.json().catch(() => ({}))) as { error?: unknown };
+      const msg = typeof d.error === "string" ? d.error : JSON.stringify(d.error ?? res.statusText);
+      throw new Error(msg);
+    }
+  }
+
   async function queueSliceRun(column: string, value: string) {
     if (!pipelineId || !column.trim() || !value.trim()) return;
     const key = `${column.trim()}::${value.trim()}`;
     setLaunchingKey(key);
     setError(null);
     try {
-      const res = await fetch("/api/elt/runs", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pipelineId,
-          environment: "backfill",
-          triggeredBy: `backfill:partition:${column.trim()}:${value.trim()}`,
-          status: "pending",
-        }),
-      });
-      if (!res.ok) {
-        const d = (await res.json().catch(() => ({}))) as { error?: unknown };
-        const msg = typeof d.error === "string" ? d.error : JSON.stringify(d.error ?? res.statusText);
-        throw new Error(msg);
-      }
+      await postBackfillSliceRun(column, value);
       await loadRuns();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Launch failed");
     } finally {
       setLaunchingKey(null);
+    }
+  }
+
+  async function queueAllMissingDays() {
+    if (!partitionCol || gapDays.length === 0) return;
+    const missing = gapDays.filter((d) => d.missing);
+    if (missing.length === 0) return;
+    const toRun = missing.slice(0, MAX_BULK_QUEUE);
+    setBulkQueueBusy(true);
+    setError(null);
+    try {
+      for (const d of toRun) {
+        await postBackfillSliceRun(partitionCol, d.day);
+      }
+      await loadRuns();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Bulk queue failed");
+    } finally {
+      setBulkQueueBusy(false);
+    }
+  }
+
+  async function queueFailedDaysInRange() {
+    if (!partitionCol || gapDays.length === 0) return;
+    const failed = gapDays.filter((d) => !d.missing && d.row && d.row.status === "failed");
+    if (failed.length === 0) return;
+    const toRun = failed.slice(0, MAX_BULK_QUEUE);
+    setBulkQueueBusy(true);
+    setError(null);
+    try {
+      for (const d of toRun) {
+        await postBackfillSliceRun(partitionCol, d.day);
+      }
+      await loadRuns();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Bulk re-run failed");
+    } finally {
+      setBulkQueueBusy(false);
     }
   }
 
@@ -172,19 +231,20 @@ export function SliceCoveragePanel({ pipelines }: { pipelines: PipelineOption[] 
             <Calendar className="h-5 w-5" aria-hidden />
             <span className="text-sm font-semibold uppercase tracking-wide">Slice coverage</span>
           </div>
-          <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">Runs by slice</h2>
+          <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">Partition-style coverage</h2>
           <p className="mt-2 max-w-3xl text-sm text-slate-600 dark:text-slate-300">
-            Pick a pipeline to see each slice that was queued via{" "}
-            <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">backfill:partition:…</code>, the latest
-            status per slice, and queue a single slice again if it failed or never ran. This matches day-by-day (or
-            key-by-key) loads when your runner honors{" "}
-            <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">triggeredBy</code>.
+            Like Dagster&apos;s asset partitions: one row per <strong className="font-medium text-slate-800 dark:text-slate-200">slice</strong>{" "}
+            (partition value), showing the <strong className="font-medium text-slate-800 dark:text-slate-200">latest run</strong> only — even if
+            you re-ran the same day many times. Only runs with{" "}
+            <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">triggeredBy: backfill:partition:…</code>{" "}
+            appear here. Re-run failed slices, queue missing days (date pipelines), or use the bulk actions below. Your
+            runner must honor <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">triggeredBy</code>.
           </p>
         </div>
         <button
           type="button"
           onClick={() => void loadRuns()}
-          disabled={loading || !pipelineId}
+          disabled={loading || !pipelineId || bulkQueueBusy}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -215,6 +275,15 @@ export function SliceCoveragePanel({ pipelines }: { pipelines: PipelineOption[] 
           <AlertCircle className="h-4 w-4 shrink-0" />
           {error}
         </div>
+      )}
+
+      {pipeline && pipeline.partitionConfig?.type === "key" && (
+        <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100">
+          <strong className="font-medium">Key slices:</strong> unlike Dagster date grids, we do not list every possible
+          key up front — each key appears here after at least one{" "}
+          <code className="font-mono text-[11px]">backfill:partition:…</code> run. Use the backfill launcher in the
+          pipeline row below or <strong className="font-medium">Queue one slice</strong> to add keys.
+        </p>
       )}
 
       {loading && runs.length === 0 ? (
@@ -273,14 +342,14 @@ export function SliceCoveragePanel({ pipelines }: { pipelines: PipelineOption[] 
                         <td className="px-3 py-2 text-right">
                           <div className="flex flex-wrap justify-end gap-2">
                             <Link
-                              href={`/runs?run=${encodeURIComponent(row.id)}`}
+                              href={`/runs?run=${encodeURIComponent(row.id)}&pipeline=${encodeURIComponent(pipelineId)}`}
                               className="text-xs font-medium text-sky-600 hover:underline dark:text-sky-400"
                             >
                               Details
                             </Link>
                             <button
                               type="button"
-                              disabled={busy}
+                              disabled={busy || bulkQueueBusy}
                               onClick={() => void queueSliceRun(row.parsed.column, row.parsed.value)}
                               className="inline-flex items-center gap-1 rounded border border-teal-200 bg-white px-2 py-1 text-xs font-medium text-teal-800 hover:bg-teal-50 disabled:opacity-50 dark:border-teal-800 dark:bg-slate-900 dark:text-teal-200 dark:hover:bg-teal-950/40"
                             >
@@ -324,7 +393,7 @@ export function SliceCoveragePanel({ pipelines }: { pipelines: PipelineOption[] 
               <div className="flex items-end">
                 <button
                   type="button"
-                  disabled={!manualColumn.trim() || !manualValue.trim() || Boolean(launchingKey)}
+                  disabled={!manualColumn.trim() || !manualValue.trim() || Boolean(launchingKey) || bulkQueueBusy}
                   onClick={() => {
                     void (async () => {
                       await queueSliceRun(manualColumn, manualValue);
@@ -371,43 +440,75 @@ export function SliceCoveragePanel({ pipelines }: { pipelines: PipelineOption[] 
                   />
                 </div>
               </div>
-              {gapDays.length > 0 && (
-                <ul className="mt-4 max-h-48 space-y-1 overflow-y-auto rounded border border-slate-100 p-2 text-xs dark:border-slate-800">
-                  {gapDays.map(({ day, row, missing, ok }) => (
-                    <li
-                      key={day}
-                      className={`flex flex-wrap items-center justify-between gap-2 rounded px-2 py-1 ${
-                        missing ? "bg-amber-50 dark:bg-amber-950/30" : ok ? "bg-emerald-50/50 dark:bg-emerald-950/20" : "bg-red-50/60 dark:bg-red-950/20"
-                      }`}
-                    >
-                      <span className="font-mono">{day}</span>
-                      <span className="text-slate-600 dark:text-slate-300">
-                        {missing ? "No slice run" : row ? <StatusBadge status={row.status} /> : null}
-                      </span>
-                      {!missing && row && (
+              {gapDays.length > 0 ? (
+                <>
+                  {(() => {
+                    const missingN = gapDays.filter((d) => d.missing).length;
+                    const failedN = gapDays.filter((d) => !d.missing && d.row?.status === "failed").length;
+                    const queueMissingCap = Math.min(missingN, MAX_BULK_QUEUE);
+                    const queueFailedCap = Math.min(failedN, MAX_BULK_QUEUE);
+                    return (
+                      <div className="mt-3 flex flex-wrap gap-2">
                         <button
                           type="button"
-                          disabled={launchingKey === `${partitionCol}::${day}`}
-                          onClick={() => void queueSliceRun(partitionCol, day)}
-                          className="text-teal-700 hover:underline dark:text-teal-400"
+                          disabled={bulkQueueBusy || missingN === 0}
+                          onClick={() => void queueAllMissingDays()}
+                          className="inline-flex items-center gap-2 rounded-lg border border-teal-300 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-900 hover:bg-teal-100 disabled:opacity-50 dark:border-teal-700 dark:bg-teal-950/40 dark:text-teal-100 dark:hover:bg-teal-900/50"
                         >
-                          Re-run
+                          {bulkQueueBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                          Queue all missing ({queueMissingCap}
+                          {missingN > MAX_BULK_QUEUE ? ` of ${missingN}` : ""})
                         </button>
-                      )}
-                      {missing && (
                         <button
                           type="button"
-                          disabled={launchingKey === `${partitionCol}::${day}`}
-                          onClick={() => void queueSliceRun(partitionCol, day)}
-                          className="font-medium text-teal-700 hover:underline dark:text-teal-400"
+                          disabled={bulkQueueBusy || failedN === 0}
+                          onClick={() => void queueFailedDaysInRange()}
+                          className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-950 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-900/40"
                         >
-                          Queue slice
+                          {bulkQueueBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                          Re-run all failed ({queueFailedCap}
+                          {failedN > MAX_BULK_QUEUE ? ` of ${failedN}` : ""})
                         </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
+                      </div>
+                    );
+                  })()}
+                  <ul className="mt-4 max-h-48 space-y-1 overflow-y-auto rounded border border-slate-100 p-2 text-xs dark:border-slate-800">
+                    {gapDays.map(({ day, row, missing, ok }) => (
+                      <li
+                        key={day}
+                        className={`flex flex-wrap items-center justify-between gap-2 rounded px-2 py-1 ${
+                          missing ? "bg-amber-50 dark:bg-amber-950/30" : ok ? "bg-emerald-50/50 dark:bg-emerald-950/20" : "bg-red-50/60 dark:bg-red-950/20"
+                        }`}
+                      >
+                        <span className="font-mono">{day}</span>
+                        <span className="text-slate-600 dark:text-slate-300">
+                          {missing ? "No slice run" : row ? <StatusBadge status={row.status} /> : null}
+                        </span>
+                        {!missing && row && (
+                          <button
+                            type="button"
+                            disabled={bulkQueueBusy || launchingKey === `${partitionCol}::${day}`}
+                            onClick={() => void queueSliceRun(partitionCol, day)}
+                            className="text-teal-700 hover:underline dark:text-teal-400"
+                          >
+                            Re-run
+                          </button>
+                        )}
+                        {missing && (
+                          <button
+                            type="button"
+                            disabled={bulkQueueBusy || launchingKey === `${partitionCol}::${day}`}
+                            onClick={() => void queueSliceRun(partitionCol, day)}
+                            className="font-medium text-teal-700 hover:underline dark:text-teal-400"
+                          >
+                            Queue slice
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
             </div>
           )}
         </>

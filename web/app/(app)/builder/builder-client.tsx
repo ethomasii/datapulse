@@ -16,6 +16,7 @@ import {
   Webhook,
   Workflow,
   History,
+  TableProperties,
 } from "lucide-react";
 import { RelatedLinks } from "@/components/ui/related-links";
 import {
@@ -593,9 +594,16 @@ export function BuilderClient({
                       <Link
                         href={`/runs?pipeline=${encodeURIComponent(p.id)}`}
                         className="mr-2 inline-flex items-center gap-1 text-amber-700 hover:underline dark:text-amber-400"
-                        title="Run history for this pipeline (all slices)"
+                        title="Chronological run log (every slice attempt)"
                       >
                         <History className="h-4 w-4" /> Runs
+                      </Link>
+                      <Link
+                        href={`/run-slices?pipeline=${encodeURIComponent(p.id)}`}
+                        className="mr-2 inline-flex items-center gap-1 text-teal-700 hover:underline dark:text-teal-400"
+                        title="Latest status per slice — backfills, gaps, re-run failed (Dagster-style partitions)"
+                      >
+                        <TableProperties className="h-4 w-4" /> Slices
                       </Link>
                       <button
                         type="button"
@@ -679,14 +687,24 @@ export function BuilderClient({
                 Visual canvas
               </Link>
               {editingId ? (
-                <Link
-                  href={`/runs?pipeline=${encodeURIComponent(editingId)}`}
-                  className="inline-flex items-center gap-1 rounded-md px-3 py-1 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-                  title="All runs for this pipeline (every slice)"
-                >
-                  <History className="h-3.5 w-3.5" aria-hidden />
-                  Run history
-                </Link>
+                <>
+                  <Link
+                    href={`/runs?pipeline=${encodeURIComponent(editingId)}`}
+                    className="inline-flex items-center gap-1 rounded-md px-3 py-1 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                    title="Chronological run log"
+                  >
+                    <History className="h-3.5 w-3.5" aria-hidden />
+                    Run history
+                  </Link>
+                  <Link
+                    href={`/run-slices?pipeline=${encodeURIComponent(editingId)}`}
+                    className="inline-flex items-center gap-1 rounded-md px-3 py-1 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                    title="Latest per slice, gaps, backfills"
+                  >
+                    <TableProperties className="h-3.5 w-3.5" aria-hidden />
+                    Slices
+                  </Link>
+                </>
               ) : null}
             </div>
           </div>
@@ -938,17 +956,20 @@ export function BuilderClient({
                       <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                         Choose how you plan to execute this pipeline. You can change this later. After you save the pipeline,
                         set the slice column and granularity below, or use{" "}
-                        <Link href="/run-slices" className="font-medium text-teal-600 hover:underline dark:text-teal-400">
+                        <Link
+                          href={editingId ? `/run-slices?pipeline=${encodeURIComponent(editingId)}` : "/run-slices"}
+                          className="font-medium text-teal-600 hover:underline dark:text-teal-400"
+                        >
                           Run slices
                         </Link>{" "}
-                        for backfills and coverage across all pipelines.
+                        for partition-style coverage and backfills{editingId ? " (this pipeline)" : " across all pipelines"}.
                       </p>
                     </div>
                     <Link
-                      href="/run-slices"
+                      href={editingId ? `/run-slices?pipeline=${encodeURIComponent(editingId)}` : "/run-slices"}
                       className="shrink-0 rounded border border-teal-200 bg-white px-2 py-1 text-xs font-medium text-teal-700 hover:bg-teal-50 dark:border-teal-700 dark:bg-slate-900 dark:text-teal-400"
                     >
-                      All pipelines →
+                      {editingId ? "This pipeline →" : "All pipelines →"}
                     </Link>
                   </div>
                   <div className="mt-3 space-y-2">
@@ -1008,10 +1029,13 @@ export function BuilderClient({
                       <p className="text-xs font-medium text-slate-700 dark:text-slate-300">Slice column &amp; granularity</p>
                       <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                         Saved to <code className="font-mono text-[11px]">sourceConfiguration._partitionConfig</code>. Use{" "}
-                        <Link href="/run-slices" className="text-teal-600 hover:underline dark:text-teal-400">
+                        <Link
+                          href={`/run-slices?pipeline=${encodeURIComponent(editingId)}`}
+                          className="text-teal-600 hover:underline dark:text-teal-400"
+                        >
                           Run slices
                         </Link>{" "}
-                        to launch backfills and view slice coverage.
+                        for backfills and latest-per-slice coverage.
                       </p>
                       <div className="mt-3">
                         <PartitionConfigEditor

@@ -477,16 +477,29 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Filters</h2>
         {pipelineFilterId ? (
-          <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">
-            Showing runs for{" "}
-            <strong className="font-medium text-slate-800 dark:text-slate-200">
-              {initialPipelines.find((p) => p.id === pipelineFilterId)?.name ?? "this pipeline"}
-            </strong>
-            .{" "}
-            <Link href="/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-              Clear pipeline filter
-            </Link>
-          </p>
+          <div className="mt-2 space-y-2">
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              Showing runs for{" "}
+              <strong className="font-medium text-slate-800 dark:text-slate-200">
+                {initialPipelines.find((p) => p.id === pipelineFilterId)?.name ?? "this pipeline"}
+              </strong>
+              .{" "}
+              <Link href="/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+                Clear pipeline filter
+              </Link>
+            </p>
+            <div className="rounded-lg border border-teal-200 bg-teal-50/80 px-3 py-2 text-xs text-teal-950 dark:border-teal-800 dark:bg-teal-950/25 dark:text-teal-100">
+              <strong className="font-medium">Partition-style view:</strong> latest status per slice (backfill runs
+              only), fill missing days, bulk re-run failed — open{" "}
+              <Link
+                href={`/run-slices?pipeline=${encodeURIComponent(pipelineFilterId)}`}
+                className="font-semibold text-teal-800 underline hover:no-underline dark:text-teal-200"
+              >
+                Slice coverage for this pipeline
+              </Link>
+              .
+            </div>
+          </div>
         ) : null}
         <div className="mt-3 flex flex-wrap gap-4">
           <label className="block">
@@ -715,6 +728,13 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                     onClick={(e) => e.stopPropagation()}
                   >
                     All runs for pipeline
+                  </Link>
+                  <Link
+                    href={`/run-slices?pipeline=${encodeURIComponent(detail.run.pipeline.id)}`}
+                    className="ml-2 text-xs font-medium text-teal-600 hover:underline dark:text-teal-400"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Slice coverage
                   </Link>
                   <span className="text-slate-500">· {detail.run.environment}</span>
                   {detail.run.targetAgentToken ? (
