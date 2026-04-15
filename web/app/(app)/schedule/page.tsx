@@ -101,7 +101,7 @@ export default function SchedulePage() {
     iso ? new Date(iso).toLocaleString() : 'Never';
 
   return (
-    <div className="w-full min-w-0 max-w-6xl space-y-8">
+    <div className="w-full min-w-0 max-w-6xl mx-auto space-y-8">
       <div>
         <div className="inline-flex items-center gap-2 text-violet-600 dark:text-violet-400">
           <CalendarClock className="h-6 w-6" aria-hidden />

@@ -73,7 +73,7 @@ export default function RunSlicesPage() {
   const selectedPipeline = pipelines.find(p => p.id === selected) ?? null;
 
   return (
-    <div className="w-full min-w-0 max-w-5xl space-y-8">
+    <div className="w-full min-w-0 max-w-5xl mx-auto space-y-8">
       {/* Header */}
       <div>
         <div className="inline-flex items-center gap-2 text-teal-600 dark:text-teal-400">

@@ -146,7 +146,7 @@ export default function OrchestrationPage() {
   };
 
   return (
-    <div className="w-full min-w-0 max-w-6xl space-y-8">
+    <div className="w-full min-w-0 max-w-6xl mx-auto space-y-8">
       <div>
         <div className="inline-flex items-center gap-2 text-sky-600 dark:text-sky-400">
           <Split className="h-6 w-6" aria-hidden />
