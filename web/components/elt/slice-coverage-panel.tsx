@@ -55,7 +55,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export function SliceCoveragePanel({ pipelines }: { pipelines: PipelineOption[] }) {
-  const [pipelineId, setPipelineId] = useState<string>(() => pipelines[0]?.id ?? "");
+  const [pipelineId, setPipelineId] = useState<string>("");
   const [runs, setRuns] = useState<RunRowForSlice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,9 +68,9 @@ export function SliceCoveragePanel({ pipelines }: { pipelines: PipelineOption[] 
   const pipeline = useMemo(() => pipelines.find((p) => p.id === pipelineId) ?? null, [pipelines, pipelineId]);
 
   useEffect(() => {
-    if (pipelines.length === 0) return;
-    if (!pipelineId || !pipelines.some((p) => p.id === pipelineId)) {
-      setPipelineId(pipelines[0].id);
+    // If the previously selected pipeline was removed, clear the selection.
+    if (pipelineId && !pipelines.some((p) => p.id === pipelineId)) {
+      setPipelineId("");
     }
   }, [pipelines, pipelineId]);
 
@@ -200,6 +200,7 @@ export function SliceCoveragePanel({ pipelines }: { pipelines: PipelineOption[] 
             onChange={(e) => setPipelineId(e.target.value)}
             className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
           >
+            <option value="">— Select a pipeline —</option>
             {pipelines.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name} ({p.sourceType})
