@@ -17,7 +17,7 @@ export type RunSliceCapability = {
 };
 
 /** Stock generators do not pass `partition_key` into the actual source load for these connectors. */
-const NONE_ONLY_SOURCES = new Set<string>(["rest_api"]);
+const NONE_ONLY_SOURCES = new Set<string>();
 
 const DATE_AND_KEY_DEFAULT: RunSliceCapability = {
   mode: "date_and_key",
@@ -35,20 +35,22 @@ const DATE_AND_KEY_GITHUB: RunSliceCapability = {
     "by date range. Use an ISO date (e.g. 2024-01-01) as your slice key.",
 };
 
-const NONE_ONLY_REST: RunSliceCapability = {
-  mode: "none_only",
-  label: "Full runs only (stock pipeline)",
+
+const DATE_AND_KEY_REST: RunSliceCapability = {
+  mode: "date_and_key",
+  label: "Date & key slices supported",
   detail:
-    "The stock REST `rest_api_source` template does not pass the partition key into the API request. Run slices " +
-    "would only create separate run records unless you extend the generated code. Use \"None\", or customize the " +
-    "pipeline to honor `partition_key` / run metadata.",
+    "The generated REST API pipeline passes partition_key as a query parameter (e.g. since=2024-01-01 or " +
+    "customer_id=acme). Add the matching filter to your endpoint config so the API honours it. " +
+    "Every REST API is different -- the generated code shows the pattern to follow.",
 };
 
 export function getRunSliceCapability(sourceType: string): RunSliceCapability {
   const s = sourceType.toLowerCase().trim();
   if (s === "github") return DATE_AND_KEY_GITHUB;
+  if (s === "rest_api") return DATE_AND_KEY_REST;
   if (!NONE_ONLY_SOURCES.has(s)) return DATE_AND_KEY_DEFAULT;
-  return NONE_ONLY_REST;
+  return DATE_AND_KEY_DEFAULT;
 }
 
 export function runSlicesAllowed(sourceType: string): boolean {

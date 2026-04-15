@@ -78,11 +78,9 @@ import dlt
 from dlt.sources.rest_api import rest_api_source
 
 def run(partition_key: str = None):
-    ${PY3Q}Run the REST API pipeline.
-
-    Args:
-        partition_key: Optional incremental run key (e.g. date string) when scheduling backfills.
-    ${PY3Q}
+    # partition_key: optional slice value passed by the scheduler or backfill launcher.
+    # It is injected as a query parameter below -- adapt the param name to match your API
+    # (common names: since, from, start_date, cursor, date, customer_id, region).
 
     # Configure the pipeline
     ${destinationComment}
@@ -91,6 +89,12 @@ def run(partition_key: str = None):
         destination="${escapePyString(destination)}",
         dataset_name="${escapePyString(datasetName)}",
     )
+
+    # Build endpoint params -- inject partition_key when present
+    endpoint_params = {}
+    if partition_key:
+        # TODO: rename "since" to whatever query param your API uses for date/key filtering
+        endpoint_params["since"] = partition_key
 
     # Configure REST API source
     source = rest_api_source({
@@ -103,6 +107,7 @@ def run(partition_key: str = None):
                 "endpoint": {
                     "path": "${escapePyString(endpoint)}",
                     "method": "${escapePyString(httpMethod)}",
+                    "params": endpoint_params,
                 },${incrementalBlock}
                 ${paginatorCode},
                 ${dataSelectorCode}
@@ -114,7 +119,7 @@ def run(partition_key: str = None):
     info = pipeline.run(
         source,
         write_disposition="${escapePyString(request.writeDisposition ?? "append")}",
-        loader_file_format="${escapePyString(request.fileFormat ?? "parquet")}"  # File format for file-based destinations
+        loader_file_format="${escapePyString(request.fileFormat ?? "parquet")}"
     )
 
     print(f"Pipeline completed: {info}")${dltDbtRunnerBeforeReturn(request)}
@@ -164,16 +169,13 @@ ${PY3Q}
 
 import base64
 import json
-
 import dlt
-
-// SWC/webpack misparses Python triple-quotes inside JS template literals.
-// Use this constant so the parser never sees ${PY3Q} as a literal in source.
-const PY3Q = '${PY3Q}';
 from dlt.sources.rest_api import rest_api_source
 
 def run(partition_key: str = None):
-    ${PY3Q}Run the REST API pipeline.${PY3Q}
+    # partition_key: optional slice value (date, key, etc.) injected by the scheduler or backfill.
+    # The advanced config is loaded from base64 below -- add your own param injection after
+    # decoding if you need to pass partition_key into the API request.
 
     # Configure the pipeline
     ${destinationComment}
@@ -183,15 +185,20 @@ def run(partition_key: str = None):
         dataset_name="${escapePyString(datasetName)}",
     )
 
-    # REST API configuration (advanced mode) — decoded from eltPulse UI JSON
+    # REST API configuration (advanced mode) -- decoded from eltPulse UI JSON
     config = json.loads(base64.b64decode("${b64}").decode("utf-8"))
+
+    # TODO: if you want partition_key to filter the request, inject it here, e.g.:
+    # if partition_key and config.get("resources"):
+    #     config["resources"][0].setdefault("endpoint", {}).setdefault("params", {})["since"] = partition_key
+
     source = rest_api_source(config)
 
     # Run the pipeline with write disposition
     info = pipeline.run(
         source,
         write_disposition="${escapePyString(request.writeDisposition ?? "append")}",
-        loader_file_format="${escapePyString(request.fileFormat ?? "parquet")}"  # File format for file-based destinations
+        loader_file_format="${escapePyString(request.fileFormat ?? "parquet")}"
     )
 
     print(f"Pipeline completed: {info}")${dltDbtRunnerBeforeReturn(request)}
