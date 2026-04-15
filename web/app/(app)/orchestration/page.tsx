@@ -1,94 +1,138 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CalendarClock, FileJson, PlayCircle, Split, Plus, Trash2, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { FileJson, Layers, PlayCircle, Split, Plus, Trash2, CheckCircle, AlertCircle, RefreshCw, Waypoints } from "lucide-react";
 import Link from "next/link";
+import { RelatedLinks } from "@/components/ui/related-links";
 
-interface Sensor {
+interface MonitorRow {
   name: string;
   type: string;
   pipeline_id: string;
   pipeline_name: string;
-  config: Record<string, any>;
+  config: Record<string, unknown>;
   last_check?: string;
 }
 
-interface TriggeredSensor {
+interface TriggeredMonitorRow {
   sensorName: string;
   pipelineName: string;
   message: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   timestamp: string;
 }
 
+function normalizeMonitorRow(raw: Record<string, unknown>): MonitorRow | null {
+  if (typeof raw.name !== "string" || !raw.name) return null;
+  const cfg = raw.config;
+  const config =
+    cfg && typeof cfg === "object" && !Array.isArray(cfg) ? (cfg as Record<string, unknown>) : {};
+  return {
+    name: raw.name,
+    type: typeof raw.type === "string" ? raw.type : "",
+    pipeline_id: typeof raw.pipeline_id === "string" ? raw.pipeline_id : "",
+    pipeline_name: typeof raw.pipeline_name === "string" ? raw.pipeline_name : "",
+    config,
+    last_check: typeof raw.last_check === "string" ? raw.last_check : undefined,
+  };
+}
+
 export default function OrchestrationPage() {
-  const [sensors, setSensors] = useState<Sensor[]>([]);
+  const [monitors, setMonitors] = useState<MonitorRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
-  const [triggeredSensors, setTriggeredSensors] = useState<TriggeredSensor[]>([]);
+  const [triggeredMonitors, setTriggeredMonitors] = useState<TriggeredMonitorRow[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadSensors();
+    loadMonitors();
   }, []);
 
-  const loadSensors = async () => {
+  const loadMonitors = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/sensors');
-      const data = await response.json();
-      setSensors(data.sensors || []);
+      setError(null);
+      const response = await fetch("/api/monitors", { credentials: "same-origin" });
+      const data = (await response.json()) as {
+        sensors?: Record<string, unknown>[];
+        monitors?: Record<string, unknown>[];
+        error?: string;
+      };
+      if (!response.ok) {
+        setError(typeof data.error === "string" ? data.error : "Failed to load monitors");
+        setMonitors([]);
+        return;
+      }
+      const rawList = Array.isArray(data.monitors)
+        ? data.monitors
+        : Array.isArray(data.sensors)
+          ? data.sensors
+          : [];
+      const next = rawList
+        .map((row) => normalizeMonitorRow(row))
+        .filter((row): row is MonitorRow => row !== null);
+      setMonitors(next);
     } catch (err) {
-      setError('Failed to load sensors');
-      console.error('Error loading sensors:', err);
+      setError("Failed to load monitors");
+      console.error("Error loading monitors:", err);
+      setMonitors([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const checkSensors = async () => {
+  const checkMonitors = async () => {
     try {
       setChecking(true);
-      setTriggeredSensors([]);
-      const response = await fetch('/api/sensors/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
+      setTriggeredMonitors([]);
+      const response = await fetch("/api/monitors/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({}),
       });
-      const data = await response.json();
-      setTriggeredSensors(data.triggeredSensors || []);
+      const data = (await response.json()) as {
+        triggeredSensors?: TriggeredMonitorRow[];
+        error?: string;
+      };
+      if (!response.ok) {
+        setError(typeof data.error === "string" ? data.error : "Failed to check monitors");
+        return;
+      }
+      setTriggeredMonitors(data.triggeredSensors || []);
     } catch (err) {
-      setError('Failed to check sensors');
-      console.error('Error checking sensors:', err);
+      setError("Failed to check monitors");
+      console.error("Error checking monitors:", err);
     } finally {
       setChecking(false);
     }
   };
 
-  const deleteSensor = async (sensorName: string) => {
-    if (!confirm(`Are you sure you want to delete sensor "${sensorName}"?`)) {
+  const deleteMonitor = async (monitorName: string) => {
+    if (!confirm(`Are you sure you want to delete monitor "${monitorName}"?`)) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/sensors/${sensorName}`, {
-        method: 'DELETE'
+      const response = await fetch(`/api/monitors/${encodeURIComponent(monitorName)}`, {
+        method: "DELETE",
+        credentials: "same-origin",
       });
-      const data = await response.json();
+      const data = (await response.json()) as { error?: string };
 
       if (response.ok) {
-        await loadSensors();
+        await loadMonitors();
       } else {
-        setError(data.error || 'Failed to delete sensor');
+        setError(data.error || "Failed to delete monitor");
       }
     } catch (err) {
-      setError('Failed to delete sensor');
-      console.error('Error deleting sensor:', err);
+      setError("Failed to delete monitor");
+      console.error("Error deleting monitor:", err);
     }
   };
 
-  const getSensorTypeColor = (type: string) => {
+  const getMonitorTypeColor = (type: string) => {
     switch (type) {
       case 's3_file_count': return 'bg-orange-100 text-orange-800';
       case 'gcs_file_count': return 'bg-blue-100 text-blue-800';
@@ -107,10 +151,10 @@ export default function OrchestrationPage() {
           <Split className="h-6 w-6" aria-hidden />
           <span className="text-sm font-semibold uppercase tracking-wide">Event-Driven Orchestration</span>
         </div>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Sensor Management</h1>
+        <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Monitor management</h1>
         <p className="mt-3 text-slate-600 dark:text-slate-300">
-          Monitor external systems and automatically trigger pipelines when conditions are met.
-          Configure sensors for cloud storage, messaging queues, and file systems.
+          Watch external systems and automatically trigger pipelines when conditions are met.
+          Configure monitors for cloud storage, messaging queues, and file systems.
         </p>
       </div>
 
@@ -118,23 +162,23 @@ export default function OrchestrationPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
-            onClick={checkSensors}
+            onClick={checkMonitors}
             disabled={checking}
             className="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${checking ? 'animate-spin' : ''}`} />
-            Check Sensors
+            Check monitors
           </button>
           <button
             onClick={() => setShowCreateForm(true)}
             className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
             <Plus className="h-4 w-4" />
-            Create Sensor
+            Create monitor
           </button>
         </div>
         <div className="text-sm text-slate-500">
-          {sensors.length} sensor{sensors.length !== 1 ? 's' : ''} configured
+          {monitors.length} monitor{monitors.length !== 1 ? "s" : ""} configured
         </div>
       </div>
 
@@ -155,32 +199,32 @@ export default function OrchestrationPage() {
         </div>
       )}
 
-      {/* Triggered Sensors */}
-      {triggeredSensors.length > 0 && (
+      {/* Triggered monitors (API field: triggeredSensors) */}
+      {triggeredMonitors.length > 0 && (
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-900/20">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-amber-900 dark:text-amber-100">
             <CheckCircle className="h-5 w-5 text-amber-600" />
-            Sensors Triggered ({triggeredSensors.length})
+            Monitors triggered ({triggeredMonitors.length})
           </h2>
           <div className="mt-4 space-y-3">
-            {triggeredSensors.map((sensor, index) => (
+            {triggeredMonitors.map((row, index) => (
               <div key={index} className="rounded-lg border border-amber-200 bg-white p-4 dark:border-amber-700 dark:bg-amber-900/10">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="font-medium text-amber-900 dark:text-amber-100">{sensor.sensorName}</span>
+                    <span className="font-medium text-amber-900 dark:text-amber-100">{row.sensorName}</span>
                     <span className="mx-2 text-amber-600">→</span>
-                    <span className="text-amber-800 dark:text-amber-200">{sensor.pipelineName}</span>
+                    <span className="text-amber-800 dark:text-amber-200">{row.pipelineName}</span>
                   </div>
                   <span className="text-xs text-amber-600 dark:text-amber-400">
-                    {new Date(sensor.timestamp).toLocaleString()}
+                    {new Date(row.timestamp).toLocaleString()}
                   </span>
                 </div>
-                <p className="mt-2 text-sm text-amber-800 dark:text-amber-200">{sensor.message}</p>
-                {Object.keys(sensor.metadata).length > 0 && (
+                <p className="mt-2 text-sm text-amber-800 dark:text-amber-200">{row.message}</p>
+                {Object.keys(row.metadata).length > 0 && (
                   <details className="mt-2">
                     <summary className="cursor-pointer text-xs text-amber-700 dark:text-amber-300">Metadata</summary>
                     <pre className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                      {JSON.stringify(sensor.metadata, null, 2)}
+                      {JSON.stringify(row.metadata, null, 2)}
                     </pre>
                   </details>
                 )}
@@ -190,51 +234,53 @@ export default function OrchestrationPage() {
         </section>
       )}
 
-      {/* Sensors List */}
+      {/* Monitors list */}
       <section className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
           <FileJson className="h-5 w-5 text-sky-600" />
-          Configured Sensors
+          Configured monitors
         </h2>
 
         {loading ? (
           <div className="mt-4 flex items-center justify-center py-8">
             <RefreshCw className="h-6 w-6 animate-spin text-slate-400" />
-            <span className="ml-2 text-slate-500">Loading sensors...</span>
+            <span className="ml-2 text-slate-500">Loading monitors...</span>
           </div>
-        ) : sensors.length === 0 ? (
+        ) : monitors.length === 0 ? (
           <div className="mt-4 text-center py-8">
             <Split className="h-12 w-12 text-slate-300 mx-auto" />
-            <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-white">No sensors configured</h3>
-            <p className="mt-2 text-slate-500">Create your first sensor to start monitoring external systems.</p>
+            <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-white">No monitors configured</h3>
+            <p className="mt-2 text-slate-500">Create your first monitor to start watching external systems.</p>
             <button
               onClick={() => setShowCreateForm(true)}
               className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700"
             >
               <Plus className="h-4 w-4" />
-              Create Sensor
+              Create monitor
             </button>
           </div>
         ) : (
           <div className="mt-4 space-y-4">
-            {sensors.map((sensor) => (
-              <div key={sensor.name} className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+            {monitors.map((m) => (
+              <div key={m.name} className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <span className="font-medium text-slate-900 dark:text-white">{sensor.name}</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getSensorTypeColor(sensor.type)}`}>
-                      {sensor.type.replace('_', ' ')}
+                    <span className="font-medium text-slate-900 dark:text-white">{m.name}</span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getMonitorTypeColor(m.type)}`}>
+                      {m.type.replace(/_/g, " ")}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-slate-500">
-                      Pipeline: {sensor.pipeline_name}
-                      <span className="mt-0.5 block font-mono text-[11px] text-slate-400">{sensor.pipeline_id}</span>
+                      Pipeline: {m.pipeline_name || "—"}
+                      {m.pipeline_id ? (
+                        <span className="mt-0.5 block font-mono text-[11px] text-slate-400">{m.pipeline_id}</span>
+                      ) : null}
                     </span>
                     <button
-                      onClick={() => deleteSensor(sensor.name)}
+                      onClick={() => deleteMonitor(m.name)}
                       className="p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                      title="Delete sensor"
+                      title="Delete monitor"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -245,7 +291,7 @@ export default function OrchestrationPage() {
                   <div>
                     <span className="font-medium text-slate-700 dark:text-slate-300">Configuration:</span>
                     <div className="mt-1 space-y-1">
-                      {Object.entries(sensor.config).map(([key, value]) => (
+                      {Object.entries(m.config).map(([key, value]) => (
                         <div key={key} className="text-slate-600 dark:text-slate-400">
                           <span className="font-mono">{key}:</span> {String(value)}
                         </div>
@@ -255,7 +301,7 @@ export default function OrchestrationPage() {
                   <div>
                     <span className="font-medium text-slate-700 dark:text-slate-300">Status:</span>
                     <div className="mt-1 text-slate-600 dark:text-slate-400">
-                      Last check: {sensor.last_check ? new Date(sensor.last_check).toLocaleString() : 'Never'}
+                      Last check: {m.last_check ? new Date(m.last_check).toLocaleString() : "Never"}
                     </div>
                   </div>
                 </div>
@@ -265,13 +311,12 @@ export default function OrchestrationPage() {
         )}
       </section>
 
-      {/* Create Sensor Form Modal */}
       {showCreateForm && (
-        <CreateSensorForm
+        <CreateMonitorForm
           onClose={() => setShowCreateForm(false)}
           onSuccess={() => {
             setShowCreateForm(false);
-            loadSensors();
+            loadMonitors();
           }}
         />
       )}
@@ -280,7 +325,7 @@ export default function OrchestrationPage() {
       <section className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-6 dark:border-slate-700 dark:bg-slate-900/40">
         <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
           <PlayCircle className="h-5 w-5 text-slate-600" />
-          Sensor Types
+          Monitor types
         </h2>
         <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-600 dark:text-slate-300">
           <div>
@@ -310,6 +355,12 @@ export default function OrchestrationPage() {
           </Link>
         </p>
       </section>
+
+      <RelatedLinks links={[
+        { href: "/builder", icon: Layers, label: "Pipelines", desc: "Define the source → destination connections monitors trigger" },
+        { href: "/runs", icon: PlayCircle, label: "Runs", desc: "View execution history and live telemetry for each run" },
+        { href: "/gateway", icon: Waypoints, label: "Gateway & execution", desc: "Connect your runner or use eltPulse-managed workers" },
+      ]} />
     </div>
   );
 }
@@ -323,8 +374,7 @@ type PipelineOpt = {
   destinationType: string;
 };
 
-// Create Sensor Form Component
-function CreateSensorForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+function CreateMonitorForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [formData, setFormData] = useState({
     name: '',
     pipelineId: '',
@@ -340,7 +390,7 @@ function CreateSensorForm({ onClose, onSuccess }: { onClose: () => void; onSucce
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/elt/pipelines', { credentials: 'same-origin' });
+        const res = await fetch("/api/elt/pipelines", { credentials: "same-origin" });
         const data = (await res.json()) as { pipelines?: PipelineOpt[] };
         if (!cancelled && res.ok && Array.isArray(data.pipelines)) {
           setPipelines(data.pipelines);
@@ -373,21 +423,22 @@ function CreateSensorForm({ onClose, onSuccess }: { onClose: () => void; onSucce
     setError(null);
 
     try {
-      const response = await fetch('/api/sensors', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+      const response = await fetch("/api/monitors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(formData),
       });
 
-      const data = await response.json();
+      const data = (await response.json()) as { error?: string };
 
       if (response.ok) {
         onSuccess();
       } else {
-        setError(data.error || 'Failed to create sensor');
+        setError(data.error || "Failed to create monitor");
       }
     } catch (err) {
-      setError('Failed to create sensor');
+      setError("Failed to create monitor");
     } finally {
       setSubmitting(false);
     }
@@ -403,12 +454,12 @@ function CreateSensorForm({ onClose, onSuccess }: { onClose: () => void; onSucce
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Create Sensor</h3>
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Create monitor</h3>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Sensor Name
+              Monitor name
             </label>
             <input
               type="text"
@@ -450,7 +501,7 @@ function CreateSensorForm({ onClose, onSuccess }: { onClose: () => void; onSucce
 
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Sensor Type
+              Monitor type
             </label>
             <select
               value={formData.type}
@@ -458,7 +509,7 @@ function CreateSensorForm({ onClose, onSuccess }: { onClose: () => void; onSucce
               className="w-full px-3 py-2 border border-slate-300 rounded-md dark:border-slate-600 dark:bg-slate-800"
               required
             >
-              <option value="">Select a sensor type...</option>
+              <option value="">Select a monitor type...</option>
               {sensorTypes.map(type => (
                 <option key={type.value} value={type.value}>{type.label}</option>
               ))}
@@ -506,7 +557,7 @@ function CreateSensorForm({ onClose, onSuccess }: { onClose: () => void; onSucce
               disabled={submitting}
               className="px-4 py-2 bg-sky-600 text-white rounded hover:bg-sky-700 disabled:opacity-50"
             >
-              {submitting ? 'Creating...' : 'Create Sensor'}
+              {submitting ? "Creating..." : "Create monitor"}
             </button>
           </div>
         </form>
