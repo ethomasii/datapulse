@@ -79,7 +79,16 @@ export function CanvasTransformInspector({ nodeId, initialData, onPatch, pipelin
         <div className="space-y-3 rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-3 dark:border-amber-800/50 dark:bg-amber-950/20">
           <p className="text-[11px] leading-snug text-amber-950 dark:text-amber-100">
             Reference a <strong className="font-medium">dbt project</strong> (local path or git URL). After extract/load,
-            a dbt run step is appended automatically.
+            a dbt run step is appended automatically. Slice runs pass{" "}
+            <code className="rounded bg-amber-100/80 px-0.5 font-mono text-[10px] dark:bg-amber-900/50">
+              {`var("elt_partition_value", none)`}
+            </code>{" "}
+            (same string as the pipeline <code className="font-mono text-[10px]">partition_key</code>) and, when Run
+            slices has a date/key partition column saved,{" "}
+            <code className="rounded bg-amber-100/80 px-0.5 font-mono text-[10px] dark:bg-amber-900/50">
+              {`var("elt_partition_column", none)`}
+            </code>{" "}
+            for SQL filters.
           </p>
           <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
             dbt project path or git URL
