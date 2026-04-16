@@ -21,6 +21,15 @@ function lastNDays(n: number): string[] {
   return days;
 }
 
+/** Narrow select so the dashboard works when optional DB columns (e.g. partition fields) are not migrated yet. */
+const DASHBOARD_RUN_LIST = {
+  id: true,
+  status: true,
+  telemetry: true,
+  logEntries: true,
+  pipeline: { select: { name: true } },
+} as const;
+
 export default async function DashboardPage() {
   const user = await requireDbUser();
 
@@ -38,13 +47,13 @@ export default async function DashboardPage() {
         where: { userId: user.id, status: { in: ["pending", "running"] } },
         orderBy: { startedAt: "desc" },
         take: 8,
-        include: { pipeline: { select: { name: true } } },
+        select: DASHBOARD_RUN_LIST,
       }),
       db.eltPipelineRun.findMany({
         where: { userId: user.id, status: { in: ["succeeded", "failed", "cancelled"] } },
         orderBy: { startedAt: "desc" },
         take: 5,
-        include: { pipeline: { select: { name: true } } },
+        select: DASHBOARD_RUN_LIST,
       }),
       db.eltPipelineRun.findMany({
         where: { userId: user.id, startedAt: { gte: chartCutoff } },
