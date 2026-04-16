@@ -1,5 +1,6 @@
 /**
  * Canonical layout for managed eltPulse repositories (your GitHub org).
+ * Declarative pipeline YAML can be applied with `POST /api/elt/pipelines/declaration` (same schema as the JSON API).
  */
 export const ELTPULSE_REPO = {
   root: "eltpulse",

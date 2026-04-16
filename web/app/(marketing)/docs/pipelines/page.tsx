@@ -43,6 +43,35 @@ export default function PipelinesDocsPage() {
         </li>
       </ul>
 
+      <h2>Declarative YAML (GitOps)</h2>
+      <p>
+        You can define or update a pipeline without the visual builder by posting a **YAML declaration** to{" "}
+        <code>POST /api/elt/pipelines/declaration</code> (same session auth as the rest of the app). The document must
+        include <code>eltpulse_pipeline_declaration: 1</code> and the same fields as{" "}
+        <code>POST /api/elt/pipelines</code> (e.g. <code>name</code>, <code>sourceType</code>,{" "}
+        <code>destinationType</code>, <code>sourceConfiguration</code>, optional <code>dlt_dbt</code>,{" "}
+        <code>_partitionConfig</code>, execution settings).
+      </p>
+      <ul>
+        <li>
+          <strong>Upsert:</strong> set <code>upsert: true</code> in YAML, or call with query{" "}
+          <code>?mode=upsert</code>, to create or **replace** the pipeline with the same <code>name</code> and resolved{" "}
+          <code>tool</code> (idempotent applies from GitHub Actions).
+        </li>
+        <li>
+          <strong>Content-Type:</strong> send raw YAML as <code>application/yaml</code>, or JSON{" "}
+          <code>{`{ "declaration": "..." }`}</code> if your client prefers JSON wrapping.
+        </li>
+        <li>
+          Example file in the product repo: <code className="text-sm">examples/eltpulse-pipeline.declaration.example.yaml</code>.
+        </li>
+      </ul>
+      <p>
+        After the control plane stores the definition, your **gateway** polls <code>GET /api/agent/runs</code> and
+        receives <code>pipelineCode</code>, <code>configYaml</code>, and <code>workspaceYaml</code> — the same as
+        pipelines created in the UI.
+      </p>
+
       <h2>Edit and delete</h2>
       <p>
         Use <strong>Edit</strong> on a row to change definition; we regenerate all artifacts on save. Delete removes the
