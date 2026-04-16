@@ -10,6 +10,10 @@ export type DbtTransformNodeData = {
   /** `all` = dlt `run_all()` default; `selection` = pass `--select` to the dbt run step. */
   dbtRunScope?: string;
   dbtSelector?: string;
+  /** dbt `var` name for the slice string (`partition_key`); persisted as `dlt_dbt.slice_value_var`. */
+  dbtSliceValueVar?: string;
+  /** dbt `var` name for the warehouse partition column; persisted as `dlt_dbt.slice_column_var`. */
+  dbtSliceColumnVar?: string;
 };
 
 function firstDbtTransformNode(nodes: Node[]): Node | undefined {
@@ -36,6 +40,8 @@ export function deriveDltDbtFromCanvasNodes(nodes: Node[]): Record<string, unkno
   const branch = String(d.dbtRepositoryBranch ?? "").trim();
   const runScope = String(d.dbtRunScope ?? "all").trim() === "selection" ? "selection" : "all";
   const selector = String(d.dbtSelector ?? "").trim();
+  const sliceValueVar = String(d.dbtSliceValueVar ?? "").trim();
+  const sliceColumnVar = String(d.dbtSliceColumnVar ?? "").trim();
 
   const out: Record<string, unknown> = {
     enabled: true,
@@ -45,6 +51,8 @@ export function deriveDltDbtFromCanvasNodes(nodes: Node[]): Record<string, unkno
   if (datasetName) out.dataset_name = datasetName;
   if (branch) out.package_repository_branch = branch;
   if (runScope === "selection" && selector) out.selector = selector;
+  if (sliceValueVar) out.slice_value_var = sliceValueVar;
+  if (sliceColumnVar) out.slice_column_var = sliceColumnVar;
 
   return out;
 }
@@ -84,6 +92,8 @@ export function enrichTransformNodesFromDltDbt(nodes: Node[], dltDbt: Record<str
   const branch = String(dltDbt.package_repository_branch ?? "").trim();
   const runScope = dltDbt.run_scope === "selection" ? "selection" : "all";
   const selector = String(dltDbt.selector ?? "").trim();
+  const sliceValueVar = String(dltDbt.slice_value_var ?? "").trim();
+  const sliceColumnVar = String(dltDbt.slice_column_var ?? "").trim();
 
   return nodes.map((n) => {
     if (n.type !== "transformNode") return n;
@@ -101,6 +111,8 @@ export function enrichTransformNodesFromDltDbt(nodes: Node[], dltDbt: Record<str
         ...(branch ? { dbtRepositoryBranch: branch } : {}),
         dbtRunScope: runScope,
         ...(selector ? { dbtSelector: selector } : {}),
+        ...(sliceValueVar ? { dbtSliceValueVar: sliceValueVar } : {}),
+        ...(sliceColumnVar ? { dbtSliceColumnVar: sliceColumnVar } : {}),
       },
     };
   });

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { dltDbtRunnerBeforeReturn, partitionColumnForDbtVars } from "./generate-dlt-dbt-append";
+import {
+  dltDbtRunnerBeforeReturn,
+  partitionColumnForDbtVars,
+  sanitizeDbtVarKey,
+} from "./generate-dlt-dbt-append";
 import type { PipelineRequest } from "./types";
 
 function baseRequest(overrides: Partial<PipelineRequest> = {}): PipelineRequest {
@@ -11,6 +15,19 @@ function baseRequest(overrides: Partial<PipelineRequest> = {}): PipelineRequest 
     ...overrides,
   };
 }
+
+describe("sanitizeDbtVarKey", () => {
+  it("falls back on invalid keys", () => {
+    expect(sanitizeDbtVarKey("", "x")).toBe("x");
+    expect(sanitizeDbtVarKey("123bad", "x")).toBe("x");
+    expect(sanitizeDbtVarKey("a-b", "x")).toBe("x");
+  });
+
+  it("accepts dbt-style identifiers", () => {
+    expect(sanitizeDbtVarKey("run_date", "x")).toBe("run_date");
+    expect(sanitizeDbtVarKey("ds", "x")).toBe("ds");
+  });
+});
 
 describe("partitionColumnForDbtVars", () => {
   it("returns null when no partition config", () => {
@@ -70,5 +87,43 @@ describe("dltDbtRunnerBeforeReturn", () => {
     );
     expect(py).toContain('"--select"');
     expect(py).toContain('"tag:nightly"');
+  });
+
+  it("uses slice_value_var and slice_column_var as dbt var keys when set", () => {
+    const py = dltDbtRunnerBeforeReturn(
+      baseRequest({
+        sourceConfiguration: {
+          dlt_dbt: {
+            enabled: true,
+            package_path: "./dbt",
+            slice_value_var: "run_date",
+            slice_column_var: "partition_col",
+          },
+          _partitionConfig: { type: "date", column: "event_dt" },
+        },
+      })
+    );
+    expect(py).toContain('_elt_dbt_vars["run_date"]');
+    expect(py).not.toContain('_elt_dbt_vars["elt_partition_value"]');
+    expect(py).toContain('_elt_dbt_vars["partition_col"]');
+    expect(py).toContain('"event_dt"');
+  });
+
+  it("resolves duplicate slice var keys by falling back column var name", () => {
+    const py = dltDbtRunnerBeforeReturn(
+      baseRequest({
+        sourceConfiguration: {
+          dlt_dbt: {
+            enabled: true,
+            package_path: "./dbt",
+            slice_value_var: "ds",
+            slice_column_var: "ds",
+          },
+          _partitionConfig: { type: "date", column: "event_date" },
+        },
+      })
+    );
+    expect(py).toContain('_elt_dbt_vars["ds"]');
+    expect(py).toContain('_elt_dbt_vars["elt_partition_column"]');
   });
 });

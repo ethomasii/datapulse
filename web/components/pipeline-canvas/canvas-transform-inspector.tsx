@@ -26,6 +26,8 @@ export function CanvasTransformInspector({ nodeId, initialData, onPatch, pipelin
     String(initialData.dbtRunScope ?? "all") === "selection" ? "selection" : "all"
   );
   const [dbtSelector, setDbtSelector] = useState(() => String(initialData.dbtSelector ?? ""));
+  const [dbtSliceValueVar, setDbtSliceValueVar] = useState(() => String(initialData.dbtSliceValueVar ?? ""));
+  const [dbtSliceColumnVar, setDbtSliceColumnVar] = useState(() => String(initialData.dbtSliceColumnVar ?? ""));
 
   useEffect(() => {
     setLabel(String(initialData.label ?? ""));
@@ -36,6 +38,8 @@ export function CanvasTransformInspector({ nodeId, initialData, onPatch, pipelin
     setDbtRepositoryBranch(String(initialData.dbtRepositoryBranch ?? ""));
     setDbtRunScope(String(initialData.dbtRunScope ?? "all") === "selection" ? "selection" : "all");
     setDbtSelector(String(initialData.dbtSelector ?? ""));
+    setDbtSliceValueVar(String(initialData.dbtSliceValueVar ?? ""));
+    setDbtSliceColumnVar(String(initialData.dbtSliceColumnVar ?? ""));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- remount or nodeId change defines a new snapshot
   }, [nodeId]);
 
@@ -79,16 +83,13 @@ export function CanvasTransformInspector({ nodeId, initialData, onPatch, pipelin
         <div className="space-y-3 rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-3 dark:border-amber-800/50 dark:bg-amber-950/20">
           <p className="text-[11px] leading-snug text-amber-950 dark:text-amber-100">
             Reference a <strong className="font-medium">dbt project</strong> (local path or git URL). After extract/load,
-            a dbt run step is appended automatically. Slice runs pass{" "}
-            <code className="rounded bg-amber-100/80 px-0.5 font-mono text-[10px] dark:bg-amber-900/50">
-              {`var("elt_partition_value", none)`}
-            </code>{" "}
-            (same string as the pipeline <code className="font-mono text-[10px]">partition_key</code>) and, when Run
-            slices has a date/key partition column saved,{" "}
-            <code className="rounded bg-amber-100/80 px-0.5 font-mono text-[10px] dark:bg-amber-900/50">
-              {`var("elt_partition_column", none)`}
-            </code>{" "}
-            for SQL filters.
+            a dbt run step is appended automatically. The slice string (<code className="font-mono text-[10px]">partition_key</code>)
+            and optional partition column name are passed as dbt vars — defaults{" "}
+            <code className="rounded bg-amber-100/80 px-0.5 font-mono text-[10px] dark:bg-amber-900/50">elt_partition_value</code>{" "}
+            and{" "}
+            <code className="rounded bg-amber-100/80 px-0.5 font-mono text-[10px] dark:bg-amber-900/50">elt_partition_column</code>
+            . Rename below to match an existing project (e.g. <code className="font-mono text-[10px]">run_date</code>,{" "}
+            <code className="font-mono text-[10px]">ds</code>).
           </p>
           <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
             dbt project path or git URL
@@ -167,6 +168,38 @@ export function CanvasTransformInspector({ nodeId, initialData, onPatch, pipelin
               />
             </label>
           ) : null}
+          <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
+            dbt var name for slice value (optional)
+            <input
+              type="text"
+              className={fieldClass}
+              value={dbtSliceValueVar}
+              onChange={(e) => {
+                const v = e.target.value;
+                setDbtSliceValueVar(v);
+                patchDbt({ dbtSliceValueVar: v });
+              }}
+              placeholder="default: elt_partition_value"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </label>
+          <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
+            dbt var name for partition column (optional)
+            <input
+              type="text"
+              className={fieldClass}
+              value={dbtSliceColumnVar}
+              onChange={(e) => {
+                const v = e.target.value;
+                setDbtSliceColumnVar(v);
+                patchDbt({ dbtSliceColumnVar: v });
+              }}
+              placeholder="default: elt_partition_column"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </label>
         </div>
       ) : null}
 

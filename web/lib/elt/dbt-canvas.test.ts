@@ -45,6 +45,21 @@ describe("deriveDltDbtFromCanvasNodes", () => {
       selector: "tag:nightly",
     });
   });
+
+  it("derives slice var name overrides", () => {
+    const nodes = [
+      transformDbt({
+        transformTool: "dbt",
+        dbtPackagePath: "/dbt",
+        dbtSliceValueVar: "ds",
+        dbtSliceColumnVar: "slice_col",
+      }),
+    ];
+    expect(deriveDltDbtFromCanvasNodes(nodes)).toMatchObject({
+      slice_value_var: "ds",
+      slice_column_var: "slice_col",
+    });
+  });
 });
 
 describe("syncDltDbtWithCanvas", () => {
@@ -110,5 +125,18 @@ describe("enrichTransformNodesFromDltDbt", () => {
     expect((out[0].data as { dbtPackagePath?: string }).dbtPackagePath).toBe("/p");
     expect((out[0].data as { dbtRunScope?: string }).dbtRunScope).toBe("selection");
     expect((out[0].data as { dbtSelector?: string }).dbtSelector).toBe("m1+");
+  });
+
+  it("hydrates slice var overrides from dlt_dbt", () => {
+    const nodes = [transformDbt({ transformTool: "dbt", label: "x" })];
+    const out = enrichTransformNodesFromDltDbt(nodes, {
+      enabled: true,
+      package_path: "/p",
+      slice_value_var: "run_date",
+      slice_column_var: "col_name",
+    });
+    const d = out[0].data as { dbtSliceValueVar?: string; dbtSliceColumnVar?: string };
+    expect(d.dbtSliceValueVar).toBe("run_date");
+    expect(d.dbtSliceColumnVar).toBe("col_name");
   });
 });

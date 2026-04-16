@@ -5,7 +5,7 @@
  * Optional post-load dbt for **dlt** pipelines (codegen appends dlt dbt runner when enabled). The canvas
  * inspector syncs into `dlt_dbt`:
  * `{ enabled, package_path, dataset_name?, package_repository_branch?, run_scope: "all"|"selection", selector? }`.
- * Codegen passes slice context into dbt via dlt `additional_vars`: `elt_partition_value`, `elt_partition_column` (when `_partitionConfig` is date/key with a column).
+ * Codegen passes slice context into dbt via dlt `additional_vars` (default var names `elt_partition_value` / `elt_partition_column`; override with `slice_value_var` / `slice_column_var` on `dlt_dbt`).
  * @see https://dlthub.com/docs/dlt-ecosystem/transformations/dbt
  */
 
