@@ -49,7 +49,7 @@ const PRODUCT_NAV: NavItem[] = [
   { href: "/connections", label: "Connections", icon: Cable },
   { href: "/webhooks", label: "Webhooks", icon: Webhook },
   { href: "/gateway", label: "Gateway", icon: Waypoints },
-  { href: "/repos", label: "Repositories", icon: FolderGit2, soon: true },
+  { href: "/repos", label: "Repositories", icon: FolderGit2 },
   { href: "/integrations", label: "Integrations", icon: Plug },
   { href: "/help", label: "Help", icon: CircleHelp },
   { href: "/team", label: "Team", icon: Users, soon: true },
