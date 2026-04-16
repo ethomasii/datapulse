@@ -1059,11 +1059,13 @@ export function BuilderClient({
                               Run slices
                             </Link>
                             , choose this pipeline, then scroll to <strong className="font-medium">Day coverage</strong>{" "}
-                            under <strong className="font-medium">Slice coverage</strong> — that is where the calendar
-                            From/To, quick ranges (7/30/90 days), and missing/failed counts appear. Set{" "}
-                            <strong className="font-medium">Slice type</strong> to <strong className="font-medium">Date</strong>{" "}
-                            above (not &quot;None&quot;), pick your partition column, and click <strong className="font-medium">Save config</strong>{" "}
-                            first; otherwise Day coverage has no date column to use.
+                            under <strong className="font-medium">Slice coverage</strong> — that is where quick ranges
+                            (7/30/90 days), <strong className="font-medium">Fit to runs</strong>, and missing/failed counts
+                            appear. With <strong className="font-medium">Date</strong> slices, you can also set default{" "}
+                            <strong className="font-medium">From / To</strong> in <strong className="font-medium">Day coverage default range</strong>{" "}
+                            below; those values are saved on the pipeline and pre-fill Run slices. Set{" "}
+                            <strong className="font-medium">Slice type</strong> to <strong className="font-medium">Date</strong>, pick your partition column, and click{" "}
+                            <strong className="font-medium">Save config</strong> first.
                           </p>
                         </div>
                       ) : (

@@ -64,6 +64,10 @@ export type PartitionConfig = {
   column: string;
   granularity: string;
   description: string;
+  /** Optional YYYY-MM-DD: default Run slices → Day coverage "From". */
+  dayCoverageFrom?: string;
+  /** Optional YYYY-MM-DD: default Day coverage "To"; omit or empty = use today on Run slices. */
+  dayCoverageTo?: string;
 };
 
 export const EMPTY_PARTITION: PartitionConfig = {
@@ -139,6 +143,8 @@ export function PartitionConfigEditor({
   );
   const [granularity, setGranularity] = useState(mergedSeed.granularity || "day");
   const [description, setDescription] = useState(mergedSeed.description || "");
+  const [dayCoverageFrom, setDayCoverageFrom] = useState(() => mergedSeed.dayCoverageFrom ?? "");
+  const [dayCoverageTo, setDayCoverageTo] = useState(() => mergedSeed.dayCoverageTo ?? "");
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
 
@@ -163,14 +169,26 @@ export function PartitionConfigEditor({
         if (!getRes.ok) throw new Error("Failed to fetch pipeline");
         const { pipeline: full } = (await getRes.json()) as { pipeline: { sourceConfiguration?: Record<string, unknown> } };
         const sc = full.sourceConfiguration ?? {};
-        const raw = sc._partitionConfig as PartitionConfig | undefined;
-        const init = raw ?? EMPTY_PARTITION;
+        const raw = sc._partitionConfig as Record<string, unknown> | undefined;
+        const init = (raw ?? {}) as Partial<PartitionConfig>;
+        const merged: PartitionConfig = {
+          ...EMPTY_PARTITION,
+          ...init,
+          type: (init.type === "date" || init.type === "key" || init.type === "none" ? init.type : "none") as PartitionType,
+          column: typeof init.column === "string" ? init.column : "",
+          granularity: typeof init.granularity === "string" ? init.granularity : "day",
+          description: typeof init.description === "string" ? init.description : "",
+          dayCoverageFrom: typeof init.dayCoverageFrom === "string" ? init.dayCoverageFrom : undefined,
+          dayCoverageTo: typeof init.dayCoverageTo === "string" ? init.dayCoverageTo : undefined,
+        };
         if (cancelled) return;
-        setSavedSnapshot(init);
-        setType(cap.mode === "none_only" ? "none" : init.type);
-        setColumn(cap.mode === "none_only" ? "" : init.column);
-        setGranularity(init.granularity || "day");
-        setDescription(init.description || "");
+        setSavedSnapshot(merged);
+        setType(cap.mode === "none_only" ? "none" : merged.type);
+        setColumn(cap.mode === "none_only" ? "" : merged.column);
+        setGranularity(merged.granularity || "day");
+        setDescription(merged.description || "");
+        setDayCoverageFrom(merged.dayCoverageFrom ?? "");
+        setDayCoverageTo(merged.dayCoverageTo ?? "");
       } catch (e) {
         if (!cancelled) onError(e instanceof Error ? e.message : "Failed to load slice config");
       } finally {
@@ -190,14 +208,21 @@ export function PartitionConfigEditor({
       const { pipeline: full } = (await getRes.json()) as { pipeline: { sourceConfiguration?: Record<string, unknown> } };
       const effectiveType: PartitionType = cap.mode === "none_only" ? "none" : type;
       const effectiveColumn = cap.mode === "none_only" ? "" : column.trim();
+      const fromTrim = dayCoverageFrom.trim();
+      const toTrim = dayCoverageTo.trim();
+      const partitionPayload: Record<string, unknown> = {
+        type: effectiveType,
+        column: effectiveColumn,
+        granularity,
+        description: description.trim(),
+      };
+      if (effectiveType === "date") {
+        if (fromTrim) partitionPayload.dayCoverageFrom = fromTrim;
+        if (toTrim) partitionPayload.dayCoverageTo = toTrim;
+      }
       const sc = {
         ...(full.sourceConfiguration ?? {}),
-        _partitionConfig: {
-          type: effectiveType,
-          column: effectiveColumn,
-          granularity,
-          description: description.trim(),
-        },
+        _partitionConfig: partitionPayload,
       };
 
       const res = await fetch(`/api/elt/pipelines/${pipelineId}`, {
@@ -211,6 +236,12 @@ export function PartitionConfigEditor({
         column: effectiveColumn,
         granularity,
         description: description.trim(),
+        ...(effectiveType === "date"
+          ? {
+              ...(fromTrim ? { dayCoverageFrom: fromTrim } : {}),
+              ...(toTrim ? { dayCoverageTo: toTrim } : {}),
+            }
+          : {}),
       });
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 2000);
@@ -406,6 +437,40 @@ export function PartitionConfigEditor({
                 placeholder="e.g. Daily partitioned by event date, one run per day"
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
               />
+            </div>
+          )}
+
+          {type === "date" && (
+            <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-600 dark:bg-slate-900/50">
+              <h4 className="text-xs font-semibold text-slate-800 dark:text-slate-200">Day coverage default range</h4>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Optional. Saved with this pipeline and used to pre-fill <strong className="font-medium">From</strong> /{" "}
+                <strong className="font-medium">To</strong> on{" "}
+                <Link href="/run-slices" className="font-medium text-teal-600 hover:underline dark:text-teal-400">
+                  Run slices
+                </Link>{" "}
+                → Day coverage. Leave <strong className="font-medium">To</strong> empty to default to today.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-4">
+                <label className="block">
+                  <span className="text-xs text-slate-500">From (optional)</span>
+                  <input
+                    type="date"
+                    value={dayCoverageFrom}
+                    onChange={(e) => setDayCoverageFrom(e.target.value)}
+                    className="mt-1 block rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-slate-500">To (optional)</span>
+                  <input
+                    type="date"
+                    value={dayCoverageTo}
+                    onChange={(e) => setDayCoverageTo(e.target.value)}
+                    className="mt-1 block rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                  />
+                </label>
+              </div>
             </div>
           )}
         </div>

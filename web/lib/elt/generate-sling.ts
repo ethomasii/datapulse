@@ -3,20 +3,22 @@ import YAML from "yaml";
 
 /**
  * Partition config shape as stored in sourceConfiguration._partitionConfig.
- * Matches the PartitionConfig type in partition-config-editor.tsx.
+ * Matches the PartitionConfig type in partition-config-editor.tsx (slice UI only uses type/column here).
  */
 type PartitionConfig = {
   type: "date" | "key" | "none";
   column: string;
   granularity?: string;
   description?: string;
+  dayCoverageFrom?: string;
+  dayCoverageTo?: string;
 };
 
 export function generateSlingReplication(request: PipelineRequest): Record<string, unknown> {
   const config = request.sourceConfiguration;
   const streams: Record<string, unknown> = {};
 
-  // Read stored partition config (saved via the Run Slices page).
+  // Read stored partition config (saved from the Builder / partition editor).
   const pc = config._partitionConfig as PartitionConfig | undefined;
   const hasIncrementalPartition = pc && pc.type !== "none" && pc.column?.trim();
 

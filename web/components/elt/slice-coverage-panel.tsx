@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Calendar, CheckCircle2, Loader2, Play, RefreshCw, XCircle } from "lucide-react";
 import { latestRunPerSlice, parseSliceFromTriggeredBy, type RunRowForSlice } from "@/lib/elt/slice-trigger";
+import type { PartitionConfig } from "@/components/elt/partition-config-editor";
 
 type PipelineOption = {
   id: string;
   name: string;
   sourceType: string;
-  partitionConfig?: { type: string; column: string; granularity: string; description: string };
+  partitionConfig?: PartitionConfig;
 };
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -152,7 +153,9 @@ export function SliceCoveragePanel({
   const partitionCol = pipeline?.partitionConfig?.column?.trim();
 
   useEffect(() => {
-    const key = `${pipelineId}|${partitionCol ?? ""}`;
+    const savedFrom = pipeline?.partitionConfig?.dayCoverageFrom?.trim() ?? "";
+    const savedTo = pipeline?.partitionConfig?.dayCoverageTo?.trim() ?? "";
+    const key = `${pipelineId}|${partitionCol ?? ""}|${savedFrom}|${savedTo}`;
     if (!pipelineId || !isDatePartition || !partitionCol) {
       if (!pipelineId) {
         setGapStart("");
@@ -163,10 +166,18 @@ export function SliceCoveragePanel({
     }
     if (gapRangeKeyRef.current === key) return;
     gapRangeKeyRef.current = key;
-    const today = new Date();
-    setGapEnd(toISODateLocal(today));
-    setGapStart(toISODateLocal(addDaysLocal(today, -29)));
-  }, [pipelineId, isDatePartition, partitionCol]);
+    const today = toISODateLocal(new Date());
+    if (savedFrom && savedTo) {
+      setGapStart(savedFrom);
+      setGapEnd(savedTo);
+    } else if (savedFrom) {
+      setGapStart(savedFrom);
+      setGapEnd(today);
+    } else {
+      setGapEnd(today);
+      setGapStart(toISODateLocal(addDaysLocal(new Date(), -29)));
+    }
+  }, [pipelineId, isDatePartition, partitionCol, pipeline?.partitionConfig?.dayCoverageFrom, pipeline?.partitionConfig?.dayCoverageTo]);
 
   const sliceMap = useMemo(() => latestRunPerSlice(runs), [runs]);
   const sliceRows = useMemo(() => {
@@ -311,8 +322,9 @@ export function SliceCoveragePanel({
             with <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">?pipeline=…</code> for the full log).
             Only runs launched as backfills with{" "}
             <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">triggeredBy: backfill:partition:…</code>{" "}
-            count here. <strong className="font-medium text-slate-800 dark:text-slate-200">Missing / failed:</strong> for
-            date slices, set a From/To range in <strong className="font-medium text-slate-800 dark:text-slate-200">Day coverage</strong>{" "}
+            count here.             <strong className="font-medium text-slate-800 dark:text-slate-200">Missing / failed:</strong> for
+            date slices, set a default From/To on the pipeline <strong className="font-medium text-slate-800 dark:text-slate-200">Builder</strong>{" "}
+            (Day coverage default range) or adjust <strong className="font-medium text-slate-800 dark:text-slate-200">Day coverage</strong>{" "}
             below — amber days never ran, red days&apos; latest run did not succeed — then queue or bulk-queue. Your
             runner must honor <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">triggeredBy</code>.
           </p>
@@ -498,9 +510,10 @@ export function SliceCoveragePanel({
               <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Day coverage (date slices)</h3>
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 Uses your saved partition column <span className="font-mono">{partitionCol}</span>.{" "}
-                <strong className="font-medium text-slate-600 dark:text-slate-300">From / To</strong> default to the last
-                30 days ending today when you select this pipeline — widen the range or use quick presets to see older
-                gaps. Days with no slice run, or whose latest run did not succeed, are highlighted.
+                <strong className="font-medium text-slate-600 dark:text-slate-300">From / To</strong> pre-fill from the
+                pipeline Builder when you saved a Day coverage default range; otherwise they default to the last 30 days
+                ending today. Widen the range or use quick presets to see older gaps. Days with no slice run, or whose
+                latest run did not succeed, are highlighted.
               </p>
               <div className="mt-3 flex flex-wrap gap-3">
                 <div>
