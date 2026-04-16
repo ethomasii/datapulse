@@ -4,6 +4,7 @@ import { getActiveOrganizationForSession } from "@/lib/auth/active-org";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
 import { resolveNewRunExecution } from "@/lib/agent/run-execution";
+import { RunPartitionResolutionError, resolveRunPartitionFields } from "@/lib/elt/run-partition-resolution";
 import { createRunBodySchema } from "@/lib/elt/run-types";
 
 export async function GET(req: Request) {
@@ -67,6 +68,7 @@ export async function POST(req: Request) {
       id: true,
       defaultTargetAgentTokenId: true,
       executionHost: true,
+      sourceConfiguration: true,
     },
   });
   if (!pipeline) {
@@ -100,6 +102,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "correlationId already exists" }, { status: 409 });
   }
 
+  let partitionColumn: string | null = null;
+  let partitionValue: string | null = null;
+  let triggeredBy: string | null = body.triggeredBy?.trim() || null;
+  try {
+    const resolved = resolveRunPartitionFields(
+      {
+        partitionColumn: body.partitionColumn,
+        partitionValue: body.partitionValue,
+        triggeredBy: body.triggeredBy,
+      },
+      pipeline.sourceConfiguration
+    );
+    partitionColumn = resolved.partitionColumn;
+    partitionValue = resolved.partitionValue;
+    triggeredBy = resolved.triggeredBy;
+  } catch (e) {
+    if (e instanceof RunPartitionResolutionError) {
+      return NextResponse.json({ error: e.message, code: e.code }, { status: 400 });
+    }
+    throw e;
+  }
+
   const run = await db.eltPipelineRun.create({
     data: {
       userId: user.id,
@@ -108,7 +132,9 @@ export async function POST(req: Request) {
       status: body.status,
       environment: body.environment,
       correlationId,
-      triggeredBy: body.triggeredBy ?? null,
+      triggeredBy,
+      partitionColumn,
+      partitionValue,
       targetAgentTokenId,
     },
     include: { pipeline: { select: { id: true, name: true } } },

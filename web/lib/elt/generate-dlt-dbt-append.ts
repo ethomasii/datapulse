@@ -1,5 +1,6 @@
 import type { PipelineRequest } from "./types";
 import { escapePyString } from "./escape-py";
+import { partitionColumnFromSourceConfiguration } from "./run-partition-resolution";
 
 function dbtDestination(request: PipelineRequest): string {
   if (request.destinationInstance) {
@@ -38,13 +39,7 @@ function dbtSliceVarKeys(d: Record<string, unknown>): { valueKey: string; column
  * `slice_value_var` (default `elt_partition_value`) — same string as the `partition_key` arg to `run()`.
  */
 export function partitionColumnForDbtVars(request: PipelineRequest): string | null {
-  const raw = request.sourceConfiguration?._partitionConfig;
-  if (!raw || typeof raw !== "object") return null;
-  const pc = raw as { type?: unknown; column?: unknown };
-  const t = pc.type;
-  if (t !== "date" && t !== "key") return null;
-  const col = String(pc.column ?? "").trim();
-  return col || null;
+  return partitionColumnFromSourceConfiguration(request.sourceConfiguration);
 }
 
 /**

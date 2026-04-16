@@ -41,6 +41,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       name: true,
       pipelineId: true,
       executionHost: true,
+      config: true,
     },
   });
 
@@ -59,7 +60,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const now = new Date();
-  let runId: string | null = null;
+  let runIds: string[] = [];
 
   await db.eltMonitor.update({
     where: { id: monitor.id },
@@ -67,11 +68,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   });
 
   if (shouldTrigger) {
-    const q = await enqueuePipelineRunForMonitor(ctx.user.id, monitor.pipelineId, monitor.name);
+    const q = await enqueuePipelineRunForMonitor(ctx.user.id, {
+      id: monitor.id,
+      name: monitor.name,
+      pipelineId: monitor.pipelineId,
+      config: monitor.config,
+    });
     if (!q.ok) {
       return NextResponse.json({ error: q.reason }, { status: 409 });
     }
-    runId = q.runId;
+    runIds = q.runIds;
     await db.eltMonitor.update({
       where: { id: monitor.id },
       data: { lastTriggeredAt: now },
@@ -80,7 +86,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   return NextResponse.json({
     ok: true,
-    runId,
+    runIds,
+    /** @deprecated use runIds */
+    runId: runIds[0] ?? null,
     message,
     metadata,
   });

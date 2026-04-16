@@ -7,6 +7,12 @@ import { db } from "@/lib/db/client";
 import { parseStoredConnectionSecrets } from "@/lib/elt/connection-secrets-store";
 import type { CronMonitorScaleOptions } from "@/lib/monitors/cron-scale";
 import { stableMonitorShard } from "@/lib/monitors/cron-scale";
+import { createPendingEltRun } from "@/lib/elt/create-pending-elt-run";
+import {
+  monitorPartitionColumnFromConfig,
+  parsePartitionValuesFromMonitorConfig,
+  resolveRunPartitionFields,
+} from "@/lib/elt/run-partition-resolution";
 import { resolveSensorCheckIntervalSeconds } from "@/lib/plans/agent-schedule";
 
 export type TriggeredSensorRow = {
@@ -231,14 +237,27 @@ async function runOneMonitorCheck(
   };
 }
 
+export type MonitorForEnqueue = {
+  id: string;
+  name: string;
+  pipelineId: string;
+  config: unknown;
+};
+
 export async function enqueuePipelineRunForMonitor(
   userId: string,
-  pipelineId: string,
-  monitorName: string
-): Promise<{ ok: true; runId: string } | { ok: false; reason: string }> {
+  monitor: MonitorForEnqueue
+): Promise<{ ok: true; runIds: string[] } | { ok: false; reason: string }> {
   const pipeline = await db.eltPipeline.findFirst({
-    where: { id: pipelineId, userId },
-    select: { id: true, enabled: true, name: true, defaultTargetAgentTokenId: true, executionHost: true },
+    where: { id: monitor.pipelineId, userId },
+    select: {
+      id: true,
+      enabled: true,
+      name: true,
+      defaultTargetAgentTokenId: true,
+      executionHost: true,
+      sourceConfiguration: true,
+    },
   });
   if (!pipeline) {
     return { ok: false, reason: "Pipeline not found" };
@@ -261,21 +280,51 @@ export async function enqueuePipelineRunForMonitor(
     userExecutionPlane: actor?.executionPlane ?? "eltpulse_managed",
   });
 
-  const run = await db.eltPipelineRun.create({
-    data: {
-      userId,
-      pipelineId: pipeline.id,
-      status: "pending",
-      environment: "monitor",
-      correlationId: crypto.randomUUID(),
-      triggeredBy: `monitor:${monitorName}`,
-      targetAgentTokenId,
-      ingestionExecutor,
-    },
-    select: { id: true },
+  const cfg = asConfig(monitor.config);
+  const sliceValues = parsePartitionValuesFromMonitorConfig(cfg);
+
+  if (sliceValues.length > 0) {
+    const column = monitorPartitionColumnFromConfig(cfg, pipeline.sourceConfiguration);
+    if (!column) {
+      return {
+        ok: false,
+        reason:
+          "Monitor has partition_values but no partition_column — set partition_column on the monitor or save a date/key partition column on the pipeline.",
+      };
+    }
+    const runIds: string[] = [];
+    for (const val of sliceValues) {
+      const r = resolveRunPartitionFields(
+        { partitionColumn: column, partitionValue: val, triggeredBy: null },
+        pipeline.sourceConfiguration
+      );
+      const run = await createPendingEltRun({
+        userId,
+        pipelineId: pipeline.id,
+        environment: "monitor",
+        triggeredBy: r.triggeredBy ?? `monitor:${monitor.name}:slice`,
+        partitionColumn: r.partitionColumn,
+        partitionValue: r.partitionValue,
+        targetAgentTokenId,
+        ingestionExecutor,
+      });
+      runIds.push(run.id);
+    }
+    return { ok: true, runIds };
+  }
+
+  const run = await createPendingEltRun({
+    userId,
+    pipelineId: pipeline.id,
+    environment: "monitor",
+    triggeredBy: `monitor:${monitor.name}`,
+    partitionColumn: null,
+    partitionValue: null,
+    targetAgentTokenId,
+    ingestionExecutor,
   });
 
-  return { ok: true, runId: run.id };
+  return { ok: true, runIds: [run.id] };
 }
 
 export async function runMonitorChecksForUser(
@@ -337,7 +386,12 @@ export async function runMonitorChecksForUser(
       });
 
       if (result.shouldTrigger) {
-        const q = await enqueuePipelineRunForMonitor(m.userId, m.pipelineId, m.name);
+        const q = await enqueuePipelineRunForMonitor(m.userId, {
+          id: m.id,
+          name: m.name,
+          pipelineId: m.pipelineId,
+          config: m.config,
+        });
         if (q.ok) {
           await db.eltMonitor.update({
             where: { id: m.id },
@@ -347,7 +401,7 @@ export async function runMonitorChecksForUser(
             sensorName: m.name,
             pipelineName: m.pipeline.name,
             message: result.message,
-            metadata: result.metadata,
+            metadata: { ...result.metadata, run_ids: q.runIds },
             timestamp: now.toISOString(),
           });
         } else {
@@ -430,7 +484,12 @@ export async function runMonitorChecksForAllUsers(options?: CronMonitorScaleOpti
       });
 
       if (result.shouldTrigger) {
-        const q = await enqueuePipelineRunForMonitor(m.userId, m.pipelineId, m.name);
+        const q = await enqueuePipelineRunForMonitor(m.userId, {
+          id: m.id,
+          name: m.name,
+          pipelineId: m.pipelineId,
+          config: m.config,
+        });
         if (q.ok) {
           await db.eltMonitor.update({
             where: { id: m.id },
@@ -440,7 +499,7 @@ export async function runMonitorChecksForAllUsers(options?: CronMonitorScaleOpti
             sensorName: m.name,
             pipelineName: m.pipeline.name,
             message: result.message,
-            metadata: result.metadata,
+            metadata: { ...result.metadata, run_ids: q.runIds },
             timestamp: now.toISOString(),
           });
         } else {

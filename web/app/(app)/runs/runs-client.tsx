@@ -35,6 +35,8 @@ type RunRow = {
   environment: string;
   correlationId: string;
   triggeredBy: string | null;
+  partitionColumn?: string | null;
+  partitionValue?: string | null;
   ingestionExecutor?: string;
   startedAt: string;
   finishedAt: string | null;
@@ -71,12 +73,29 @@ function SortIcon({ col, sortCol, sortDir }: { col: SortCol; sortCol: SortCol; s
     : <ArrowDown className="ml-1 inline h-3 w-3 text-sky-600" />;
 }
 
-function SliceCell({ triggeredBy }: { triggeredBy: string | null }) {
+function SliceCell({
+  triggeredBy,
+  partitionColumn,
+  partitionValue,
+}: {
+  triggeredBy: string | null;
+  partitionColumn?: string | null;
+  partitionValue?: string | null;
+}) {
   const parsed = parseSliceFromTriggeredBy(triggeredBy);
   if (parsed) {
     return (
       <span className="font-mono text-xs text-teal-700 dark:text-teal-300" title={`${parsed.column} = ${parsed.value}`}>
         {parsed.value}
+      </span>
+    );
+  }
+  const pv = partitionValue?.trim();
+  if (pv) {
+    const pc = partitionColumn?.trim();
+    return (
+      <span className="font-mono text-xs text-teal-700 dark:text-teal-300" title={pc ? `${pc} = ${pv}` : pv}>
+        {pv}
       </span>
     );
   }
@@ -649,7 +668,11 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                     </span>
                   </td>
                   <td className="max-w-[150px] px-3 py-2 align-top">
-                    <SliceCell triggeredBy={r.triggeredBy} />
+                    <SliceCell
+                      triggeredBy={r.triggeredBy}
+                      partitionColumn={r.partitionColumn}
+                      partitionValue={r.partitionValue}
+                    />
                   </td>
                   <td className="max-w-[140px] truncate px-3 py-2 text-slate-600 dark:text-slate-300" title={r.targetAgentToken?.name ?? "Any gateway"}>
                     {r.targetAgentToken?.name ?? "Any"}
@@ -782,6 +805,21 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                     </div>
                   </div>
                 </div>
+
+                {(Boolean((detail.run as { partitionValue?: string | null }).partitionValue) ||
+                  Boolean((detail.run as { partitionColumn?: string | null }).partitionColumn)) && (
+                  <div className="rounded-lg border border-teal-100 bg-teal-50/60 px-3 py-2 dark:border-teal-900 dark:bg-teal-950/30">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-teal-800 dark:text-teal-200">
+                      Slice for executor
+                    </div>
+                    <div className="mt-1 font-mono text-xs text-teal-900 dark:text-teal-100">
+                      <span className="text-teal-700 dark:text-teal-300">column:</span>{" "}
+                      {(detail.run as { partitionColumn?: string | null }).partitionColumn ?? "—"}{" "}
+                      <span className="text-teal-700 dark:text-teal-300">value:</span>{" "}
+                      {(detail.run as { partitionValue?: string | null }).partitionValue ?? "—"}
+                    </div>
+                  </div>
+                )}
 
                 {/* Correlation ID */}
                 <div>

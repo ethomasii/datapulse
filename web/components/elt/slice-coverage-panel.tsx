@@ -217,6 +217,8 @@ export function SliceCoveragePanel({
         pipelineId,
         environment: "backfill",
         triggeredBy: `backfill:partition:${column.trim()}:${value.trim()}`,
+        partitionColumn: column.trim(),
+        partitionValue: value.trim(),
         status: "pending",
       }),
     });

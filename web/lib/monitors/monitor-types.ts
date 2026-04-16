@@ -1,3 +1,10 @@
+/**
+ * Optional slice queueing when a monitor fires (stored on `EltMonitor.config` JSON):
+ * - `partition_values` — string[] or newline/comma-separated string; each value creates one **pending** run with
+ *   `partitionValue` / `partitionColumn` set for the agent (max 100 values).
+ * - `partition_column` — warehouse column for the slice; if omitted, the pipeline’s saved `_partitionConfig.column`
+ *   is used when it is a date/key partition.
+ */
 /** Monitor kinds (CLI `--type`) that must be tied to a saved connection profile. */
 export const MONITOR_TYPES_REQUIRING_CONNECTION = new Set([
   "s3_file_count",

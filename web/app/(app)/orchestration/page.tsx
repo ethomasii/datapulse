@@ -294,7 +294,8 @@ export default function OrchestrationPage() {
                     <div className="mt-1 space-y-1">
                       {Object.entries(m.config).map(([key, value]) => (
                         <div key={key} className="text-slate-600 dark:text-slate-400">
-                          <span className="font-mono">{key}:</span> {String(value)}
+                          <span className="font-mono">{key}:</span>{" "}
+                          {Array.isArray(value) ? (value as unknown[]).join(", ") : String(value)}
                         </div>
                       ))}
                     </div>
@@ -382,6 +383,10 @@ function CreateMonitorForm({ onClose, onSuccess }: { onClose: () => void; onSucc
     type: '',
     config: {} as Record<string, any>
   });
+  /** One slice value per line (stored as `partition_values` on the monitor). */
+  const [slicePartitionValuesText, setSlicePartitionValuesText] = useState("");
+  /** Optional override; pipeline saved partition column is used if empty. */
+  const [slicePartitionColumn, setSlicePartitionColumn] = useState("");
   const [pipelines, setPipelines] = useState<PipelineOpt[]>([]);
   const [pipelinesLoading, setPipelinesLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -428,11 +433,27 @@ function CreateMonitorForm({ onClose, onSuccess }: { onClose: () => void; onSucc
     setError(null);
 
     try {
+      const finalConfig = { ...formData.config };
+      const lines = slicePartitionValuesText
+        .split(/[\n,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (lines.length > 0) {
+        finalConfig.partition_values = lines;
+      } else {
+        delete finalConfig.partition_values;
+      }
+      if (slicePartitionColumn.trim()) {
+        finalConfig.partition_column = slicePartitionColumn.trim();
+      } else {
+        delete finalConfig.partition_column;
+      }
+
       const response = await fetch("/api/monitors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, config: finalConfig }),
       });
 
       const data = (await response.json()) as { error?: string };
@@ -530,6 +551,39 @@ function CreateMonitorForm({ onClose, onSuccess }: { onClose: () => void; onSucc
               </div>
             </div>
           )}
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-600 dark:bg-slate-800/40">
+            <p className="text-xs font-medium text-slate-800 dark:text-slate-200">When the monitor fires: slice runs (optional)</p>
+            <p className="mt-1 text-[11px] leading-snug text-slate-600 dark:text-slate-400">
+              If you list values below, eltPulse queues <strong className="font-medium">one pending run per line</strong>{" "}
+              with <code className="rounded bg-white px-0.5 font-mono text-[10px] dark:bg-slate-900">partitionValue</code>{" "}
+              set for your gateway (same as dlt <code className="font-mono text-[10px]">partition_key</code>). Leave empty
+              for a single run with no slice. Partition column defaults from the pipeline&apos;s Run slices config unless
+              you override it.
+            </p>
+            <label className="mt-2 block text-xs text-slate-600 dark:text-slate-400">
+              Partition column override (optional)
+              <input
+                type="text"
+                value={slicePartitionColumn}
+                onChange={(e) => setSlicePartitionColumn(e.target.value)}
+                placeholder="e.g. event_date"
+                className="mt-1 w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
+                spellCheck={false}
+              />
+            </label>
+            <label className="mt-2 block text-xs text-slate-600 dark:text-slate-400">
+              Partition values (one per line, max 100)
+              <textarea
+                value={slicePartitionValuesText}
+                onChange={(e) => setSlicePartitionValuesText(e.target.value)}
+                placeholder={"2024-01-01\n2024-01-02"}
+                rows={4}
+                className="mt-1 w-full rounded border border-slate-300 px-2 py-1 font-mono text-xs dark:border-slate-600 dark:bg-slate-800"
+                spellCheck={false}
+              />
+            </label>
+          </div>
 
           {error && (
             <div className="text-red-600 text-sm">{error}</div>

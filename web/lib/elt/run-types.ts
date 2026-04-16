@@ -40,6 +40,10 @@ export const createRunBodySchema = z.object({
   environment: z.string().max(64).optional().default("default"),
   correlationId: z.string().max(128).optional(),
   triggeredBy: z.string().max(256).optional(),
+  /** Warehouse partition column for this run (optional if pipeline has `_partitionConfig` and `partitionValue` is set). */
+  partitionColumn: z.string().max(256).optional(),
+  /** Slice value passed to executors (e.g. dlt argv / dbt vars), e.g. `2024-01-01`. */
+  partitionValue: z.string().max(2048).optional(),
   status: runStatusSchema.optional().default("running"),
   /** Named gateway (`AgentToken` id). Omit for pipeline default, then single-gateway auto-pin if applicable; null = any gateway. */
   targetAgentTokenId: z.string().min(1).nullable().optional(),

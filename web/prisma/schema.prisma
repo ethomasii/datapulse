@@ -299,6 +299,10 @@ model EltPipelineRun {
   targetAgentTokenId String?    @map("target_agent_token_id")
   targetAgentToken   AgentToken? @relation(fields: [targetAgentTokenId], references: [id], onDelete: SetNull)
   triggeredBy   String?
+  /// Slice / partition value for the executor (e.g. dlt `sys.argv[1]` / `partition_key`). Populated by API, monitors, or Run slices.
+  partitionValue  String? @map("partition_value") @db.Text
+  /// Warehouse column name for this slice when applicable (aligns with `backfill:partition:<column>:<value>`).
+  partitionColumn String? @map("partition_column") @db.Text
   startedAt     DateTime  @default(now())
   finishedAt    DateTime?
   /// JSON array: [{ "at": ISO string, "level": "info"|"warn"|"error", "message": string }]
