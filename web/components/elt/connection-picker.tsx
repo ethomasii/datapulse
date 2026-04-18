@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Cable, Check, ChevronDown, Save } from "lucide-react";
+import { CREDENTIAL_SENSITIVE_KEY_SET } from "@/lib/elt/credential-payload";
 
 export type StoredConnection = {
   id: string;
@@ -70,19 +71,26 @@ export function ConnectionPicker({ connectionType, connector, onSelect, currentV
     (c) => c.connectionType === connectionType && c.connector.toLowerCase() === connector.toLowerCase()
   );
 
+  function flattenConfig(raw: Record<string, unknown> | undefined): Record<string, string> {
+    const flat: Record<string, string> = {};
+    for (const [k, v] of Object.entries(raw ?? {})) {
+      if (v === undefined || v === null) continue;
+      flat[k] = typeof v === "string" ? v : String(v);
+    }
+    return flat;
+  }
+
   async function saveAsConnection(e: React.FormEvent) {
     e.preventDefault();
     if (!saveName.trim()) return;
     setSaving(true);
     setSaveError("");
-    // Only save non-empty, non-secret-looking values
+    // Non-empty values only; omit catalog password/textarea fields (same rules as server-side sanitize).
     const safeConfig: Record<string, string> = {};
     for (const [k, v] of Object.entries(currentValues)) {
-      if (v && !k.toLowerCase().includes("password") && !k.toLowerCase().includes("token") &&
-          !k.toLowerCase().includes("secret") && !k.toLowerCase().includes("key") &&
-          !k.toLowerCase().includes("pem") && !k.toLowerCase().includes("cert")) {
-        safeConfig[k] = v;
-      }
+      if (!v.trim()) continue;
+      if (CREDENTIAL_SENSITIVE_KEY_SET.has(k)) continue;
+      safeConfig[k] = v;
     }
     try {
       const res = await fetch("/api/elt/connections", {
@@ -100,7 +108,9 @@ export function ConnectionPicker({ connectionType, connector, onSelect, currentV
         setSaveError(data.error ?? "Failed to save");
         return;
       }
-      setConnections((prev) => [data.connection as StoredConnection, ...prev]);
+      const created = data.connection as StoredConnection;
+      setConnections((prev) => [created, ...prev]);
+      onSelect({ id: created.id, config: flattenConfig(created.config as Record<string, unknown>) });
       setSaveOpen(false);
       setSaveName("");
       setSaved(true);
@@ -142,13 +152,7 @@ export function ConnectionPicker({ connectionType, connector, onSelect, currentV
                     <button
                       type="button"
                       onClick={() => {
-                        const flat: Record<string, string> = {};
-                        const raw = c.config as Record<string, unknown>;
-                        for (const [k, v] of Object.entries(raw ?? {})) {
-                          if (v === undefined || v === null) continue;
-                          flat[k] = typeof v === "string" ? v : String(v);
-                        }
-                        onSelect({ id: c.id, config: flat });
+                        onSelect({ id: c.id, config: flattenConfig(c.config as Record<string, unknown>) });
                         setOpen(false);
                       }}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
