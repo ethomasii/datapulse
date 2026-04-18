@@ -113,7 +113,7 @@ export async function runManagedWorkerStubBatchHttp(options: {
   return { processed, errors };
 }
 
-export type ManagedExecutorMode = "stub" | "local" | "vercel-python";
+export type ManagedExecutorMode = "stub" | "local" | "vercel-python" | "delegate";
 
 /**
  * `stub` — demo telemetry only (default, backwards compatible).
@@ -121,11 +121,13 @@ export type ManagedExecutorMode = "stub" | "local" | "vercel-python";
  * as this process (dev machine, long-running Node VM, or container with Python/Sling + dlt deps).
  * `vercel-python` — forward to the FastAPI Python service (Vercel Services, `/managed-elt/batch`);
  *   **900s (15 min) max** per serverless invocation for the whole batch (Vercel `maxDuration`).
+ * `delegate` — POST to `ELTPULSE_MANAGED_DELEGATE_URL` (second deployment / long-runner); same batch JSON contract.
  */
 export function resolveManagedExecutorMode(): ManagedExecutorMode {
   const v = (process.env.ELTPULSE_MANAGED_EXECUTOR ?? "stub").toLowerCase().trim();
   if (v === "local") return "local";
   if (v === "vercel-python") return "vercel-python";
+  if (v === "delegate") return "delegate";
   return "stub";
 }
 
@@ -144,6 +146,13 @@ export async function runManagedWorkerBatchHttp(options: {
     const { runManagedWorkerVercelPythonBatchHttp } = await import("@/lib/elt/managed-worker-vercel-python");
     return runManagedWorkerVercelPythonBatchHttp({
       baseUrl: options.baseUrl,
+      limit: options.limit,
+      deadlineMs: options.deadlineMs,
+    });
+  }
+  if (mode === "delegate") {
+    const { runManagedWorkerDelegateBatchHttp } = await import("@/lib/elt/managed-worker-delegate");
+    return runManagedWorkerDelegateBatchHttp({
       limit: options.limit,
       deadlineMs: options.deadlineMs,
     });

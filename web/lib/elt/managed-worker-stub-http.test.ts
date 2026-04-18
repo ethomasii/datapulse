@@ -51,4 +51,9 @@ describe("resolveManagedExecutorMode", () => {
     vi.stubEnv("ELTPULSE_MANAGED_EXECUTOR", "vercel-python");
     expect(resolveManagedExecutorMode()).toBe("vercel-python");
   });
+
+  it("honors delegate", () => {
+    vi.stubEnv("ELTPULSE_MANAGED_EXECUTOR", "delegate");
+    expect(resolveManagedExecutorMode()).toBe("delegate");
+  });
 });

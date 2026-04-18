@@ -2,64 +2,116 @@
 
 Processes **`eltpulse_managed`** pipeline runs via the **internal** control-plane APIs (same bearer secret as `POST /api/internal/agent-heartbeat`).
 
-## Cost-friendly execution (no always-on VM)
+---
 
-1. **Vercel Cron (default in `web/vercel.json`)** — `GET /api/cron/managed-worker` every 15 minutes. Each invocation is a **short burst** (stub: self-calls internal APIs; **vercel-python**: forwards to the Python service). Idle cost ≈ **zero** when nothing runs; you pay per cron tick + function duration.
+## Vercel Services (same project — `vercel-python`)
 
-   - Set **`CRON_SECRET`** (Vercel injects `Authorization: Bearer …` on cron).
-   - Set **`ELTPULSE_INTERNAL_API_SECRET`** (must match internal routes).
-   - Set **`ELTPULSE_CRON_APP_URL`** to your production HTTPS origin if `VERCEL_URL` / `NEXT_PUBLIC_APP_URL` is not enough (e.g. custom domain).
+Vercel’s message is **two parts**:
 
-   **Executor mode** — `ELTPULSE_MANAGED_EXECUTOR`:
+1. **Project setting (dashboard)** — In the Vercel project, the **framework / project type** must be set to **Services** (polyglot). If the project is still “Next.js only,” the build will not wire `experimentalServices` the way you expect.
+2. **Repo config** — `web/vercel.json` must contain **`experimentalServices`** (we ship `web` + `api` keys to match the [quick start](https://vercel.com/docs/services)).
 
-   | Value | Behavior |
-   |-------|----------|
-   | `stub` (default) | Marks runs succeeded with demo telemetry (no dlt/Sling). |
-   | `local` | Runs **real** `python pipeline.py [partition]` or `sling run -r replication.yaml` **in the same Node process host** as the cron handler (dev VM / container with Python + dlt/Sling). |
-   | `vercel-python` | **Vercel [Services](https://vercel.com/docs/services)** — Next.js at `/`, FastAPI worker at **`/managed-elt`**. Cron `POST`s ` /managed-elt/batch` (Bearer `ELTPULSE_MANAGED_VERCEL_PYTHON_SECRET`). Python runs **real** subprocess dlt/Sling with **`maxDuration: 900`** ( **900 seconds = 15 minutes** ) per Python invocation for the **whole batch**. |
+**Monorepo:** set the Vercel **Root Directory** to **`web`** so `vercel.json`, `app/`, and `managed-worker-service/` all resolve from the same root.
 
-   **`vercel-python` env (Vercel project — shared by both services):**
+**Local:** `vercel dev -L` runs all services together.
 
-   - `ELTPULSE_MANAGED_VERCEL_PYTHON_SECRET` — long random string; cron sends `Authorization: Bearer …` to `/managed-elt/batch`.
-   - `ELTPULSE_INTERNAL_API_SECRET` — Python uses this to PATCH/GET internal APIs on the same deployment.
-   - Optional: `ELTPULSE_MANAGED_VERCEL_PYTHON_PATH` — default `/managed-elt` if you change the route prefix in `vercel.json`.
+---
 
-   **15-minute cap (product stance for now):** one serverless invocation cannot exceed Vercel’s configured `maxDuration` (here **900s**). Multiple pending runs in one tick **share** that wall clock; use a low `limit` (e.g. `1`) for heavy pipelines. Customers who need **longer** runs should move to **option #2** (separate long-runner / queue / second deployment) or a future queue+chunking design — not “more expensive” by magic, but **operationally** you maintain two deployables or a job system, and you pay for **two** cold starts / billing surfaces if you split projects.
+## Two pending runs + `limit=1` — do they each get 15 minutes?
 
-   **Deploy requirement:** the Vercel project must use **Services** (polyglot) so `experimentalServices` in `web/vercel.json` is honored. If you are not ready for Services, remove the `experimentalServices` block from `vercel.json` and keep `ELTPULSE_MANAGED_EXECUTOR=stub` or use **`local`** / the CLI on a VM.
+**No — they do not run in parallel** from this design, and **they do not each get their own 15‑minute serverless budget** unless you trigger **two separate** invocations (e.g. two cron hits or two workers).
 
-2. **External scheduler** — AWS EventBridge, Cloud Scheduler, GitHub Actions cron: `curl` your deployed `/api/cron/managed-worker` with `Authorization: Bearer $CRON_SECRET` on whatever cadence you want (cheaper than 15m if load is low).
+- **`limit=1` on one `/batch` call:** at most **one** run is taken from the queue for that invocation. That run may use up to **~900 seconds** for that **single** Python/Node invocation (minus startup/overhead).
+- **A second pending run:** waits until the **next** time work runs — e.g. the **next cron** tick (`*/15 * * * *` → up to ~15 minutes later), or another manual `GET /api/cron/managed-worker`, or a second concurrent worker if you add that later.
+- **`limit=2` in one `/batch`:** runs are processed **one after another** in a **for** loop. **Both share one 900s wall clock** for that invocation. So run #2 does **not** get a fresh 15 minutes; if run #1 takes 14 minutes, run #2 only has ~1 minute left before the function is cut off.
 
-3. **CLI (laptop / build agent)** — from `web/`:
+**Summary:** `limit=1` = **time-queue between ticks** (and at most one heavy run per invocation). It is **not** “15 minutes per run” in parallel unless you run **multiple invocations** in parallel (separate design).
 
-   ```bash
-   cd web
-   npm install
-   # .env.local: ELTPULSE_INTERNAL_API_SECRET, ELTPULSE_MANAGED_EXECUTOR=local,
-   #             NEXT_PUBLIC_APP_URL or ELTPULSE_CONTROL_PLANE_URL
-   npm run managed-worker:local
-   ```
+---
 
-   Optional env: `ELTPULSE_MANAGED_PYTHON_BIN`, `ELTPULSE_MANAGED_SLING_BIN`, `ELTPULSE_MANAGED_RUN_TIMEOUT_MS`, `ELTPULSE_MANAGED_LIMIT`, `ELTPULSE_MANAGED_DEADLINE_MS`.
+## Environment variables
 
-4. **Legacy one-shot (stub only)** — `integrations/managed-worker/run-once.mjs` is still **stub** only. For real execution use `npm run managed-worker:local` or `vercel-python` on Vercel.
+### Always (any executor on Vercel)
 
-## Internal APIs (managed worker)
+| Variable | Purpose |
+|----------|---------|
+| `DATABASE_URL` / `DIRECT_URL` | Postgres (Neon, etc.) |
+| `ELTPULSE_TOKEN_ENCRYPTION_KEY` | Decrypt connection secrets for `executor-context` |
+| `ELTPULSE_INTERNAL_API_SECRET` | Bearer for `/api/internal/*` (managed runs, heartbeat) |
+| `CRON_SECRET` | Cron `Authorization: Bearer …` for `/api/cron/*` |
+| `NEXT_PUBLIC_APP_URL` | Public app URL (or rely on `VERCEL_URL` in prod) |
+| `ELTPULSE_CRON_APP_URL` | Optional; canonical HTTPS origin for server-to-server calls (custom domain) |
 
-- `GET /api/internal/managed-runs?limit=N` — pending managed runs + pipeline manifest fields.
-- `PATCH /api/internal/managed-runs/:id` — claim (`pending` → `running`) and report logs / telemetry / terminal status.
-- `GET /api/internal/managed-runs/:id` — read `status`.
-- `GET /api/internal/managed-runs/:id/executor-context` — **after claim**, pipeline artifacts + **decrypted** connection secrets (internal bearer only).
+### `ELTPULSE_MANAGED_EXECUTOR=stub` (default)
 
-## Python worker (FastAPI)
+No extra managed vars. Cron self-calls internal APIs with `ELTPULSE_INTERNAL_API_SECRET`.
 
-- Source: `web/managed-worker-service/main.py` + `pyproject.toml`.
-- **Sling** on stock Vercel Python images usually **has no `sling` binary**; those runs fail with a clear error unless you add a layer/binary. **dlt** pipelines use `sys.executable` and the service’s installed `dlt` package.
+### `ELTPULSE_MANAGED_EXECUTOR=vercel-python` (Services — same deployment)
 
-## Tuning cron frequency
+| Variable | Purpose |
+|----------|---------|
+| `ELTPULSE_MANAGED_VERCEL_PYTHON_SECRET` | Cron → `POST /managed-elt/batch` with `Authorization: Bearer …` |
+| `ELTPULSE_MANAGED_VERCEL_PYTHON_PATH` | Optional; default `/managed-elt` if you change `routePrefix` |
+| `ELTPULSE_MANAGED_RUN_TIMEOUT_MS` | Optional; per-pipeline subprocess kill delay (ms), capped at 900_000 |
 
-- More frequent cron → lower **latency** to pick up pending runs, more **invocations** (Vercel billing).
-- Less frequent → fewer invocations, higher worst-case delay.
-- Edit `web/vercel.json` → `schedule` for `/api/cron/managed-worker`.
+Python service uses the **same** `ELTPULSE_INTERNAL_API_SECRET` and `VERCEL_URL` / `ELTPULSE_CRON_APP_URL` / `NEXT_PUBLIC_APP_URL` to call the Next app’s internal routes.
+
+### `ELTPULSE_MANAGED_EXECUTOR=delegate` (option #2 — second deployment / long-runner)
+
+**Project A (Next — control plane + cron)**
+
+| Variable | Purpose |
+|----------|---------|
+| `ELTPULSE_MANAGED_EXECUTOR` | `delegate` |
+| `ELTPULSE_MANAGED_DELEGATE_URL` | Full URL to worker’s batch endpoint, e.g. `https://your-worker.vercel.app/managed-elt/batch` |
+| `ELTPULSE_MANAGED_DELEGATE_SECRET` | Bearer secret; must match what the worker expects (`ELTPULSE_MANAGED_VERCEL_PYTHON_SECRET` on the worker) |
+
+**Project B (Python worker only)** — deploy `managed-worker-service/` (same FastAPI app). It does **not** need the Next app; it only needs HTTP access to **Project A’s origin**.
+
+| Variable | Purpose |
+|----------|---------|
+| `ELTPULSE_CONTROL_PLANE_URL` | **Project A** HTTPS origin, e.g. `https://app.yourdomain.com` |
+| `ELTPULSE_INTERNAL_API_SECRET` | **Same value as Project A** (so internal APIs authorize) |
+| `ELTPULSE_MANAGED_VERCEL_PYTHON_SECRET` | **Same value as** `ELTPULSE_MANAGED_DELEGATE_SECRET` on A (validates `POST /batch`) |
+| `ELTPULSE_TOKEN_ENCRYPTION_KEY` | **Not required on B** if B only calls A’s HTTP APIs (A decrypts). Omit on B unless you add DB access there. |
+
+Project B can use a **longer** `maxDuration` (or a non-Vercel host) if you move off the 900s cap.
+
+If Project A uses **only** `delegate`, you may remove **`experimentalServices`** from Project A’s `vercel.json` (Next-only app) and deploy the Python worker **only** on Project B.
+
+### `ELTPULSE_MANAGED_EXECUTOR=local` (CLI / Node on a VM)
+
+See `npm run managed-worker:local` in `web/package.json` and `.env.local`: `ELTPULSE_MANAGED_EXECUTOR=local`, `ELTPULSE_INTERNAL_API_SECRET`, app URL.
+
+---
+
+## Cost-friendly execution (summary)
+
+1. **Vercel Cron** — `GET /api/cron/managed-worker` (see `web/vercel.json`). Uses `ELTPULSE_MANAGED_EXECUTOR` to choose stub, same-host local, `vercel-python`, or `delegate`.
+
+2. **External scheduler** — `curl` the same cron path with `Authorization: Bearer $CRON_SECRET`.
+
+3. **CLI** — `cd web && npm run managed-worker:local` with `ELTPULSE_MANAGED_EXECUTOR=local`.
+
+4. **Legacy stub** — `integrations/managed-worker/run-once.mjs`.
+
+---
+
+## Internal APIs
+
+- `GET /api/internal/managed-runs?limit=N`
+- `PATCH /api/internal/managed-runs/:id`
+- `GET /api/internal/managed-runs/:id`
+- `GET /api/internal/managed-runs/:id/executor-context` (after claim; decrypted connection secrets)
+
+## Python worker
+
+- `web/managed-worker-service/main.py` + `pyproject.toml`
+- **Sling:** needs `sling` on `PATH` on that image; stock Vercel Python usually lacks it.
+- **dlt:** uses `sys.executable` + installed `dlt`.
+
+## Cron frequency
+
+Edit `web/vercel.json` → `crons` → `/api/cron/managed-worker`.
 
 Customer gateways **must not** poll managed runs; `GET /api/agent/runs` excludes `eltpulse_managed` / `datapulse_managed`.

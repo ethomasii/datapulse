@@ -20,6 +20,7 @@ export const maxDuration = 900;
  * Set `ELTPULSE_MANAGED_EXECUTOR=local` for real dlt/Sling on the Node host (dev VM / container).
  * Set `ELTPULSE_MANAGED_EXECUTOR=vercel-python` for Vercel **Services** Python worker (`/managed-elt/batch`),
  *   **900s (15 min) max** per cron tick for the Python invocation (see `vercel.json` `experimentalServices`).
+ * Set `ELTPULSE_MANAGED_EXECUTOR=delegate` to POST the same batch payload to `ELTPULSE_MANAGED_DELEGATE_URL` (option #2).
  *
  * Auth: `Authorization: Bearer ${CRON_SECRET}` (same as `/api/cron/monitors`).
  *
@@ -59,8 +60,9 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const mode = resolveManagedExecutorMode();
   const limit = Math.min(20, Math.max(1, Number(url.searchParams.get("limit") ?? 5) || 5));
-  const defaultBudget = mode === "vercel-python" ? 900_000 : 45_000;
-  const maxBudget = mode === "vercel-python" ? 900_000 : 120_000;
+  const longRunner = mode === "vercel-python" || mode === "delegate";
+  const defaultBudget = longRunner ? 900_000 : 45_000;
+  const maxBudget = longRunner ? 900_000 : 120_000;
   const budgetMs = Math.min(
     maxBudget,
     Math.max(5_000, Number(url.searchParams.get("budgetMs") ?? defaultBudget) || defaultBudget)

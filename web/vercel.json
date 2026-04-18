@@ -1,12 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "experimentalServices": {
-    "nextjs": {
+    "web": {
       "entrypoint": ".",
       "routePrefix": "/",
       "framework": "nextjs"
     },
-    "managedWorker": {
+    "api": {
       "entrypoint": "managed-worker-service/main.py",
       "routePrefix": "/managed-elt",
       "framework": "fastapi",
