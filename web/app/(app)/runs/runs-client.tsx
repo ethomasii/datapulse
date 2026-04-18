@@ -605,13 +605,13 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
             </div>
           </div>
         ) : null}
-        <div className="mt-3 flex flex-wrap gap-4">
-          <label className="block">
-            <span className="text-xs text-slate-500">Pipeline</span>
+        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
+          <label className="flex min-w-0 flex-col gap-1">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Pipeline</span>
             <select
               value={pipelineFilterId}
               onChange={(e) => setPipelineFilterInUrl(e.target.value)}
-              className="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
             >
               <option value="">All pipelines</option>
               {initialPipelines.map((p) => (
@@ -621,12 +621,12 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
               ))}
             </select>
           </label>
-          <label className="block">
-            <span className="text-xs text-slate-500">Status</span>
+          <label className="flex min-w-0 flex-col gap-1">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Status</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
             >
               <option value="">Any</option>
               {STATUS_OPTIONS.map((s) => (
@@ -636,13 +636,13 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
               ))}
             </select>
           </label>
-          <label className="block">
-            <span className="text-xs text-slate-500">Environment</span>
+          <label className="flex min-w-0 flex-col gap-1">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Environment</span>
             <input
               value={environmentFilter}
               onChange={(e) => setEnvironmentFilter(e.target.value)}
               placeholder="e.g. prod, demo"
-              className="mt-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
             />
           </label>
         </div>
