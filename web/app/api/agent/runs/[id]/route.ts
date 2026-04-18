@@ -78,6 +78,29 @@ export async function PATCH(req: Request, { params }: Params) {
   }
   const body = parsed.data;
 
+  // ── Atomic claim guard ───────────────────────────────────────────────────────
+  // When a gateway is transitioning a run from pending → running, use an
+  // atomic updateMany with a status=pending guard so that two gateway replicas
+  // racing to claim the same run produce exactly one winner. The loser gets a
+  // 409 Conflict and should skip this run — another replica already owns it.
+  if (body.status === "running" && existing.status === "pending") {
+    const claimed = await db.eltPipelineRun.updateMany({
+      where: { id, userId: user.id, status: "pending" },
+      data: { status: "running", ingestionExecutor: "customer_agent" },
+    });
+    if (claimed.count === 0) {
+      // Another replica claimed it first
+      return NextResponse.json({ error: "Already claimed by another gateway" }, { status: 409 });
+    }
+    // Re-fetch after atomic update to return the current record
+    const run = await db.eltPipelineRun.findFirst({
+      where: { id },
+      include: { pipeline: { select: { name: true } } },
+    });
+    return NextResponse.json({ run, cancel: false });
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
   const patch = applyPatchRunBody(
     {
       status: existing.status,
