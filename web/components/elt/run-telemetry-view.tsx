@@ -285,3 +285,21 @@ export function RunTelemetryTableCells({ telemetryRaw }: { telemetryRaw: unknown
     </>
   );
 }
+
+/** Single table cell: progress · rows · bytes (for compact run lists). */
+export function RunTelemetryCompactCell({ telemetryRaw }: { telemetryRaw: unknown }) {
+  const { summary } = effectiveRunTelemetry(telemetryRaw, undefined);
+  const parts: string[] = [];
+  if (summary.progress !== undefined) parts.push(`${Math.round(summary.progress)}%`);
+  if (summary.rowsLoaded !== undefined) parts.push(formatRows(summary.rowsLoaded));
+  if (summary.bytesLoaded !== undefined) parts.push(formatBytes(summary.bytesLoaded));
+  const text = parts.length > 0 ? parts.join(" · ") : "—";
+  return (
+    <td
+      className="max-w-[min(280px,32vw)] truncate px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-200"
+      title={text}
+    >
+      {text}
+    </td>
+  );
+}

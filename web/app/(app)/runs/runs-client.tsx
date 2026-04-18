@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   ChevronRight,
   ClipboardCopy,
-  ExternalLink,
   Layers,
   Loader2,
   Play,
@@ -21,7 +20,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { RunTelemetryTableCells, RunTelemetryView } from "@/components/elt/run-telemetry-view";
+import { RunTelemetryCompactCell, RunTelemetryView } from "@/components/elt/run-telemetry-view";
 import { formatBytes, formatRows, parseRunTelemetry } from "@/lib/elt/run-telemetry";
 import { RelatedLinks } from "@/components/ui/related-links";
 import { BarChart } from "@/components/ui/bar-chart";
@@ -63,7 +62,7 @@ function telemetrySourceLabel(executor: string) {
 
 const STATUS_OPTIONS = ["pending", "running", "succeeded", "failed", "cancelled"] as const;
 
-type SortCol = "startedAt" | "pipeline" | "status" | "environment" | "rows" | "bytes";
+type SortCol = "startedAt" | "pipeline" | "status" | "environment" | "rows";
 type SortDir = "asc" | "desc";
 
 function SortIcon({ col, sortCol, sortDir }: { col: SortCol; sortCol: SortCol; sortDir: SortDir }) {
@@ -155,6 +154,8 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
   const [detailLoading, setDetailLoading] = useState(false);
   const [demoBusy, setDemoBusy] = useState(false);
   const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const selectAllRef = useRef<HTMLInputElement>(null);
   const [sortCol, setSortCol] = useState<SortCol>("startedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -206,12 +207,55 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
   }, [loadRuns]);
 
   useEffect(() => {
+    setSelectedIds(new Set());
+  }, [pipelineFilterId, statusFilter, environmentFilter]);
+
+  useEffect(() => {
     if (typeof statusFromUrl === "string" && statusFromUrl.length > 0) {
       setStatusFilter(statusFromUrl);
     }
   }, [statusFromUrl]);
 
   const activeRunCount = runs.filter((r) => r.status === "pending" || r.status === "running").length;
+
+  const sortedRuns = useMemo(() => {
+    return [...runs].sort((a, b) => {
+      let cmp = 0;
+      switch (sortCol) {
+        case "startedAt":
+          cmp = new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime();
+          break;
+        case "pipeline":
+          cmp = a.pipeline.name.localeCompare(b.pipeline.name);
+          break;
+        case "status":
+          cmp = a.status.localeCompare(b.status);
+          break;
+        case "environment":
+          cmp = a.environment.localeCompare(b.environment);
+          break;
+        case "rows": {
+          const aRows = parseRunTelemetry(a.telemetry).summary.rowsLoaded ?? 0;
+          const bRows = parseRunTelemetry(b.telemetry).summary.rowsLoaded ?? 0;
+          cmp = aRows - bRows;
+          break;
+        }
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [runs, sortCol, sortDir]);
+
+  const cancellableIdsInList = useMemo(
+    () => sortedRuns.filter((r) => r.status === "pending" || r.status === "running").map((r) => r.id),
+    [sortedRuns]
+  );
+
+  useEffect(() => {
+    const el = selectAllRef.current;
+    if (!el) return;
+    const n = cancellableIdsInList.filter((id) => selectedIds.has(id)).length;
+    el.indeterminate = n > 0 && n < cancellableIdsInList.length;
+  }, [cancellableIdsInList, selectedIds]);
 
   useEffect(() => {
     if (!runIdFromUrl) {
@@ -259,6 +303,11 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
         body: JSON.stringify({ status: "cancelled" }),
       });
       if (!res.ok) throw new Error(await res.text());
+      setSelectedIds((prev) => {
+        const s = new Set(prev);
+        s.delete(id);
+        return s;
+      });
       await loadRuns();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to cancel run");
@@ -269,6 +318,65 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
         return s;
       });
     }
+  }
+
+  async function cancelSelectedRuns() {
+    const ids = Array.from(selectedIds).filter((id) => {
+      const r = runs.find((x) => x.id === id);
+      return r && (r.status === "pending" || r.status === "running");
+    });
+    if (ids.length === 0) return;
+    setError(null);
+    setCancellingIds((prev) => {
+      const s = new Set(prev);
+      ids.forEach((id) => s.add(id));
+      return s;
+    });
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) =>
+          fetch(`/api/elt/runs/${id}`, {
+            method: "PATCH",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "cancelled" }),
+          }).then(async (res) => {
+            if (!res.ok) throw new Error(await res.text());
+          })
+        )
+      );
+      const failed = results.filter((r) => r.status === "rejected").length;
+      if (failed > 0) {
+        setError(`${failed} of ${ids.length} run(s) could not be cancelled. Try refreshing.`);
+      }
+      setSelectedIds(new Set());
+      await loadRuns();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Bulk cancel failed");
+    } finally {
+      setCancellingIds((prev) => {
+        const s = new Set(prev);
+        ids.forEach((id) => s.delete(id));
+        return s;
+      });
+    }
+  }
+
+  function toggleSelectAll() {
+    const list = cancellableIdsInList;
+    if (list.length === 0) return;
+    const allOn = list.every((id) => selectedIds.has(id));
+    if (allOn) setSelectedIds(new Set());
+    else setSelectedIds(new Set(list));
+  }
+
+  function toggleRowSelect(id: string) {
+    setSelectedIds((prev) => {
+      const s = new Set(prev);
+      if (s.has(id)) s.delete(id);
+      else s.add(id);
+      return s;
+    });
   }
 
   async function runDemo() {
@@ -379,66 +487,29 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
     return key in runsPerDay;
   });
 
-  const sortedRuns = [...runs].sort((a, b) => {
-    let cmp = 0;
-    switch (sortCol) {
-      case "startedAt":
-        cmp = new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime();
-        break;
-      case "pipeline":
-        cmp = a.pipeline.name.localeCompare(b.pipeline.name);
-        break;
-      case "status":
-        cmp = a.status.localeCompare(b.status);
-        break;
-      case "environment":
-        cmp = a.environment.localeCompare(b.environment);
-        break;
-      case "rows": {
-        const aRows = parseRunTelemetry(a.telemetry).summary.rowsLoaded ?? 0;
-        const bRows = parseRunTelemetry(b.telemetry).summary.rowsLoaded ?? 0;
-        cmp = aRows - bRows;
-        break;
-      }
-      case "bytes": {
-        const aBytes = parseRunTelemetry(a.telemetry).summary.bytesLoaded ?? 0;
-        const bBytes = parseRunTelemetry(b.telemetry).summary.bytesLoaded ?? 0;
-        cmp = aBytes - bBytes;
-        break;
-      }
-    }
-    return sortDir === "asc" ? cmp : -cmp;
-  });
-
   return (
     <div className="w-full min-w-0 max-w-7xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Runs</h1>
         <p className="mt-2 max-w-3xl text-slate-600 dark:text-slate-300">
-          List and filter executions per pipeline (newest first). Open a pipeline from{" "}
+          Filter and inspect pipeline executions. Jump from{" "}
           <Link href="/builder" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
             Pipelines
           </Link>{" "}
-          and use <strong className="font-medium text-slate-800 dark:text-slate-200">Runs</strong> to jump here with{" "}
-          <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">?pipeline=…</code> so you see the full
-          history for that line (every slice is still one row). Push{" "}
-          <strong className="font-medium text-slate-800 dark:text-slate-200">live telemetry</strong>{" "}
-          (rows, bytes, progress, phase) via the same PATCH as logs — gateway and managed workers use identical fields.
-          Logs are structured and scrubbed — we never store raw warehouse credentials. Telemetry is stored here whether
-          ingestion runs on{" "}
-          <strong className="font-medium text-slate-800 dark:text-slate-200">your gateway</strong>,{" "}
-          <strong className="font-medium text-slate-800 dark:text-slate-200">eltPulse-managed</strong> compute (when
-          enabled), or the <strong className="font-medium text-slate-800 dark:text-slate-200">app / API</strong>. Share
-          the <strong className="font-medium text-slate-800 dark:text-slate-200">correlation ID</strong> with your
-          runner or CI for support. Optional webhooks fire when a run reaches a terminal state.
-        </p>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-          Schedules and sensors don&apos;t live here — they trigger runs elsewhere (in eltPulse or in an external
-          orchestrator). See{" "}
+          with <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">?pipeline=…</code> for one
+          line&apos;s history. Open <strong className="font-medium text-slate-800 dark:text-slate-200">Details</strong>{" "}
+          for correlation ID, full telemetry, and logs. Schedules live under{" "}
           <Link href="/orchestration" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
             Orchestration
-          </Link>{" "}
-          for how definitions stay separate from scheduling, and why you can run the same exports on or off platform.
+          </Link>
+          ; webhooks under{" "}
+          <Link href="/webhooks" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+            Webhooks
+          </Link>
+          .{" "}
+          <Link href="/docs/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+            Runs docs →
+          </Link>
         </p>
       </div>
 
@@ -476,17 +547,6 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
           </Link>
         </div>
       )}
-
-      <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-        <Webhook className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
-        <span>
-          Want to fire a webhook when a run finishes?{" "}
-          <Link href="/webhooks" className="inline-flex items-center gap-0.5 font-medium text-sky-600 hover:underline dark:text-sky-400">
-            Manage webhooks <ExternalLink className="h-3 w-3" />
-          </Link>
-          {" "}— account default and per-pipeline overrides, decoupled from runs.
-        </span>
-      </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <Link
@@ -648,99 +708,160 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
           )}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-          <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
-              <tr>
-                {(["startedAt", "pipeline", "environment", "status"] as SortCol[]).map((col) => (
-                  <th key={col} className="px-3 py-2 font-medium">
-                    <button type="button" onClick={() => toggleSort(col)} className="inline-flex items-center whitespace-nowrap hover:text-sky-600">
-                      {col === "startedAt" ? "Started" : col === "pipeline" ? "Pipeline" : col === "environment" ? "Environment" : "Status"}
-                      <SortIcon col={col} sortCol={sortCol} sortDir={sortDir} />
-                    </button>
+        <>
+          {selectedIds.size > 0 && (
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+              <span>
+                <strong className="font-semibold">{selectedIds.size}</strong> selected
+              </span>
+              <button
+                type="button"
+                onClick={() => void cancelSelectedRuns()}
+                disabled={Array.from(selectedIds).some((id) => cancellingIds.has(id))}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+              >
+                Cancel selected
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className="text-xs font-medium text-amber-900 underline hover:no-underline dark:text-amber-100"
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
+          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+            <table className="w-full min-w-0 text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
+                <tr>
+                  <th className="sticky left-0 z-20 w-[200px] min-w-[180px] border-r border-slate-200 bg-slate-50 px-2 py-2 text-left align-bottom dark:border-slate-700 dark:bg-slate-900">
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={selectAllRef}
+                        type="checkbox"
+                        className="h-4 w-4 shrink-0 rounded border-slate-300 text-sky-600 focus:ring-sky-500 disabled:opacity-40 dark:border-slate-600"
+                        checked={
+                          cancellableIdsInList.length > 0 &&
+                          cancellableIdsInList.every((id) => selectedIds.has(id))
+                        }
+                        disabled={cancellableIdsInList.length === 0}
+                        onChange={toggleSelectAll}
+                        title="Select all pending / running runs in this list"
+                        aria-label="Select all cancellable runs"
+                      />
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+                        Actions
+                      </span>
+                    </div>
                   </th>
-                ))}
-                <th className="px-3 py-2 font-medium text-slate-600 dark:text-slate-400">Slice</th>
-                <th className="px-3 py-2 font-medium">Gateway</th>
-                <th className="px-3 py-2 font-medium">Progress</th>
-                <th className="px-3 py-2 font-medium">
-                  <button type="button" onClick={() => toggleSort("rows")} className="inline-flex items-center hover:text-sky-600">
-                    Rows<SortIcon col="rows" sortCol={sortCol} sortDir={sortDir} />
-                  </button>
-                </th>
-                <th className="px-3 py-2 font-medium">
-                  <button type="button" onClick={() => toggleSort("bytes")} className="inline-flex items-center hover:text-sky-600">
-                    Bytes<SortIcon col="bytes" sortCol={sortCol} sortDir={sortDir} />
-                  </button>
-                </th>
-                <th className="px-3 py-2 font-medium">Source</th>
-                <th className="px-3 py-2 font-medium">Correlation ID</th>
-                <th className="px-3 py-2 font-medium" />
-              </tr>
-            </thead>
-            <tbody>
-              {sortedRuns.map((r) => (
-                <tr key={r.id} className="border-b border-slate-100 dark:border-slate-800">
-                  <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-400">
-                    {new Date(r.startedAt).toLocaleString()}
-                  </td>
-                  <td className="px-3 py-2 font-medium text-slate-900 dark:text-white">{r.pipeline.name}</td>
-                  <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{r.environment}</td>
-                  <td className="px-3 py-2">
-                    <span className="inline-flex items-center gap-1.5">
-                      <StatusGlyph status={r.status} />
-                      <span className="capitalize">{r.status}</span>
-                    </span>
-                  </td>
-                  <td className="max-w-[150px] px-3 py-2 align-top">
-                    <SliceCell
-                      triggeredBy={r.triggeredBy}
-                      partitionColumn={r.partitionColumn}
-                      partitionValue={r.partitionValue}
-                    />
-                  </td>
-                  <td className="max-w-[140px] truncate px-3 py-2 text-slate-600 dark:text-slate-300" title={r.targetAgentToken?.name ?? "Any gateway"}>
-                    {r.targetAgentToken?.name ?? "Any"}
-                  </td>
-                  <RunTelemetryTableCells telemetryRaw={r.telemetry} />
-                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
-                    {telemetrySourceLabel(r.ingestionExecutor ?? "unspecified")}
-                  </td>
-                  <td className="max-w-[200px] truncate px-3 py-2 font-mono text-xs text-slate-600 dark:text-slate-400">
-                    {r.correlationId}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <div className="inline-flex items-center gap-2">
-                      {(r.status === "pending" || r.status === "running") && (
-                        <button
-                          type="button"
-                          disabled={cancellingIds.has(r.id)}
-                          onClick={() => void cancelRun(r.id)}
-                          className="inline-flex items-center gap-1 text-xs text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
-                          title="Cancel this run"
-                        >
-                          {cancellingIds.has(r.id) ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <X className="h-3 w-3" />
-                          )}
-                          Cancel
-                        </button>
-                      )}
+                  {(["startedAt", "pipeline", "environment", "status"] as SortCol[]).map((col) => (
+                    <th key={col} className="px-3 py-2 font-medium">
                       <button
                         type="button"
-                        onClick={() => void openDetail(r.id)}
-                        className="inline-flex items-center gap-1 text-sky-600 hover:underline dark:text-sky-400"
+                        onClick={() => toggleSort(col)}
+                        className="inline-flex items-center whitespace-nowrap hover:text-sky-600"
                       >
-                        Details <ChevronRight className="h-4 w-4" />
+                        {col === "startedAt"
+                          ? "Started"
+                          : col === "pipeline"
+                            ? "Pipeline"
+                            : col === "environment"
+                              ? "Environment"
+                              : "Status"}
+                        <SortIcon col={col} sortCol={sortCol} sortDir={sortDir} />
                       </button>
-                    </div>
-                  </td>
+                    </th>
+                  ))}
+                  <th className="px-3 py-2 font-medium text-slate-600 dark:text-slate-400">Slice</th>
+                  <th className="px-3 py-2 font-medium">Gateway</th>
+                  <th className="px-3 py-2 font-medium">
+                    <button type="button" onClick={() => toggleSort("rows")} className="inline-flex items-center hover:text-sky-600">
+                      Progress / loads
+                      <SortIcon col="rows" sortCol={sortCol} sortDir={sortDir} />
+                    </button>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {sortedRuns.map((r) => {
+                  const cancellable = r.status === "pending" || r.status === "running";
+                  return (
+                    <tr key={r.id} className="border-b border-slate-100 dark:border-slate-800">
+                      <td className="sticky left-0 z-10 border-r border-slate-100 bg-white px-2 py-2 align-top dark:border-slate-800 dark:bg-slate-950">
+                        <div className="flex gap-2">
+                          <div className="flex w-5 shrink-0 justify-center pt-0.5">
+                            {cancellable ? (
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 dark:border-slate-600"
+                                checked={selectedIds.has(r.id)}
+                                onChange={() => toggleRowSelect(r.id)}
+                                aria-label={`Select run ${r.pipeline.name}`}
+                              />
+                            ) : null}
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            {cancellable ? (
+                              <button
+                                type="button"
+                                disabled={cancellingIds.has(r.id)}
+                                onClick={() => void cancelRun(r.id)}
+                                className="inline-flex items-center gap-1 text-left text-xs font-medium text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+                                title="Cancel this run"
+                              >
+                                {cancellingIds.has(r.id) ? (
+                                  <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+                                ) : (
+                                  <X className="h-3 w-3 shrink-0" />
+                                )}
+                                Cancel
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => void openDetail(r.id)}
+                              className="inline-flex items-center gap-1 text-left text-xs font-medium text-sky-600 hover:underline dark:text-sky-400"
+                            >
+                              Details <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-400">
+                        {new Date(r.startedAt).toLocaleString()}
+                      </td>
+                      <td className="max-w-[min(200px,28vw)] truncate px-3 py-2 font-medium text-slate-900 dark:text-white" title={r.pipeline.name}>
+                        {r.pipeline.name}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">{r.environment}</td>
+                      <td className="whitespace-nowrap px-3 py-2">
+                        <span className="inline-flex items-center gap-1.5">
+                          <StatusGlyph status={r.status} />
+                          <span className="capitalize">{r.status}</span>
+                        </span>
+                      </td>
+                      <td className="max-w-[120px] px-3 py-2 align-top sm:max-w-[160px]">
+                        <SliceCell
+                          triggeredBy={r.triggeredBy}
+                          partitionColumn={r.partitionColumn}
+                          partitionValue={r.partitionValue}
+                        />
+                      </td>
+                      <td
+                        className="max-w-[100px] truncate px-3 py-2 text-xs text-slate-600 dark:text-slate-300 sm:max-w-[140px]"
+                        title={r.targetAgentToken?.name ?? "Any gateway"}
+                      >
+                        {r.targetAgentToken?.name ?? "Any"}
+                      </td>
+                      <RunTelemetryCompactCell telemetryRaw={r.telemetry} />
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       <RelatedLinks links={[
