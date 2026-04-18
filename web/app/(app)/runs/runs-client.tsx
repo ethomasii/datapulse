@@ -154,6 +154,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
   } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [demoBusy, setDemoBusy] = useState(false);
+  const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
   const [sortCol, setSortCol] = useState<SortCol>("startedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -244,6 +245,30 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
     const q = new URLSearchParams(searchParams.toString());
     q.delete("run");
     router.replace(runsPathWithQuery(q), { scroll: false });
+  }
+
+  async function cancelRun(id: string) {
+    const next = new Set(cancellingIds);
+    next.add(id);
+    setCancellingIds(next);
+    try {
+      const res = await fetch(`/api/elt/runs/${id}`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "cancelled" }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await loadRuns();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to cancel run");
+    } finally {
+      setCancellingIds((prev) => {
+        const s = new Set(prev);
+        s.delete(id);
+        return s;
+      });
+    }
   }
 
   async function runDemo() {
@@ -685,13 +710,31 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                     {r.correlationId}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => void openDetail(r.id)}
-                      className="inline-flex items-center gap-1 text-sky-600 hover:underline dark:text-sky-400"
-                    >
-                      Details <ChevronRight className="h-4 w-4" />
-                    </button>
+                    <div className="inline-flex items-center gap-2">
+                      {(r.status === "pending" || r.status === "running") && (
+                        <button
+                          type="button"
+                          disabled={cancellingIds.has(r.id)}
+                          onClick={() => void cancelRun(r.id)}
+                          className="inline-flex items-center gap-1 text-xs text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+                          title="Cancel this run"
+                        >
+                          {cancellingIds.has(r.id) ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <X className="h-3 w-3" />
+                          )}
+                          Cancel
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => void openDetail(r.id)}
+                        className="inline-flex items-center gap-1 text-sky-600 hover:underline dark:text-sky-400"
+                      >
+                        Details <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

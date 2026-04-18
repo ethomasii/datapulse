@@ -96,11 +96,13 @@ export function CatalogCredentialFields({ fields, values, onPatch }: Props) {
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
               />
               {f.help ? <p className="mt-1 text-xs text-slate-500">{f.help}</p> : null}
-              <p className="mt-1 text-[11px] leading-relaxed text-amber-800 dark:text-amber-200">
-                Not stored in eltPulse. Use when you export or copy a local <code className="font-mono text-[10px]">.env</code>{" "}
-                from the builder. For runs on a gateway or eltPulse-managed workers, set the same secret in that
-                environment using the variable name from your pipeline config (for GitHub, the &quot;PAT env var name&quot;
-                field — default <code className="font-mono text-[10px]">GITHUB_TOKEN</code>).
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                Store this secret in{" "}
+                <a href="/connections" className="font-medium text-sky-600 underline hover:no-underline dark:text-sky-400">
+                  Connections
+                </a>{" "}
+                so it is encrypted at rest and injected automatically when eltPulse-managed or gateway workers execute this pipeline.
+                The value entered here is only used for local export / <code className="font-mono text-[10px]">.env</code> generation.
               </p>
             </label>
           );

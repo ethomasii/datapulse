@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   AlertCircle,
+  ChevronRight,
   Database,
   Layers,
   Loader2,
@@ -29,26 +30,24 @@ type PipelineSummary = {
   partitionConfig?: PartitionConfig;
 };
 
-// --- Main page ---
-
 export default function RunSlicesPage() {
   const searchParams = useSearchParams();
-  const pipelineRaw = searchParams.get("pipeline");
-  const pipelineFromUrl = pipelineRaw && pipelineRaw.length > 0 ? pipelineRaw : null;
+  const router = useRouter();
+  const pipelineFromUrl = searchParams.get("pipeline") ?? "";
 
   const [pipelines, setPipelines] = useState<PipelineSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string>(pipelineFromUrl);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/elt/pipelines');
-      if (!res.ok) throw new Error('Failed to load pipelines');
+      const res = await fetch("/api/elt/pipelines");
+      if (!res.ok) throw new Error("Failed to load pipelines");
       const data = await res.json() as { pipelines: any[] };
-      // Load full pipeline details (including sourceConfiguration) for each
       const detailed = await Promise.all(
-        data.pipelines.map(async p => {
+        data.pipelines.map(async (p) => {
           const r = await fetch(`/api/elt/pipelines/${p.id}`);
           if (!r.ok) return { ...p, partitionConfig: undefined };
           const d = await r.json() as { pipeline: any };
@@ -64,13 +63,24 @@ export default function RunSlicesPage() {
       );
       setPipelines(detailed);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load');
+      setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Sync selectedId → URL ?pipeline= param (without full navigation)
+  const selectPipeline = useCallback((id: string) => {
+    setSelectedId(id);
+    const params = new URLSearchParams(searchParams.toString());
+    if (id) params.set("pipeline", id);
+    else params.delete("pipeline");
+    router.replace(`/run-slices?${params.toString()}`, { scroll: false });
+  }, [router, searchParams]);
+
+  const selected = pipelines.find((p) => p.id === selectedId) ?? null;
 
   return (
     <div className="w-full min-w-0 max-w-5xl mx-auto space-y-8">
@@ -82,16 +92,9 @@ export default function RunSlicesPage() {
         </div>
         <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Run slices & backfills</h1>
         <p className="mt-3 text-slate-600 dark:text-slate-300">
-          Start with <strong className="font-medium text-slate-800 dark:text-slate-200">Slice coverage</strong> (first
-          block): pick a pipeline to see <strong className="font-medium text-slate-800 dark:text-slate-200">latest status per slice</strong>{" "}
-          for dlt/Sling-style backfills, queue missing or failed slices, and (for date columns) scan a day range for gaps.
-          Every run attempt still lives under{" "}
-          <Link href="/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-            Runs
-          </Link>{" "}
-          (<code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">?pipeline=…</code>). Expand a pipeline
-          below to edit slice column, launch range backfills, and wire{" "}
-          <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">triggeredBy</code> the way your runner expects.
+          Pick a pipeline below to configure its slice type and launch targeted backfills.
+          Each slice launches an independent run you can monitor in{" "}
+          <Link href="/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">Runs</Link>.
         </p>
       </div>
 
@@ -123,19 +126,63 @@ export default function RunSlicesPage() {
           </Link>
         </div>
       ) : (
-        <>
-          <SliceCoveragePanel pipelines={pipelines} initialPipelineId={pipelineFromUrl} />
-          <div className="space-y-6">
-            {pipelines.map(p => (
+        <div className="space-y-6">
+          {/* Pipeline list */}
+          <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
+            <div className="border-b border-slate-100 px-5 py-3 dark:border-slate-800">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Pipelines</h2>
+            </div>
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+              {pipelines.map((p) => {
+                const cfg = p.partitionConfig;
+                const hasPartition = cfg && cfg.type !== "none";
+                const isSelected = p.id === selectedId;
+                return (
+                  <li key={p.id}>
+                    <button
+                      onClick={() => selectPipeline(isSelected ? "" : p.id)}
+                      className={`flex w-full items-center gap-3 px-5 py-3.5 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/60 ${isSelected ? "bg-teal-50 dark:bg-teal-950/20" : ""}`}
+                    >
+                      <Layers className="h-4 w-4 shrink-0 text-slate-400" />
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-slate-900 dark:text-white truncate block">{p.name}</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">{p.sourceType} → {p.destinationType}</span>
+                      </div>
+                      {hasPartition ? (
+                        <span className="shrink-0 rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-800 dark:bg-teal-900/30 dark:text-teal-300">
+                          {cfg!.type === "date" ? `Date · ${cfg!.column}` : `Key · ${cfg!.column}`}
+                        </span>
+                      ) : (
+                        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800">
+                          No slice
+                        </span>
+                      )}
+                      <ChevronRight className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${isSelected ? "rotate-90 text-teal-600" : ""}`} />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          {/* Selected pipeline detail */}
+          {selected ? (
+            <div className="space-y-6">
+              <SliceCoveragePanel pipelines={pipelines} initialPipelineId={selected.id} />
               <PipelinePartitionCard
-                key={p.id}
-                pipeline={p}
+                key={selected.id}
+                pipeline={selected}
                 onSaved={load}
                 onError={setError}
               />
-            ))}
-          </div>
-        </>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center dark:border-slate-700">
+              <TableProperties className="mx-auto h-8 w-8 text-slate-300" />
+              <p className="mt-2 text-sm text-slate-500">Select a pipeline above to configure its slice settings and launch backfills.</p>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Concept reference */}
@@ -160,18 +207,18 @@ export default function RunSlicesPage() {
         </div>
       </section>
 
-      {pipelines.length > 0 ? (
+      {pipelines.length > 0 && (
         <RelatedLinks links={[
           { href: "/runs", icon: Play, label: "Runs", desc: "Full run history and live telemetry for every execution" },
           { href: "/builder", icon: Layers, label: "Pipelines", desc: "Define the source → destination connections being backfilled" },
           { href: "/gateway", icon: Waypoints, label: "Gateway & execution", desc: "Configure where backfill runs execute" },
         ]} />
-      ) : null}
+      )}
     </div>
   );
 }
 
-// ─── Per-pipeline card (always expanded) ──────────────────────────────────────
+// ─── Per-pipeline config card ──────────────────────────────────────────────────
 
 function PipelinePartitionCard({
   pipeline,
@@ -183,7 +230,7 @@ function PipelinePartitionCard({
   onError: (msg: string) => void;
 }) {
   const cfg = pipeline.partitionConfig;
-  const hasPartition = cfg && cfg.type !== 'none';
+  const hasPartition = cfg && cfg.type !== "none";
   const cap = getRunSliceCapability(pipeline.sourceType);
   const unsupportedSavedSlice = cap.mode === "none_only" && hasPartition;
 
@@ -202,7 +249,7 @@ function PipelinePartitionCard({
         </span>
         {hasPartition ? (
           <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-800 dark:bg-teal-900/30 dark:text-teal-300">
-            {cfg!.type === 'date' ? `Date · ${cfg!.column} / ${cfg!.granularity}` : `Key · ${cfg!.column}`}
+            {cfg!.type === "date" ? `Date · ${cfg!.column} / ${cfg!.granularity}` : `Key · ${cfg!.column}`}
           </span>
         ) : (
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800">
