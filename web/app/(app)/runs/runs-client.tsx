@@ -26,7 +26,7 @@ import { RelatedLinks } from "@/components/ui/related-links";
 import { BarChart } from "@/components/ui/bar-chart";
 import { parseSliceFromTriggeredBy } from "@/lib/elt/slice-trigger";
 
-type PipelineOpt = { id: string; name: string };
+type PipelineOpt = { id: string; name: string; partitionColumn: string | null };
 
 type RunRow = {
   id: string;
@@ -153,11 +153,23 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
   } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [demoBusy, setDemoBusy] = useState(false);
+  const [gatewayOptions, setGatewayOptions] = useState<{ id: string; name: string }[]>([]);
+  const [runNowPipelineId, setRunNowPipelineId] = useState("");
+  const [runNowEnvironment, setRunNowEnvironment] = useState("default");
+  const [runNowPartitionValue, setRunNowPartitionValue] = useState("");
+  const [runNowGateway, setRunNowGateway] = useState("");
+  const [runNowSubmitting, setRunNowSubmitting] = useState(false);
+  const [runNowError, setRunNowError] = useState<string | null>(null);
   const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const selectAllRef = useRef<HTMLInputElement>(null);
   const [sortCol, setSortCol] = useState<SortCol>("startedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const runNowPipelineMeta = useMemo(
+    () => initialPipelines.find((p) => p.id === runNowPipelineId) ?? null,
+    [initialPipelines, runNowPipelineId]
+  );
 
   function toggleSort(col: SortCol) {
     setSortCol((prev) => {
@@ -205,6 +217,48 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
   useEffect(() => {
     void loadRuns();
   }, [loadRuns]);
+
+  useEffect(() => {
+    if (initialPipelines.length === 0) {
+      setRunNowPipelineId("");
+      return;
+    }
+    setRunNowPipelineId((cur) => {
+      if (cur && initialPipelines.some((p) => p.id === cur)) return cur;
+      if (pipelineFilterId && initialPipelines.some((p) => p.id === pipelineFilterId)) return pipelineFilterId;
+      return initialPipelines[0].id;
+    });
+  }, [pipelineFilterId, initialPipelines]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/elt/agent-status", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((gw: unknown) => {
+        if (cancelled || !gw || typeof gw !== "object") return;
+        const g = gw as {
+          connectors?: { id: string; name: string }[];
+          organization?: { connectors?: { id: string; name: string }[]; name?: string } | null;
+        };
+        const personal = Array.isArray(g.connectors)
+          ? g.connectors.map((c) => ({ id: c.id, name: c.name }))
+          : [];
+        const orgName = g.organization?.name?.trim() || "Org";
+        const orgList = Array.isArray(g.organization?.connectors)
+          ? g.organization!.connectors!.map((c) => ({
+              id: c.id,
+              name: `${c.name} (${orgName})`,
+            }))
+          : [];
+        setGatewayOptions([...personal, ...orgList]);
+      })
+      .catch(() => {
+        if (!cancelled) setGatewayOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     setSelectedIds(new Set());
@@ -377,6 +431,60 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
       else s.add(id);
       return s;
     });
+  }
+
+  async function triggerRunNow(e: React.FormEvent) {
+    e.preventDefault();
+    if (!runNowPipelineId) return;
+    setRunNowSubmitting(true);
+    setRunNowError(null);
+    setError(null);
+    try {
+      const body: Record<string, unknown> = {
+        pipelineId: runNowPipelineId,
+        environment: runNowEnvironment.trim() || "default",
+        status: "pending",
+      };
+      const pv = runNowPartitionValue.trim();
+      if (pv) {
+        body.partitionValue = pv;
+      } else {
+        body.triggeredBy = "manual";
+      }
+      if (runNowGateway === "__any__") body.targetAgentTokenId = null;
+      else if (runNowGateway) body.targetAgentTokenId = runNowGateway;
+
+      const res = await fetch("/api/elt/runs", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: unknown; run?: { id: string } };
+      if (!res.ok) {
+        const msg =
+          typeof data.error === "string"
+            ? data.error
+            : data.error && typeof data.error === "object"
+              ? JSON.stringify(data.error)
+              : res.statusText;
+        setRunNowError(msg);
+        return;
+      }
+      const runId = data.run?.id;
+      setRunNowPartitionValue("");
+      await loadRuns();
+      if (runId) {
+        const q = new URLSearchParams(searchParams.toString());
+        q.set("run", runId);
+        q.set("pipeline", runNowPipelineId);
+        router.push(runsPathWithQuery(q), { scroll: false });
+      }
+    } catch (err) {
+      setRunNowError(err instanceof Error ? err.message : "Run request failed");
+    } finally {
+      setRunNowSubmitting(false);
+    }
   }
 
   async function runDemo() {
@@ -577,6 +685,102 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
           <RefreshCw className="h-4 w-4" /> Refresh
         </button>
       </div>
+
+      {initialPipelines.length > 0 ? (
+        <section className="rounded-2xl border border-sky-200 bg-sky-50/50 p-5 dark:border-sky-900/40 dark:bg-sky-950/20">
+          <h2 className="text-sm font-semibold text-sky-950 dark:text-sky-100">Run on demand</h2>
+          <p className="mt-1 text-xs text-sky-900/90 dark:text-sky-200/90">
+            Queues a <strong className="font-medium">pending</strong> run (same path as webhooks and slice backfills).
+            Your gateway polls <code className="rounded bg-white/70 px-1 font-mono text-[10px] dark:bg-sky-950/60">GET /api/agent/runs</code>{" "}
+            to execute it, or eltPulse-managed workers pick it up when configured.
+          </p>
+          <form onSubmit={triggerRunNow} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="flex flex-col gap-1 sm:col-span-2">
+              <span className="text-xs font-medium text-sky-900 dark:text-sky-200">Pipeline</span>
+              <select
+                value={runNowPipelineId}
+                onChange={(e) => setRunNowPipelineId(e.target.value)}
+                required
+                className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm dark:border-sky-800 dark:bg-slate-950 dark:text-white"
+              >
+                {initialPipelines.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-sky-900 dark:text-sky-200">Environment</span>
+              <input
+                value={runNowEnvironment}
+                onChange={(e) => setRunNowEnvironment(e.target.value)}
+                placeholder="default"
+                className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm dark:border-sky-800 dark:bg-slate-950 dark:text-white"
+              />
+            </label>
+            {runNowPipelineMeta?.partitionColumn ? (
+              <label className="flex flex-col gap-1 sm:col-span-2 lg:col-span-4">
+                <span className="text-xs font-medium text-sky-900 dark:text-sky-200">
+                  Slice / partition value <span className="font-normal text-sky-800/80 dark:text-sky-300/80">(optional)</span>
+                </span>
+                <span className="text-[11px] text-sky-800/80 dark:text-sky-300/80">
+                  Column <code className="font-mono">{runNowPipelineMeta.partitionColumn}</code> — leave blank for a full run.
+                </span>
+                <input
+                  value={runNowPartitionValue}
+                  onChange={(e) => setRunNowPartitionValue(e.target.value)}
+                  placeholder="e.g. 2024-01-01"
+                  className="mt-1 rounded-lg border border-sky-200 bg-white px-3 py-2 font-mono text-sm dark:border-sky-800 dark:bg-slate-950 dark:text-white"
+                />
+              </label>
+            ) : null}
+            {gatewayOptions.length > 0 ? (
+              <label className="flex flex-col gap-1 sm:col-span-2 lg:col-span-4">
+                <span className="text-xs font-medium text-sky-900 dark:text-sky-200">Gateway override</span>
+                <select
+                  value={runNowGateway}
+                  onChange={(e) => setRunNowGateway(e.target.value)}
+                  className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm dark:border-sky-800 dark:bg-slate-950 dark:text-white"
+                >
+                  <option value="">Pipeline / account default</option>
+                  <option value="__any__">Any gateway (unpinned)</option>
+                  {gatewayOptions.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <div className="flex flex-col justify-end sm:col-span-2 lg:col-span-4">
+              <button
+                type="submit"
+                disabled={runNowSubmitting || !runNowPipelineId}
+                className="inline-flex w-full max-w-xs items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50 sm:w-auto"
+              >
+                {runNowSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Play className="h-4 w-4" aria-hidden />}
+                Queue run
+              </button>
+            </div>
+          </form>
+          {runNowPipelineMeta && !runNowPipelineMeta.partitionColumn ? (
+            <p className="mt-2 text-[11px] text-sky-800/80 dark:text-sky-300/70">
+              This pipeline has no saved partition column — runs are full loads only. For per-slice backfills, configure
+              partitions on the pipeline or use{" "}
+              <Link href={`/run-slices?pipeline=${encodeURIComponent(runNowPipelineMeta.id)}`} className="font-medium underline">
+                Run slices
+              </Link>
+              .
+            </p>
+          ) : null}
+          {runNowError ? (
+            <p className="mt-2 text-xs text-red-600 dark:text-red-400" role="alert">
+              {runNowError}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Filters</h2>
