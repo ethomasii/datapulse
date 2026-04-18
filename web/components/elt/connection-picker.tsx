@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Cable, Check, ChevronDown, Save } from "lucide-react";
-import { CREDENTIAL_SENSITIVE_KEY_SET } from "@/lib/elt/credential-payload";
+import {
+  CREDENTIAL_SENSITIVE_KEY_SET,
+  credentialKeysForConnectionSide,
+} from "@/lib/elt/credential-payload";
 
 export type StoredConnection = {
   id: string;
@@ -10,6 +13,7 @@ export type StoredConnection = {
   connectionType: "source" | "destination";
   connector: string;
   config: Record<string, string>;
+  hasStoredSecrets?: boolean;
 };
 
 type Props = {
@@ -42,7 +46,7 @@ export function ConnectionPicker({ connectionType, connector, onSelect, currentV
   useEffect(() => {
     if (loaded) return;
     setLoaded(true);
-    fetch("/api/elt/connections")
+    fetch("/api/elt/connections", { credentials: "same-origin" })
       .then((r) => r.text())
       .then((t) => {
         if (!t) return;
@@ -85,23 +89,34 @@ export function ConnectionPicker({ connectionType, connector, onSelect, currentV
     if (!saveName.trim()) return;
     setSaving(true);
     setSaveError("");
-    // Non-empty values only; omit catalog password/textarea fields (same rules as server-side sanitize).
+    // Non-secret catalog fields → `config`; password/textarea fields for this connector → `secrets` (encrypted server-side).
     const safeConfig: Record<string, string> = {};
+    const allowedCredKeys = credentialKeysForConnectionSide(connectionType, connector);
+    const secrets: Record<string, string> = {};
     for (const [k, v] of Object.entries(currentValues)) {
       if (!v.trim()) continue;
+      if (CREDENTIAL_SENSITIVE_KEY_SET.has(k) && allowedCredKeys.has(k)) {
+        secrets[k] = v.trim();
+        continue;
+      }
       if (CREDENTIAL_SENSITIVE_KEY_SET.has(k)) continue;
       safeConfig[k] = v;
+    }
+    const payload: Record<string, unknown> = {
+      name: saveName.trim(),
+      connectionType,
+      connector,
+      config: safeConfig,
+    };
+    if (Object.keys(secrets).length > 0) {
+      payload.secrets = secrets;
     }
     try {
       const res = await fetch("/api/elt/connections", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: saveName.trim(),
-          connectionType,
-          connector,
-          config: safeConfig,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -194,7 +209,8 @@ export function ConnectionPicker({ connectionType, connector, onSelect, currentV
               Save as connection
             </p>
             <p className="mb-2 text-[11px] text-slate-500 dark:text-slate-400">
-              Passwords and secrets are excluded automatically.
+              Non-secret fields are saved in config. Passwords and tokens are sent as encrypted secrets (server needs{" "}
+              <span className="font-mono">ELTPULSE_TOKEN_ENCRYPTION_KEY</span>).
             </p>
             {saveError && (
               <p className="mb-2 text-[11px] text-red-600 dark:text-red-400">{saveError}</p>

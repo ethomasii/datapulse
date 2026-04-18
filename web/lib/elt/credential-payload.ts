@@ -24,6 +24,17 @@ export const CREDENTIAL_SENSITIVE_KEY_SET: ReadonlySet<string> = (() => {
   return s;
 })();
 
+/** Catalog-defined credential env keys for this connector side (used for encrypted `secrets` allowlists). */
+export function credentialKeysForConnectionSide(
+  connectionType: "source" | "destination",
+  connector: string
+): ReadonlySet<string> {
+  const c = connector.toLowerCase();
+  const fields =
+    connectionType === "destination" ? getDestinationCredentials(c) : getSourceCredentials(c);
+  return new Set(fields.map((f) => f.key));
+}
+
 /** Pull catalog credential keys out of `sourceConfiguration` for dedicated form state. */
 export function extractConnectionValues(
   cfg: Record<string, unknown>,

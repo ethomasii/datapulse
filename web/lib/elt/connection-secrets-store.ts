@@ -1,14 +1,11 @@
 import { decryptSecret, encryptSecret } from "@/lib/crypto/token-encryption";
-import { getDestinationCredentials, getSourceCredentials } from "@/lib/elt/credentials-catalog";
+import { credentialKeysForConnectionSide } from "@/lib/elt/credential-payload";
 
 export function allowedSecretKeysForConnection(
   connectionType: "source" | "destination",
   connector: string
 ): Set<string> {
-  const c = connector.toLowerCase();
-  const fields =
-    connectionType === "destination" ? getDestinationCredentials(c) : getSourceCredentials(c);
-  return new Set(fields.map((f) => f.key));
+  return new Set(credentialKeysForConnectionSide(connectionType, connector));
 }
 
 /** Decrypt stored JSON object of env-style secrets; returns {} if missing or invalid. */
