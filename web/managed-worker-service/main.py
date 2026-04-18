@@ -1,23 +1,33 @@
 """
-eltPulse managed worker — Vercel Python runtime (FastAPI).
+eltPulse managed worker — Python batch executor (FastAPI HTTP + CLI + GitHub Actions).
 
-Mounted under routePrefix `/managed-elt` via Vercel Services (`experimentalServices` in vercel.json).
+**Deploy options (no Vercel “Services” required):**
 
-- POST `/batch` — process up to `limit` pending managed runs (real subprocess: dlt or sling).
-- Auth: `Authorization: Bearer ${ELTPULSE_MANAGED_VERCEL_PYTHON_SECRET}` (same secret the Next cron sends).
+1. **GitHub Actions** — workflow runs `python main.py` on `ubuntu-latest` (see repo
+   `.github/workflows/eltpulse-managed-worker.yml`). Set repo secrets `ELTPULSE_CONTROL_PLANE_URL`
+   and `ELTPULSE_INTERNAL_API_SECRET`. Trigger on schedule or via Vercel cron using
+   `ELTPULSE_MANAGED_EXECUTOR=gha` + a fine-grained PAT.
 
-Uses `ELTPULSE_INTERNAL_API_SECRET` from the environment to call the Next app's internal APIs.
+2. **Second Vercel project** — create a new project with Root Directory `web/managed-worker-service`,
+   set env vars, expose `POST /batch`. Point main app at it with `ELTPULSE_MANAGED_EXECUTOR=delegate`.
 
-**Wall clock:** each deployment invocation is capped at **900s** (Vercel `maxDuration`). Per-pipeline
-runs share that budget when `limit` > 1; prefer `limit=1` for heavy pipelines.
+3. **Vercel Services** (optional) — polyglot same-domain mount; only if your account has access.
 
-Sling requires a `sling` binary on PATH (usually absent on Vercel Python); dlt pipelines use `sys.executable`.
+- **HTTP:** `POST /batch` with `Authorization: Bearer ${ELTPULSE_MANAGED_VERCEL_PYTHON_SECRET}`.
+- **CLI / CI:** `python main.py` (uses `ELTPULSE_CONTROL_PLANE_URL` or `ELTPULSE_CRON_APP_URL` / `VERCEL_URL`).
+
+Uses `ELTPULSE_INTERNAL_API_SECRET` to call the control plane internal APIs.
+
+**Wall clock:** cap `deadlineMs` at **900_000 ms (15 minutes)** per invocation by default.
+
+Sling needs a `sling` binary on PATH; dlt uses `sys.executable`.
 """
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import os
 import shutil
 import sys
@@ -38,6 +48,10 @@ _LOG_CHUNK = 3400
 
 
 def _control_plane_base() -> str:
+    """Origin of the Next.js control plane (HTTPS, no trailing slash)."""
+    cp = (os.environ.get("ELTPULSE_CONTROL_PLANE_URL") or "").strip().rstrip("/")
+    if cp:
+        return cp
     explicit = (os.environ.get("ELTPULSE_CRON_APP_URL") or "").strip().rstrip("/")
     if explicit:
         return explicit
@@ -48,7 +62,8 @@ def _control_plane_base() -> str:
     if npu:
         return npu
     raise RuntimeError(
-        "Set ELTPULSE_CRON_APP_URL, VERCEL_URL, or NEXT_PUBLIC_APP_URL for internal API calls."
+        "Set ELTPULSE_CONTROL_PLANE_URL (preferred in CI), or ELTPULSE_CRON_APP_URL / "
+        "VERCEL_URL / NEXT_PUBLIC_APP_URL for internal API calls."
     )
 
 
@@ -375,16 +390,14 @@ async def health() -> dict[str, Any]:
     return {"ok": True, "service": "eltpulse-managed-worker", "python": sys.version}
 
 
-@app.post("/batch")
-async def batch(request: Request, body: BatchBody | None = None) -> dict[str, Any]:
-    _require_trigger(request)
-    b = body or BatchBody()
+async def run_managed_batch(limit: int, deadline_ms: int) -> dict[str, Any]:
+    """Core batch loop (CLI, GitHub Actions, or HTTP after auth)."""
     internal = (os.environ.get("ELTPULSE_INTERNAL_API_SECRET") or "").strip()
     if not internal:
-        raise HTTPException(status_code=500, detail="ELTPULSE_INTERNAL_API_SECRET is not set")
+        raise RuntimeError("ELTPULSE_INTERNAL_API_SECRET is not set")
 
     base = _control_plane_base()
-    wall_deadline = time.monotonic() + min(b.deadline_ms, _MAX_WALL_MS) / 1000.0
+    wall_deadline = time.monotonic() + min(deadline_ms, _MAX_WALL_MS) / 1000.0
     raw_to = (os.environ.get("ELTPULSE_MANAGED_RUN_TIMEOUT_MS") or "").strip()
     try:
         per_run_timeout = int(raw_to) if raw_to else _MAX_WALL_MS
@@ -396,7 +409,7 @@ async def batch(request: Request, body: BatchBody | None = None) -> dict[str, An
     errors: list[str] = []
 
     async with httpx.AsyncClient() as client:
-        ids = await _fetch_pending_ids(client, base, internal, b.limit)
+        ids = await _fetch_pending_ids(client, base, internal, limit)
         for run_id in ids:
             if time.monotonic() >= wall_deadline:
                 break
@@ -424,3 +437,20 @@ async def batch(request: Request, body: BatchBody | None = None) -> dict[str, An
                     pass
 
     return {"ok": True, "processed": processed, "errors": errors, "baseUrl": base}
+
+
+@app.post("/batch")
+async def batch(request: Request, body: BatchBody | None = None) -> dict[str, Any]:
+    _require_trigger(request)
+    b = body or BatchBody()
+    try:
+        return await run_managed_batch(b.limit, b.deadline_ms)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+if __name__ == "__main__":
+    lim = int(os.environ.get("ELTPULSE_MANAGED_LIMIT", "5"))
+    dlm = int(os.environ.get("ELTPULSE_MANAGED_DEADLINE_MS", str(_MAX_WALL_MS)))
+    out = asyncio.run(run_managed_batch(lim, dlm))
+    print(json.dumps(out, indent=2))

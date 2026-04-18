@@ -1,5 +1,13 @@
 import type { PatchRunBody } from "@/lib/elt/run-types";
 
+/** Result of one managed-worker tick (stub, local, delegate, or GitHub dispatch). */
+export type ManagedWorkerBatchResult = {
+  processed: number;
+  errors: string[];
+  /** True when the Vercel cron only triggered a GitHub Actions run (work happens on GitHub). */
+  githubDispatched?: boolean;
+};
+
 /** Normalize control-plane origin (no trailing slash). */
 export function normalizeControlPlaneBase(url: string): string {
   return url.replace(/\/$/, "");
@@ -96,7 +104,7 @@ export async function runManagedWorkerStubBatchHttp(options: {
   secret: string;
   limit: number;
   deadlineMs: number;
-}): Promise<{ processed: number; errors: string[] }> {
+}): Promise<ManagedWorkerBatchResult> {
   const errors: string[] = [];
   const deadline = Date.now() + options.deadlineMs;
   const ids = await fetchPendingManagedRunIds(options.baseUrl, options.secret, options.limit);
@@ -113,21 +121,35 @@ export async function runManagedWorkerStubBatchHttp(options: {
   return { processed, errors };
 }
 
-export type ManagedExecutorMode = "stub" | "local" | "vercel-python" | "delegate";
+export type ManagedExecutorMode = "stub" | "local" | "vercel-python" | "delegate" | "gha";
 
 /**
- * `stub` — demo telemetry only (default, backwards compatible).
- * `local` — run real `python pipeline.py` / `sling run -r replication.yaml` on the **same host**
- * as this process (dev machine, long-running Node VM, or container with Python/Sling + dlt deps).
- * `vercel-python` — forward to the FastAPI Python service (Vercel Services, `/managed-elt/batch`);
- *   **900s (15 min) max** per serverless invocation for the whole batch (Vercel `maxDuration`).
- * `delegate` — POST to `ELTPULSE_MANAGED_DELEGATE_URL` (second deployment / long-runner); same batch JSON contract.
+ * `stub` — demo telemetry only.
+ * `gha` — Vercel cron triggers **GitHub Actions** (`workflow_dispatch`); real Python runs on GitHub runners.
+ * `local` — real dlt/Sling on the **same host** as the Node process.
+ * `vercel-python` — same-domain Python service (**requires** Vercel Services if your account has access).
+ * `delegate` — POST batch to `ELTPULSE_MANAGED_DELEGATE_URL` (second deployment / long-runner).
+ *
+ * If `ELTPULSE_MANAGED_EXECUTOR` is **unset** and both `ELTPULSE_GITHUB_DISPATCH_TOKEN` and
+ * `ELTPULSE_GITHUB_REPOSITORY` are set, defaults to **`gha`** so managed pipelines run without extra config.
+ * Set `ELTPULSE_MANAGED_EXECUTOR=stub` to force stub when those GitHub vars exist for other reasons.
  */
 export function resolveManagedExecutorMode(): ManagedExecutorMode {
-  const v = (process.env.ELTPULSE_MANAGED_EXECUTOR ?? "stub").toLowerCase().trim();
-  if (v === "local") return "local";
-  if (v === "vercel-python") return "vercel-python";
-  if (v === "delegate") return "delegate";
+  const raw = process.env.ELTPULSE_MANAGED_EXECUTOR;
+  if (raw !== undefined && raw !== null && String(raw).trim() !== "") {
+    const v = String(raw).toLowerCase().trim();
+    if (v === "local") return "local";
+    if (v === "vercel-python") return "vercel-python";
+    if (v === "delegate") return "delegate";
+    if (v === "gha") return "gha";
+    if (v === "stub") return "stub";
+  }
+  if (
+    process.env.ELTPULSE_GITHUB_DISPATCH_TOKEN?.trim() &&
+    process.env.ELTPULSE_GITHUB_REPOSITORY?.trim()
+  ) {
+    return "gha";
+  }
   return "stub";
 }
 
@@ -136,7 +158,7 @@ export async function runManagedWorkerBatchHttp(options: {
   secret: string;
   limit: number;
   deadlineMs: number;
-}): Promise<{ processed: number; errors: string[] }> {
+}): Promise<ManagedWorkerBatchResult> {
   const mode = resolveManagedExecutorMode();
   if (mode === "local") {
     const { runManagedWorkerLocalBatchHttp } = await import("@/lib/elt/managed-executor-local");
@@ -157,11 +179,17 @@ export async function runManagedWorkerBatchHttp(options: {
       deadlineMs: options.deadlineMs,
     });
   }
+  if (mode === "gha") {
+    const { runManagedWorkerGithubDispatchHttp } = await import("@/lib/elt/managed-worker-github-dispatch");
+    return runManagedWorkerGithubDispatchHttp();
+  }
   return runManagedWorkerStubBatchHttp(options);
 }
 
 /** Resolve public HTTPS base for server-to-server calls (Vercel cron → same deployment). */
 export function resolveControlPlaneBaseUrl(): string | null {
+  const controlPlane = process.env.ELTPULSE_CONTROL_PLANE_URL?.trim();
+  if (controlPlane) return normalizeControlPlaneBase(controlPlane);
   const explicit = process.env.ELTPULSE_CRON_APP_URL?.trim();
   if (explicit) return normalizeControlPlaneBase(explicit);
   const vercel = process.env.VERCEL_URL?.trim();

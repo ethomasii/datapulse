@@ -1,0 +1,46 @@
+# Real eltPulse-managed pipeline execution (dlt/Sling) on GitHub-hosted runners.
+# No Vercel Services required. Triggered on schedule and by Vercel cron when
+# ELTPULSE_MANAGED_EXECUTOR=gha (or auto: ELTPULSE_GITHUB_DISPATCH_TOKEN + ELTPULSE_GITHUB_REPOSITORY set).
+#
+# Repo secrets (Settings → Secrets and variables → Actions):
+#   ELTPULSE_CONTROL_PLANE_URL   — production app origin, e.g. https://app.example.com
+#   ELTPULSE_INTERNAL_API_SECRET — same bearer as on Vercel for /api/internal/*
+#
+# Optional repo Variables (same UI, Variables tab):
+#   ELTPULSE_MANAGED_LIMIT        — default 5
+#   ELTPULSE_MANAGED_DEADLINE_MS  — default 900000
+#
+# Scheduling: use Vercel cron → `gha` dispatch (below), or add a `schedule:` here — not both
+# unless you intend to run twice.
+
+name: eltPulse managed worker
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: eltpulse-managed-worker
+  cancel-in-progress: false
+
+jobs:
+  managed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install httpx "dlt>=1.5.0" "fastapi>=0.115.0" "pydantic>=2" "uvicorn[standard]>=0.32.0"
+
+      - name: Run managed batch
+        working-directory: web/managed-worker-service
+        env:
+          ELTPULSE_CONTROL_PLANE_URL: ${{ secrets.ELTPULSE_CONTROL_PLANE_URL }}
+          ELTPULSE_INTERNAL_API_SECRET: ${{ secrets.ELTPULSE_INTERNAL_API_SECRET }}
+          ELTPULSE_MANAGED_LIMIT: ${{ vars.ELTPULSE_MANAGED_LIMIT || '5' }}
+          ELTPULSE_MANAGED_DEADLINE_MS: ${{ vars.ELTPULSE_MANAGED_DEADLINE_MS || '900000' }}
+        run: python main.py

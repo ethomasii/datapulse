@@ -10,7 +10,13 @@ describe("resolveControlPlaneBaseUrl", () => {
     vi.unstubAllEnvs();
   });
 
-  it("prefers ELTPULSE_CRON_APP_URL", () => {
+  it("prefers ELTPULSE_CONTROL_PLANE_URL over CRON_APP_URL", () => {
+    vi.stubEnv("ELTPULSE_CONTROL_PLANE_URL", "https://cp.example/");
+    vi.stubEnv("ELTPULSE_CRON_APP_URL", "https://custom.example/");
+    expect(resolveControlPlaneBaseUrl()).toBe("https://cp.example");
+  });
+
+  it("prefers ELTPULSE_CRON_APP_URL when CONTROL_PLANE unset", () => {
     vi.stubEnv("ELTPULSE_CRON_APP_URL", "https://custom.example/");
     vi.stubEnv("VERCEL_URL", "ignored.vercel.app");
     expect(resolveControlPlaneBaseUrl()).toBe("https://custom.example");
@@ -38,7 +44,20 @@ describe("resolveManagedExecutorMode", () => {
     vi.unstubAllEnvs();
   });
 
-  it("defaults to stub", () => {
+  it("defaults to stub when no GitHub dispatch env", () => {
+    expect(resolveManagedExecutorMode()).toBe("stub");
+  });
+
+  it("defaults to gha when dispatch token and repository are set and executor unset", () => {
+    vi.stubEnv("ELTPULSE_GITHUB_DISPATCH_TOKEN", "ghp_test");
+    vi.stubEnv("ELTPULSE_GITHUB_REPOSITORY", "acme/app");
+    expect(resolveManagedExecutorMode()).toBe("gha");
+  });
+
+  it("explicit stub overrides GitHub dispatch env", () => {
+    vi.stubEnv("ELTPULSE_MANAGED_EXECUTOR", "stub");
+    vi.stubEnv("ELTPULSE_GITHUB_DISPATCH_TOKEN", "ghp_test");
+    vi.stubEnv("ELTPULSE_GITHUB_REPOSITORY", "acme/app");
     expect(resolveManagedExecutorMode()).toBe("stub");
   });
 
@@ -55,5 +74,10 @@ describe("resolveManagedExecutorMode", () => {
   it("honors delegate", () => {
     vi.stubEnv("ELTPULSE_MANAGED_EXECUTOR", "delegate");
     expect(resolveManagedExecutorMode()).toBe("delegate");
+  });
+
+  it("honors gha", () => {
+    vi.stubEnv("ELTPULSE_MANAGED_EXECUTOR", "gha");
+    expect(resolveManagedExecutorMode()).toBe("gha");
   });
 });
