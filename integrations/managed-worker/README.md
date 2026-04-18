@@ -8,12 +8,14 @@ Processes **`eltpulse_managed`** pipeline runs via the **internal** control-plan
 
 Vercel’s message is **two parts**:
 
-1. **Project setting (dashboard)** — In the Vercel project, the **framework / project type** must be set to **Services** (polyglot). If the project is still “Next.js only,” the build will not wire `experimentalServices` the way you expect.
-2. **Repo config** — `web/vercel.json` must contain **`experimentalServices`** (we ship `web` + `api` keys to match the [quick start](https://vercel.com/docs/services)).
+1. **Project setting (dashboard)** — The project **framework** must be set to **Services** (polyglot), **and** `experimentalServices` must exist in `vercel.json`. The official [Services](https://vercel.com/docs/services) doc page shows **“Permissions Required: Services”** — in practice many teams **do not** see a “Services” option in the UI yet (it can be gated, preview-only, or only on certain plans). If you **never** see “Services” anywhere (import wizard, Project → Settings → General, Framework Preset, etc.), assume your account does **not** have access and use **`delegate`** below instead of `vercel-python`.
+2. **Repo config** — `web/vercel.json` contains **`experimentalServices`** with **`web`** + **`api`** keys (aligned with Vercel’s quick start). If deploys fail with errors about Services / experimental configuration, remove the **`experimentalServices`** block from `vercel.json` for a **Next-only** project and use **`ELTPULSE_MANAGED_EXECUTOR=delegate`** with a **second** deployment for Python.
+
+**“Function CPU”** in the Vercel dashboard is **unrelated** — that is about **serverless function runtime** sizing / performance (e.g. Fluid / default Node function settings), not polyglot **Services**.
 
 **Monorepo:** set the Vercel **Root Directory** to **`web`** so `vercel.json`, `app/`, and `managed-worker-service/` all resolve from the same root.
 
-**Local:** `vercel dev -L` runs all services together.
+**Local:** `vercel dev -L` runs all services together (when Services is available).
 
 ---
 
