@@ -1,13 +1,19 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Bot, X, Send, Sparkles, Maximize2, Minimize2, Zap, CheckCircle, Loader2, ChevronRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import {
+  Bot, X, Send, Sparkles, Maximize2, Minimize2,
+  Zap, CheckCircle, Loader2, ChevronRight, ExternalLink, PenLine,
+} from 'lucide-react';
 import type { CreatePipelineBody } from '@/lib/elt/types';
+import type { InlineField } from '@/app/api/elt/ai-assistant/route';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   savePayload?: CreatePipelineBody;
+  requiredFields?: InlineField[];
 }
 
 const STARTER_PROMPTS = [
@@ -19,7 +25,6 @@ const STARTER_PROMPTS = [
   'What sources do you support?',
 ];
 
-// Follow-ups only shown when the AI responds with info/questions (no pipeline generated yet)
 const FOLLOW_UPS = [
   'Show me all supported sources',
   'What destinations are available?',
@@ -70,23 +75,11 @@ function renderContent(text: string): React.ReactNode[] {
       if (trimmed === '') {
         elements.push(<div key={`br-${idx}`} className="h-1" />);
       } else if (trimmed.startsWith('### ')) {
-        elements.push(
-          <p key={`h3-${idx}`} className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mt-3 mb-0.5">
-            {trimmed.slice(4)}
-          </p>
-        );
+        elements.push(<p key={`h3-${idx}`} className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mt-3 mb-0.5">{trimmed.slice(4)}</p>);
       } else if (trimmed.startsWith('## ')) {
-        elements.push(
-          <p key={`h2-${idx}`} className="text-sm font-bold text-white mt-2 mb-0.5">
-            {trimmed.slice(3)}
-          </p>
-        );
+        elements.push(<p key={`h2-${idx}`} className="text-sm font-bold text-white mt-2 mb-0.5">{trimmed.slice(3)}</p>);
       } else {
-        elements.push(
-          <p key={`p-${idx}`} className="text-sm text-slate-300 leading-relaxed">
-            {renderInline(trimmed)}
-          </p>
-        );
+        elements.push(<p key={`p-${idx}`} className="text-sm text-slate-300 leading-relaxed">{renderInline(trimmed)}</p>);
       }
     }
   });
@@ -94,33 +87,207 @@ function renderContent(text: string): React.ReactNode[] {
   return elements;
 }
 
+// ── Inline config form ────────────────────────────────────────────────────────
+
+function InlineConfigForm({
+  fields,
+  payload,
+  onSave,
+  onSkip,
+  saving,
+  saved,
+}: {
+  fields: InlineField[];
+  payload: CreatePipelineBody;
+  onSave: (patched: CreatePipelineBody) => void;
+  onSkip: () => void;
+  saving: boolean;
+  saved: boolean;
+}) {
+  const [values, setValues] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    for (const f of fields) {
+      initial[f.key] = String((payload.sourceConfiguration ?? {})[f.key] ?? '');
+    }
+    return initial;
+  });
+
+  const handleSave = () => {
+    const patched: CreatePipelineBody = {
+      ...payload,
+      sourceConfiguration: {
+        ...(payload.sourceConfiguration ?? {}),
+        ...Object.fromEntries(
+          fields
+            .filter((f) => values[f.key]?.trim())
+            .map((f) => [f.key, values[f.key].trim()])
+        ),
+      },
+    };
+    onSave(patched);
+  };
+
+  if (saved) {
+    return (
+      <div className="flex items-center gap-1.5 text-teal-400 text-xs font-medium mt-2">
+        <CheckCircle className="h-3.5 w-3.5" /> Pipeline saved and configured!
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2.5 space-y-2 rounded-lg border border-slate-600 bg-slate-900 p-3">
+      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Configure now</p>
+      {fields.map((f) => (
+        <label key={f.key} className="block">
+          <span className="text-[11px] text-slate-400">{f.label}</span>
+          {f.help && <span className="ml-1 text-[10px] text-slate-600">({f.help})</span>}
+          <input
+            type={f.type === 'password' ? 'password' : 'text'}
+            value={values[f.key] ?? ''}
+            onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
+            placeholder={f.placeholder}
+            autoComplete="off"
+            className="mt-0.5 w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-white placeholder-slate-600 outline-none focus:border-teal-600"
+          />
+        </label>
+      ))}
+      <div className="flex gap-2 pt-1">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-500 disabled:opacity-60 transition-colors"
+        >
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+          Save pipeline
+        </button>
+        <button
+          onClick={onSkip}
+          className="flex items-center gap-1 rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+        >
+          Skip — fill in builder
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Save actions shown on generated pipeline ──────────────────────────────────
+
+function PipelineActions({
+  msg,
+  msgIdx,
+  savingKey,
+  savedKeys,
+  onSaveWithPayload,
+  onOpenBuilder,
+}: {
+  msg: Message;
+  msgIdx: number;
+  savingKey: string | null;
+  savedKeys: Set<string>;
+  onSaveWithPayload: (payload: CreatePipelineBody, key: string) => Promise<void>;
+  onOpenBuilder: (pipelineId?: string) => void;
+}) {
+  const [mode, setMode] = useState<'buttons' | 'inline'>('buttons');
+  const key = `${msgIdx}`;
+  const isSaving = savingKey === key;
+  const isSaved = savedKeys.has(key);
+  const savedWithPlaceholders = savedKeys.has(`${key}-skip`);
+
+  if (!msg.savePayload) return null;
+
+  if (isSaved || savedWithPlaceholders) {
+    return (
+      <div className="mt-2.5 pt-2.5 border-t border-slate-700 flex items-center gap-2">
+        <CheckCircle className="h-3.5 w-3.5 text-teal-400" />
+        <span className="text-xs text-teal-400 font-medium">Saved!</span>
+        <button
+          onClick={() => onOpenBuilder()}
+          className="ml-auto flex items-center gap-1 text-[11px] text-slate-400 hover:text-white transition-colors"
+        >
+          <ExternalLink className="h-3 w-3" /> Open in builder
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2.5 pt-2.5 border-t border-slate-700">
+      {mode === 'buttons' ? (
+        <div className="flex flex-col gap-2">
+          {/* Primary: configure inline if fields exist */}
+          {msg.requiredFields && msg.requiredFields.length > 0 ? (
+            <button
+              onClick={() => setMode('inline')}
+              className="flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-500 transition-colors"
+            >
+              <PenLine className="h-3.5 w-3.5" />
+              Configure &amp; save &quot;{msg.savePayload.name}&quot;
+            </button>
+          ) : (
+            <button
+              onClick={() => void onSaveWithPayload(msg.savePayload!, key)}
+              disabled={isSaving}
+              className="flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-500 disabled:opacity-60 transition-colors"
+            >
+              {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+              Save &quot;{msg.savePayload.name}&quot;
+            </button>
+          )}
+          {/* Secondary: save with placeholders and open builder */}
+          {msg.requiredFields && msg.requiredFields.length > 0 && (
+            <button
+              onClick={async () => {
+                await onSaveWithPayload(msg.savePayload!, `${key}-skip`);
+                onOpenBuilder();
+              }}
+              disabled={isSaving}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:text-white hover:border-slate-500 transition-colors"
+            >
+              <ExternalLink className="h-3 w-3" />
+              Save &amp; configure in builder
+            </button>
+          )}
+        </div>
+      ) : (
+        <InlineConfigForm
+          fields={msg.requiredFields ?? []}
+          payload={msg.savePayload}
+          onSave={(patched) => void onSaveWithPayload(patched, key)}
+          onSkip={async () => {
+            await onSaveWithPayload(msg.savePayload!, `${key}-skip`);
+            onOpenBuilder();
+          }}
+          saving={isSaving}
+          saved={isSaved}
+        />
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function AiPipelineAssistant({
-  onPipelineSaved,
-}: {
-  onPipelineSaved?: (name: string) => void;
-}) {
+export function AiPipelineAssistant({ onPipelineSaved }: { onPipelineSaved?: (name: string) => void }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [savingPayload, setSavingPayload] = useState<string | null>(null);
-  const [savedNames, setSavedNames] = useState<Set<string>>(new Set());
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
+  const [savedPipelineId, setSavedPipelineId] = useState<string | undefined>();
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, loading]);
 
   useEffect(() => {
-    if (open && textareaRef.current) {
-      setTimeout(() => textareaRef.current?.focus(), 50);
-    }
+    if (open && textareaRef.current) setTimeout(() => textareaRef.current?.focus(), 50);
   }, [open]);
 
   const sendMessage = useCallback(async (text: string) => {
@@ -130,7 +297,6 @@ export function AiPipelineAssistant({
     setMessages(next);
     setInput('');
     setLoading(true);
-
     try {
       const res = await fetch('/api/elt/ai-assistant', {
         method: 'POST',
@@ -138,8 +304,13 @@ export function AiPipelineAssistant({
         body: JSON.stringify({ messages: next.map((m) => ({ role: m.role, content: m.content })) }),
       });
       if (!res.ok) throw new Error('Assistant request failed');
-      const data = await res.json() as { message: string; savePayload?: CreatePipelineBody };
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.message, savePayload: data.savePayload }]);
+      const data = await res.json() as { message: string; savePayload?: CreatePipelineBody; requiredFields?: InlineField[] };
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: data.message,
+        savePayload: data.savePayload,
+        requiredFields: data.requiredFields,
+      }]);
     } catch {
       setMessages((prev) => [...prev, { role: 'assistant', content: 'Sorry, something went wrong. Please try again.' }]);
     } finally {
@@ -147,16 +318,8 @@ export function AiPipelineAssistant({
     }
   }, [messages, loading]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      void sendMessage(input);
-    }
-  };
-
-  const savePipeline = async (payload: CreatePipelineBody, msgIdx: number) => {
-    const key = `${msgIdx}`;
-    setSavingPayload(key);
+  const savePipeline = useCallback(async (payload: CreatePipelineBody, key: string) => {
+    setSavingKey(key);
     try {
       const res = await fetch('/api/elt/pipelines', {
         method: 'POST',
@@ -167,34 +330,36 @@ export function AiPipelineAssistant({
         const err = await res.json() as { error?: string };
         throw new Error(err.error ?? 'Save failed');
       }
-      setSavedNames((prev) => { const next = new Set(prev); next.add(key); return next; });
+      const data = await res.json() as { pipeline?: { id?: string } };
+      setSavedPipelineId(data.pipeline?.id);
+      setSavedKeys((prev) => { const next = new Set(prev); next.add(key); return next; });
       onPipelineSaved?.(payload.name);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: `Pipeline **${payload.name}** saved! You can find it in the [Pipelines](/builder) list. Head to [Run Slices](/run-slices) to configure incremental loading.`,
-        },
-      ]);
     } catch (e) {
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: `Could not save pipeline: ${e instanceof Error ? e.message : 'unknown error'}` },
-      ]);
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: `Could not save pipeline: ${e instanceof Error ? e.message : 'unknown error'}`,
+      }]);
     } finally {
-      setSavingPayload(null);
+      setSavingKey(null);
     }
+  }, [onPipelineSaved]);
+
+  const openBuilder = useCallback((id?: string) => {
+    const target = id ?? savedPipelineId;
+    router.push(target ? `/builder?pipeline=${encodeURIComponent(target)}` : '/builder');
+  }, [router, savedPipelineId]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendMessage(input); }
   };
 
   const lastMsg = messages[messages.length - 1];
-  // Only show follow-ups when the last response was informational (no pipeline generated)
   const showFollowUps = lastMsg?.role === 'assistant' && !lastMsg.savePayload && !loading;
-  const panelW = expanded ? 'w-[720px]' : 'w-[420px]';
-  const panelH = expanded ? 'h-[640px]' : 'h-[520px]';
+  const panelW = expanded ? 'w-[480px]' : 'w-[420px]';
+  const panelH = expanded ? 'h-[680px]' : 'h-[520px]';
 
   return (
     <>
-      {/* Floating trigger button */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
@@ -206,11 +371,8 @@ export function AiPipelineAssistant({
         </button>
       )}
 
-      {/* Chat panel */}
       {open && (
-        <div
-          className={`fixed bottom-6 right-6 z-50 flex flex-col rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl transition-all ${panelW} ${panelH}`}
-        >
+        <div className={`fixed bottom-6 right-6 z-50 flex flex-col rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl transition-all ${panelW} ${panelH}`}>
           {/* Header */}
           <div className="flex items-center gap-2 border-b border-slate-800 px-4 py-3">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-sky-500">
@@ -220,18 +382,10 @@ export function AiPipelineAssistant({
               <p className="text-sm font-semibold text-white">AI Pipeline Builder</p>
               <p className="text-[11px] text-slate-400">Powered by Claude · eltPulse</p>
             </div>
-            <button
-              onClick={() => setExpanded((v) => !v)}
-              className="rounded p-1 text-slate-400 hover:text-white"
-              title={expanded ? 'Collapse' : 'Expand'}
-            >
+            <button onClick={() => setExpanded((v) => !v)} className="rounded p-1 text-slate-400 hover:text-white" title={expanded ? 'Collapse' : 'Expand'}>
               {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </button>
-            <button
-              onClick={() => setOpen(false)}
-              className="rounded p-1 text-slate-400 hover:text-white"
-              title="Close"
-            >
+            <button onClick={() => setOpen(false)} className="rounded p-1 text-slate-400 hover:text-white" title="Close">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -245,16 +399,12 @@ export function AiPipelineAssistant({
                     <Bot className="h-3.5 w-3.5 text-white" />
                   </div>
                   <div className="rounded-xl rounded-tl-none bg-slate-800 px-3 py-2.5 text-sm text-slate-200">
-                    Hi! I can help you build ELT pipelines using dlt verified sources and Sling. Tell me what data you want to move — or pick a starter below.
+                    Tell me what data you want to move and I&apos;ll build the pipeline. Or pick a starter below.
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1.5 pl-8">
                   {STARTER_PROMPTS.map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => void sendMessage(p)}
-                      className="rounded-full border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] text-slate-300 hover:border-teal-500 hover:text-teal-300 transition-colors"
-                    >
+                    <button key={p} onClick={() => void sendMessage(p)} className="rounded-full border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] text-slate-300 hover:border-teal-500 hover:text-teal-300 transition-colors">
                       {p}
                     </button>
                   ))}
@@ -269,42 +419,21 @@ export function AiPipelineAssistant({
                     <Bot className="h-3.5 w-3.5 text-white" />
                   </div>
                 )}
-                <div
-                  className={`max-w-[85%] rounded-xl px-3 py-2.5 ${
-                    msg.role === 'user'
-                      ? 'rounded-tr-none bg-teal-700 text-white text-sm'
-                      : 'rounded-tl-none bg-slate-800 text-slate-200'
-                  }`}
-                >
+                <div className={`max-w-[88%] rounded-xl px-3 py-2.5 ${msg.role === 'user' ? 'rounded-tr-none bg-teal-700 text-white text-sm' : 'rounded-tl-none bg-slate-800 text-slate-200'}`}>
                   {msg.role === 'user' ? (
                     <p className="text-sm">{msg.content}</p>
                   ) : (
-                    renderContent(msg.content)
-                  )}
-
-                  {/* Save pipeline button */}
-                  {msg.role === 'assistant' && msg.savePayload && (
-                    <div className="mt-2.5 pt-2.5 border-t border-slate-700">
-                      {savedNames.has(`${idx}`) ? (
-                        <div className="flex items-center gap-1.5 text-teal-400 text-xs font-medium">
-                          <CheckCircle className="h-3.5 w-3.5" />
-                          Pipeline saved!
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => void savePipeline(msg.savePayload!, idx)}
-                          disabled={savingPayload === `${idx}`}
-                          className="flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-500 disabled:opacity-60 transition-colors"
-                        >
-                          {savingPayload === `${idx}` ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Zap className="h-3.5 w-3.5" />
-                          )}
-                          Save pipeline &quot;{msg.savePayload.name}&quot;
-                        </button>
-                      )}
-                    </div>
+                    <>
+                      {renderContent(msg.content)}
+                      <PipelineActions
+                        msg={msg}
+                        msgIdx={idx}
+                        savingKey={savingKey}
+                        savedKeys={savedKeys}
+                        onSaveWithPayload={savePipeline}
+                        onOpenBuilder={openBuilder}
+                      />
+                    </>
                   )}
                 </div>
               </div>
@@ -326,17 +455,12 @@ export function AiPipelineAssistant({
             )}
           </div>
 
-          {/* Follow-up suggestions — only for informational responses */}
+          {/* Follow-up chips — only for informational responses */}
           {showFollowUps && (
             <div className="flex flex-wrap gap-1.5 border-t border-slate-800 px-4 py-2">
               {FOLLOW_UPS.map((f) => (
-                <button
-                  key={f}
-                  onClick={() => void sendMessage(f)}
-                  className="flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] text-slate-400 hover:border-teal-600 hover:text-teal-300 transition-colors"
-                >
-                  <ChevronRight className="h-3 w-3" />
-                  {f}
+                <button key={f} onClick={() => void sendMessage(f)} className="flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] text-slate-400 hover:border-teal-600 hover:text-teal-300 transition-colors">
+                  <ChevronRight className="h-3 w-3" />{f}
                 </button>
               ))}
             </div>

@@ -297,6 +297,84 @@ function toolSuggestRestApiConfig(
   };
 }
 
+/** Per-source inline config fields shown in the chat form. */
+export type InlineField = {
+  key: string;
+  label: string;
+  placeholder: string;
+  type: "text" | "password" | "select";
+  options?: string[];
+  configPath: "sourceConfiguration" | "destinationType" | "name";
+  help?: string;
+};
+
+const SOURCE_INLINE_FIELDS: Record<string, InlineField[]> = {
+  github: [
+    { key: "repo_owner", label: "GitHub org / owner", placeholder: "my-org", type: "text", configPath: "sourceConfiguration" },
+    { key: "repo_name", label: "Repository name", placeholder: "my-repo", type: "text", configPath: "sourceConfiguration" },
+    { key: "github_token_env", label: "Token env var name", placeholder: "GITHUB_TOKEN", type: "text", configPath: "sourceConfiguration", help: "Name of the env var holding your GitHub PAT" },
+  ],
+  stripe_analytics: [
+    { key: "start_date", label: "Start date", placeholder: "2024-01-01", type: "text", configPath: "sourceConfiguration" },
+  ],
+  shopify_dlt: [
+    { key: "private_app_password", label: "API password / token", placeholder: "shppa_...", type: "password", configPath: "sourceConfiguration" },
+    { key: "store_url", label: "Store URL", placeholder: "my-store.myshopify.com", type: "text", configPath: "sourceConfiguration" },
+  ],
+  hubspot: [
+    { key: "api_key", label: "Access token", placeholder: "pat-na1-...", type: "password", configPath: "sourceConfiguration" },
+  ],
+  salesforce: [
+    { key: "user_name", label: "Username", placeholder: "user@example.com", type: "text", configPath: "sourceConfiguration" },
+    { key: "password", label: "Password", placeholder: "••••••••", type: "password", configPath: "sourceConfiguration" },
+    { key: "security_token", label: "Security token", placeholder: "abc123...", type: "password", configPath: "sourceConfiguration" },
+  ],
+  slack: [
+    { key: "access_token", label: "Bot OAuth token", placeholder: "xoxb-...", type: "password", configPath: "sourceConfiguration" },
+  ],
+  notion: [
+    { key: "database_ids", label: "Database ID(s)", placeholder: "abc123def456...", type: "text", configPath: "sourceConfiguration", help: "Comma-separated Notion database IDs" },
+  ],
+  airtable: [
+    { key: "access_token", label: "Personal access token", placeholder: "pat...", type: "password", configPath: "sourceConfiguration" },
+    { key: "base_id", label: "Base ID", placeholder: "appXXXXXXXXXXXXXX", type: "text", configPath: "sourceConfiguration" },
+  ],
+  jira: [
+    { key: "subdomain", label: "Jira subdomain", placeholder: "mycompany", type: "text", configPath: "sourceConfiguration" },
+    { key: "email", label: "Email", placeholder: "user@example.com", type: "text", configPath: "sourceConfiguration" },
+    { key: "api_token", label: "API token", placeholder: "ATATT...", type: "password", configPath: "sourceConfiguration" },
+  ],
+  zendesk: [
+    { key: "subdomain", label: "Zendesk subdomain", placeholder: "mycompany", type: "text", configPath: "sourceConfiguration" },
+    { key: "email", label: "Email", placeholder: "user@example.com", type: "text", configPath: "sourceConfiguration" },
+    { key: "token", label: "API token", placeholder: "abc123...", type: "password", configPath: "sourceConfiguration" },
+  ],
+  rest_api: [
+    { key: "base_url", label: "Base URL", placeholder: "https://api.example.com", type: "text", configPath: "sourceConfiguration" },
+    { key: "endpoint", label: "Endpoint path", placeholder: "/v1/events", type: "text", configPath: "sourceConfiguration" },
+    { key: "resource_name", label: "Resource name", placeholder: "events", type: "text", configPath: "sourceConfiguration", help: "Used as the table name in the destination" },
+  ],
+  postgres: [
+    { key: "tables", label: "Tables to sync", placeholder: "public.users, public.orders", type: "text", configPath: "sourceConfiguration", help: "Comma-separated schema.table names" },
+  ],
+  mysql: [
+    { key: "tables", label: "Tables to sync", placeholder: "public.users, public.orders", type: "text", configPath: "sourceConfiguration" },
+  ],
+};
+
+const DEST_INLINE_FIELDS: Record<string, InlineField[]> = {
+  snowflake: [],   // credentials come from env vars — nothing to fill inline
+  bigquery: [],
+  redshift: [],
+  databricks: [],
+  postgres: [],
+  duckdb: [],
+};
+
+function getInlineFields(sourceType: string): InlineField[] {
+  return SOURCE_INLINE_FIELDS[sourceType.toLowerCase()] ?? [];
+}
+
 function toolGeneratePipeline(params: {
   name: string;
   source_type: string;
@@ -317,34 +395,24 @@ function toolGeneratePipeline(params: {
     sourceConfiguration: params.source_configuration ?? {},
   };
 
+  const requiredFields = getInlineFields(params.source_type);
+
   try {
     const artifacts = generatePipelineArtifacts(body);
     return {
       success: true,
-      pipeline_config: {
-        name,
-        source_type: params.source_type,
-        destination_type: params.destination_type,
-        tool,
-        description: body.description,
-        source_configuration: body.sourceConfiguration,
-      },
-      generated_code_preview: artifacts.pipelineCode.slice(0, 800) + (artifacts.pipelineCode.length > 800 ? "\n... (truncated)" : ""),
       next_action: "save_pipeline",
       save_payload: body,
+      required_fields: requiredFields,
+      generated_code_preview: artifacts.pipelineCode.slice(0, 400) + (artifacts.pipelineCode.length > 400 ? "\n..." : ""),
     };
   } catch (e) {
     return {
       success: false,
       error: e instanceof Error ? e.message : "Code generation failed",
-      pipeline_config: {
-        name,
-        source_type: params.source_type,
-        destination_type: params.destination_type,
-        tool,
-        source_configuration: body.sourceConfiguration,
-      },
+      next_action: "save_pipeline",
       save_payload: body,
+      required_fields: requiredFields,
     };
   }
 }
@@ -407,17 +475,30 @@ export async function POST(request: Request) {
         .pop();
 
       let savePayload: CreatePipelineBody | undefined;
-      if (lastToolResult) {
+      let requiredFields: InlineField[] | undefined;
+
+      // Walk all tool results to find the most recent generate_pipeline result
+      const allToolResults = anthropicMessages
+        .filter((m) => m.role === "user")
+        .flatMap((m) => (Array.isArray(m.content) ? m.content : []))
+        .filter((c): c is Anthropic.ToolResultBlockParam => typeof c === "object" && c.type === "tool_result");
+
+      for (const toolResult of allToolResults) {
         try {
-          const resultContent = Array.isArray(lastToolResult.content)
-            ? lastToolResult.content.find((c) => c.type === "text")?.text
-            : typeof lastToolResult.content === "string"
-              ? lastToolResult.content
+          const resultContent = Array.isArray(toolResult.content)
+            ? toolResult.content.find((c) => c.type === "text")?.text
+            : typeof toolResult.content === "string"
+              ? toolResult.content
               : undefined;
           if (resultContent) {
-            const parsed = JSON.parse(resultContent) as { save_payload?: CreatePipelineBody; next_action?: string };
+            const parsed = JSON.parse(resultContent) as {
+              save_payload?: CreatePipelineBody;
+              next_action?: string;
+              required_fields?: InlineField[];
+            };
             if (parsed.next_action === "save_pipeline" && parsed.save_payload) {
               savePayload = parsed.save_payload;
+              requiredFields = parsed.required_fields;
             }
           }
         } catch {
@@ -428,6 +509,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         message: text,
         savePayload,
+        requiredFields,
       });
     }
 
