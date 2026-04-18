@@ -24,11 +24,27 @@ node src/index.mjs
 
 `ELTPULSE_AGENT_TOKEN` matches the variable name used in Docker Compose samples and the in-app Gateway copy-paste.
 
+## Ephemeral gateway (inline runs, spin down when idle — **no K8s Job**)
+
+You can run pipelines **inside this Node process** (`ELTPULSE_PIPELINE_RUN_ISOLATION=inline`, default) and **stop the container** when there is nothing left to do:
+
+1. Start the gateway only when you expect work (cron, Cloud Scheduler, GitHub Actions, “docker run” from a hook).
+2. Set **`ELTPULSE_EXECUTE_RUNS=1`** so pending customer-gateway runs are processed **in-process** (replace `stubCompleteRun` with your real dlt/Sling invoker when ready).
+3. Set **`ELTPULSE_GATEWAY_IDLE_EXIT_POLLS=N`** (e.g. `3`). After **N** consecutive polls with **zero** pending customer runs, the process **`exit(0)`** so the host can stop the VM/container (scale to zero).
+
+Tune **`runsPollIntervalSeconds`** from the control-plane manifest (or your first manifest fetch) so each poll is a few seconds — e.g. 3 polls × 5s ≈ 15s max idle tail before exit.
+
+Managed (`eltpulse_managed`) runs are **not** polled by this customer token; use the **managed-worker** cron/script + internal APIs for that path.
+
 ## Docker
 
 ```bash
 docker build -t eltpulse-gateway:local .
-docker run --rm -e ELTPULSE_AGENT_TOKEN -e ELTPULSE_CONTROL_PLANE_URL eltpulse-gateway:local
+docker run --rm \
+  -e ELTPULSE_AGENT_TOKEN -e ELTPULSE_CONTROL_PLANE_URL \
+  -e ELTPULSE_EXECUTE_RUNS=1 \
+  -e ELTPULSE_GATEWAY_IDLE_EXIT_POLLS=3 \
+  eltpulse-gateway:local
 ```
 
 ## Publish to GHCR

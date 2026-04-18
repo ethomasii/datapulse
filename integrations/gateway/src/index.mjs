@@ -11,6 +11,8 @@
  * Optional:
  *   ELTPULSE_EXECUTE_RUNS=1           Poll loop: claim runs (required for dispatcher inline path).
  *   ELTPULSE_EVAL_MONITORS=0            Disable monitor polling in the long-lived dispatcher.
+ *   ELTPULSE_GATEWAY_IDLE_EXIT_POLLS=N  After N consecutive polls with **zero** pending customer-gateway runs, exit(0).
+ *                                       Use with cron/`docker run`: process starts, drains queue, stops — no K8s Job required.
  *
  * Isolation (dispatcher only; env overrides manifest.executorHints from named token metadata):
  *   ELTPULSE_PIPELINE_RUN_ISOLATION=inline|spawn
@@ -33,6 +35,28 @@ const executeRuns = ["1", "true", "yes"].includes(
 const evalMonitors = !["0", "false", "no"].includes(
   String(process.env.ELTPULSE_EVAL_MONITORS ?? "1").toLowerCase()
 );
+
+/** >0: exit after this many consecutive polls with no pending customer-gateway runs (ephemeral / scale-to-zero). */
+const idleExitAfterEmptyRunPolls = Math.max(
+  0,
+  Number(process.env.ELTPULSE_GATEWAY_IDLE_EXIT_POLLS || "") || 0
+);
+let consecutiveEmptyCustomerRunPolls = 0;
+
+function maybeIdleExitAfterEmptyRunPoll() {
+  if (idleExitAfterEmptyRunPolls <= 0 || !executeRuns) return;
+  consecutiveEmptyCustomerRunPolls += 1;
+  if (consecutiveEmptyCustomerRunPolls >= idleExitAfterEmptyRunPolls) {
+    console.log(
+      `[eltpulse-gateway] exiting after ${idleExitAfterEmptyRunPolls} consecutive empty customer run polls (ELTPULSE_GATEWAY_IDLE_EXIT_POLLS)`
+    );
+    process.exit(0);
+  }
+}
+
+function resetCustomerRunPollIdle() {
+  consecutiveEmptyCustomerRunPolls = 0;
+}
 
 const singleRunId = process.env.ELTPULSE_SINGLE_RUN_ID?.trim() || "";
 const singleMonitorId = process.env.ELTPULSE_SINGLE_MONITOR_ID?.trim() || "";
@@ -441,7 +465,11 @@ async function sendHeartbeat() {
 async function pollRunsOnce() {
   const data = await api("/api/agent/runs?status=pending&limit=5");
   const runs = Array.isArray(data.runs) ? data.runs : [];
-  if (runs.length === 0) return;
+  if (runs.length === 0) {
+    maybeIdleExitAfterEmptyRunPoll();
+    return;
+  }
+  resetCustomerRunPollIdle();
   console.log(`[eltpulse-gateway] pending runs: ${runs.length}`);
   if (!executeRuns) return;
 
