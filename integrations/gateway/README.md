@@ -54,6 +54,8 @@ eltPulse’s own worker fleet should use the **internal** control-plane APIs (sa
 
 Those workers still need a **real executor** (spawn dlt in Docker/K8s, etc.); this repo’s reference gateway continues to use `stubCompleteRun` unless you replace it.
 
+For **burst / cron-style** managed execution (no always-on poller), see **`../managed-worker/README.md`** and `GET /api/cron/managed-worker` in the web app.
+
 ## Dispatcher vs isolated workers
 
 For **ECS / Kubernetes / Docker**, keep the long-lived process as a **dispatcher** only: set **`pipelineRunIsolation`** / **`monitorCheckIsolation`** to **`spawn`** on the named gateway token’s JSON metadata (surfaced in **`GET /api/agent/manifest`** as `executorHints`), or override with env on the host:
