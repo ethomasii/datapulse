@@ -35,6 +35,8 @@ export async function GET(req: Request) {
   let repos = json.map((r) => ({
     name: r.name,
     fullName: r.full_name,
+    url: r.html_url ?? `https://github.com/${r.full_name}`,
+    description: r.description ?? null,
     private: r.private,
     defaultBranch: r.default_branch ?? "main",
   }));

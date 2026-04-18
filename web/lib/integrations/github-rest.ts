@@ -37,6 +37,8 @@ export type GithubRepoListItem = {
   id: number;
   name: string;
   full_name: string;
+  html_url?: string;
+  description?: string | null;
   private: boolean;
   default_branch?: string;
   updated_at?: string;
