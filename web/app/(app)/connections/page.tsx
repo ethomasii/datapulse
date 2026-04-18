@@ -203,9 +203,12 @@ function ConnectorRunnerAuthBlock({
     <div className="mt-4 rounded-lg border border-emerald-200/80 bg-emerald-50/50 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
       <p className="text-xs font-semibold text-emerald-950 dark:text-emerald-100">Authenticate in your runtime</p>
       <p className="mt-1 text-[11px] leading-snug text-emerald-900/90 dark:text-emerald-100/90">
-        eltPulse does not store passwords or API keys in connection JSON. Set these variables where this connection is
-        used (local <code className="rounded bg-white/60 px-0.5 dark:bg-emerald-950/50">.env</code>, CI secrets, or your
-        gateway host).
+        Passwords and API keys are never stored in the public <code className="rounded bg-white/60 px-0.5 dark:bg-emerald-950/50">config</code>{" "}
+        JSON — only in optional encrypted storage above. Your runner still reads these env var names. Either set values
+        yourself (local <code className="rounded bg-white/60 px-0.5 dark:bg-emerald-950/50">.env</code>, CI secrets), or
+        have a trusted self-hosted gateway call{" "}
+        <code className="rounded bg-white/60 px-0.5 font-mono text-[10px] dark:bg-emerald-950/50">GET /api/agent/connections</code>{" "}
+        with its Bearer token to receive decrypted secrets and export them into the process environment.
       </p>
       <ul className="mt-2 space-y-1.5 text-[11px] text-emerald-950 dark:text-emerald-100">
         {rows.map((r) => (
