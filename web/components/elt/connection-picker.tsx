@@ -84,8 +84,7 @@ export function ConnectionPicker({ connectionType, connector, onSelect, currentV
     return flat;
   }
 
-  async function saveAsConnection(e: React.FormEvent) {
-    e.preventDefault();
+  async function saveAsConnection() {
     if (!saveName.trim()) return;
     setSaving(true);
     setSaveError("");
@@ -201,8 +200,9 @@ export function ConnectionPicker({ connectionType, connector, onSelect, currentV
         </button>
 
         {saveOpen && (
-          <form
-            onSubmit={saveAsConnection}
+          <div
+            role="group"
+            aria-label="Save as connection"
             className="absolute right-0 top-full z-50 mt-1 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-700 dark:bg-slate-900"
           >
             <p className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
@@ -218,14 +218,20 @@ export function ConnectionPicker({ connectionType, connector, onSelect, currentV
             <input
               value={saveName}
               onChange={(e) => setSaveName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void saveAsConnection();
+                }
+              }}
               placeholder={`e.g. ${connector}-prod`}
-              required
               className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1.5 font-mono text-xs dark:border-slate-700 dark:bg-slate-950 dark:text-white"
             />
             <div className="mt-2 flex gap-2">
               <button
-                type="submit"
+                type="button"
                 disabled={saving || !saveName.trim()}
+                onClick={() => void saveAsConnection()}
                 className="flex-1 rounded bg-sky-600 px-2 py-1 text-xs font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
               >
                 {saving ? "Saving…" : "Save"}
@@ -238,7 +244,7 @@ export function ConnectionPicker({ connectionType, connector, onSelect, currentV
                 Cancel
               </button>
             </div>
-          </form>
+          </div>
         )}
       </div>
     </div>
