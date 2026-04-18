@@ -1,12 +1,10 @@
 /**
- * PATCH /api/agent/runs/:id
+ * GET  /api/agent/runs/:id  — check current run status (agent polls this to detect cancellation)
+ * PATCH /api/agent/runs/:id — report progress, logs, telemetry, final status
  *
- * Agent reports run progress, logs, **telemetry** (rows/bytes/progress samples), and final status.
- * Authenticated by Bearer agentToken.
- *
- * Body (all optional; zod-validated, same shape as `PATCH /api/elt/runs/:id`):
- *   status, appendLog, logEntries, errorSummary, finishedAt,
- *   telemetrySummary, appendTelemetrySample, telemetrySamples
+ * Both authenticated by Bearer agentToken.
+ * PATCH response includes `cancel: true` when the run has been cancelled server-side
+ * while the agent was executing, so the agent can abort immediately.
  */
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
@@ -18,6 +16,31 @@ import { maybeDispatchRunWebhook } from "@/lib/elt/maybe-dispatch-run-webhook";
 import { patchRunBodySchema } from "@/lib/elt/run-types";
 
 type Params = { params: Promise<{ id: string }> };
+
+export async function GET(req: Request, { params }: Params) {
+  const ctx = await getAgentAuthContext(req);
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { user } = ctx;
+  const namedId = ctx.agentTokenRow?.id ?? null;
+
+  const { id } = await params;
+  const run = await db.eltPipelineRun.findFirst({
+    where: { id, userId: user.id },
+    select: {
+      id: true,
+      status: true,
+      targetAgentTokenId: true,
+      pipeline: { select: { id: true, name: true } },
+    },
+  });
+  if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (!agentCanMutateRun(namedId, run.targetAgentTokenId)) {
+    return NextResponse.json({ error: "This run is targeted to a different gateway" }, { status: 403 });
+  }
+
+  return NextResponse.json({ run, cancel: run.status === "cancelled" });
+}
 
 export async function PATCH(req: Request, { params }: Params) {
   const ctx = await getAgentAuthContext(req);
@@ -34,6 +57,12 @@ export async function PATCH(req: Request, { params }: Params) {
       { error: "This run is targeted to a different gateway" },
       { status: 403 }
     );
+  }
+
+  // If the run was cancelled server-side (user clicked Cancel), tell the agent
+  // to stop immediately rather than continuing to write progress.
+  if (existing.status === "cancelled") {
+    return NextResponse.json({ run: existing, cancel: true });
   }
 
   let json: unknown;
@@ -80,5 +109,5 @@ export async function PATCH(req: Request, { params }: Params) {
     await maybeDispatchRunWebhook(run.id, user.id);
   }
 
-  return NextResponse.json({ run });
+  return NextResponse.json({ run, cancel: false });
 }
