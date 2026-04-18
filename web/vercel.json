@@ -1,5 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "experimentalServices": {
+    "nextjs": {
+      "entrypoint": ".",
+      "routePrefix": "/",
+      "framework": "nextjs"
+    },
+    "managedWorker": {
+      "entrypoint": "managed-worker-service/main.py",
+      "routePrefix": "/managed-elt",
+      "framework": "fastapi",
+      "maxDuration": 900
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/monitors",

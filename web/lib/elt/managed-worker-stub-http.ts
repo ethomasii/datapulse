@@ -113,15 +113,19 @@ export async function runManagedWorkerStubBatchHttp(options: {
   return { processed, errors };
 }
 
+export type ManagedExecutorMode = "stub" | "local" | "vercel-python";
+
 /**
  * `stub` — demo telemetry only (default, backwards compatible).
  * `local` — run real `python pipeline.py` / `sling run -r replication.yaml` on the **same host**
  * as this process (dev machine, long-running Node VM, or container with Python/Sling + dlt deps).
- * Not suitable for stock Vercel serverless unless that image includes Python + your pipeline deps.
+ * `vercel-python` — forward to the FastAPI Python service (Vercel Services, `/managed-elt/batch`);
+ *   **900s (15 min) max** per serverless invocation for the whole batch (Vercel `maxDuration`).
  */
-export function resolveManagedExecutorMode(): "stub" | "local" {
+export function resolveManagedExecutorMode(): ManagedExecutorMode {
   const v = (process.env.ELTPULSE_MANAGED_EXECUTOR ?? "stub").toLowerCase().trim();
   if (v === "local") return "local";
+  if (v === "vercel-python") return "vercel-python";
   return "stub";
 }
 
@@ -131,9 +135,18 @@ export async function runManagedWorkerBatchHttp(options: {
   limit: number;
   deadlineMs: number;
 }): Promise<{ processed: number; errors: string[] }> {
-  if (resolveManagedExecutorMode() === "local") {
+  const mode = resolveManagedExecutorMode();
+  if (mode === "local") {
     const { runManagedWorkerLocalBatchHttp } = await import("@/lib/elt/managed-executor-local");
     return runManagedWorkerLocalBatchHttp(options);
+  }
+  if (mode === "vercel-python") {
+    const { runManagedWorkerVercelPythonBatchHttp } = await import("@/lib/elt/managed-worker-vercel-python");
+    return runManagedWorkerVercelPythonBatchHttp({
+      baseUrl: options.baseUrl,
+      limit: options.limit,
+      deadlineMs: options.deadlineMs,
+    });
   }
   return runManagedWorkerStubBatchHttp(options);
 }

@@ -46,4 +46,9 @@ describe("resolveManagedExecutorMode", () => {
     vi.stubEnv("ELTPULSE_MANAGED_EXECUTOR", "local");
     expect(resolveManagedExecutorMode()).toBe("local");
   });
+
+  it("honors vercel-python", () => {
+    vi.stubEnv("ELTPULSE_MANAGED_EXECUTOR", "vercel-python");
+    expect(resolveManagedExecutorMode()).toBe("vercel-python");
+  });
 });

@@ -1,0 +1,14 @@
+[project]
+name = "eltpulse-managed-worker"
+version = "0.1.0"
+description = "Vercel Python service: real dlt/Sling execution for eltPulse-managed runs (Services /managed-elt)"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115.0",
+  "httpx>=0.27.0",
+  "uvicorn[standard]>=0.32.0",
+  "dlt>=1.5.0",
+]
+
+[tool.setuptools]
+packages = []
