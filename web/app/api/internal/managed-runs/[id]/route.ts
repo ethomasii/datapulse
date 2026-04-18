@@ -23,6 +23,32 @@ const MANAGED: RunIngestionExecutor[] = [
 
 type Ctx = { params: { id: string } | Promise<{ id: string }> };
 
+/**
+ * Lightweight status read for managed workers (e.g. cancel detection).
+ * GET /api/internal/managed-runs/:id
+ */
+export async function GET(req: Request, ctx: Ctx) {
+  const secret = process.env.ELTPULSE_INTERNAL_API_SECRET;
+  const auth = req.headers.get("authorization") ?? "";
+  if (!secret || auth !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const id = await resolveRouteParamId(ctx.params);
+  const run = await db.eltPipelineRun.findFirst({
+    where: { id },
+    select: { id: true, status: true, ingestionExecutor: true },
+  });
+  if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!MANAGED.includes(run.ingestionExecutor)) {
+    return NextResponse.json({ error: "Run is not managed-ingestion" }, { status: 403 });
+  }
+
+  return NextResponse.json({
+    run: { id: run.id, status: run.status, ingestionExecutor: run.ingestionExecutor },
+  });
+}
+
 export async function PATCH(req: Request, ctx: Ctx) {
   const secret = process.env.ELTPULSE_INTERNAL_API_SECRET;
   const auth = req.headers.get("authorization") ?? "";

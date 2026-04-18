@@ -15,7 +15,8 @@
     "db:push": "npx dotenv-cli -e .env.local -- prisma db push",
     "db:migrate": "npx dotenv-cli -e .env.local -- prisma migrate dev",
     "db:migrate:deploy": "npx dotenv-cli -e .env.local -- prisma migrate deploy",
-    "db:studio": "npx dotenv-cli -e .env.local -- prisma studio"
+    "db:studio": "npx dotenv-cli -e .env.local -- prisma studio",
+    "managed-worker:local": "npx dotenv-cli -e .env.local -- tsx scripts/run-managed-local.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.758.0",
@@ -49,6 +50,7 @@
     "eslint-config-next": "14.2.4",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
+    "tsx": "^4.19.2",
     "typescript": "^5",
     "vitest": "^3.0.5"
   }

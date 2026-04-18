@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { unstable_noStore as noStore } from "next/cache";
 import {
   resolveControlPlaneBaseUrl,
-  runManagedWorkerStubBatchHttp,
+  runManagedWorkerBatchHttp,
 } from "@/lib/elt/managed-worker-stub-http";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,8 @@ export const maxDuration = 60;
 
 /**
  * Vercel Cron — schedule in `vercel.json`. Bursts: no always-on worker; each tick pulls pending
- * `eltpulse_managed` runs and stub-completes them (replace stub with real executor later).
+ * `eltpulse_managed` runs. Default: stub executor (`ELTPULSE_MANAGED_EXECUTOR=stub`).
+ * Set `ELTPULSE_MANAGED_EXECUTOR=local` for real dlt/Sling on the Node host (dev VM / container).
  *
  * Auth: `Authorization: Bearer ${CRON_SECRET}` (same as `/api/cron/monitors`).
  *
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
   const budgetMs = Math.min(120_000, Math.max(5_000, Number(url.searchParams.get("budgetMs") ?? 45_000) || 45_000));
 
   try {
-    const { processed, errors } = await runManagedWorkerStubBatchHttp({
+    const { processed, errors } = await runManagedWorkerBatchHttp({
       baseUrl,
       secret: internal,
       limit,

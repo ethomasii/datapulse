@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { resolveControlPlaneBaseUrl } from "./managed-worker-stub-http";
+import {
+  normalizeControlPlaneBase,
+  resolveControlPlaneBaseUrl,
+  resolveManagedExecutorMode,
+} from "./managed-worker-stub-http";
 
 describe("resolveControlPlaneBaseUrl", () => {
   afterEach(() => {
@@ -20,5 +24,26 @@ describe("resolveControlPlaneBaseUrl", () => {
   it("falls back to NEXT_PUBLIC_APP_URL", () => {
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "http://localhost:3000/");
     expect(resolveControlPlaneBaseUrl()).toBe("http://localhost:3000");
+  });
+});
+
+describe("normalizeControlPlaneBase", () => {
+  it("strips trailing slash", () => {
+    expect(normalizeControlPlaneBase("https://x.com/")).toBe("https://x.com");
+  });
+});
+
+describe("resolveManagedExecutorMode", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("defaults to stub", () => {
+    expect(resolveManagedExecutorMode()).toBe("stub");
+  });
+
+  it("honors local", () => {
+    vi.stubEnv("ELTPULSE_MANAGED_EXECUTOR", "local");
+    expect(resolveManagedExecutorMode()).toBe("local");
   });
 });

@@ -1,6 +1,9 @@
 /**
- * One-shot managed-worker (Node 18+): pull pending managed runs and stub-complete them.
- * Keep PATCH sequence aligned with web/lib/elt/managed-worker-stub-http.ts
+ * One-shot managed-worker (Node 18+): pull pending managed runs and **stub-complete** them.
+ *
+ * For **real** dlt/Sling execution on a machine with Python/Sling installed, use instead:
+ *   cd web && pnpm managed-worker:local
+ * with `ELTPULSE_MANAGED_EXECUTOR=local` in `.env.local` (see README.md in this folder).
  *
  * Env:
  *   ELTPULSE_CONTROL_PLANE_URL  — e.g. https://app.example.com or http://localhost:3000
