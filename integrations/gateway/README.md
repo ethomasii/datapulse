@@ -43,6 +43,17 @@ By default the process **does not** change run status. **`ELTPULSE_EXECUTE_RUNS=
 
 **Monitors:** when your manifest resolves a monitor to the customer gateway (per-monitor `executionHost` + account `executionPlane`), this process polls S3/SQS and **`POST /api/agent/monitors/:id/report`**. Disable with **`ELTPULSE_EVAL_MONITORS=0`** if needed.
 
+## Managed runs (`ingestionExecutor: eltpulse_managed`)
+
+Runs marked for **eltPulse-managed** execution are **not** returned by `GET /api/agent/runs` for customer Bearer tokens, so a self-hosted gateway will not accidentally stub-complete them.
+
+eltPulse’s own worker fleet should use the **internal** control-plane APIs (same deployment secret as `POST /api/internal/agent-heartbeat`):
+
+- `GET /api/internal/managed-runs?limit=5` — pending managed runs with full pipeline manifest (+ owning `user` id/email for tenancy).
+- `PATCH /api/internal/managed-runs/:id` — same patch contract as `PATCH /api/agent/runs/:id`, but **preserves** managed `ingestionExecutor` (customer agent routes force `customer_agent`).
+
+Those workers still need a **real executor** (spawn dlt in Docker/K8s, etc.); this repo’s reference gateway continues to use `stubCompleteRun` unless you replace it.
+
 ## Dispatcher vs isolated workers
 
 For **ECS / Kubernetes / Docker**, keep the long-lived process as a **dispatcher** only: set **`pipelineRunIsolation`** / **`monitorCheckIsolation`** to **`spawn`** on the named gateway token’s JSON metadata (surfaced in **`GET /api/agent/manifest`** as `executorHints`), or override with env on the host:

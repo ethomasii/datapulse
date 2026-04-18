@@ -5,10 +5,17 @@
  * Returns runs with full pipeline manifest (code, config, workspace yaml).
  * Authenticated by Bearer agentToken.
  */
+import { RunIngestionExecutor } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
 import { getAgentAuthContext } from "@/lib/agent/auth";
 import { agentPollRunsWhere } from "@/lib/agent/gateway-routing";
+
+/** Customer gateways must not pick runs reserved for eltPulse-operated workers. */
+const NOT_CUSTOMER_GATEWAY_POLL: RunIngestionExecutor[] = [
+  RunIngestionExecutor.eltpulse_managed,
+  RunIngestionExecutor.datapulse_managed,
+];
 
 export async function GET(req: Request) {
   const ctx = await getAgentAuthContext(req);
@@ -28,6 +35,7 @@ export async function GET(req: Request) {
     where: {
       AND: [
         agentPollRunsWhere(user.id, namedId),
+        { ingestionExecutor: { notIn: NOT_CUSTOMER_GATEWAY_POLL } },
         ...(statuses.length ? [{ status: { in: statuses } as const }] : []),
         ...(pipelineId ? [{ pipelineId }] : []),
       ],

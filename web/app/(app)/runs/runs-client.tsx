@@ -691,8 +691,12 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
           <h2 className="text-sm font-semibold text-sky-950 dark:text-sky-100">Run on demand</h2>
           <p className="mt-1 text-xs text-sky-900/90 dark:text-sky-200/90">
             Queues a <strong className="font-medium">pending</strong> run (same path as webhooks and slice backfills).
-            Your gateway polls <code className="rounded bg-white/70 px-1 font-mono text-[10px] dark:bg-sky-950/60">GET /api/agent/runs</code>{" "}
-            to execute it, or eltPulse-managed workers pick it up when configured.
+            Self-hosted gateways poll{" "}
+            <code className="rounded bg-white/70 px-1 font-mono text-[10px] dark:bg-sky-950/60">GET /api/agent/runs</code>{" "}
+            for runs that are <strong className="font-medium">not</strong> reserved for eltPulse-managed execution.
+            Managed runs are listed under{" "}
+            <code className="rounded bg-white/70 px-1 font-mono text-[10px] dark:bg-sky-950/60">GET /api/internal/managed-runs</code>{" "}
+            (deployment secret) for eltPulse-operated workers — see <code className="font-mono text-[10px]">integrations/gateway/README.md</code>.
           </p>
           <form onSubmit={triggerRunNow} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className="flex flex-col gap-1 sm:col-span-2">
