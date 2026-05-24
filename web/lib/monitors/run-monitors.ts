@@ -217,7 +217,7 @@ async function checkSqlWatermark(
   let rowCount = 0;
   let maxWatermark: string | null = null;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Client } = require("pg") as { Client: new (cfg: { connectionString: string; ssl: { rejectUnauthorized: boolean } }) => { connect(): Promise<void>; query(sql: string, params: unknown[]): Promise<{ rows: { cnt: string; max_wm: string | null }[] }>; end(): Promise<void> } };
     const client = new Client({ connectionString: connStr, ssl: { rejectUnauthorized: false } });
     await client.connect();

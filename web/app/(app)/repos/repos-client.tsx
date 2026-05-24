@@ -82,7 +82,7 @@ export function RepositoriesClient({
     setRepoName(initialConnection?.defaultRepoName ?? "");
     setBranch(initialConnection?.defaultBranch ?? "main");
     setRepositoryUrl(defaultRepoUrl(initialConnection));
-  }, [initialConnection?.defaultRepoOwner, initialConnection?.defaultRepoName, initialConnection?.defaultBranch]);
+  }, [initialConnection]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
