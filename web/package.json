@@ -37,12 +37,14 @@
     "stripe": "^21.0.1",
     "svix": "^1.89.0",
     "tailwind-merge": "^3.5.0",
+    "pg": "^8.13.3",
     "yaml": "^2.8.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^20",
+    "@types/pg": "^8.11.10",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "dotenv-cli": "^11.0.0",

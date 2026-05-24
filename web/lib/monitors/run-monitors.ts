@@ -1,6 +1,7 @@
 import { ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
 import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { createHash } from "crypto";
+import { Client as PgClient } from "pg";
 import type { Connection, EltMonitor, ExecutionPlane } from "@prisma/client";
 import { monitorEvaluatesOnControlPlane } from "@/lib/agent/monitor-execution";
 import { resolveNewRunExecution } from "@/lib/agent/run-execution";
@@ -217,8 +218,7 @@ async function checkSqlWatermark(
   let rowCount = 0;
   let maxWatermark: string | null = null;
   try {
-    const { Client } = (require as any)("pg") as { Client: new (cfg: { connectionString: string; ssl: { rejectUnauthorized: boolean } }) => { connect(): Promise<void>; query(sql: string, params: unknown[]): Promise<{ rows: { cnt: string; max_wm: string | null }[] }>; end(): Promise<void> } };
-    const client = new Client({ connectionString: connStr, ssl: { rejectUnauthorized: false } });
+    const client = new PgClient({ connectionString: connStr, ssl: { rejectUnauthorized: false } });
     await client.connect();
     const whereClause = lastWatermark
       ? `WHERE ${watermarkColumn} > $1`
