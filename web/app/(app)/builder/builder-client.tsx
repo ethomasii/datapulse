@@ -24,11 +24,12 @@ import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
 import { SourceCatalogWizard } from "@/components/elt/source-catalog-wizard";
 import { RelatedLinks } from "@/components/ui/related-links";
 import {
-  DESTINATION_GROUPS,
-  SOURCE_GROUPS,
+  DESTINATION_OPTIONS,
+  SOURCE_OPTIONS,
   DESTINATION_TYPES,
   SOURCE_TYPES,
 } from "@/lib/elt/catalog";
+import { ConnectorCombobox } from "@/components/elt/connector-combobox";
 import { CopyEnvButton } from "@/components/elt/copy-env-button";
 import { ConnectionPicker } from "@/components/elt/connection-picker";
 import { FormAccordion } from "@/components/elt/form-accordion";
@@ -808,54 +809,38 @@ export function BuilderClient({
                     </label>
                     <label className="block">
                       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Source</span>
-                      <select
-                        value={sourceType}
-                        onChange={(e) => {
-                          const t = e.target.value;
-                          setSourceType(t);
-                          if (!editingId && showCreateForm) {
-                            resetConnectorForNewSourceType(t, destinationType);
-                          } else {
-                            setSourceConnectionId(null);
-                          }
-                        }}
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                      >
-                        {Object.entries(SOURCE_GROUPS).map(([group, items]) => (
-                          <optgroup key={group} label={group}>
-                            {items.map((s) => (
-                              <option key={s} value={s}>
-                                {s}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </select>
+                      <div className="mt-1">
+                        <ConnectorCombobox
+                          options={SOURCE_OPTIONS}
+                          value={sourceType}
+                          onChange={(t) => {
+                            setSourceType(t);
+                            if (!editingId && showCreateForm) {
+                              resetConnectorForNewSourceType(t, destinationType);
+                            } else {
+                              setSourceConnectionId(null);
+                            }
+                          }}
+                          placeholder="Search sources…"
+                        />
+                      </div>
                     </label>
                     <label className="block">
                       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Destination</span>
-                      <select
-                        value={destinationType}
-                        onChange={(e) => {
-                          const d = e.target.value;
-                          setDestinationType(d);
-                          if (!editingId && showCreateForm) {
-                            setConnectionValues(emptyConnectionValuesForTypes(sourceType, d));
-                          }
-                          setDestinationConnectionId(null);
-                        }}
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                      >
-                        {Object.entries(DESTINATION_GROUPS).map(([group, items]) => (
-                          <optgroup key={group} label={group}>
-                            {items.map((d) => (
-                              <option key={d} value={d}>
-                                {d}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </select>
+                      <div className="mt-1">
+                        <ConnectorCombobox
+                          options={DESTINATION_OPTIONS}
+                          value={destinationType}
+                          onChange={(d) => {
+                            setDestinationType(d);
+                            if (!editingId && showCreateForm) {
+                              setConnectionValues(emptyConnectionValuesForTypes(sourceType, d));
+                            }
+                            setDestinationConnectionId(null);
+                          }}
+                          placeholder="Search destinations…"
+                        />
+                      </div>
                     </label>
                     <label className="block sm:col-span-2">
                       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">

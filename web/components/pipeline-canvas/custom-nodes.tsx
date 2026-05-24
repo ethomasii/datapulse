@@ -3,7 +3,8 @@
 import { useCallback } from "react";
 import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react";
 import { ArrowRightLeft, Database, Target } from "lucide-react";
-import { DESTINATION_GROUPS, SOURCE_GROUPS } from "@/lib/elt/catalog";
+import { DESTINATION_OPTIONS, SOURCE_OPTIONS } from "@/lib/elt/catalog";
+import { ConnectorCombobox } from "@/components/elt/connector-combobox";
 import { cn } from "@/lib/utils";
 import { useCanvasBindings } from "./canvas-bindings-context";
 import { TRANSFORM_TOOLS } from "./transform-tools";
@@ -108,29 +109,17 @@ export function SourceNode({ id, data }: NodeProps) {
         Source
       </div>
       {bindings ? (
-        <label className="nodrag mb-1 block min-w-0 text-[9px] font-semibold uppercase tracking-wide text-emerald-900 dark:text-emerald-100">
-          Source type
-          <select
-            className={cn(
-              selectBase,
-              "border-emerald-200 focus:ring-emerald-500 dark:border-emerald-800",
-              bindings.bindingsBusy && "opacity-60"
-            )}
+        <div className="nodrag mb-1">
+          <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-900 dark:text-emerald-100">Source type</p>
+          <ConnectorCombobox
+            options={SOURCE_OPTIONS}
             value={bindings.pipelineSourceType}
+            onChange={(v) => void bindings.onPickSourceType(v)}
             disabled={bindings.bindingsBusy}
-            onChange={(e) => void bindings.onPickSourceType(e.target.value)}
-          >
-            {Object.entries(SOURCE_GROUPS).map(([group, types]) => (
-              <optgroup key={group} label={group}>
-                {types.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </label>
+            compact
+            className="border-emerald-200 dark:border-emerald-800"
+          />
+        </div>
       ) : (
         <p className="nodrag mb-1 text-[10px] leading-snug text-slate-500 dark:text-slate-400">
           Open a saved pipeline to pick a source (updates generated extract code).
@@ -225,29 +214,17 @@ export function DestinationNode({ id, data }: NodeProps) {
         Destination
       </div>
       {bindings ? (
-        <label className="nodrag mb-1 block min-w-0 text-[9px] font-semibold uppercase tracking-wide text-sky-900 dark:text-sky-100">
-          Destination type
-          <select
-            className={cn(
-              selectBase,
-              "border-sky-200 focus:ring-sky-500 dark:border-sky-800",
-              bindings.bindingsBusy && "opacity-60"
-            )}
+        <div className="nodrag mb-1">
+          <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-sky-900 dark:text-sky-100">Destination type</p>
+          <ConnectorCombobox
+            options={DESTINATION_OPTIONS}
             value={bindings.pipelineDestinationType}
+            onChange={(v) => void bindings.onPickDestinationType(v)}
             disabled={bindings.bindingsBusy}
-            onChange={(e) => void bindings.onPickDestinationType(e.target.value)}
-          >
-            {Object.entries(DESTINATION_GROUPS).map(([group, types]) => (
-              <optgroup key={group} label={group}>
-                {types.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </label>
+            compact
+            className="border-sky-200 dark:border-sky-800"
+          />
+        </div>
       ) : (
         <p className="nodrag mb-1 text-[10px] leading-snug text-slate-500 dark:text-slate-400">
           Open a saved pipeline to pick a destination (updates generated load target).

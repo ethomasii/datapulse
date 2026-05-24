@@ -15,6 +15,7 @@ import {
   getConnectorConfigFields,
   connectorLabel,
 } from "@/lib/elt/connectors-registry";
+import { ConnectorCombobox } from "@/components/elt/connector-combobox";
 
 function connectorsByCategory(connectionType: "source" | "destination"): { category: string; slugs: string[] }[] {
   const grouped = new Map<string, string[]>();
@@ -42,10 +43,6 @@ type Connection = {
   hasStoredSecrets?: boolean;
 };
 
-// ── Connector lists — derived from connectors-registry (single source of truth) ──
-
-const SOURCE_CONNECTORS: readonly string[] = SOURCE_CONNECTOR_SLUGS;
-const DESTINATION_CONNECTORS: readonly string[] = DESTINATION_CONNECTOR_SLUGS;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -438,21 +435,16 @@ function CreateConnectionForm({ onCreated }: { onCreated: (c: Connection) => voi
 
         <label className="block">
           <span className="text-xs text-sky-800 dark:text-sky-300">Connector</span>
-          <select
-            value={connector}
-            onChange={(e) => setConnector(e.target.value)}
-            required
-            className="mt-1 w-full rounded border border-sky-200 bg-white px-2 py-1.5 text-sm dark:border-sky-800 dark:bg-sky-950 dark:text-white"
-          >
-            <option value="">Select…</option>
-            {connectorsByCategory(type).map(({ category, slugs }) => (
-              <optgroup key={category} label={category}>
-                {slugs.map((c) => (
-                  <option key={c} value={c}>{connectorLabel(c)}</option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+          <div className="mt-1">
+            <ConnectorCombobox
+              options={connectorsByCategory(type).flatMap(({ category, slugs }) =>
+                slugs.map((s) => ({ slug: s, label: connectorLabel(s), category }))
+              )}
+              value={connector}
+              onChange={setConnector}
+              placeholder="Search connectors…"
+            />
+          </div>
         </label>
       </div>
 

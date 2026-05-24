@@ -68,3 +68,23 @@ export const DESTINATION_GROUPS: Record<string, readonly string[]> = {
 export const SOURCE_TYPES = Array.from(new Set(Object.values(SOURCE_GROUPS).flat())) as string[];
 
 export const DESTINATION_TYPES = Array.from(new Set(Object.values(DESTINATION_GROUPS).flat())) as string[];
+
+/** Flat option list for ConnectorCombobox — all pipeline sources (111+) */
+export const SOURCE_OPTIONS: { slug: string; label: string; category: string }[] =
+  Object.entries(SOURCE_GROUPS).flatMap(([category, slugs]) =>
+    (slugs as string[]).map((slug) => ({
+      slug,
+      label: slug.charAt(0).toUpperCase() + slug.slice(1).replace(/_/g, " "),
+      category,
+    }))
+  );
+
+/** Flat option list for ConnectorCombobox — pipeline destinations */
+export const DESTINATION_OPTIONS: { slug: string; label: string; category: string }[] =
+  Object.entries(DESTINATION_GROUPS).flatMap(([category, slugs]) =>
+    (slugs as string[]).map((slug) => ({
+      slug,
+      label: slug.charAt(0).toUpperCase() + slug.slice(1).replace(/_/g, " "),
+      category,
+    }))
+  );

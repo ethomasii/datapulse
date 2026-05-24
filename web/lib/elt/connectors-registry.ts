@@ -739,6 +739,18 @@ export function getConnectorDestinationCredentials(slug: string): CredentialFiel
   return c.credentialFields ?? [];
 }
 
+/** Flat option list for ConnectorCombobox — sources */
+export const SOURCE_CONNECTOR_OPTIONS: { slug: string; label: string; category: string }[] =
+  ALL_CONNECTORS
+    .filter((c) => c.connectionTypes.includes("source"))
+    .map((c) => ({ slug: c.slug, label: c.label ?? connectorLabel(c.slug), category: c.category }));
+
+/** Flat option list for ConnectorCombobox — destinations */
+export const DESTINATION_CONNECTOR_OPTIONS: { slug: string; label: string; category: string }[] =
+  ALL_CONNECTORS
+    .filter((c) => c.connectionTypes.includes("destination"))
+    .map((c) => ({ slug: c.slug, label: c.label ?? connectorLabel(c.slug), category: c.category }));
+
 /** Source-wizard configuration fields for a source connector */
 export function getConnectorSourceConfigFields(slug: string): ConfigField[] {
   return ALL_CONNECTORS.find((c) => c.slug === slug)?.sourceConfigFields ?? [];
