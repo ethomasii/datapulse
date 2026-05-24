@@ -9,11 +9,23 @@ import { ConnectionStoredSecretsForm } from "@/components/elt/connection-stored-
 import { CopyEnvButton } from "@/components/elt/copy-env-button";
 import { getDestinationCredentials, getSourceCredentials } from "@/lib/elt/credentials-catalog";
 import {
+  ALL_CONNECTORS,
   SOURCE_CONNECTOR_SLUGS,
   DESTINATION_CONNECTOR_SLUGS,
   getConnectorConfigFields,
   connectorLabel,
 } from "@/lib/elt/connectors-registry";
+
+function connectorsByCategory(connectionType: "source" | "destination"): { category: string; slugs: string[] }[] {
+  const grouped = new Map<string, string[]>();
+  for (const c of ALL_CONNECTORS) {
+    if (!c.connectionTypes.includes(connectionType)) continue;
+    const cat = c.category;
+    if (!grouped.has(cat)) grouped.set(cat, []);
+    grouped.get(cat)!.push(c.slug);
+  }
+  return Array.from(grouped.entries()).map(([category, slugs]) => ({ category, slugs }));
+}
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -316,7 +328,6 @@ function CreateConnectionForm({ onCreated }: { onCreated: (c: Connection) => voi
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const connectorList = type === "source" ? SOURCE_CONNECTORS : DESTINATION_CONNECTORS;
 
   useEffect(() => {
     setConnector("");
@@ -434,10 +445,12 @@ function CreateConnectionForm({ onCreated }: { onCreated: (c: Connection) => voi
             className="mt-1 w-full rounded border border-sky-200 bg-white px-2 py-1.5 text-sm dark:border-sky-800 dark:bg-sky-950 dark:text-white"
           >
             <option value="">Select…</option>
-            {connectorList.map((c) => (
-              <option key={c} value={c}>
-                {connectorLabel(c)}
-              </option>
+            {connectorsByCategory(type).map(({ category, slugs }) => (
+              <optgroup key={category} label={category}>
+                {slugs.map((c) => (
+                  <option key={c} value={c}>{connectorLabel(c)}</option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </label>
