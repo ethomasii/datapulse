@@ -28,6 +28,7 @@ export function CanvasTransformInspector({ nodeId, initialData, onPatch, pipelin
   const [dbtSelector, setDbtSelector] = useState(() => String(initialData.dbtSelector ?? ""));
   const [dbtSliceValueVar, setDbtSliceValueVar] = useState(() => String(initialData.dbtSliceValueVar ?? ""));
   const [dbtSliceColumnVar, setDbtSliceColumnVar] = useState(() => String(initialData.dbtSliceColumnVar ?? ""));
+  const [postTransformCode, setPostTransformCode] = useState(() => String(initialData.postTransformCode ?? ""));
 
   useEffect(() => {
     setLabel(String(initialData.label ?? ""));
@@ -38,6 +39,7 @@ export function CanvasTransformInspector({ nodeId, initialData, onPatch, pipelin
     setDbtRepositoryBranch(String(initialData.dbtRepositoryBranch ?? ""));
     setDbtRunScope(String(initialData.dbtRunScope ?? "all") === "selection" ? "selection" : "all");
     setDbtSelector(String(initialData.dbtSelector ?? ""));
+    setPostTransformCode(String(initialData.postTransformCode ?? ""));
     setDbtSliceValueVar(String(initialData.dbtSliceValueVar ?? ""));
     setDbtSliceColumnVar(String(initialData.dbtSliceColumnVar ?? ""));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- remount or nodeId change defines a new snapshot
@@ -198,6 +200,43 @@ export function CanvasTransformInspector({ nodeId, initialData, onPatch, pipelin
               placeholder="default: elt_partition_column"
               autoComplete="off"
               spellCheck={false}
+            />
+          </label>
+        </div>
+      ) : null}
+
+      {(transformTool === "python" || transformTool === "sql") ? (
+        <div className="space-y-3 rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-3 dark:border-amber-800/50 dark:bg-amber-950/20">
+          {transformTool === "python" ? (
+            <p className="text-[11px] leading-snug text-amber-950 dark:text-amber-100">
+              Python script appended after <code className="rounded bg-amber-100/80 px-0.5 font-mono text-[10px] dark:bg-amber-900/50">pipeline.run()</code>.
+              Has access to <code className="font-mono text-[10px]">pipeline</code>, <code className="font-mono text-[10px]">info</code>,
+              and <code className="font-mono text-[10px]">partition_key</code>.
+            </p>
+          ) : (
+            <p className="text-[11px] leading-snug text-amber-950 dark:text-amber-100">
+              SQL statements executed against the destination after load. Separate multiple statements with{" "}
+              <code className="rounded bg-amber-100/80 px-0.5 font-mono text-[10px] dark:bg-amber-900/50">;</code>.
+              Use fully-qualified table names (schema.table) as needed.
+            </p>
+          )}
+          <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
+            {transformTool === "python" ? "Python script" : "SQL statements"}
+            <textarea
+              value={postTransformCode}
+              onChange={(e) => {
+                const v = e.target.value;
+                setPostTransformCode(v);
+                onPatch({ postTransformCode: v });
+              }}
+              rows={10}
+              spellCheck={false}
+              placeholder={
+                transformTool === "python"
+                  ? "# e.g.\nprint(f'Loaded {info.loads_ids} load(s)')\n# call any Python here"
+                  : "-- e.g.\nCREATE OR REPLACE VIEW analytics.v_orders AS SELECT * FROM raw.orders;\nUPDATE analytics.summary SET updated_at = NOW();"
+              }
+              className={`${fieldClass} resize-y font-mono text-xs leading-relaxed`}
             />
           </label>
         </div>

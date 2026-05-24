@@ -1,6 +1,7 @@
 import type { PipelineRequest } from "./types";
 import { escapePyString } from "./escape-py";
 import { dltDbtRunnerBeforeReturn } from "./generate-dlt-dbt-append";
+import { postTransformBeforeReturn } from "./generate-post-transform";
 import { generateRestApiAdvanced, generateRestApiPipeline } from "./generate-dlt-rest";
 
 // SWC/webpack misparses Python triple-quotes inside JS template literals.
@@ -106,7 +107,7 @@ def run(partition_key: str = None):
         loader_file_format="${escapePyString(request.fileFormat ?? "parquet")}"
     )
 
-    print(f"Pipeline completed: {info}")${dltDbtRunnerBeforeReturn(request)}
+    print(f"Pipeline completed: {info}")${dltDbtRunnerBeforeReturn(request)}${postTransformBeforeReturn(request)}
     return info
 
 if __name__ == "__main__":
@@ -165,7 +166,7 @@ def run(partition_key: str = None):
         loader_file_format="${escapePyString(request.fileFormat ?? "parquet")}"  # File format for file-based destinations
     )
 
-    print(f"Pipeline completed: {info}")${dltDbtRunnerBeforeReturn(request)}
+    print(f"Pipeline completed: {info}")${dltDbtRunnerBeforeReturn(request)}${postTransformBeforeReturn(request)}
     return info
 
 if __name__ == "__main__":

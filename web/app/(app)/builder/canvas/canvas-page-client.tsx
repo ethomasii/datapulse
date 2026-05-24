@@ -33,7 +33,7 @@ import {
   stripCanvasFromSourceConfig,
 } from "@/lib/elt/canvas-source-config";
 import { chooseTool } from "@/lib/elt/choose-tool";
-import { enrichTransformNodesFromDltDbt } from "@/lib/elt/dbt-canvas";
+import { enrichTransformNodesFromDltDbt, enrichPostTransformNodes } from "@/lib/elt/dbt-canvas";
 import { attachCanvasToSourceConfiguration } from "@/lib/elt/merge-canvas-into-source-config";
 import { minimalSourceConfigurationForNewPipeline } from "@/lib/elt/minimal-source-configuration";
 import { ensureGithubReposForForm } from "@/lib/elt/normalize-source-configuration";
@@ -275,7 +275,12 @@ export function CanvasPageClient() {
         const rawDbt = cfg.dlt_dbt;
         const dbtObj =
           rawDbt && typeof rawDbt === "object" && !Array.isArray(rawDbt) ? (rawDbt as Record<string, unknown>) : null;
-        const nodes = enrichTransformNodesFromDltDbt(canvas.nodes as Node[], dbtObj);
+        const rawPt = cfg.post_transform;
+        const ptObj = rawPt && typeof rawPt === "object" && !Array.isArray(rawPt) ? (rawPt as Record<string, unknown>) : null;
+        const nodes = enrichPostTransformNodes(
+          enrichTransformNodesFromDltDbt(canvas.nodes as Node[], dbtObj),
+          ptObj
+        );
         const g = { nodes, edges: canvas.edges as Edge[] };
         setLoadedGraph(g);
         setLoadedSig(JSON.stringify({ nodes: g.nodes, edges: g.edges }));

@@ -135,6 +135,8 @@ export function BuilderClient({
   /** Saved Connection rows linked to this pipeline (persisted as FKs; not stored in source_configuration). */
   const [sourceConnectionId, setSourceConnectionId] = useState<string | null>(null);
   const [destinationConnectionId, setDestinationConnectionId] = useState<string | null>(null);
+  const [postTransformType, setPostTransformType] = useState<"" | "python" | "sql">("");
+  const [postTransformCode, setPostTransformCode] = useState("");
 
   function patchConnection(key: string, value: string) {
     setConnectionValues((prev) => ({ ...prev, [key]: value }));
@@ -228,6 +230,12 @@ export function BuilderClient({
       delete next[PIPELINE_CANVAS_KEY];
     } else {
       next[PIPELINE_CANVAS_KEY] = canvasGraph;
+    }
+    // Post-transform
+    if (postTransformType && postTransformCode.trim()) {
+      next.post_transform = { type: postTransformType, code: postTransformCode.trim() };
+    } else {
+      delete next.post_transform;
     }
     return next;
   }
@@ -402,6 +410,9 @@ export function BuilderClient({
     setScheduleTimezone(typeof cfg.schedule_timezone === "string" ? cfg.schedule_timezone : "UTC");
     setPipelineWebhookUrl(typeof p.runsWebhookUrl === "string" ? p.runsWebhookUrl : "");
     setCanvasGraph(getCanvasFromSourceConfig(cfg));
+    const pt = cfg.post_transform as Record<string, unknown> | undefined;
+    setPostTransformType((pt?.type === "python" || pt?.type === "sql") ? pt.type : "");
+    setPostTransformCode(typeof pt?.code === "string" ? pt.code : "");
   }
 
   useEffect(() => {
@@ -919,6 +930,66 @@ export function BuilderClient({
                   />
                   <div className="mt-4">
                     <CopyEnvButton values={connectionValues} />
+                  </div>
+                </FormAccordion>
+
+                <FormAccordion
+                  id="acc-transform"
+                  title="Post-load transform"
+                  subtitle="Optional Python script or SQL statements to run after ingest"
+                >
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Transform type
+                      <select
+                        value={postTransformType}
+                        onChange={(e) => setPostTransformType(e.target.value as "" | "python" | "sql")}
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                      >
+                        <option value="">None</option>
+                        <option value="python">Python script</option>
+                        <option value="sql">SQL statements</option>
+                      </select>
+                    </label>
+                    {postTransformType === "python" && (
+                      <>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Appended after <code className="font-mono">pipeline.run()</code>. Has access to{" "}
+                          <code className="font-mono">pipeline</code>, <code className="font-mono">info</code>, and{" "}
+                          <code className="font-mono">partition_key</code>.
+                        </p>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                          Python script
+                          <textarea
+                            value={postTransformCode}
+                            onChange={(e) => setPostTransformCode(e.target.value)}
+                            rows={10}
+                            spellCheck={false}
+                            placeholder={"# e.g.\nprint(f'Loaded {info.loads_ids} load(s)')\n# any Python here — imports, function calls, etc."}
+                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-xs leading-relaxed dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                          />
+                        </label>
+                      </>
+                    )}
+                    {postTransformType === "sql" && (
+                      <>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Executed against the destination after load. Separate statements with{" "}
+                          <code className="font-mono">;</code>. Use fully-qualified names (schema.table).
+                        </p>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                          SQL statements
+                          <textarea
+                            value={postTransformCode}
+                            onChange={(e) => setPostTransformCode(e.target.value)}
+                            rows={10}
+                            spellCheck={false}
+                            placeholder={"-- e.g.\nCREATE OR REPLACE VIEW analytics.v_orders AS SELECT * FROM raw.orders;\nUPDATE analytics.summary SET updated_at = NOW();"}
+                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-xs leading-relaxed dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                          />
+                        </label>
+                      </>
+                    )}
                   </div>
                 </FormAccordion>
               </>

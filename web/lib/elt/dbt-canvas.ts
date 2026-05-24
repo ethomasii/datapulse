@@ -1,6 +1,70 @@
 import type { Node } from "@xyflow/react";
 import { isPipelineCanvasGraph } from "@/lib/elt/canvas-source-config";
 
+// ── Post-transform (Python / SQL) canvas sync ─────────────────────────────────
+
+export type PostTransformNodeData = {
+  transformTool?: string;
+  postTransformCode?: string;
+};
+
+function firstTransformNodeByTool(nodes: Node[], tool: string): Node | undefined {
+  return nodes.find(
+    (n) => n.type === "transformNode" && String((n.data as Record<string, unknown>)?.transformTool) === tool
+  );
+}
+
+/**
+ * Sync `source_configuration.post_transform` from the first python or sql transform node.
+ * Removes the key when no such node exists.
+ */
+export function syncPostTransformWithCanvas(base: Record<string, unknown>): void {
+  const raw = base.canvas;
+  if (!isPipelineCanvasGraph(raw)) return;
+  const nodes = (raw as { nodes: Node[] }).nodes;
+  const transforms = nodes.filter((n) => n.type === "transformNode");
+  if (transforms.length === 0) return;
+
+  const pythonNode = firstTransformNodeByTool(nodes, "python");
+  const sqlNode = firstTransformNodeByTool(nodes, "sql");
+  const activeNode = pythonNode ?? sqlNode;
+
+  if (!activeNode) {
+    delete base.post_transform;
+    return;
+  }
+
+  const d = (activeNode.data ?? {}) as PostTransformNodeData;
+  const code = String(d.postTransformCode ?? "").trim();
+  const type = String(d.transformTool ?? "").trim();
+
+  if (!code) {
+    delete base.post_transform;
+    return;
+  }
+
+  base.post_transform = { type, code };
+}
+
+/** Hydrate python/sql transform node from persisted `post_transform`. */
+export function enrichPostTransformNodes(
+  nodes: Node[],
+  postTransform: Record<string, unknown> | null | undefined
+): Node[] {
+  if (!postTransform || typeof postTransform !== "object") return nodes;
+  const type = String(postTransform.type ?? "").trim();
+  const code = String(postTransform.code ?? "").trim();
+  if (!code || (type !== "python" && type !== "sql")) return nodes;
+
+  return nodes.map((n) => {
+    if (n.type !== "transformNode") return n;
+    const d = (n.data ?? {}) as PostTransformNodeData;
+    if (String(d.transformTool ?? "") !== type) return n;
+    if (String(d.postTransformCode ?? "").trim()) return n;
+    return { ...n, data: { ...d, transformTool: type, postTransformCode: code } };
+  });
+}
+
 /** Transform node `data` keys (camelCase) edited in the canvas / inspector. */
 export type DbtTransformNodeData = {
   transformTool?: string;

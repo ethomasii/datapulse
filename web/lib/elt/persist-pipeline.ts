@@ -1,7 +1,7 @@
 import type { EltPipeline } from "@prisma/client";
 import { assertUserOwnsGatewayToken } from "@/lib/agent/gateway-routing";
 import { db } from "@/lib/db/client";
-import { syncDltDbtWithCanvas } from "@/lib/elt/dbt-canvas";
+import { syncDltDbtWithCanvas, syncPostTransformWithCanvas } from "@/lib/elt/dbt-canvas";
 import { generatePipelineArtifacts, resolveTool } from "@/lib/elt/generate-artifacts";
 import { mergeEltMetadataIntoSourceConfig } from "@/lib/elt/merge-elt-metadata";
 import { preparePipelinePersistenceAndArtifacts } from "@/lib/elt/pipeline-connection-fks";
@@ -35,6 +35,7 @@ async function prepareWrite(
 ): Promise<PersistPipelineFailure | PreparedPipelineWrite> {
   const mergedSourceConfiguration = mergeEltMetadataIntoSourceConfig(body);
   syncDltDbtWithCanvas(mergedSourceConfiguration);
+  syncPostTransformWithCanvas(mergedSourceConfiguration);
   const bodyMerged = { ...body, sourceConfiguration: mergedSourceConfiguration };
   const prepared = await preparePipelinePersistenceAndArtifacts(userId, bodyMerged, mergedSourceConfiguration);
   if (!prepared.ok) {
