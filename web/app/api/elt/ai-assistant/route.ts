@@ -399,12 +399,13 @@ function toolGeneratePipeline(params: {
 
   try {
     const artifacts = generatePipelineArtifacts(body);
+    const preview = artifacts.pipelineCode.slice(0, 800) + (artifacts.pipelineCode.length > 800 ? "\n# ... (truncated)" : "");
     return {
       success: true,
       next_action: "save_pipeline",
       save_payload: body,
       required_fields: requiredFields,
-      generated_code_preview: artifacts.pipelineCode.slice(0, 400) + (artifacts.pipelineCode.length > 400 ? "\n..." : ""),
+      generated_code_preview: preview,
     };
   } catch (e) {
     return {
@@ -413,6 +414,7 @@ function toolGeneratePipeline(params: {
       next_action: "save_pipeline",
       save_payload: body,
       required_fields: requiredFields,
+      generated_code_preview: null,
     };
   }
 }
@@ -432,16 +434,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "AI assistant not configured" }, { status: 503 });
   }
 
-  const body = await request.json() as { messages: Message[] };
-  const { messages } = body;
+  const body = await request.json() as { messages: Message[]; lastRunError?: string };
+  const { messages, lastRunError } = body;
   if (!Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: "messages required" }, { status: 400 });
   }
 
+  // Inject last run failure context as a system-level note appended to the first user message
+  const messagesWithContext = lastRunError
+    ? messages.map((m, i) =>
+        i === 0
+          ? { ...m, content: `[Context: the last run of this pipeline failed with error: "${lastRunError}"]\n\n${m.content}` }
+          : m
+      )
+    : messages;
+
   const client = new Anthropic({ apiKey });
 
-  // Convert plain messages to Anthropic format
-  const anthropicMessages: Anthropic.MessageParam[] = messages.map((m) => ({
+  const anthropicMessages: Anthropic.MessageParam[] = messagesWithContext.map((m) => ({
     role: m.role,
     content: m.content,
   }));
@@ -476,8 +486,8 @@ export async function POST(request: Request) {
 
       let savePayload: CreatePipelineBody | undefined;
       let requiredFields: InlineField[] | undefined;
+      let codePreview: string | undefined;
 
-      // Walk all tool results to find the most recent generate_pipeline result
       const allToolResults = anthropicMessages
         .filter((m) => m.role === "user")
         .flatMap((m) => (Array.isArray(m.content) ? m.content : []))
@@ -495,10 +505,12 @@ export async function POST(request: Request) {
               save_payload?: CreatePipelineBody;
               next_action?: string;
               required_fields?: InlineField[];
+              generated_code_preview?: string | null;
             };
             if (parsed.next_action === "save_pipeline" && parsed.save_payload) {
               savePayload = parsed.save_payload;
               requiredFields = parsed.required_fields;
+              codePreview = parsed.generated_code_preview ?? undefined;
             }
           }
         } catch {
@@ -510,6 +522,7 @@ export async function POST(request: Request) {
         message: text,
         savePayload,
         requiredFields,
+        codePreview,
       });
     }
 

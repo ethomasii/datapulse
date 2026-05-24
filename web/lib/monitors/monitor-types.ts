@@ -11,14 +11,23 @@ export const MONITOR_TYPES_REQUIRING_CONNECTION = new Set([
   "gcs_file_count",
   "adls_file_count",
   "sqs_message_count",
+  "gcs_file_arrival",
+  "sql_watermark",
+]);
+
+/** Monitor kinds where a connection is optional (secrets can come from config). */
+export const MONITOR_TYPES_OPTIONAL_CONNECTION = new Set([
+  "http_change",
 ]);
 
 const CONNECTOR_ALIASES: Record<string, readonly string[]> = {
   s3_file_count: ["s3", "aws"],
   sqs_message_count: ["s3", "aws"],
   gcs_file_count: ["gcs"],
+  gcs_file_arrival: ["gcs"],
   adls_file_count: ["azure_blob", "adls", "azure"],
   kafka_message_count: ["kafka"],
+  sql_watermark: ["postgres", "mysql", "snowflake", "bigquery", "redshift", "mssql"],
 };
 
 export function monitorTypeRequiresConnection(monitorType: string): boolean {

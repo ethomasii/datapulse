@@ -1,5 +1,6 @@
 import { ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
 import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
+import { createHash } from "crypto";
 import type { Connection, EltMonitor, ExecutionPlane } from "@prisma/client";
 import { monitorEvaluatesOnControlPlane } from "@/lib/agent/monitor-execution";
 import { resolveNewRunExecution } from "@/lib/agent/run-execution";
@@ -187,12 +188,238 @@ async function checkSqsMessageCount(
   };
 }
 
+type MonitorCheckResult = { shouldTrigger: boolean; message: string; metadata: Record<string, unknown> };
+
+// ── SQL watermark monitor ──────────────────────────────────────────────────────
+// Connects to a database and checks for rows newer than the stored watermark.
+// Supports postgres, mysql, snowflake, bigquery connection strings.
+async function checkSqlWatermark(
+  cfg: Record<string, unknown>,
+  secrets: Record<string, string>,
+  hints: Record<string, string>
+): Promise<MonitorCheckResult> {
+  const table = String(cfg.table ?? "");
+  const watermarkColumn = String(cfg.watermark_column ?? "updated_at");
+  const lastWatermark = cfg.last_watermark ? String(cfg.last_watermark) : null;
+  const connStr =
+    secrets.DATABASE_URL ?? secrets.POSTGRES_URL ?? secrets.MYSQL_URL ??
+    hints.connection_string ?? hints.host ?? "";
+
+  if (!table) {
+    return { shouldTrigger: false, message: "sql_watermark: table is required", metadata: {} };
+  }
+  if (!connStr) {
+    return { shouldTrigger: false, message: "sql_watermark: no connection string found in connection secrets (DATABASE_URL, POSTGRES_URL, MYSQL_URL)", metadata: {} };
+  }
+
+  // Dynamically import pg — only available when postgres connection is used.
+  // Falls back gracefully for other DB types (Snowflake/BigQuery require gateway-side execution).
+  let rowCount = 0;
+  let maxWatermark: string | null = null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Client } = require("pg") as { Client: new (cfg: { connectionString: string; ssl: { rejectUnauthorized: boolean } }) => { connect(): Promise<void>; query(sql: string, params: unknown[]): Promise<{ rows: { cnt: string; max_wm: string | null }[] }>; end(): Promise<void> } };
+    const client = new Client({ connectionString: connStr, ssl: { rejectUnauthorized: false } });
+    await client.connect();
+    const whereClause = lastWatermark
+      ? `WHERE ${watermarkColumn} > $1`
+      : "";
+    const params = lastWatermark ? [lastWatermark] : [];
+    const result = await client.query(
+      `SELECT COUNT(*) AS cnt, MAX(${watermarkColumn}::text) AS max_wm FROM ${table} ${whereClause}`,
+      params
+    );
+    await client.end();
+    rowCount = parseInt(result.rows[0]?.cnt ?? "0", 10);
+    maxWatermark = result.rows[0]?.max_wm ?? null;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { shouldTrigger: false, message: `sql_watermark query failed: ${msg}`, metadata: {} };
+  }
+
+  if (rowCount > 0) {
+    return {
+      shouldTrigger: true,
+      message: `Found ${rowCount} new row(s) in ${table} since watermark ${lastWatermark ?? "none"} (max: ${maxWatermark})`,
+      metadata: { table, watermark_column: watermarkColumn, new_row_count: rowCount, max_watermark: maxWatermark, previous_watermark: lastWatermark },
+    };
+  }
+  return {
+    shouldTrigger: false,
+    message: `No new rows in ${table} since ${lastWatermark ?? "beginning"}`,
+    metadata: { table, watermark_column: watermarkColumn, row_count: rowCount },
+  };
+}
+
+// ── GCS file arrival monitor ───────────────────────────────────────────────────
+// Uses GCS JSON API (no extra package required) to detect files matching a pattern
+// that are newer than last_triggered_at. Triggers on any matching new object.
+async function checkGcsFileArrival(
+  cfg: Record<string, unknown>,
+  secrets: Record<string, string>,
+  lastTriggeredAt: Date | null
+): Promise<MonitorCheckResult> {
+  const bucket = String(cfg.bucket_name ?? "");
+  const prefix = String(cfg.prefix ?? "");
+  const filePattern = String(cfg.file_pattern ?? ".*");
+  const serviceAccountJson = secrets.GOOGLE_SERVICE_ACCOUNT_JSON ?? secrets.GCS_SERVICE_ACCOUNT_JSON;
+
+  if (!bucket) {
+    return { shouldTrigger: false, message: "gcs_file_arrival: bucket_name is required", metadata: {} };
+  }
+  if (!serviceAccountJson) {
+    return { shouldTrigger: false, message: "gcs_file_arrival: GOOGLE_SERVICE_ACCOUNT_JSON secret missing on connection", metadata: {} };
+  }
+
+  let regex: RegExp;
+  try {
+    regex = new RegExp(filePattern);
+  } catch {
+    return { shouldTrigger: false, message: `gcs_file_arrival: invalid file_pattern regex: ${filePattern}`, metadata: {} };
+  }
+
+  let accessToken: string;
+  try {
+    // Exchange service account JSON for a short-lived access token via GCP metadata endpoint
+    const sa = JSON.parse(serviceAccountJson) as { client_email: string; private_key: string };
+    const now = Math.floor(Date.now() / 1000);
+    const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
+    const payload = Buffer.from(JSON.stringify({
+      iss: sa.client_email,
+      scope: "https://www.googleapis.com/auth/devstorage.read_only",
+      aud: "https://oauth2.googleapis.com/token",
+      exp: now + 3600,
+      iat: now,
+    })).toString("base64url");
+    // Node 22+ crypto.subtle RSA-SHA256 sign
+    const { createSign } = await import("crypto");
+    const sign = createSign("RSA-SHA256");
+    sign.update(`${header}.${payload}`);
+    const sig = sign.sign(sa.private_key, "base64url");
+    const jwt = `${header}.${payload}.${sig}`;
+    const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
+    });
+    const tokenData = await tokenResp.json() as { access_token?: string; error?: string };
+    if (!tokenData.access_token) {
+      return { shouldTrigger: false, message: `gcs_file_arrival: token exchange failed: ${tokenData.error ?? "unknown"}`, metadata: {} };
+    }
+    accessToken = tokenData.access_token;
+  } catch (e) {
+    return { shouldTrigger: false, message: `gcs_file_arrival: auth failed: ${e instanceof Error ? e.message : String(e)}`, metadata: {} };
+  }
+
+  // List objects with optional prefix
+  const url = new URL(`https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(bucket)}/o`);
+  if (prefix) url.searchParams.set("prefix", prefix);
+  url.searchParams.set("maxResults", "1000");
+  const listResp = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!listResp.ok) {
+    return { shouldTrigger: false, message: `gcs_file_arrival: list objects failed (${listResp.status})`, metadata: {} };
+  }
+  const listData = await listResp.json() as { items?: { name: string; timeCreated: string; size: string }[] };
+  const items = listData.items ?? [];
+
+  const cutoff = lastTriggeredAt ?? new Date(0);
+  const newFiles = items.filter((obj) => {
+    const created = new Date(obj.timeCreated);
+    return created > cutoff && regex.test(obj.name);
+  });
+
+  if (newFiles.length > 0) {
+    return {
+      shouldTrigger: true,
+      message: `Found ${newFiles.length} new file(s) in gs://${bucket}/${prefix} matching ${filePattern}`,
+      metadata: { bucket, prefix, file_pattern: filePattern, new_file_count: newFiles.length, newest_file: newFiles[newFiles.length - 1]?.name },
+    };
+  }
+  return {
+    shouldTrigger: false,
+    message: `No new files in gs://${bucket}/${prefix} matching ${filePattern} since ${cutoff.toISOString()}`,
+    metadata: { bucket, prefix, total_checked: items.length },
+  };
+}
+
+// ── HTTP change monitor ────────────────────────────────────────────────────────
+// Fetches a URL and hashes a portion of the response. Triggers when the hash
+// differs from the stored last_hash, indicating the endpoint content changed.
+async function checkHttpChange(
+  cfg: Record<string, unknown>,
+  secrets: Record<string, string>
+): Promise<MonitorCheckResult> {
+  const url = String(cfg.url ?? "");
+  const jsonPath = cfg.json_path ? String(cfg.json_path) : null;
+  const lastHash = cfg.last_hash ? String(cfg.last_hash) : null;
+  const authHeader = secrets.HTTP_AUTH_HEADER ?? null;
+
+  if (!url) {
+    return { shouldTrigger: false, message: "http_change: url is required", metadata: {} };
+  }
+
+  let responseText: string;
+  try {
+    const headers: Record<string, string> = { "User-Agent": "DataPulse-Monitor/1.0" };
+    if (authHeader) headers["Authorization"] = authHeader;
+    const resp = await fetch(url, { headers, signal: AbortSignal.timeout(15_000) });
+    if (!resp.ok) {
+      return { shouldTrigger: false, message: `http_change: fetch returned ${resp.status}`, metadata: { url, status: resp.status } };
+    }
+    responseText = await resp.text();
+  } catch (e) {
+    return { shouldTrigger: false, message: `http_change: fetch failed: ${e instanceof Error ? e.message : String(e)}`, metadata: { url } };
+  }
+
+  // Optionally extract a sub-value via a dot-notation json_path (e.g. "data.count")
+  let hashInput = responseText;
+  if (jsonPath) {
+    try {
+      const parsed = JSON.parse(responseText) as Record<string, unknown>;
+      const parts = jsonPath.split(".");
+      let cur: unknown = parsed;
+      for (const part of parts) {
+        if (cur && typeof cur === "object") cur = (cur as Record<string, unknown>)[part];
+      }
+      hashInput = JSON.stringify(cur ?? null);
+    } catch {
+      // fall back to full body
+    }
+  }
+
+  const currentHash = createHash("sha256").update(hashInput).digest("hex").slice(0, 16);
+
+  if (!lastHash) {
+    // First check — store hash but don't trigger yet
+    return {
+      shouldTrigger: false,
+      message: `http_change: baseline hash stored (${currentHash}). Will trigger on next change.`,
+      metadata: { url, current_hash: currentHash, first_check: true },
+    };
+  }
+
+  if (currentHash !== lastHash) {
+    return {
+      shouldTrigger: true,
+      message: `http_change: content at ${url} changed (hash ${lastHash} → ${currentHash})`,
+      metadata: { url, previous_hash: lastHash, current_hash: currentHash, json_path: jsonPath },
+    };
+  }
+  return {
+    shouldTrigger: false,
+    message: `http_change: no change detected at ${url}`,
+    metadata: { url, hash: currentHash },
+  };
+}
+
 async function runOneMonitorCheck(
   monitor: EltMonitor & {
     connection: Connection | null;
     pipeline: { id: string; name: string };
   }
-): Promise<{ shouldTrigger: boolean; message: string; metadata: Record<string, unknown> }> {
+): Promise<MonitorCheckResult & { configUpdates?: Record<string, unknown> }> {
   const cfg = asConfig(monitor.config);
   const type = monitor.type;
 
@@ -204,12 +431,24 @@ async function runOneMonitorCheck(
     };
   }
 
-  if (type === "gcs_file_count" || type === "adls_file_count" || type === "kafka_message_count") {
+  if (type === "adls_file_count" || type === "kafka_message_count") {
     return {
       shouldTrigger: false,
       message: `${type} checks are not yet wired in the cloud runner (coming soon)`,
       metadata: {},
     };
+  }
+
+  // http_change needs no stored connection — secrets come from config
+  if (type === "http_change") {
+    const secrets = monitor.connection
+      ? parseStoredConnectionSecrets(monitor.connection.connectionSecretsEnc)
+      : {};
+    const result = await checkHttpChange(cfg, secrets);
+    // Always persist the current hash so the next check can compare against it
+    const currentHash = result.metadata.current_hash ?? result.metadata.hash ?? null;
+    const configUpdates = currentHash ? { last_hash: currentHash } : undefined;
+    return { ...result, configUpdates };
   }
 
   if (!monitor.connection) {
@@ -228,6 +467,18 @@ async function runOneMonitorCheck(
   }
   if (type === "sqs_message_count") {
     return checkSqsMessageCount(cfg, secrets, hints);
+  }
+  if (type === "gcs_file_arrival") {
+    const result = await checkGcsFileArrival(cfg, secrets, monitor.lastTriggeredAt);
+    return result;
+  }
+  if (type === "sql_watermark") {
+    const result = await checkSqlWatermark(cfg, secrets, hints);
+    // Advance the watermark after a successful trigger so we don't re-fire on the same rows
+    const configUpdates = result.shouldTrigger && result.metadata.max_watermark
+      ? { last_watermark: result.metadata.max_watermark }
+      : undefined;
+    return { ...result, configUpdates };
   }
 
   return {
@@ -380,9 +631,13 @@ export async function runMonitorChecksForUser(
     checked += 1;
     try {
       const result = await runOneMonitorCheck(m);
+      const baseConfig = asConfig(m.config);
+      const updatedConfig = result.configUpdates
+        ? ({ ...baseConfig, ...result.configUpdates } as Parameters<typeof db.eltMonitor.update>[0]["data"]["config"])
+        : undefined;
       await db.eltMonitor.update({
         where: { id: m.id },
-        data: { lastCheckAt: now },
+        data: { lastCheckAt: now, ...(updatedConfig !== undefined ? { config: updatedConfig } : {}) },
       });
 
       if (result.shouldTrigger) {
@@ -478,9 +733,13 @@ export async function runMonitorChecksForAllUsers(options?: CronMonitorScaleOpti
     cloudEvaluated += 1;
     try {
       const result = await runOneMonitorCheck(m);
+      const baseConfigAll = asConfig(m.config);
+      const updatedConfigAll = result.configUpdates
+        ? ({ ...baseConfigAll, ...result.configUpdates } as Parameters<typeof db.eltMonitor.update>[0]["data"]["config"])
+        : undefined;
       await db.eltMonitor.update({
         where: { id: m.id },
-        data: { lastCheckAt: now },
+        data: { lastCheckAt: now, ...(updatedConfigAll !== undefined ? { config: updatedConfigAll } : {}) },
       });
 
       if (result.shouldTrigger) {

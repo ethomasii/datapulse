@@ -136,11 +136,14 @@ export default function OrchestrationPage() {
   const getMonitorTypeColor = (type: string) => {
     switch (type) {
       case 's3_file_count': return 'bg-orange-100 text-orange-800';
-      case 'gcs_file_count': return 'bg-blue-100 text-blue-800';
-      case 'adls_file_count': return 'bg-purple-100 text-purple-800';
-      case 'csv_row_count': return 'bg-green-100 text-green-800';
-      case 'kafka_message_count': return 'bg-red-100 text-red-800';
       case 'sqs_message_count': return 'bg-yellow-100 text-yellow-800';
+      case 'gcs_file_arrival': return 'bg-blue-100 text-blue-800';
+      case 'gcs_file_count': return 'bg-blue-50 text-blue-700';
+      case 'adls_file_count': return 'bg-purple-100 text-purple-800';
+      case 'sql_watermark': return 'bg-teal-100 text-teal-800';
+      case 'http_change': return 'bg-indigo-100 text-indigo-800';
+      case 'kafka_message_count': return 'bg-red-100 text-red-800';
+      case 'csv_row_count': return 'bg-green-100 text-green-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -329,21 +332,28 @@ export default function OrchestrationPage() {
           <PlayCircle className="h-5 w-5 text-slate-600" />
           Monitor types
         </h2>
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-600 dark:text-slate-300">
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-slate-600 dark:text-slate-300">
           <div>
             <strong className="font-medium text-slate-800 dark:text-slate-200">Cloud Storage:</strong>
             <ul className="mt-1 ml-4 list-disc space-y-1">
-              <li>S3 File Count - Monitor AWS S3 bucket file counts</li>
-              <li>GCS File Count - Monitor Google Cloud Storage file counts</li>
-              <li>ADLS File Count - Monitor Azure Data Lake Storage file counts</li>
+              <li>S3 File Count — trigger when file count crosses a threshold</li>
+              <li>GCS File Arrival — trigger when new files matching a regex land in a bucket</li>
+              <li>ADLS File Count — Azure Data Lake Storage file counts</li>
             </ul>
           </div>
           <div>
-            <strong className="font-medium text-slate-800 dark:text-slate-200">Messaging & Files:</strong>
+            <strong className="font-medium text-slate-800 dark:text-slate-200">Databases & APIs:</strong>
             <ul className="mt-1 ml-4 list-disc space-y-1">
-              <li>CSV Row Count - Monitor CSV file row counts</li>
-              <li>Kafka Message Count - Monitor Kafka topic message counts</li>
-              <li>SQS Message Count - Monitor AWS SQS queue message counts</li>
+              <li>SQL Watermark — trigger when new rows appear in a table (tracks updated_at / id)</li>
+              <li>HTTP Change — trigger when an API endpoint response changes (hash-based)</li>
+            </ul>
+          </div>
+          <div>
+            <strong className="font-medium text-slate-800 dark:text-slate-200">Queues & Files:</strong>
+            <ul className="mt-1 ml-4 list-disc space-y-1">
+              <li>SQS Message Count — AWS SQS queue depth</li>
+              <li>Kafka Message Count — Kafka topic message counts</li>
+              <li>CSV Row Count — local CSV row counts (gateway only)</li>
             </ul>
           </div>
         </div>
@@ -374,6 +384,40 @@ type PipelineOpt = {
   enabled: boolean;
   sourceType: string;
   destinationType: string;
+};
+
+const REQUIRED_FIELDS = new Set([
+  'bucket_name', 'threshold', 'account_name', 'container_name',
+  'file_path', 'bootstrap_servers', 'topic', 'queue_url',
+  'table', 'url',
+]);
+
+const FIELD_PLACEHOLDERS: Record<string, string> = {
+  bucket_name: 'my-bucket',
+  prefix: 'data/incoming/',
+  file_pattern: '.*\\.csv$',
+  threshold: '1',
+  region: 'us-east-1',
+  blob_pattern: '*.parquet',
+  account_name: 'mystorageaccount',
+  container_name: 'raw-data',
+  file_path: '/data/export.csv',
+  delimiter: ',',
+  has_header: 'true',
+  bootstrap_servers: 'kafka:9092',
+  topic: 'my-topic',
+  queue_url: 'https://sqs.us-east-1.amazonaws.com/123456789/my-queue',
+  table: 'public.events',
+  watermark_column: 'updated_at',
+  url: 'https://api.example.com/v1/status',
+  json_path: 'data.count',
+};
+
+const FIELD_HELP: Record<string, string> = {
+  file_pattern: 'Regex matched against the full object key. E.g. .*\\.csv$ for CSV files.',
+  watermark_column: 'Column used to detect new rows — typically updated_at or an auto-increment id.',
+  json_path: 'Dot-notation path into the JSON response to hash. Leave blank to hash the full body.',
+  table: 'Schema-qualified table name, e.g. public.orders.',
 };
 
 function CreateMonitorForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
@@ -414,11 +458,14 @@ function CreateMonitorForm({ onClose, onSuccess }: { onClose: () => void; onSucc
 
   const sensorTypes = [
     { value: 's3_file_count', label: 'S3 File Count', configFields: ['bucket_name', 'threshold', 'prefix', 'region'] },
-    { value: 'gcs_file_count', label: 'GCS File Count', configFields: ['bucket_name', 'threshold', 'blob_pattern'] },
+    { value: 'sqs_message_count', label: 'SQS Message Count', configFields: ['queue_url', 'threshold'] },
+    { value: 'gcs_file_arrival', label: 'GCS File Arrival', configFields: ['bucket_name', 'prefix', 'file_pattern'] },
+    { value: 'gcs_file_count', label: 'GCS File Count (legacy)', configFields: ['bucket_name', 'threshold', 'blob_pattern'] },
     { value: 'adls_file_count', label: 'ADLS File Count', configFields: ['account_name', 'container_name', 'threshold'] },
-    { value: 'csv_row_count', label: 'CSV Row Count', configFields: ['file_path', 'threshold', 'delimiter', 'has_header'] },
+    { value: 'sql_watermark', label: 'SQL Watermark', configFields: ['table', 'watermark_column'] },
+    { value: 'http_change', label: 'HTTP Change Detection', configFields: ['url', 'json_path'] },
     { value: 'kafka_message_count', label: 'Kafka Message Count', configFields: ['bootstrap_servers', 'topic', 'threshold'] },
-    { value: 'sqs_message_count', label: 'SQS Message Count', configFields: ['queue_url', 'threshold'] }
+    { value: 'csv_row_count', label: 'CSV Row Count', configFields: ['file_path', 'threshold', 'delimiter', 'has_header'] },
   ];
 
   const selectedType = sensorTypes.find(t => t.value === formData.type);
@@ -537,15 +584,19 @@ function CreateMonitorForm({ onClose, onSuccess }: { onClose: () => void; onSucc
                 {selectedType.configFields.map(field => (
                   <div key={field}>
                     <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1 capitalize">
-                      {field.replace('_', ' ')}
+                      {field.replace(/_/g, ' ')}
                     </label>
                     <input
                       type="text"
-                      value={formData.config[field] || ''}
+                      value={formData.config[field] as string || ''}
                       onChange={(e) => updateConfig(field, e.target.value)}
+                      placeholder={FIELD_PLACEHOLDERS[field] ?? ''}
                       className="w-full px-2 py-1 text-sm border border-slate-300 rounded dark:border-slate-600 dark:bg-slate-800"
-                      required={['bucket_name', 'threshold', 'account_name', 'container_name', 'file_path', 'bootstrap_servers', 'topic', 'queue_url'].includes(field)}
+                      required={REQUIRED_FIELDS.has(field)}
                     />
+                    {FIELD_HELP[field] && (
+                      <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">{FIELD_HELP[field]}</p>
+                    )}
                   </div>
                 ))}
               </div>
