@@ -12,7 +12,7 @@ export const fetchCache = "force-no-store";
  * Must cover worst case: `vercel-python` waits for Python worker (up to 900s).
  * Stub/local self-calls finish faster.
  */
-export const maxDuration = 900;
+export const maxDuration = 800;
 
 /**
  * Vercel Cron — schedule in `vercel.json`. Bursts: no always-on worker; each tick pulls pending
@@ -64,8 +64,8 @@ export async function GET(request: Request) {
   const limit = Math.min(20, Math.max(1, Number(url.searchParams.get("limit") ?? 5) || 5));
   const quickDispatch = mode === "gha";
   const longRunner = mode === "vercel-python" || mode === "delegate";
-  const defaultBudget = quickDispatch ? 60_000 : longRunner ? 900_000 : 45_000;
-  const maxBudget = quickDispatch ? 60_000 : longRunner ? 900_000 : 120_000;
+  const defaultBudget = quickDispatch ? 60_000 : longRunner ? 780_000 : 45_000;
+  const maxBudget = quickDispatch ? 60_000 : longRunner ? 780_000 : 120_000;
   const budgetMs = Math.min(
     maxBudget,
     Math.max(5_000, Number(url.searchParams.get("budgetMs") ?? defaultBudget) || defaultBudget)
