@@ -18,8 +18,10 @@ import {
   History,
   TableProperties,
   Sparkles,
+  LayoutGrid,
 } from "lucide-react";
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
+import { SourceCatalogWizard } from "@/components/elt/source-catalog-wizard";
 import { RelatedLinks } from "@/components/ui/related-links";
 import {
   DESTINATION_GROUPS,
@@ -88,8 +90,8 @@ export function BuilderClient({
   const [editingId, setEditingId] = useState<string | null>(null);
   /** When true, show the create form (listing stays above). */
   const [showCreateForm, setShowCreateForm] = useState(false);
-  /** "ai" shows the inline AI assistant; "manual" shows the standard form. */
-  const [createMode, setCreateMode] = useState<"ai" | "manual">("ai");
+  /** "ai" = inline AI chat, "browse" = source catalog wizard, "manual" = standard form */
+  const [createMode, setCreateMode] = useState<"ai" | "browse" | "manual">("browse");
   const [detail, setDetail] = useState<{
     id: string;
     tool: string;
@@ -640,14 +642,22 @@ export function BuilderClient({
               {editingId ? "Edit pipeline" : "New pipeline"}
             </h2>
             {!editingId && (
-              <div className="flex items-center gap-1 rounded-lg border border-slate-200 p-0.5 text-sm dark:border-slate-600">
+              <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 p-0.5 text-sm dark:border-slate-600">
+                <button
+                  type="button"
+                  onClick={() => setCreateMode("browse")}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 ${createMode === "browse" ? "bg-sky-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"}`}
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                  Browse sources
+                </button>
                 <button
                   type="button"
                   onClick={() => setCreateMode("ai")}
                   className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 ${createMode === "ai" ? "bg-gradient-to-r from-teal-500 to-sky-500 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"}`}
                 >
                   <Sparkles className="h-3.5 w-3.5" />
-                  AI Builder
+                  AI
                 </button>
                 <button
                   type="button"
@@ -735,7 +745,14 @@ export function BuilderClient({
             )}
           </div>
 
-          {/* AI Builder panel — shown when creating in AI mode */}
+          {/* Browse sources panel — catalog wizard, default for new pipelines */}
+          {!editingId && createMode === "browse" && (
+            <SourceCatalogWizard
+              onPipelineSaved={() => { void load(); setShowCreateForm(false); }}
+            />
+          )}
+
+          {/* AI Builder panel */}
           {!editingId && createMode === "ai" && (
             <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-4 dark:border-teal-800 dark:bg-teal-900/10">
               <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
