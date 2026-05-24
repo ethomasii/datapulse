@@ -7,8 +7,13 @@ import { Cable, Layers, Play, Plus, Trash2, ChevronDown, ChevronRight, Check, Sh
 import { RelatedLinks } from "@/components/ui/related-links";
 import { ConnectionStoredSecretsForm } from "@/components/elt/connection-stored-secrets-form";
 import { CopyEnvButton } from "@/components/elt/copy-env-button";
-import { CREDENTIAL_HINTS } from "@/lib/elt/credential-hints";
 import { getDestinationCredentials, getSourceCredentials } from "@/lib/elt/credentials-catalog";
+import {
+  SOURCE_CONNECTOR_SLUGS,
+  DESTINATION_CONNECTOR_SLUGS,
+  getConnectorConfigFields,
+  connectorLabel,
+} from "@/lib/elt/connectors-registry";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,119 +30,10 @@ type Connection = {
   hasStoredSecrets?: boolean;
 };
 
-// ── Connector lists ──────────────────────────────────────────────────────────
+// ── Connector lists — derived from connectors-registry (single source of truth) ──
 
-const SOURCE_CONNECTORS = [
-  "rest_api", "github", "stripe", "shopify", "salesforce", "postgres", "mysql",
-  "mongodb", "trino", "clickhouse", "mssql", "hubspot", "google_analytics", "slack",
-  "notion", "airtable", "zendesk", "jira", "facebook_ads", "google_ads", "intercom",
-  "mixpanel", "segment", "asana", "duckdb", "sqlite", "s3", "gcs", "azure_blob",
-  "csv", "json", "parquet",
-] as const;
-
-const DESTINATION_CONNECTORS = [
-  "snowflake", "bigquery", "redshift", "postgres", "duckdb", "motherduck",
-  "databricks", "clickhouse", "mysql", "sqlite", "s3", "gcs", "azure_blob",
-  "trino", "elasticsearch", "mssql", "druid", "pinot",
-] as const;
-
-// Common non-secret config keys per connector (label → key)
-const CONNECTOR_CONFIG_HINTS: Record<string, { key: string; label: string; placeholder?: string }[]> = {
-  postgres: [
-    { key: "host", label: "Host", placeholder: "db.example.com" },
-    { key: "port", label: "Port", placeholder: "5432" },
-    { key: "database", label: "Database" },
-    { key: "username", label: "Username" },
-  ],
-  mysql: [
-    { key: "host", label: "Host" },
-    { key: "port", label: "Port", placeholder: "3306" },
-    { key: "database", label: "Database" },
-    { key: "username", label: "Username" },
-  ],
-  mssql: [
-    { key: "host", label: "Host" },
-    { key: "port", label: "Port", placeholder: "1433" },
-    { key: "database", label: "Database" },
-    { key: "username", label: "Username" },
-  ],
-  snowflake: [
-    { key: "account", label: "Account", placeholder: "xy12345.us-east-1" },
-    { key: "database", label: "Database" },
-    { key: "warehouse", label: "Warehouse" },
-    { key: "role", label: "Role" },
-    { key: "username", label: "Username" },
-  ],
-  bigquery: [
-    { key: "project", label: "Project ID" },
-    { key: "dataset", label: "Default dataset" },
-    { key: "location", label: "Location", placeholder: "US" },
-  ],
-  redshift: [
-    { key: "host", label: "Host" },
-    { key: "port", label: "Port", placeholder: "5439" },
-    { key: "database", label: "Database" },
-    { key: "username", label: "Username" },
-    { key: "schema", label: "Schema" },
-  ],
-  databricks: [
-    { key: "server_hostname", label: "Server hostname" },
-    { key: "http_path", label: "HTTP path" },
-    { key: "catalog", label: "Catalog" },
-    { key: "schema", label: "Schema" },
-  ],
-  clickhouse: [
-    { key: "host", label: "Host" },
-    { key: "port", label: "Port", placeholder: "9440" },
-    { key: "database", label: "Database" },
-    { key: "username", label: "Username" },
-  ],
-  duckdb: [
-    { key: "database", label: "Database path", placeholder: "/data/warehouse.duckdb" },
-  ],
-  motherduck: [
-    { key: "database", label: "Database", placeholder: "md:my_db" },
-  ],
-  s3: [
-    { key: "bucket", label: "Bucket" },
-    { key: "region", label: "Region", placeholder: "us-east-1" },
-    { key: "prefix", label: "Prefix / path" },
-  ],
-  gcs: [
-    { key: "bucket", label: "Bucket" },
-    { key: "project", label: "Project ID" },
-  ],
-  azure_blob: [
-    { key: "account_name", label: "Account name" },
-    { key: "container", label: "Container" },
-  ],
-  github: [
-    { key: "org", label: "Organization" },
-    { key: "repo", label: "Repository (optional)" },
-  ],
-  rest_api: [
-    { key: "base_url", label: "Base URL" },
-  ],
-  stripe: [
-    { key: "account_id", label: "Account ID (optional)" },
-  ],
-  shopify: [
-    { key: "shop", label: "Shop subdomain", placeholder: "my-store.myshopify.com" },
-  ],
-  salesforce: [
-    { key: "domain", label: "Domain", placeholder: "login" },
-  ],
-  hubspot: [
-    { key: "account_id", label: "Account ID" },
-  ],
-  google_analytics: [
-    { key: "property_id", label: "Property ID" },
-  ],
-  mongodb: [
-    { key: "host", label: "Host" },
-    { key: "database", label: "Database" },
-  ],
-};
+const SOURCE_CONNECTORS: readonly string[] = SOURCE_CONNECTOR_SLUGS;
+const DESTINATION_CONNECTORS: readonly string[] = DESTINATION_CONNECTOR_SLUGS;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -145,14 +41,6 @@ function fmt(ts: string) {
   return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function connectorLabel(c: string) {
-  const MAP: Record<string, string> = {
-    rest_api: "REST API", s3: "Amazon S3", gcs: "Google Cloud Storage", azure_blob: "Azure Blob",
-    mssql: "SQL Server", google_analytics: "Google Analytics", facebook_ads: "Facebook Ads",
-    google_ads: "Google Ads", motherduck: "MotherDuck",
-  };
-  return MAP[c] ?? c.charAt(0).toUpperCase() + c.slice(1).replace(/_/g, " ");
-}
 
 const TYPE_COLOR: Record<ConnectionType, string> = {
   source: "bg-sky-50 text-sky-800 border-sky-200 dark:bg-sky-950/40 dark:text-sky-200 dark:border-sky-900/50",
@@ -166,16 +54,10 @@ type AuthHintRow = { key: string; label: string; help?: string };
 
 function runnerAuthHints(connectionType: ConnectionType, connector: string): AuthHintRow[] {
   const key = connector.toLowerCase();
-  if (connectionType === "destination") {
-    const d = getDestinationCredentials(key);
-    if (d.length) return d.map((f) => ({ key: f.key, label: f.label, help: f.help }));
-  } else {
-    const s = getSourceCredentials(key);
-    if (s.length) return s.map((f) => ({ key: f.key, label: f.label, help: f.help }));
-  }
-  const h = CREDENTIAL_HINTS[key];
-  if (h) return h.map((x) => ({ key: x.key, label: x.label, help: x.help }));
-  return [];
+  const fields = connectionType === "destination"
+    ? getDestinationCredentials(key)
+    : getSourceCredentials(key);
+  return fields.map((f) => ({ key: f.key, label: f.label, help: f.help }));
 }
 
 function ConnectorRunnerAuthBlock({
@@ -248,7 +130,7 @@ function ConfigFields({
   values: Record<string, string>;
   onChange: (key: string, value: string) => void;
 }) {
-  const hints = CONNECTOR_CONFIG_HINTS[connector] ?? [];
+  const hints = getConnectorConfigFields(connector);
   if (hints.length === 0) {
     return (
       <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -289,7 +171,7 @@ function ConnectionRow({
   const [clearSecrets, setClearSecrets] = useState(false);
   const [hasSecrets, setHasSecrets] = useState(Boolean(conn.hasStoredSecrets));
 
-  const hints = CONNECTOR_CONFIG_HINTS[conn.connector] ?? [];
+  const hints = getConnectorConfigFields(conn.connector);
 
   useEffect(() => {
     setCfg(conn.config as Record<string, string>);

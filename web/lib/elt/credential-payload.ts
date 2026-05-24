@@ -1,25 +1,18 @@
-import type { CatalogCredentialField } from "./credentials-catalog";
 import {
-  credentialsCatalog,
   getDestinationCredentials,
   getSourceCredentials,
 } from "./credentials-catalog";
+import { ALL_CONNECTORS } from "./connectors-registry";
 
 /** Env keys we never persist (passwords, pasted JSON blobs, private keys). */
 export const CREDENTIAL_SENSITIVE_KEY_SET: ReadonlySet<string> = (() => {
   const s = new Set<string>();
-  const scan = (fields: CatalogCredentialField[]) => {
-    for (const f of fields) {
+  for (const connector of ALL_CONNECTORS) {
+    for (const f of connector.credentialFields ?? []) {
       if (f.type === "password" || f.type === "textarea") {
         s.add(f.key);
       }
     }
-  };
-  for (const fields of Object.values(credentialsCatalog.sourceCredentials)) {
-    scan(fields);
-  }
-  for (const fields of Object.values(credentialsCatalog.destinationCredentials)) {
-    scan(fields);
   }
   return s;
 })();

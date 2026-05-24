@@ -1,60 +1,40 @@
-import catalog from "./credentials-catalog.json";
+/**
+ * Thin adapter that re-exports credential/config data from connectors-registry.ts
+ * using the same function signatures all consumers already import.
+ *
+ * Do not add connector data here — edit connectors-registry.ts instead.
+ */
 
-/** Field from embedded_elt_builder `credentials_config.py` (serialized). */
+import {
+  ALL_CONNECTORS,
+  getConnectorSourceCredentials,
+  getConnectorDestinationCredentials,
+  getConnectorSourceConfigFields,
+  type CredentialField,
+  type ConfigField,
+} from "./connectors-registry";
+
+// Re-export types under legacy names so existing imports keep compiling.
 export type CatalogFieldOption = { value: string; label: string };
-
-export type CatalogCredentialField = {
-  key: string;
-  label: string;
-  type: string;
-  required?: boolean;
-  help?: string;
-  placeholder?: string;
-  options?: CatalogFieldOption[];
-  default?: string | boolean;
-  show_if?: Record<string, unknown>;
-};
-
-export type CatalogSourceConfigField = {
-  key: string;
-  label: string;
-  type: string;
-  required?: boolean;
-  help?: string;
-  placeholder?: string;
-  options?: CatalogFieldOption[];
-  default?: string | boolean | string[];
-  show_if?: Record<string, unknown>;
-};
-
-export type CredentialsCatalogFile = {
-  sourceCredentials: Record<string, CatalogCredentialField[]>;
-  destinationCredentials: Record<string, CatalogCredentialField[]>;
-  sourceConfigurations: Record<string, CatalogSourceConfigField[]>;
-};
-
-export const credentialsCatalog = catalog as CredentialsCatalogFile;
-
-export function getSourceConfigurationFields(sourceType: string): CatalogSourceConfigField[] {
-  return credentialsCatalog.sourceConfigurations[sourceType.toLowerCase()] ?? [];
-}
+export type CatalogCredentialField = CredentialField;
+export type CatalogSourceConfigField = ConfigField;
 
 export function getSourceCredentials(sourceType: string): CatalogCredentialField[] {
-  return credentialsCatalog.sourceCredentials[sourceType.toLowerCase()] ?? [];
+  return getConnectorSourceCredentials(sourceType.toLowerCase());
 }
 
 export function getDestinationCredentials(destinationType: string): CatalogCredentialField[] {
-  return credentialsCatalog.destinationCredentials[destinationType.toLowerCase()] ?? [];
+  return getConnectorDestinationCredentials(destinationType.toLowerCase());
 }
 
-/** Every env-style key defined for sources and destinations — strip from persisted sourceConfiguration. */
+export function getSourceConfigurationFields(sourceType: string): CatalogSourceConfigField[] {
+  return getConnectorSourceConfigFields(sourceType.toLowerCase());
+}
+
 export const ALL_CREDENTIAL_ENV_KEYS: ReadonlySet<string> = (() => {
   const s = new Set<string>();
-  for (const fields of Object.values(credentialsCatalog.sourceCredentials)) {
-    for (const f of fields) s.add(f.key);
-  }
-  for (const fields of Object.values(credentialsCatalog.destinationCredentials)) {
-    for (const f of fields) s.add(f.key);
+  for (const connector of ALL_CONNECTORS) {
+    for (const f of connector.credentialFields ?? []) s.add(f.key);
   }
   return s;
 })();
