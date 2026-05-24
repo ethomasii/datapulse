@@ -152,7 +152,6 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
     };
   } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [demoBusy, setDemoBusy] = useState(false);
   const [gatewayOptions, setGatewayOptions] = useState<{ id: string; name: string }[]>([]);
   const [runNowPipelineId, setRunNowPipelineId] = useState("");
   const [runNowEnvironment, setRunNowEnvironment] = useState("default");
@@ -487,88 +486,6 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
     }
   }
 
-  async function runDemo() {
-    const p = initialPipelines[0];
-    if (!p) return;
-    setDemoBusy(true);
-    setError(null);
-    try {
-      // Randomize metrics so each sample run looks distinct
-      const totalRows = Math.floor(Math.random() * 90_000) + 5_000;
-      const totalBytes = Math.floor(totalRows * (Math.random() * 200 + 100));
-      const midRows = Math.floor(totalRows * (0.35 + Math.random() * 0.25));
-      const midBytes = Math.floor(totalBytes * (0.35 + Math.random() * 0.25));
-      const midProgress = Math.floor(40 + Math.random() * 25);
-      const phases = ["orders", "customers", "products", "events", "sessions", "transactions"];
-      const resource = phases[Math.floor(Math.random() * phases.length)];
-      const environments = ["demo", "staging", "dev"];
-      const env = environments[Math.floor(Math.random() * environments.length)];
-
-      const create = await fetch("/api/elt/runs", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pipelineId: p.id,
-          environment: env,
-          triggeredBy: "manual:sample",
-          status: "running",
-        }),
-      });
-      if (!create.ok) throw new Error(await create.text());
-      const { run } = (await create.json()) as { run: { id: string } };
-
-      const assertPatchOk = async (res: Response, step: string) => {
-        if (!res.ok) {
-          const body = await res.text();
-          throw new Error(`${step} failed (${res.status}): ${body.slice(0, 400)}`);
-        }
-      };
-
-      const patch1 = await fetch(`/api/elt/runs/${run.id}`, {
-        method: "PATCH",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: "running",
-          appendLog: { level: "info", message: `Starting sync on ${resource} (sample run).` },
-          telemetrySummary: { currentPhase: "extract", currentResource: resource, progress: 5 },
-          appendTelemetrySample: { progress: 5, rows: 0, bytes: 0, phase: "extract", resource },
-        }),
-      });
-      await assertPatchOk(patch1, "Sample run step 1");
-      const patch2 = await fetch(`/api/elt/runs/${run.id}`, {
-        method: "PATCH",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          appendLog: { level: "info", message: `Rows processed so far: ${midRows.toLocaleString()} (sample).` },
-          telemetrySummary: { currentPhase: "load", currentResource: resource, progress: midProgress, rowsLoaded: midRows, bytesLoaded: midBytes },
-          appendTelemetrySample: { progress: midProgress, rows: midRows, bytes: midBytes, phase: "load", resource },
-        }),
-      });
-      await assertPatchOk(patch2, "Sample run step 2");
-      const patch3 = await fetch(`/api/elt/runs/${run.id}`, {
-        method: "PATCH",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: "succeeded",
-          appendLog: { level: "info", message: `Completed successfully. ${totalRows.toLocaleString()} rows loaded.` },
-          telemetrySummary: { currentPhase: "done", currentResource: resource, progress: 100, rowsLoaded: totalRows, bytesLoaded: totalBytes },
-          appendTelemetrySample: { progress: 100, rows: totalRows, bytes: totalBytes, phase: "done", resource },
-        }),
-      });
-      await assertPatchOk(patch3, "Sample run step 3");
-      await loadRuns();
-      await openDetail(run.id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Demo failed");
-    } finally {
-      setDemoBusy(false);
-    }
-  }
-
   // Build 14-day chart data from the loaded runs
   const CHART_DAYS = 14;
   const chartDays = (() => {
@@ -664,17 +581,6 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
           <Play className="h-4 w-4" />
           {initialPipelines.length === 0 ? "Create a pipeline first" : "New pipeline"}
         </Link>
-        {initialPipelines.length > 0 ? (
-          <button
-            type="button"
-            onClick={() => void runDemo()}
-            disabled={demoBusy}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            {demoBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Record sample run
-          </button>
-        ) : null}
         <button
           type="button"
           onClick={() => {
@@ -910,8 +816,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
             </>
           ) : (
             <>
-              No runs yet. Connect your runner to the API (same session or future API tokens) or click{" "}
-              <strong className="font-medium">Record sample run</strong> to seed demo data.
+              No runs yet. Connect your runner to the API, trigger a run from this page, or set up a schedule or monitor to trigger runs automatically.
             </>
           )}
         </p>

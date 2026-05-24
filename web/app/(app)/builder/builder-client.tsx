@@ -117,7 +117,8 @@ export function BuilderClient({
   const runSliceCapability = useMemo(() => getRunSliceCapability(sourceType), [sourceType]);
 
   const [tests, setTests] = useState("");
-  const [sensors, setSensors] = useState("");
+  /** Live monitors linked to this pipeline (loaded when editingId changes). */
+  const [pipelineMonitors, setPipelineMonitors] = useState<{ name: string; type: string }[]>([]);
   const [sliceIntent, setSliceIntent] = useState<"full" | "sliced">("full");
   const [partitionsNote, setPartitionsNote] = useState("");
   const [otherNotes, setOtherNotes] = useState("");
@@ -300,7 +301,6 @@ export function BuilderClient({
           sourceConnectionId: sourceConnectionId ?? null,
           destinationConnectionId: destinationConnectionId ?? null,
           tests,
-          sensors,
           sliceIntent,
           partitionsNote,
           otherNotes,
@@ -319,7 +319,6 @@ export function BuilderClient({
         setDescription("");
         setShowCreateForm(false);
         setTests("");
-        setSensors("");
         setSliceIntent("full");
         setPartitionsNote("");
         setOtherNotes("");
@@ -356,7 +355,7 @@ export function BuilderClient({
     setDestinationType("duckdb");
     setFormMode("structured");
     setTests("");
-    setSensors("");
+    setPipelineMonitors([]);
     setSliceIntent("full");
     setPartitionsNote("");
     setOtherNotes("");
@@ -436,7 +435,6 @@ export function BuilderClient({
     setDestinationConnectionId(p.destinationConnectionId ?? null);
 
     setTests(eltLinesFromConfig("elt_tests", cfg));
-    setSensors(eltLinesFromConfig("elt_sensors", cfg));
     const rawIntent = cfg.elt_slice_intent;
     setSliceIntent(rawIntent === "sliced" ? "sliced" : "full");
     setPartitionsNote(typeof cfg.elt_partitions_note === "string" ? cfg.elt_partitions_note : "");
@@ -481,6 +479,26 @@ export function BuilderClient({
     void startEdit(effectiveOpenPipelineId);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- URL-driven open; avoid effect churn from startEdit identity
   }, [effectiveOpenPipelineId]);
+
+  useEffect(() => {
+    if (!editingId) {
+      setPipelineMonitors([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/monitors", { credentials: "same-origin" });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { monitors?: { name: string; type: string; pipeline_id: string }[] };
+        const all = data.monitors ?? [];
+        if (!cancelled) setPipelineMonitors(all.filter((m) => m.pipeline_id === editingId));
+      } catch {
+        /* monitors are optional context — ignore errors */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [editingId]);
 
   async function remove(id: string) {
     if (!confirm("Delete this connection?")) return;
@@ -853,6 +871,23 @@ export function BuilderClient({
             </p>
           ) : null}
 
+          {formMode === "structured" && editingId && canvasGraph !== null ? (
+            <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+              <span className="mt-0.5 shrink-0 text-amber-500 dark:text-amber-400">⚠</span>
+              <span>
+                This pipeline has a <strong className="font-medium">canvas layout</strong>. Saving here will update the
+                source configuration and may overwrite canvas-specific node positions. Use{" "}
+                <Link
+                  href={`/builder/canvas?pipeline=${encodeURIComponent(editingId)}`}
+                  className="font-medium underline hover:no-underline"
+                >
+                  Visual canvas
+                </Link>{" "}
+                to edit the diagram directly.
+              </span>
+            </div>
+          ) : null}
+
           <form onSubmit={createPipeline} className="space-y-3">
             {formMode === "structured" && (
               <>
@@ -1187,34 +1222,74 @@ export function BuilderClient({
                   />
                 </div>
 
-                {/* Monitors (pipeline notes) */}
-                <div className="rounded-lg border border-sky-100 bg-sky-50/60 p-3 dark:border-sky-900 dark:bg-sky-900/10">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Event sensors</span>
-                      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        Describe which sensors should trigger this pipeline. Managed in{" "}
-                        <Link href="/orchestration" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-                          Monitors
-                        </Link>{" "}
-                        — the live sensor engine is decoupled from the pipeline definition.
-                      </p>
+                {/* Triggers summary — live read-only overview with links to manage each type */}
+                {editingId ? (
+                  <div className="rounded-lg border border-sky-100 bg-sky-50/60 p-3 dark:border-sky-900 dark:bg-sky-900/10">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Triggers</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500">what fires this pipeline</span>
                     </div>
-                    <Link
-                      href="/orchestration"
-                      className="shrink-0 rounded border border-sky-200 bg-white px-2 py-1 text-xs font-medium text-sky-700 hover:bg-sky-50 dark:border-sky-700 dark:bg-slate-900 dark:text-sky-400"
-                    >
-                      Manage →
-                    </Link>
+                    <div className="mt-2 space-y-1.5">
+                      {/* Cron */}
+                      <div className="flex items-center justify-between gap-2 rounded border border-violet-200 bg-white px-2.5 py-1.5 dark:border-violet-800 dark:bg-slate-900">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-xs font-medium text-violet-700 dark:text-violet-300 shrink-0">Cron</span>
+                          <span className="truncate font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                            {scheduleEnabled && scheduleCron ? scheduleCron : <span className="italic text-slate-400 dark:text-slate-500">not set</span>}
+                          </span>
+                          {scheduleEnabled && scheduleCron && scheduleTimezone !== "UTC" ? (
+                            <span className="shrink-0 text-[10px] text-slate-400">{scheduleTimezone}</span>
+                          ) : null}
+                        </div>
+                        <span className="shrink-0 text-[10px] text-slate-500 dark:text-slate-400">edit below ↓</span>
+                      </div>
+                      {/* Incoming webhook */}
+                      <div className="flex items-center justify-between gap-2 rounded border border-sky-200 bg-white px-2.5 py-1.5 dark:border-sky-800 dark:bg-slate-900">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-sky-700 dark:text-sky-300 shrink-0">Webhook</span>
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400">incoming trigger URL</span>
+                        </div>
+                        <Link
+                          href="/webhooks"
+                          className="shrink-0 text-[10px] font-medium text-sky-600 hover:underline dark:text-sky-400"
+                        >
+                          Manage →
+                        </Link>
+                      </div>
+                      {/* Monitors */}
+                      <div className="rounded border border-teal-200 bg-white dark:border-teal-800 dark:bg-slate-900">
+                        <div className="flex items-center justify-between gap-2 px-2.5 py-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-teal-700 dark:text-teal-300 shrink-0">Event monitors</span>
+                            {pipelineMonitors.length === 0 ? (
+                              <span className="italic text-[11px] text-slate-400 dark:text-slate-500">none linked</span>
+                            ) : (
+                              <span className="text-[11px] text-slate-600 dark:text-slate-400">{pipelineMonitors.length} linked</span>
+                            )}
+                          </div>
+                          <Link
+                            href="/orchestration"
+                            className="shrink-0 text-[10px] font-medium text-teal-600 hover:underline dark:text-teal-400"
+                          >
+                            Manage →
+                          </Link>
+                        </div>
+                        {pipelineMonitors.length > 0 ? (
+                          <ul className="border-t border-teal-100 dark:border-teal-900 px-2.5 py-1.5 space-y-0.5">
+                            {pipelineMonitors.map((m) => (
+                              <li key={m.name} className="flex items-center gap-2 text-[11px]">
+                                <span className="font-medium text-slate-700 dark:text-slate-300">{m.name}</span>
+                                <span className="rounded bg-teal-100 px-1 font-mono text-[10px] text-teal-700 dark:bg-teal-900/50 dark:text-teal-300">
+                                  {m.type.replace(/_/g, " ")}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
-                  <textarea
-                    value={sensors}
-                    onChange={(e) => setSensors(e.target.value)}
-                    rows={2}
-                    placeholder="s3_landing_bucket_watch&#10;upstream_dbt_succeeded"
-                    className="mt-2 w-full rounded border border-sky-200 bg-white px-2 py-1.5 font-mono text-xs dark:border-sky-800 dark:bg-slate-900 dark:text-white"
-                  />
-                </div>
+                ) : null}
 
                 {/* Run slices — intent + notes; partition column saved here when editing an existing pipeline */}
                 <div className="rounded-lg border border-teal-100 bg-teal-50/60 p-3 dark:border-teal-900 dark:bg-teal-900/10">
