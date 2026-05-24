@@ -99,31 +99,41 @@ export function ConnectorCombobox({
       {/* Dropdown */}
       {open && (
         <div className={cn(
-          "absolute left-0 z-50 mt-1 w-full min-w-[220px] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900",
+          "absolute left-0 z-50 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900",
+          compact ? "w-[200px] min-w-[160px]" : "w-full min-w-[220px]",
         )}>
           <Command shouldFilter={false}>
             {/* Search input */}
-            <div className="flex items-center gap-2 border-b border-slate-100 px-2.5 py-2 dark:border-slate-800">
-              <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+            <div className={cn(
+              "flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800",
+              compact ? "px-1.5 py-1" : "px-2.5 py-2",
+            )}>
+              <Search className={cn("shrink-0 text-slate-400", compact ? "h-2.5 w-2.5" : "h-3.5 w-3.5")} />
               <Command.Input
                 ref={inputRef}
                 value={search}
                 onValueChange={setSearch}
                 placeholder="Search…"
-                className="w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-white dark:placeholder:text-slate-500"
+                className={cn(
+                  "w-full bg-transparent text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-white dark:placeholder:text-slate-500",
+                  compact ? "text-[10px]" : "text-sm",
+                )}
               />
             </div>
 
-            <Command.List className="max-h-64 overflow-y-auto py-1">
+            <Command.List className={cn("overflow-y-auto py-0.5", compact ? "max-h-48" : "max-h-64")}>
               {grouped.size === 0 && (
-                <Command.Empty className="px-3 py-6 text-center text-xs text-slate-500">
+                <Command.Empty className={cn("px-3 py-4 text-center text-slate-500", compact ? "text-[9px]" : "text-xs")}>
                   No connectors match &ldquo;{search}&rdquo;
                 </Command.Empty>
               )}
 
               {Array.from(grouped.entries()).map(([category, items]) => (
                 <Command.Group key={category} heading={category}>
-                  <div className="px-2 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  <div className={cn(
+                    "px-2 pb-0.5 pt-1 font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500",
+                    compact ? "text-[8px]" : "text-[10px]",
+                  )}>
                     {category}
                   </div>
                   {items.map((opt) => (
@@ -136,14 +146,15 @@ export function ConnectorCombobox({
                         setSearch("");
                       }}
                       className={cn(
-                        "flex cursor-pointer items-center justify-between px-3 py-1.5 text-sm",
+                        "flex cursor-pointer items-center justify-between",
                         "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800",
                         "aria-selected:bg-slate-100 dark:aria-selected:bg-slate-800",
+                        compact ? "px-2 py-0.5 text-[10px]" : "px-3 py-1.5 text-sm",
                       )}
                     >
-                      <span>{opt.label}</span>
+                      <span className="truncate">{opt.label}</span>
                       {opt.slug === value && (
-                        <Check className="h-3.5 w-3.5 shrink-0 text-sky-600 dark:text-sky-400" />
+                        <Check className={cn("shrink-0 text-sky-600 dark:text-sky-400", compact ? "h-2.5 w-2.5" : "h-3.5 w-3.5")} />
                       )}
                     </Command.Item>
                   ))}
