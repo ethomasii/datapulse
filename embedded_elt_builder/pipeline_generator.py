@@ -38,7 +38,7 @@ class PipelineRequest(BaseModel):
     incremental_enabled: bool = False  # Enable incremental loading (creates partitioned assets)
     cursor_field: Optional[str] = None  # Cursor field for incremental loading (becomes partition key)
     cursor_initial_value: Optional[str] = None  # Initial cursor value
-    partition_frequency: Optional[str] = "@daily"  # Partition frequency for Dagster partitioned assets (only used if incremental_enabled)
+    partition_frequency: Optional[str] = "@daily"  # Partition frequency for incremental time-based partitions (only used if incremental_enabled)
     file_format: str = "parquet"  # File format for file-based destinations (parquet, jsonl, csv)
     compression: str = "gzip"  # Compression method (gzip, none, bz2, snappy, zstd)
     table_prefix: Optional[str] = None  # Prefix for table names (e.g., "raw_")
@@ -200,7 +200,7 @@ def _generate_rest_api_pipeline(request: PipelineRequest) -> str:
 
 {request.description or f"Load data from REST API to {request.destination_type}"}
 
-{'This pipeline uses incremental loading with partitioned assets in Dagster.' if request.incremental_enabled else ''}
+{'This pipeline uses incremental loading with time-based partitions.' if request.incremental_enabled else ''}
 """
 
 import dlt
@@ -506,10 +506,10 @@ def create_pipeline(
     readme = generate_readme(request, tool)
     (pipeline_dir / "README.md").write_text(readme)
 
-    # Create dagster.yaml
-    dagster_yaml = generate_dagster_yaml(request)
-    with open(pipeline_dir / "dagster.yaml", "w") as f:
-        yaml.dump(dagster_yaml, f, sort_keys=False, default_flow_style=False)
+    # Create eltpulse.yaml
+    eltpulse_yaml = generate_eltpulse_yaml(request)
+    with open(pipeline_dir / "eltpulse.yaml", "w") as f:
+        yaml.dump(eltpulse_yaml, f, sort_keys=False, default_flow_style=False)
 
 
 def generate_readme(request: PipelineRequest, tool: str) -> str:
@@ -546,8 +546,8 @@ See your .env file for required credentials.
 '''
 
 
-def generate_dagster_yaml(request: PipelineRequest) -> Dict[str, Any]:
-    """Generate dagster.yaml configuration."""
+def generate_eltpulse_yaml(request: PipelineRequest) -> Dict[str, Any]:
+    """Generate eltpulse.yaml pipeline configuration."""
     config = {
         "enabled": True,
     }

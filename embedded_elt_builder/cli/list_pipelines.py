@@ -81,7 +81,7 @@ def list_pipelines(repo_path: str, tool: str, enabled: bool):
 
 def _get_pipeline_info(pipeline_dir: Path, tool_type: str) -> dict:
     """Get information about a pipeline."""
-    dagster_yaml = pipeline_dir / "dagster.yaml"
+    dagster_yaml = pipeline_dir / "eltpulse.yaml"
     config_yaml = pipeline_dir / "config.yaml"
     replication_yaml = pipeline_dir / "replication.yaml"
 

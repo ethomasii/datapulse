@@ -43,7 +43,7 @@ def show(name: str, repo_path: str):
     pipeline_dir, tool = found
 
     # Read configuration files
-    dagster_yaml_path = pipeline_dir / "dagster.yaml"
+    dagster_yaml_path = pipeline_dir / "eltpulse.yaml"
     config_yaml_path = pipeline_dir / "config.yaml"
     replication_yaml_path = pipeline_dir / "replication.yaml"
 

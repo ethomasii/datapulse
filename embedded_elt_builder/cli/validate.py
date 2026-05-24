@@ -16,7 +16,7 @@ def validate(repo_path: str):
     """Validate all pipeline configurations.
 
     Checks for:
-    - Missing required files (dagster.yaml, pipeline.py/replication.yaml)
+    - Missing required files (eltpulse.yaml, pipeline.py/replication.yaml)
     - Invalid YAML syntax
     - Missing required fields
     - Invalid cron schedules
@@ -95,22 +95,22 @@ def _validate_dlt_pipeline(pipeline_dir: Path) -> list[str]:
     pipeline_name = pipeline_dir.name
 
     # Check for required files
-    dagster_yaml = pipeline_dir / "dagster.yaml"
+    dagster_yaml = pipeline_dir / "eltpulse.yaml"
     pipeline_py = pipeline_dir / "pipeline.py"
 
     if not dagster_yaml.exists():
-        issues.append(f"dlt/{pipeline_name}: Missing dagster.yaml")
+        issues.append(f"dlt/{pipeline_name}: Missing eltpulse.yaml")
     else:
         # Validate YAML syntax and required fields
         try:
             with open(dagster_yaml) as f:
                 config = yaml.safe_load(f)
                 if not config:
-                    issues.append(f"dlt/{pipeline_name}: Empty dagster.yaml")
+                    issues.append(f"dlt/{pipeline_name}: Empty eltpulse.yaml")
                 else:
                     # Check for description
                     if not config.get("description"):
-                        issues.append(f"dlt/{pipeline_name}: Missing description in dagster.yaml")
+                        issues.append(f"dlt/{pipeline_name}: Missing description in eltpulse.yaml")
 
                     # Validate schedule if present
                     if config.get("schedule", {}).get("enabled"):
@@ -118,7 +118,7 @@ def _validate_dlt_pipeline(pipeline_dir: Path) -> list[str]:
                             issues.append(f"dlt/{pipeline_name}: Schedule enabled but no cron_schedule defined")
 
         except yaml.YAMLError as e:
-            issues.append(f"dlt/{pipeline_name}: Invalid YAML in dagster.yaml - {e}")
+            issues.append(f"dlt/{pipeline_name}: Invalid YAML in eltpulse.yaml - {e}")
 
     if not pipeline_py.exists():
         issues.append(f"dlt/{pipeline_name}: Missing pipeline.py")
@@ -141,22 +141,22 @@ def _validate_sling_pipeline(pipeline_dir: Path) -> list[str]:
     pipeline_name = pipeline_dir.name
 
     # Check for required files
-    dagster_yaml = pipeline_dir / "dagster.yaml"
+    dagster_yaml = pipeline_dir / "eltpulse.yaml"
     replication_yaml = pipeline_dir / "replication.yaml"
 
     if not dagster_yaml.exists():
-        issues.append(f"sling/{pipeline_name}: Missing dagster.yaml")
+        issues.append(f"sling/{pipeline_name}: Missing eltpulse.yaml")
     else:
         # Validate YAML syntax
         try:
             with open(dagster_yaml) as f:
                 config = yaml.safe_load(f)
                 if not config:
-                    issues.append(f"sling/{pipeline_name}: Empty dagster.yaml")
+                    issues.append(f"sling/{pipeline_name}: Empty eltpulse.yaml")
                 else:
                     # Check for description
                     if not config.get("description"):
-                        issues.append(f"sling/{pipeline_name}: Missing description in dagster.yaml")
+                        issues.append(f"sling/{pipeline_name}: Missing description in eltpulse.yaml")
 
                     # Validate schedule if present
                     if config.get("schedule", {}).get("enabled"):
@@ -164,7 +164,7 @@ def _validate_sling_pipeline(pipeline_dir: Path) -> list[str]:
                             issues.append(f"sling/{pipeline_name}: Schedule enabled but no cron_schedule defined")
 
         except yaml.YAMLError as e:
-            issues.append(f"sling/{pipeline_name}: Invalid YAML in dagster.yaml - {e}")
+            issues.append(f"sling/{pipeline_name}: Invalid YAML in eltpulse.yaml - {e}")
 
     if not replication_yaml.exists():
         issues.append(f"sling/{pipeline_name}: Missing replication.yaml")

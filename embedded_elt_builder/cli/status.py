@@ -138,7 +138,7 @@ def _show_pipeline_summary(pipelines_dir: Path):
         for pipeline_dir in dlt_dir.iterdir():
             if pipeline_dir.is_dir():
                 stats["dlt"]["total"] += 1
-                dagster_yaml = pipeline_dir / "dagster.yaml"
+                dagster_yaml = pipeline_dir / "eltpulse.yaml"
                 if dagster_yaml.exists():
                     try:
                         with open(dagster_yaml) as f:
@@ -156,7 +156,7 @@ def _show_pipeline_summary(pipelines_dir: Path):
         for pipeline_dir in sling_dir.iterdir():
             if pipeline_dir.is_dir():
                 stats["sling"]["total"] += 1
-                dagster_yaml = pipeline_dir / "dagster.yaml"
+                dagster_yaml = pipeline_dir / "eltpulse.yaml"
                 if dagster_yaml.exists():
                     try:
                         with open(dagster_yaml) as f:

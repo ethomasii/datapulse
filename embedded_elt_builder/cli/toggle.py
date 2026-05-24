@@ -60,10 +60,10 @@ def _toggle_pipeline(name: str, repo_path: str, enabled: bool, git_commit: bool)
         return
 
     pipeline_dir, tool = found
-    dagster_yaml_path = pipeline_dir / "dagster.yaml"
+    dagster_yaml_path = pipeline_dir / "eltpulse.yaml"
 
     if not dagster_yaml_path.exists():
-        console.print(f"[red]✗[/red] No dagster.yaml found in {pipeline_dir}")
+        console.print(f"[red]✗[/red] No eltpulse.yaml found in {pipeline_dir}")
         return
 
     # Read current config
