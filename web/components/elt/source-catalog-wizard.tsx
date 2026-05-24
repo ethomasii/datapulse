@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search, ChevronRight, ChevronLeft, Loader2, CheckCircle,
-  ExternalLink, AlertCircle, Zap, Database, RefreshCw,
+  ExternalLink, AlertCircle, Zap, Database, RefreshCw, Cable, Plus,
 } from 'lucide-react';
 import { ALL_DLT_SOURCES, getContextSlug, type DltHubSource } from '@/lib/elt/dlt-hub-registry';
 import { DESTINATION_GROUPS } from '@/lib/elt/catalog';
@@ -15,6 +15,15 @@ import type { CreatePipelineBody } from '@/lib/elt/types';
 
 type WizardStep = 'browse' | 'configure' | 'review';
 
+type StoredConnection = {
+  id: string;
+  name: string;
+  connectionType: 'source' | 'destination';
+  connector: string;
+  config: Record<string, unknown>;
+  hasStoredSecrets?: boolean;
+};
+
 type WizardState = {
   step: WizardStep;
   source: DltHubSource | null;
@@ -23,7 +32,9 @@ type WizardState = {
   contextError: string | null;
   selectedEndpoints: Set<string>;
   authValues: Record<string, string>;
+  sourceConnectionId: string | null;
   destination: string;
+  destinationConnectionId: string | null;
   pipelineName: string;
   saving: boolean;
   saved: boolean;
@@ -36,8 +47,6 @@ const CATEGORY_ORDER = [
   'Developer & Code', 'Storage & Files', 'Databases', 'Productivity', 'Other',
 ];
 
-// ── Category badge colours ────────────────────────────────────────────────────
-
 const CATEGORY_COLORS: Record<string, string> = {
   'CRM & Sales': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
   'Marketing': 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300',
@@ -49,6 +58,83 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Productivity': 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
   'Other': 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
 };
+
+// ── Mini connection picker (inline, no save-as) ───────────────────────────────
+
+function InlineConnectionPicker({
+  connectionType,
+  connector,
+  selectedId,
+  onSelect,
+  label,
+}: {
+  connectionType: 'source' | 'destination';
+  connector: string;
+  selectedId: string | null;
+  onSelect: (id: string | null, name: string | null) => void;
+  label: string;
+}) {
+  const [connections, setConnections] = useState<StoredConnection[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (loaded) return;
+    setLoaded(true);
+    fetch('/api/elt/connections', { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((d: { connections?: StoredConnection[] }) => setConnections(d.connections ?? []))
+      .catch(() => {/* ignore */});
+  }, [loaded]);
+
+  const matching = connections.filter(
+    (c) => c.connectionType === connectionType && c.connector.toLowerCase() === connector.toLowerCase()
+  );
+  const selected = matching.find((c) => c.id === selectedId);
+
+  const isDestination = connectionType === 'destination';
+  const accentClass = isDestination
+    ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200'
+    : 'border-sky-300 bg-sky-50 text-sky-800 dark:border-sky-700 dark:bg-sky-950/30 dark:text-sky-200';
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</label>
+        <a href="/connections" target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-sky-600 hover:underline dark:text-sky-400">
+          <Plus className="h-3 w-3" /> New connection
+        </a>
+      </div>
+      {matching.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-600 px-3 py-2.5 text-xs text-slate-500 dark:text-slate-400">
+          No saved {connectionType} connections for <strong>{connector}</strong>.{' '}
+          <a href="/connections" target="_blank" rel="noreferrer" className="text-sky-600 hover:underline">Create one →</a>
+        </div>
+      ) : (
+        <select
+          value={selectedId ?? ''}
+          onChange={(e) => {
+            const id = e.target.value || null;
+            const name = matching.find((c) => c.id === id)?.name ?? null;
+            onSelect(id, name);
+          }}
+          className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm dark:text-white focus:border-sky-500 outline-none"
+        >
+          <option value="">— select a saved connection —</option>
+          {matching.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+      )}
+      {selected && (
+        <div className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium ${accentClass}`}>
+          <Cable className="h-3.5 w-3.5 shrink-0" />
+          {selected.name}
+          {selected.hasStoredSecrets && <span className="opacity-60">· credentials stored</span>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Source card ───────────────────────────────────────────────────────────────
 
@@ -108,7 +194,6 @@ function BrowseStep({ onSelect }: { onSelect: (s: DltHubSource) => void }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
         <input
@@ -120,8 +205,6 @@ function BrowseStep({ onSelect }: { onSelect: (s: DltHubSource) => void }) {
           autoFocus
         />
       </div>
-
-      {/* Category filter pills */}
       <div className="flex flex-wrap gap-1.5">
         <button
           onClick={() => setActiveCategory(null)}
@@ -139,8 +222,6 @@ function BrowseStep({ onSelect }: { onSelect: (s: DltHubSource) => void }) {
           </button>
         ))}
       </div>
-
-      {/* Source grid */}
       {filtered.length === 0 ? (
         <div className="py-10 text-center text-slate-500 dark:text-slate-400">
           <Search className="h-8 w-8 mx-auto mb-2 text-slate-300" />
@@ -161,21 +242,14 @@ function BrowseStep({ onSelect }: { onSelect: (s: DltHubSource) => void }) {
 // ── Configure step ────────────────────────────────────────────────────────────
 
 function ConfigureStep({
-  source,
-  context,
-  loading,
-  error,
-  selectedEndpoints,
-  onToggleEndpoint,
-  onToggleAll,
-  authValues,
-  onAuthChange,
-  destination,
-  onDestinationChange,
-  pipelineName,
-  onNameChange,
-  onBack,
-  onNext,
+  source, context, loading, error,
+  selectedEndpoints, onToggleEndpoint, onToggleAll,
+  authValues, onAuthChange,
+  sourceConnectionId, onSourceConnectionSelect,
+  destination, onDestinationChange,
+  destinationConnectionId, onDestinationConnectionSelect,
+  pipelineName, onNameChange,
+  onBack, onNext,
 }: {
   source: DltHubSource;
   context: DltSourceContext | null;
@@ -186,8 +260,12 @@ function ConfigureStep({
   onToggleAll: (endpoints: DltContextEndpoint[]) => void;
   authValues: Record<string, string>;
   onAuthChange: (k: string, v: string) => void;
+  sourceConnectionId: string | null;
+  onSourceConnectionSelect: (id: string | null) => void;
   destination: string;
   onDestinationChange: (d: string) => void;
+  destinationConnectionId: string | null;
+  onDestinationConnectionSelect: (id: string | null) => void;
   pipelineName: string;
   onNameChange: (n: string) => void;
   onBack: () => void;
@@ -236,10 +314,7 @@ function ConfigureStep({
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Resources to load ({selectedEndpoints.size}/{context.endpoints.length} selected)
                 </label>
-                <button
-                  onClick={() => onToggleAll(context.endpoints)}
-                  className="text-xs text-sky-600 hover:underline"
-                >
+                <button onClick={() => onToggleAll(context.endpoints)} className="text-xs text-sky-600 hover:underline">
                   {selectedEndpoints.size === context.endpoints.length ? 'Deselect all' : 'Select all'}
                 </button>
               </div>
@@ -268,34 +343,54 @@ function ConfigureStep({
             </div>
           )}
 
-          {/* Auth */}
-          {context.authType !== 'none' && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Authentication — {context.authType}
-              </label>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-                This value will be stored as an environment variable on your agent.
-                Suggested env var: <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">{context.authEnvHint}</code>
+          {/* Source auth — saved connection OR inline credential */}
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-4">
+            <p className="text-sm font-semibold text-slate-800 dark:text-white">Source credentials</p>
+
+            <InlineConnectionPicker
+              connectionType="source"
+              connector={source.slug.replace(/_dlt$/, '')}
+              selectedId={sourceConnectionId}
+              onSelect={(id) => onSourceConnectionSelect(id)}
+              label="Use a saved connection"
+            />
+
+            {!sourceConnectionId && context.authType !== 'none' && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                  <span className="text-xs text-slate-400">or enter inline</span>
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                </div>
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                  {context.authType} — <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">{context.authEnvHint}</code>
+                </label>
+                <input
+                  type="password"
+                  value={authValues[context.authParam] ?? ''}
+                  onChange={(e) => onAuthChange(context.authParam, e.target.value)}
+                  placeholder={`${context.authEnvHint} value`}
+                  autoComplete="off"
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm dark:text-white focus:border-sky-500 outline-none"
+                />
+                <p className="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">
+                  Stored as an env var on your agent. Consider saving as a connection for reuse.
+                </p>
+              </div>
+            )}
+
+            {sourceConnectionId && (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Credentials will be injected from the saved connection at runtime.
               </p>
-              <input
-                type="password"
-                value={authValues[context.authParam] ?? ''}
-                onChange={(e) => onAuthChange(context.authParam, e.target.value)}
-                placeholder={`${context.authEnvHint} value`}
-                autoComplete="off"
-                className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm dark:text-white focus:border-sky-500 outline-none"
-              />
-            </div>
-          )}
+            )}
+          </div>
         </>
       )}
 
       {/* Pipeline name */}
       <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Pipeline name
-        </label>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Pipeline name</label>
         <input
           type="text"
           value={pipelineName}
@@ -306,21 +401,37 @@ function ConfigureStep({
       </div>
 
       {/* Destination */}
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Destination
-        </label>
-        <select
-          value={destination}
-          onChange={(e) => onDestinationChange(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm dark:text-white focus:border-sky-500 outline-none"
-        >
-          {Object.entries(DESTINATION_GROUPS).map(([group, items]) => (
-            <optgroup key={group} label={group}>
-              {items.map((d) => <option key={d} value={d}>{d}</option>)}
-            </optgroup>
-          ))}
-        </select>
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-4">
+        <p className="text-sm font-semibold text-slate-800 dark:text-white">Destination</p>
+
+        <div>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Destination type</label>
+          <select
+            value={destination}
+            onChange={(e) => { onDestinationChange(e.target.value); onDestinationConnectionSelect(null); }}
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm dark:text-white focus:border-sky-500 outline-none"
+          >
+            {Object.entries(DESTINATION_GROUPS).map(([group, items]) => (
+              <optgroup key={group} label={group}>
+                {items.map((d) => <option key={d} value={d}>{d}</option>)}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+
+        <InlineConnectionPicker
+          connectionType="destination"
+          connector={destination}
+          selectedId={destinationConnectionId}
+          onSelect={(id) => onDestinationConnectionSelect(id)}
+          label="Use a saved connection"
+        />
+
+        {!destinationConnectionId && (
+          <p className="text-[11px] text-slate-400 dark:text-slate-500">
+            No connection selected — credentials must be set as env vars on your agent (<code className="font-mono">{destination.toUpperCase()}_*</code>).
+          </p>
+        )}
       </div>
 
       <button
@@ -337,22 +448,16 @@ function ConfigureStep({
 // ── Review step ───────────────────────────────────────────────────────────────
 
 function ReviewStep({
-  source,
-  context,
-  selectedEndpoints,
-  destination,
-  pipelineName,
-  saving,
-  saved,
-  savedId,
-  saveError,
-  onBack,
-  onSave,
+  source, context, selectedEndpoints, destination,
+  destinationConnectionId, sourceConnectionId,
+  pipelineName, saving, saved, savedId, saveError, onBack, onSave,
 }: {
   source: DltHubSource;
   context: DltSourceContext;
   selectedEndpoints: Set<string>;
   destination: string;
+  destinationConnectionId: string | null;
+  sourceConnectionId: string | null;
   pipelineName: string;
   saving: boolean;
   saved: boolean;
@@ -380,13 +485,18 @@ function ReviewStep({
         </div>
         <div className="px-4 py-3 flex items-center justify-between">
           <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Source</span>
-          <span className="text-sm text-slate-800 dark:text-slate-200">{source.name}</span>
+          <div className="flex items-center gap-1.5 text-sm text-slate-800 dark:text-slate-200">
+            {source.name}
+            {sourceConnectionId && <span className="flex items-center gap-1 text-xs text-sky-600"><Cable className="h-3 w-3" /> connected</span>}
+          </div>
         </div>
         <div className="px-4 py-3 flex items-center justify-between">
           <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Destination</span>
-          <span className="text-sm text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-            <Database className="h-3.5 w-3.5 text-slate-400" />{destination}
-          </span>
+          <div className="flex items-center gap-1.5 text-sm text-slate-800 dark:text-slate-200">
+            <Database className="h-3.5 w-3.5 text-slate-400" />
+            {destination}
+            {destinationConnectionId && <span className="flex items-center gap-1 text-xs text-emerald-600"><Cable className="h-3 w-3" /> connected</span>}
+          </div>
         </div>
         <div className="px-4 py-3">
           <span className="text-xs font-medium text-slate-500 uppercase tracking-wide block mb-2">
@@ -401,10 +511,18 @@ function ReviewStep({
           </div>
         </div>
         <div className="px-4 py-3 flex items-center justify-between">
-          <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Auth</span>
-          <span className="text-sm text-slate-600 dark:text-slate-400">{context.authType === 'none' ? 'None' : `${context.authType} (env var)`}</span>
+          <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Credentials</span>
+          <span className="text-sm text-slate-600 dark:text-slate-400">
+            {sourceConnectionId ? 'Saved connection' : context.authType === 'none' ? 'None' : 'Inline / env var'}
+          </span>
         </div>
       </div>
+
+      {!destinationConnectionId && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 px-3 py-2.5 text-xs text-amber-800 dark:text-amber-300">
+          No destination connection selected — make sure <code className="font-mono">{destination.toUpperCase()}_*</code> env vars are set on your agent before running.
+        </div>
+      )}
 
       {saveError && (
         <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20 p-3 flex items-start gap-2 text-sm text-red-700 dark:text-red-300">
@@ -453,7 +571,9 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
     contextError: null,
     selectedEndpoints: new Set(),
     authValues: {},
+    sourceConnectionId: null,
     destination: 'duckdb',
+    destinationConnectionId: null,
     pipelineName: '',
     saving: false,
     saved: false,
@@ -473,6 +593,7 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
       contextLoading: true,
       contextError: null,
       selectedEndpoints: new Set(),
+      sourceConnectionId: null,
       pipelineName: defaultName,
       saved: false,
       savedId: null,
@@ -483,27 +604,13 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
       const res = await fetch(`/api/elt/source-context/${encodeURIComponent(contextSlug)}`);
       const data = await res.json() as { context?: DltSourceContext; error?: string };
       if (!res.ok || !data.context) {
-        setState((prev) => ({
-          ...prev,
-          contextLoading: false,
-          contextError: data.error ?? 'Could not load source context',
-        }));
+        setState((prev) => ({ ...prev, contextLoading: false, contextError: data.error ?? 'Could not load source context' }));
         return;
       }
-      // Default: select first 5 endpoints
       const defaultSelected = new Set(data.context.endpoints.slice(0, 5).map((e) => e.name));
-      setState((prev) => ({
-        ...prev,
-        contextLoading: false,
-        context: data.context!,
-        selectedEndpoints: defaultSelected,
-      }));
+      setState((prev) => ({ ...prev, contextLoading: false, context: data.context!, selectedEndpoints: defaultSelected }));
     } catch (e) {
-      setState((prev) => ({
-        ...prev,
-        contextLoading: false,
-        contextError: e instanceof Error ? e.message : 'Network error',
-      }));
+      setState((prev) => ({ ...prev, contextLoading: false, contextError: e instanceof Error ? e.message : 'Network error' }));
     }
   }, []);
 
@@ -524,28 +631,20 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
   }, []);
 
   const savePipeline = useCallback(async () => {
-    const { source, context, selectedEndpoints, authValues, destination, pipelineName } = state;
+    const { source, context, selectedEndpoints, authValues, sourceConnectionId, destination, destinationConnectionId, pipelineName } = state;
     if (!source || !context) return;
 
-    // Build a filtered RESTAPIConfig with only the selected endpoints
     const filteredResources = (context.restApiConfig.resources as unknown[])?.filter((r) => {
       const name = (r as { name?: string }).name;
       return name && selectedEndpoints.has(name);
     }) ?? [];
 
-    const advancedConfig: Record<string, unknown> = {
-      ...context.restApiConfig,
-      resources: filteredResources,
-    };
+    const advancedConfig: Record<string, unknown> = { ...context.restApiConfig, resources: filteredResources };
 
-    // Inject auth credential into the client config (replace placeholder env var with actual env var name)
-    if (context.authType !== 'none' && authValues[context.authParam]) {
+    if (!sourceConnectionId && context.authType !== 'none' && authValues[context.authParam]) {
       const client = advancedConfig.client as Record<string, unknown>;
       const auth = client?.auth as Record<string, unknown> | undefined;
-      if (auth) {
-        // Store the env var name, not the value — consistent with how dlt loads secrets
-        auth[context.authParam] = `ENV:${context.authEnvHint}`;
-      }
+      if (auth) auth[context.authParam] = `ENV:${context.authEnvHint}`;
     }
 
     const body: CreatePipelineBody = {
@@ -561,6 +660,8 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
         _context_slug: context.slug,
         _context_url: context.contextUrl,
       },
+      ...(sourceConnectionId ? { sourceConnectionId } : {}),
+      ...(destinationConnectionId ? { destinationConnectionId } : {}),
     };
 
     setState((prev) => ({ ...prev, step: 'review', saving: true, saveError: null }));
@@ -576,32 +677,25 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
       setState((prev) => ({ ...prev, saving: false, saved: true, savedId: data.pipeline?.id ?? null }));
       onPipelineSaved?.(pipelineName);
     } catch (e) {
-      setState((prev) => ({
-        ...prev,
-        saving: false,
-        saveError: e instanceof Error ? e.message : 'Save failed',
-      }));
+      setState((prev) => ({ ...prev, saving: false, saveError: e instanceof Error ? e.message : 'Save failed' }));
     }
   }, [state, onPipelineSaved]);
 
-  const { step, source, context, contextLoading, contextError, selectedEndpoints, authValues, destination, pipelineName, saving, saved, savedId, saveError } = state;
+  const { step, source, context, contextLoading, contextError, selectedEndpoints, authValues, sourceConnectionId, destination, destinationConnectionId, pipelineName, saving, saved, savedId, saveError } = state;
 
   return (
     <div className="min-h-0">
-      {/* Progress indicator */}
       {step !== 'browse' && (
         <div className="flex items-center gap-2 mb-5 text-xs text-slate-500">
           <span className="text-slate-400">Browse</span>
           <ChevronRight className="h-3 w-3" />
-          <span className={step === 'configure' ? 'text-sky-600 font-medium' : step === 'review' ? 'text-slate-400' : 'text-slate-400'}>Configure</span>
+          <span className={step === 'configure' ? 'text-sky-600 font-medium' : 'text-slate-400'}>Configure</span>
           <ChevronRight className="h-3 w-3" />
           <span className={step === 'review' ? 'text-sky-600 font-medium' : 'text-slate-400'}>Review</span>
         </div>
       )}
 
-      {step === 'browse' && (
-        <BrowseStep onSelect={fetchContext} />
-      )}
+      {step === 'browse' && <BrowseStep onSelect={fetchContext} />}
 
       {step === 'configure' && source && (
         <ConfigureStep
@@ -614,8 +708,12 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
           onToggleAll={toggleAll}
           authValues={authValues}
           onAuthChange={(k, v) => setState((prev) => ({ ...prev, authValues: { ...prev.authValues, [k]: v } }))}
+          sourceConnectionId={sourceConnectionId}
+          onSourceConnectionSelect={(id) => setState((prev) => ({ ...prev, sourceConnectionId: id }))}
           destination={destination}
           onDestinationChange={(d) => setState((prev) => ({ ...prev, destination: d }))}
+          destinationConnectionId={destinationConnectionId}
+          onDestinationConnectionSelect={(id) => setState((prev) => ({ ...prev, destinationConnectionId: id }))}
           pipelineName={pipelineName}
           onNameChange={(n) => setState((prev) => ({ ...prev, pipelineName: n }))}
           onBack={() => setState((prev) => ({ ...prev, step: 'browse' }))}
@@ -629,6 +727,8 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
           context={context}
           selectedEndpoints={selectedEndpoints}
           destination={destination}
+          destinationConnectionId={destinationConnectionId}
+          sourceConnectionId={sourceConnectionId}
           pipelineName={pipelineName}
           saving={saving}
           saved={saved}
