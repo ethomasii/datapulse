@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentDbUser } from "@/lib/auth/server";
+import { ALL_DLT_SOURCES } from "@/lib/elt/dlt-hub-registry";
+import { getConnectorSourceCredentials } from "@/lib/elt/connectors-registry";
 
 export type DltContextEndpoint = {
   name: string;
@@ -170,6 +172,49 @@ function buildRestApiConfig(
   return { client, resources };
 }
 
+// ── Static context from registry (no remote fetch needed) ─────────────────────
+
+function authTypeFromRegistry(authArr: string[]): DltSourceContext["authType"] {
+  const s = authArr.join(" ").toLowerCase();
+  if (s.includes("bearer") || s.includes("token")) return "bearer";
+  if (s.includes("api key") || s.includes("api_key")) return "api_key";
+  if (s.includes("basic") || s.includes("username") || s.includes("password")) return "basic";
+  return "none";
+}
+
+function authEnvHintFromCredentials(slug: string): string {
+  const fields = getConnectorSourceCredentials(slug);
+  const passwordField = fields.find((f) => f.type === "password");
+  return passwordField?.key ?? "";
+}
+
+/**
+ * For verified dlt sources that use `dlt init`, return a static context
+ * derived from the registry — no remote HTTP fetch required.
+ */
+function buildStaticContext(requestedSlug: string): DltSourceContext | null {
+  // Match by slug or contextSlug
+  const src = ALL_DLT_SOURCES.find(
+    (s) => s.slug === requestedSlug || s.contextSlug === requestedSlug
+  );
+  if (!src) return null;
+
+  const authType = authTypeFromRegistry(src.auth);
+  const authEnvHint = authEnvHintFromCredentials(src.slug);
+
+  return {
+    slug: requestedSlug,
+    name: src.name,
+    baseUrl: "",
+    authType,
+    authParam: authType === "api_key" ? "api_key" : authType === "bearer" ? "token" : "",
+    authEnvHint,
+    endpoints: [],
+    restApiConfig: {},
+    contextUrl: `https://dlthub.com/context/source/${requestedSlug}`,
+  };
+}
+
 // ── Route handler ──────────────────────────────────────────────────────────────
 
 export async function GET(
@@ -182,6 +227,16 @@ export async function GET(
   const { slug } = await params;
   if (!slug || !/^[a-z0-9_-]+$/.test(slug)) {
     return NextResponse.json({ error: "Invalid slug" }, { status: 400 });
+  }
+
+  // For known registry sources, return static context — no remote fetch needed.
+  // dlthub context pages are CSR (client-side rendered) and return empty HTML
+  // shells when fetched server-side, causing timeouts.
+  const staticCtx = buildStaticContext(slug);
+  if (staticCtx) {
+    return NextResponse.json({ context: staticCtx }, {
+      headers: { "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800" },
+    });
   }
 
   const contextUrl = `https://dlthub.com/context/source/${slug}`;
