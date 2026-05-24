@@ -135,8 +135,15 @@ export function BuilderClient({
   /** Saved Connection rows linked to this pipeline (persisted as FKs; not stored in source_configuration). */
   const [sourceConnectionId, setSourceConnectionId] = useState<string | null>(null);
   const [destinationConnectionId, setDestinationConnectionId] = useState<string | null>(null);
-  const [postTransformType, setPostTransformType] = useState<"" | "python" | "sql">("");
+  const [postTransformType, setPostTransformType] = useState<"" | "python" | "sql" | "dbt">("");
   const [postTransformCode, setPostTransformCode] = useState("");
+  const [dbtPackagePath, setDbtPackagePath] = useState("");
+  const [dbtDatasetName, setDbtDatasetName] = useState("");
+  const [dbtRepositoryBranch, setDbtRepositoryBranch] = useState("");
+  const [dbtRunScope, setDbtRunScope] = useState<"all" | "selection">("all");
+  const [dbtSelector, setDbtSelector] = useState("");
+  const [dbtSliceValueVar, setDbtSliceValueVar] = useState("");
+  const [dbtSliceColumnVar, setDbtSliceColumnVar] = useState("");
 
   function patchConnection(key: string, value: string) {
     setConnectionValues((prev) => ({ ...prev, [key]: value }));
@@ -231,11 +238,31 @@ export function BuilderClient({
     } else {
       next[PIPELINE_CANVAS_KEY] = canvasGraph;
     }
-    // Post-transform
-    if (postTransformType && postTransformCode.trim()) {
+    // Post-transform (Python / SQL)
+    if ((postTransformType === "python" || postTransformType === "sql") && postTransformCode.trim()) {
       next.post_transform = { type: postTransformType, code: postTransformCode.trim() };
     } else {
       delete next.post_transform;
+    }
+    // dbt transform
+    if (postTransformType === "dbt") {
+      if (dbtPackagePath.trim()) {
+        const dltDbt: Record<string, unknown> = {
+          enabled: true,
+          package_path: dbtPackagePath.trim(),
+          run_scope: dbtRunScope,
+        };
+        if (dbtDatasetName.trim()) dltDbt.dataset_name = dbtDatasetName.trim();
+        if (dbtRepositoryBranch.trim()) dltDbt.package_repository_branch = dbtRepositoryBranch.trim();
+        if (dbtRunScope === "selection" && dbtSelector.trim()) dltDbt.selector = dbtSelector.trim();
+        if (dbtSliceValueVar.trim()) dltDbt.slice_value_var = dbtSliceValueVar.trim();
+        if (dbtSliceColumnVar.trim()) dltDbt.slice_column_var = dbtSliceColumnVar.trim();
+        next.dlt_dbt = dltDbt;
+      } else {
+        next.dlt_dbt = { enabled: false };
+      }
+    } else {
+      delete next.dlt_dbt;
     }
     return next;
   }
@@ -340,6 +367,15 @@ export function BuilderClient({
     setCanvasGraph(null);
     setSourceConnectionId(null);
     setDestinationConnectionId(null);
+    setPostTransformType("");
+    setPostTransformCode("");
+    setDbtPackagePath("");
+    setDbtDatasetName("");
+    setDbtRepositoryBranch("");
+    setDbtRunScope("all");
+    setDbtSelector("");
+    setDbtSliceValueVar("");
+    setDbtSliceColumnVar("");
     resetConnectorForNewSourceType("github", "duckdb");
   }
 
@@ -411,8 +447,28 @@ export function BuilderClient({
     setPipelineWebhookUrl(typeof p.runsWebhookUrl === "string" ? p.runsWebhookUrl : "");
     setCanvasGraph(getCanvasFromSourceConfig(cfg));
     const pt = cfg.post_transform as Record<string, unknown> | undefined;
-    setPostTransformType((pt?.type === "python" || pt?.type === "sql") ? pt.type : "");
-    setPostTransformCode(typeof pt?.code === "string" ? pt.code : "");
+    const dbtCfg = cfg.dlt_dbt as Record<string, unknown> | undefined;
+    if (dbtCfg?.enabled && dbtCfg?.package_path) {
+      setPostTransformType("dbt");
+      setDbtPackagePath(String(dbtCfg.package_path ?? ""));
+      setDbtDatasetName(String(dbtCfg.dataset_name ?? ""));
+      setDbtRepositoryBranch(String(dbtCfg.package_repository_branch ?? ""));
+      setDbtRunScope(dbtCfg.run_scope === "selection" ? "selection" : "all");
+      setDbtSelector(String(dbtCfg.selector ?? ""));
+      setDbtSliceValueVar(String(dbtCfg.slice_value_var ?? ""));
+      setDbtSliceColumnVar(String(dbtCfg.slice_column_var ?? ""));
+      setPostTransformCode("");
+    } else {
+      setPostTransformType((pt?.type === "python" || pt?.type === "sql") ? pt.type : "");
+      setPostTransformCode(typeof pt?.code === "string" ? pt.code : "");
+      setDbtPackagePath("");
+      setDbtDatasetName("");
+      setDbtRepositoryBranch("");
+      setDbtRunScope("all");
+      setDbtSelector("");
+      setDbtSliceValueVar("");
+      setDbtSliceColumnVar("");
+    }
   }
 
   useEffect(() => {
@@ -943,14 +999,111 @@ export function BuilderClient({
                       Transform type
                       <select
                         value={postTransformType}
-                        onChange={(e) => setPostTransformType(e.target.value as "" | "python" | "sql")}
+                        onChange={(e) => setPostTransformType(e.target.value as "" | "python" | "sql" | "dbt")}
                         className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
                       >
                         <option value="">None</option>
+                        <option value="dbt">dbt (post-load dbt run)</option>
                         <option value="python">Python script</option>
                         <option value="sql">SQL statements</option>
                       </select>
                     </label>
+                    {postTransformType === "dbt" && (
+                      <div className="space-y-3 rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-3 dark:border-amber-800/50 dark:bg-amber-950/20">
+                        <p className="text-xs leading-snug text-amber-950 dark:text-amber-100">
+                          Reference a <strong className="font-medium">dbt project</strong> (local path or git URL). After
+                          extract/load, a dbt run step is appended automatically. The slice string and optional partition
+                          column name are passed as dbt vars — defaults{" "}
+                          <code className="rounded bg-amber-100/80 px-0.5 font-mono text-[11px] dark:bg-amber-900/50">elt_partition_value</code>{" "}
+                          and{" "}
+                          <code className="rounded bg-amber-100/80 px-0.5 font-mono text-[11px] dark:bg-amber-900/50">elt_partition_column</code>.
+                          Rename below to match an existing project (e.g.{" "}
+                          <code className="font-mono text-[11px]">run_date</code>,{" "}
+                          <code className="font-mono text-[11px]">ds</code>).
+                        </p>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                          dbt project path or git URL
+                          <input
+                            type="text"
+                            value={dbtPackagePath}
+                            onChange={(e) => setDbtPackagePath(e.target.value)}
+                            placeholder="e.g. ./dbt_project or https://github.com/org/dbt-analytics"
+                            autoComplete="off"
+                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                          />
+                        </label>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                          Output dataset / schema (optional)
+                          <input
+                            type="text"
+                            value={dbtDatasetName}
+                            onChange={(e) => setDbtDatasetName(e.target.value)}
+                            placeholder="Defaults to pipeline_name_dbt"
+                            autoComplete="off"
+                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                          />
+                        </label>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                          Git branch / tag / commit (optional)
+                          <input
+                            type="text"
+                            value={dbtRepositoryBranch}
+                            onChange={(e) => setDbtRepositoryBranch(e.target.value)}
+                            placeholder="main"
+                            autoComplete="off"
+                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                          />
+                        </label>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                          dbt run scope
+                          <select
+                            value={dbtRunScope}
+                            onChange={(e) => setDbtRunScope(e.target.value === "selection" ? "selection" : "all")}
+                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                          >
+                            <option value="all">Full package (run_all — seed, sources tests, run)</option>
+                            <option value="selection">Selection only (extra --select on the run step)</option>
+                          </select>
+                        </label>
+                        {dbtRunScope === "selection" && (
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                            dbt selector
+                            <input
+                              type="text"
+                              value={dbtSelector}
+                              onChange={(e) => setDbtSelector(e.target.value)}
+                              placeholder="e.g. my_mart+ or tag:nightly"
+                              autoComplete="off"
+                              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                            />
+                          </label>
+                        )}
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                          dbt var name for slice value (optional)
+                          <input
+                            type="text"
+                            value={dbtSliceValueVar}
+                            onChange={(e) => setDbtSliceValueVar(e.target.value)}
+                            placeholder="default: elt_partition_value"
+                            autoComplete="off"
+                            spellCheck={false}
+                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                          />
+                        </label>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                          dbt var name for partition column (optional)
+                          <input
+                            type="text"
+                            value={dbtSliceColumnVar}
+                            onChange={(e) => setDbtSliceColumnVar(e.target.value)}
+                            placeholder="default: elt_partition_column"
+                            autoComplete="off"
+                            spellCheck={false}
+                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                          />
+                        </label>
+                      </div>
+                    )}
                     {postTransformType === "python" && (
                       <>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
