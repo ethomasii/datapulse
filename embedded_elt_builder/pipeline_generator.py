@@ -1,9 +1,23 @@
 """Shared pipeline generation logic for CLI and Web UI."""
 
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 import yaml
 from pydantic import BaseModel, Field
+
+# UI destination names that map to dlt's filesystem destination with a bucket URL prefix.
+_FILESYSTEM_DEST_MAP = {
+    "s3": ("filesystem", "s3://your-bucket/path"),
+    "gcs": ("filesystem", "gs://your-bucket/path"),
+    "azure_blob": ("filesystem", "az://your-container/path"),
+    "adls": ("filesystem", "az://your-container/path"),
+}
+
+def resolve_dlt_destination(destination_type: str) -> Tuple[str, Optional[str]]:
+    """Return (dlt_destination_name, bucket_url_hint) for a UI destination type."""
+    if destination_type in _FILESYSTEM_DEST_MAP:
+        return _FILESYSTEM_DEST_MAP[destination_type]
+    return destination_type, None
 
 
 class PipelineRequest(BaseModel):
@@ -75,12 +89,15 @@ def _generate_github_pipeline(request: PipelineRequest) -> str:
     dataset_name = request.schema_override or f"github_{repo_owner}_{repo_name}"
 
     # Build destination string with instance name if provided
+    _dlt_dest, _bucket_hint = resolve_dlt_destination(request.destination_type)
     if request.destination_instance:
-        destination = f"{request.destination_type}__{request.destination_instance}"
-        destination_comment = f"# Named destination: {destination} (uses {request.destination_type.upper()}_{request.destination_instance.upper()}_* env vars)"
+        destination = f"{_dlt_dest}__{request.destination_instance}"
+        destination_comment = f"# Named destination: {destination} (uses {_dlt_dest.upper()}_{request.destination_instance.upper()}_* env vars)"
     else:
-        destination = request.destination_type
+        destination = _dlt_dest
         destination_comment = ""
+    if _bucket_hint:
+        destination_comment = (destination_comment + f"\n    # Set DESTINATION__FILESYSTEM__BUCKET_URL={_bucket_hint}").strip()
 
     return f'''"""dlt pipeline: {request.name}
 
@@ -153,12 +170,15 @@ def _generate_rest_api_pipeline(request: PipelineRequest) -> str:
     dataset_name = request.schema_override or f"{resource_name}_data"
 
     # Build destination string with instance name if provided
+    _dlt_dest, _bucket_hint = resolve_dlt_destination(request.destination_type)
     if request.destination_instance:
-        destination = f"{request.destination_type}__{request.destination_instance}"
-        destination_comment = f"# Named destination: {destination} (uses {request.destination_type.upper()}_{request.destination_instance.upper()}_* env vars)"
+        destination = f"{_dlt_dest}__{request.destination_instance}"
+        destination_comment = f"# Named destination: {destination} (uses {_dlt_dest.upper()}_{request.destination_instance.upper()}_* env vars)"
     else:
-        destination = request.destination_type
+        destination = _dlt_dest
         destination_comment = ""
+    if _bucket_hint:
+        destination_comment = (destination_comment + f"\n    # Set DESTINATION__FILESYSTEM__BUCKET_URL={_bucket_hint}").strip()
 
     # Build paginator config based on type
     paginator_code = ''
@@ -279,12 +299,15 @@ def _generate_rest_api_advanced(request: PipelineRequest) -> str:
     dataset_name = request.schema_override or f"{resource_name}_data"
 
     # Build destination string with instance name if provided
+    _dlt_dest, _bucket_hint = resolve_dlt_destination(request.destination_type)
     if request.destination_instance:
-        destination = f"{request.destination_type}__{request.destination_instance}"
-        destination_comment = f"# Named destination: {destination} (uses {request.destination_type.upper()}_{request.destination_instance.upper()}_* env vars)"
+        destination = f"{_dlt_dest}__{request.destination_instance}"
+        destination_comment = f"# Named destination: {destination} (uses {_dlt_dest.upper()}_{request.destination_instance.upper()}_* env vars)"
     else:
-        destination = request.destination_type
+        destination = _dlt_dest
         destination_comment = ""
+    if _bucket_hint:
+        destination_comment = (destination_comment + f"\n    # Set DESTINATION__FILESYSTEM__BUCKET_URL={_bucket_hint}").strip()
 
     return f'''"""dlt pipeline: {request.name}
 
@@ -334,12 +357,15 @@ def _generate_generic_pipeline(request: PipelineRequest) -> str:
     dataset_name = request.schema_override or f"{request.source_type}_data"
 
     # Build destination string with instance name if provided
+    _dlt_dest, _bucket_hint = resolve_dlt_destination(request.destination_type)
     if request.destination_instance:
-        destination = f"{request.destination_type}__{request.destination_instance}"
-        destination_comment = f"# Named destination: {destination} (uses {request.destination_type.upper()}_{request.destination_instance.upper()}_* env vars)"
+        destination = f"{_dlt_dest}__{request.destination_instance}"
+        destination_comment = f"# Named destination: {destination} (uses {_dlt_dest.upper()}_{request.destination_instance.upper()}_* env vars)"
     else:
-        destination = request.destination_type
+        destination = _dlt_dest
         destination_comment = ""
+    if _bucket_hint:
+        destination_comment = (destination_comment + f"\n    # Set DESTINATION__FILESYSTEM__BUCKET_URL={_bucket_hint}").strip()
 
     return f'''"""dlt pipeline: {request.name}
 

@@ -61,8 +61,8 @@ export const SOURCE_GROUPS: Record<string, readonly string[]> = buildSourceGroup
 
 export const DESTINATION_GROUPS: Record<string, readonly string[]> = {
   "Cloud Warehouses": ["snowflake", "bigquery", "redshift", "databricks"],
-  Databases: ["postgres", "mysql", "duckdb", "motherduck", "clickhouse", "sqlite"],
-  Storage: ["filesystem"],
+  Databases: ["postgres", "mysql", "duckdb", "motherduck", "clickhouse", "mssql", "sqlite"],
+  "Cloud Storage": ["s3", "gcs", "azure_blob"],
 };
 
 export const SOURCE_TYPES = Array.from(new Set(Object.values(SOURCE_GROUPS).flat())) as string[];
