@@ -5,6 +5,7 @@
 export const ELTPULSE_REPO = {
   root: "eltpulse",
   pipelinesDir: "eltpulse/pipelines",
+  monitorsDir: "eltpulse/monitors",
   definitionsDir: "eltpulse/definitions",
   workspaceFile: "eltpulse_workspace.yaml",
   pipelineConfigFile: "config.yaml",

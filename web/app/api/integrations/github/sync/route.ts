@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import YAML from "yaml";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
 import { getGithubConnectionForUser } from "@/lib/db/github-connection-query";
@@ -19,6 +20,8 @@ import {
 const bodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("pull_declarations") }),
   z.object({ action: z.literal("push_pipeline"), pipelineId: z.string().min(1) }),
+  z.object({ action: z.literal("push_monitors") }),
+  z.object({ action: z.literal("pull_monitors") }),
 ]);
 
 function repoContext(
@@ -131,6 +134,144 @@ export async function POST(req: Request) {
       branch: ctx.branch,
       path: basePath,
     });
+  }
+
+  if (parsed.data.action === "push_monitors") {
+    const monitors = await db.eltMonitor.findMany({
+      where: { userId: user.id },
+      include: { pipeline: { select: { name: true } } },
+      orderBy: { name: "asc" },
+    });
+
+    if (monitors.length === 0) {
+      return NextResponse.json({ ok: true, pushed: [], message: "No monitors to push." });
+    }
+
+    const pushed: string[] = [];
+    const errors: { name: string; message: string }[] = [];
+    const monitorsPath = ELTPULSE_REPO.monitorsDir;
+
+    for (const m of monitors) {
+      const doc: Record<string, unknown> = {
+        eltpulse_monitor_declaration: 1,
+        upsert: true,
+        name: m.name,
+        pipeline_name: m.pipeline.name,
+        type: m.type,
+        execution_host: m.executionHost,
+        config: m.config as Record<string, unknown>,
+      };
+      const yamlText = YAML.stringify(doc, { lineWidth: 0 }).trimEnd() + "\n";
+      const relPath = `${monitorsPath}/${m.name}.yaml`;
+      const fileUrlPath = githubRepoContentsApiPath(ctx.owner, ctx.name, relPath);
+      const existing = await githubJson<{ sha?: string }>(token, `${fileUrlPath}?ref=${encodeURIComponent(ctx.branch)}`);
+      const sha = existing.ok && existing.json && typeof (existing.json as { sha?: unknown }).sha === "string"
+        ? (existing.json as { sha: string }).sha
+        : undefined;
+
+      const putBody: Record<string, unknown> = {
+        message: `[eltpulse] Sync monitor ${m.name}`,
+        content: Buffer.from(yamlText, "utf8").toString("base64"),
+        branch: ctx.branch,
+      };
+      if (sha) putBody.sha = sha;
+
+      const put = await fetch(`https://api.github.com${fileUrlPath}`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(putBody),
+      });
+
+      if (put.ok) {
+        pushed.push(m.name);
+      } else {
+        const j = (await put.json()) as { message?: string };
+        errors.push({ name: m.name, message: typeof j.message === "string" ? j.message : "GitHub rejected the commit" });
+      }
+    }
+
+    return NextResponse.json({ ok: errors.length === 0, pushed, errors, branch: ctx.branch, path: monitorsPath });
+  }
+
+  if (parsed.data.action === "pull_monitors") {
+    const monitorsPath = ELTPULSE_REPO.monitorsDir;
+    const listPath = githubRepoContentsApiPath(ctx.owner, ctx.name, monitorsPath, ctx.branch);
+    const { ok, status, json: dirJson } = await githubJson<GithubContentDirItem[] | { message?: string }>(token, listPath);
+
+    if (status === 404) {
+      return NextResponse.json(
+        { error: `Path ${monitorsPath} not found on ${ctx.branch}. Push monitors from eltPulse first.` },
+        { status: 404 }
+      );
+    }
+    if (!ok || !Array.isArray(dirJson)) {
+      const msg = dirJson && typeof dirJson === "object" && "message" in dirJson
+        ? String((dirJson as { message?: string }).message)
+        : "Could not read monitors path.";
+      return NextResponse.json({ error: msg }, { status: status >= 400 && status < 600 ? status : 502 });
+    }
+
+    const yamls = dirJson.filter((e) => e.type === "file" && /\.ya?ml$/i.test(e.name));
+    const applied: string[] = [];
+    const errors: { path: string; message: string }[] = [];
+
+    for (const f of yamls) {
+      const fp = githubRepoContentsApiPath(ctx.owner, ctx.name, f.path, ctx.branch);
+      const fileRes = await githubJson<GithubContentFile>(token, fp);
+      if (!fileRes.ok || !fileRes.json || !("content" in fileRes.json)) {
+        errors.push({ path: f.path, message: "Could not load file" });
+        continue;
+      }
+      const file = fileRes.json;
+      if (file.encoding !== "base64" || typeof file.content !== "string") {
+        errors.push({ path: f.path, message: "Unexpected file encoding" });
+        continue;
+      }
+
+      let doc: Record<string, unknown>;
+      try {
+        const text = decodeGithubFileContent(file);
+        doc = (YAML.parse(text) as Record<string, unknown>) ?? {};
+      } catch (e) {
+        errors.push({ path: f.path, message: `Invalid YAML: ${e instanceof Error ? e.message : String(e)}` });
+        continue;
+      }
+
+      const monitorName = typeof doc.name === "string" ? doc.name.trim() : "";
+      const pipelineName = typeof doc.pipeline_name === "string" ? doc.pipeline_name.trim() : "";
+      const type = typeof doc.type === "string" ? doc.type.trim() : "";
+
+      if (!monitorName || !pipelineName || !type) {
+        errors.push({ path: f.path, message: "Missing required fields: name, pipeline_name, type" });
+        continue;
+      }
+
+      const pipeline = await db.eltPipeline.findFirst({ where: { name: pipelineName, userId: user.id }, select: { id: true } });
+      if (!pipeline) {
+        errors.push({ path: f.path, message: `Pipeline "${pipelineName}" not found — import pipelines first` });
+        continue;
+      }
+
+      const config = doc.config && typeof doc.config === "object" && !Array.isArray(doc.config)
+        ? (doc.config as Record<string, unknown>)
+        : {};
+
+      type MonitorData = Parameters<typeof db.eltMonitor.upsert>[0]["create"];
+      const monitorConfig = config as MonitorData["config"];
+      await db.eltMonitor.upsert({
+        where: { userId_name: { userId: user.id, name: monitorName } },
+        create: { userId: user.id, name: monitorName, pipelineId: pipeline.id, type, config: monitorConfig, executionHost: "inherit" },
+        update: { type, config: monitorConfig, pipelineId: pipeline.id },
+      });
+      applied.push(monitorName);
+    }
+
+    return NextResponse.json({ ok: true, applied, errors, branch: ctx.branch, path: monitorsPath });
   }
 
   const pipelineId = parsed.data.pipelineId;

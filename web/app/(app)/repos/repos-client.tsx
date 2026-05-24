@@ -73,6 +73,10 @@ export function RepositoriesClient({
   const [pulling, setPulling] = useState(false);
   const [pushingId, setPushingId] = useState<string | null>(null);
 
+  const [monitorCount, setMonitorCount] = useState<number | null>(null);
+  const [pushingMonitors, setPushingMonitors] = useState(false);
+  const [pullingMonitors, setPullingMonitors] = useState(false);
+
   useEffect(() => {
     setOwner(initialConnection?.defaultRepoOwner ?? "");
     setRepoName(initialConnection?.defaultRepoName ?? "");
@@ -105,9 +109,21 @@ export function RepositoriesClient({
     }
   }, []);
 
+  const loadMonitorCount = useCallback(async () => {
+    try {
+      const res = await fetch("/api/monitors");
+      const json = (await res.json()) as { monitors?: unknown[]; sensors?: unknown[] };
+      if (!res.ok) return;
+      setMonitorCount((json.monitors ?? json.sensors ?? []).length);
+    } catch {
+      // silently ignore
+    }
+  }, []);
+
   useEffect(() => {
     void loadPipelines();
-  }, [loadPipelines]);
+    void loadMonitorCount();
+  }, [loadPipelines, loadMonitorCount]);
 
   const persistRepoSettings = useCallback(
     async (o: string, n: string, b: string, opts?: { quiet?: boolean }): Promise<boolean> => {
@@ -264,6 +280,55 @@ export function RepositoriesClient({
       setBanner({ kind: "err", text: e instanceof Error ? e.message : "Push failed" });
     } finally {
       setPushingId(null);
+    }
+  }
+
+  async function pushMonitors() {
+    setPushingMonitors(true);
+    setBanner(null);
+    try {
+      const res = await fetch("/api/integrations/github/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "push_monitors" }),
+      });
+      const json = (await res.json()) as { ok?: boolean; pushed?: string[]; errors?: { name: string; message: string }[]; message?: string; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Push failed");
+      const n = json.pushed?.length ?? 0;
+      const errN = json.errors?.length ?? 0;
+      setBanner({
+        kind: errN ? "err" : "ok",
+        text: json.message ?? `Pushed ${n} monitor(s) to eltpulse/monitors.` + (errN ? ` ${errN} failed.` : ""),
+      });
+    } catch (e) {
+      setBanner({ kind: "err", text: e instanceof Error ? e.message : "Push monitors failed" });
+    } finally {
+      setPushingMonitors(false);
+    }
+  }
+
+  async function pullMonitors() {
+    setPullingMonitors(true);
+    setBanner(null);
+    try {
+      const res = await fetch("/api/integrations/github/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "pull_monitors" }),
+      });
+      const json = (await res.json()) as { ok?: boolean; applied?: string[]; errors?: { path: string; message: string }[]; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Pull failed");
+      const n = json.applied?.length ?? 0;
+      const errN = json.errors?.length ?? 0;
+      setBanner({
+        kind: errN ? "err" : "ok",
+        text: `Imported ${n} monitor(s) from eltpulse/monitors.` + (errN ? ` ${errN} skipped.` : ""),
+      });
+      await loadMonitorCount();
+    } catch (e) {
+      setBanner({ kind: "err", text: e instanceof Error ? e.message : "Pull monitors failed" });
+    } finally {
+      setPullingMonitors(false);
     }
   }
 
@@ -574,6 +639,42 @@ export function RepositoriesClient({
                 ))}
               </ul>
             )}
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Monitors &amp; sensors</h2>
+                {monitorCount !== null && (
+                  <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                    {monitorCount} monitor{monitorCount !== 1 ? "s" : ""} in this workspace
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={!canSync || pullingMonitors}
+                  onClick={() => void pullMonitors()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50 dark:bg-sky-500 dark:hover:bg-sky-600"
+                >
+                  {pullingMonitors ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowDownToLine className="h-4 w-4" aria-hidden />}
+                  Import monitors
+                </button>
+                <button
+                  type="button"
+                  disabled={!canSync || pushingMonitors || monitorCount === 0}
+                  onClick={() => void pushMonitors()}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  {pushingMonitors ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpFromLine className="h-4 w-4" aria-hidden />}
+                  Push all monitors
+                </button>
+              </div>
+            </div>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              Writes each monitor as <code className="text-xs">eltpulse/monitors/&lt;name&gt;.yaml</code>. Pulling imports monitors and links them to pipelines by name — import pipelines first if any are missing.
+            </p>
           </section>
         </>
       ) : null}
