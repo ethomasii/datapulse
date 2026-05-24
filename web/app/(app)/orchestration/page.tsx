@@ -12,7 +12,8 @@ interface MonitorRow {
   pipeline_id: string;
   pipeline_name: string;
   config: Record<string, unknown>;
-  last_check?: string;
+  last_check: string | null;
+  last_triggered: string | null;
 }
 
 interface TriggeredMonitorRow {
@@ -34,7 +35,8 @@ function normalizeMonitorRow(raw: Record<string, unknown>): MonitorRow | null {
     pipeline_id: typeof raw.pipeline_id === "string" ? raw.pipeline_id : "",
     pipeline_name: typeof raw.pipeline_name === "string" ? raw.pipeline_name : "",
     config,
-    last_check: typeof raw.last_check === "string" ? raw.last_check : undefined,
+    last_check: typeof raw.last_check === "string" ? raw.last_check : null,
+    last_triggered: typeof raw.last_triggered === "string" ? raw.last_triggered : null,
   };
 }
 
@@ -56,7 +58,6 @@ export default function OrchestrationPage() {
       setError(null);
       const response = await fetch("/api/monitors", { credentials: "same-origin" });
       const data = (await response.json()) as {
-        sensors?: Record<string, unknown>[];
         monitors?: Record<string, unknown>[];
         error?: string;
       };
@@ -65,11 +66,7 @@ export default function OrchestrationPage() {
         setMonitors([]);
         return;
       }
-      const rawList = Array.isArray(data.monitors)
-        ? data.monitors
-        : Array.isArray(data.sensors)
-          ? data.sensors
-          : [];
+      const rawList = Array.isArray(data.monitors) ? data.monitors : [];
       const next = rawList
         .map((row) => normalizeMonitorRow(row))
         .filter((row): row is MonitorRow => row !== null);
@@ -267,49 +264,80 @@ export default function OrchestrationPage() {
           <div className="mt-4 space-y-4">
             {monitors.map((m) => (
               <div key={m.name} className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                {/* Header row */}
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium text-slate-900 dark:text-white">{m.name}</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getMonitorTypeColor(m.type)}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getMonitorTypeColor(m.type)}`}>
                       {m.type.replace(/_/g, " ")}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-500">
-                      Pipeline: {m.pipeline_name || "—"}
-                      {m.pipeline_id ? (
-                        <span className="mt-0.5 block font-mono text-[11px] text-slate-400">{m.pipeline_id}</span>
-                      ) : null}
-                    </span>
-                    <button
-                      onClick={() => deleteMonitor(m.name)}
-                      className="p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                      title="Delete monitor"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => deleteMonitor(m.name)}
+                    className="shrink-0 p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 rounded dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                    title="Delete monitor"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium text-slate-700 dark:text-slate-300">Configuration:</span>
-                    <div className="mt-1 space-y-1">
-                      {Object.entries(m.config).map(([key, value]) => (
-                        <div key={key} className="text-slate-600 dark:text-slate-400">
-                          <span className="font-mono">{key}:</span>{" "}
+                {/* Pipeline links */}
+                {m.pipeline_id ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-slate-500 dark:text-slate-400">Pipeline:</span>
+                    <Link
+                      href={`/builder?pipeline=${encodeURIComponent(m.pipeline_id)}`}
+                      className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                    >
+                      {m.pipeline_name || m.pipeline_id}
+                    </Link>
+                    <Link
+                      href={`/runs?pipeline=${encodeURIComponent(m.pipeline_id)}`}
+                      className="inline-flex items-center gap-1 rounded border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-950/70"
+                    >
+                      View runs →
+                    </Link>
+                    <Link
+                      href={`/run-slices?pipeline=${encodeURIComponent(m.pipeline_id)}`}
+                      className="inline-flex items-center gap-1 rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700 hover:bg-teal-100 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-300 dark:hover:bg-teal-950/70"
+                    >
+                      Slice config →
+                    </Link>
+                  </div>
+                ) : null}
+
+                {/* Status row */}
+                <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
+                  <span>
+                    Last check:{" "}
+                    <span className="text-slate-700 dark:text-slate-300">
+                      {m.last_check ? new Date(m.last_check).toLocaleString() : "Never"}
+                    </span>
+                  </span>
+                  <span>
+                    Last triggered:{" "}
+                    <span className={m.last_triggered ? "font-medium text-sky-700 dark:text-sky-300" : "text-slate-400 dark:text-slate-500"}>
+                      {m.last_triggered ? new Date(m.last_triggered).toLocaleString() : "Never"}
+                    </span>
+                  </span>
+                </div>
+
+                {/* Config */}
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+                    Configuration
+                  </summary>
+                  <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1">
+                    {Object.entries(m.config)
+                      .filter(([k]) => !k.startsWith("eltpulse_") && k !== "auth_credentials")
+                      .map(([key, value]) => (
+                        <div key={key} className="text-xs text-slate-600 dark:text-slate-400">
+                          <span className="font-mono text-slate-500">{key}:</span>{" "}
                           {Array.isArray(value) ? (value as unknown[]).join(", ") : String(value)}
                         </div>
                       ))}
-                    </div>
                   </div>
-                  <div>
-                    <span className="font-medium text-slate-700 dark:text-slate-300">Status:</span>
-                    <div className="mt-1 text-slate-600 dark:text-slate-400">
-                      Last check: {m.last_check ? new Date(m.last_check).toLocaleString() : "Never"}
-                    </div>
-                  </div>
-                </div>
+                </details>
               </div>
             ))}
           </div>
@@ -369,8 +397,9 @@ export default function OrchestrationPage() {
       </section>
 
       <RelatedLinks links={[
-        { href: "/builder", icon: Layers, label: "Pipelines", desc: "Define the source → destination connections monitors trigger" },
-        { href: "/runs", icon: PlayCircle, label: "Runs", desc: "View execution history and live telemetry for each run" },
+        { href: "/builder", icon: Layers, label: "Pipelines", desc: "Edit the pipeline a monitor triggers — source, destination, transforms" },
+        { href: "/runs", icon: PlayCircle, label: "Runs", desc: "View execution history; filter by pipeline to see monitor-triggered runs" },
+        { href: "/run-slices", icon: Split, label: "Run slices", desc: "Configure partition column and values that monitors queue per trigger" },
         { href: "/gateway", icon: Waypoints, label: "Gateway & execution", desc: "Connect your runner or use eltPulse-managed workers" },
       ]} />
     </div>

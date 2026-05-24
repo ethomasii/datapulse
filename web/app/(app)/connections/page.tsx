@@ -43,6 +43,8 @@ type Connection = {
   hasStoredSecrets?: boolean;
 };
 
+type PipelineUsage = { id: string; name: string };
+
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -166,9 +168,11 @@ function ConfigFields({
 
 function ConnectionRow({
   conn,
+  usedBy,
   onDelete,
 }: {
   conn: Connection;
+  usedBy: PipelineUsage[];
   onDelete: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -248,23 +252,56 @@ function ConnectionRow({
             {conn.connectionType}
           </span>
           <span className="text-sm text-slate-500 dark:text-slate-400">{connectorLabel(conn.connector)}</span>
+          {usedBy.length > 0 ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300">
+              {usedBy.length} pipeline{usedBy.length !== 1 ? "s" : ""}
+            </span>
+          ) : (
+            <span className="text-[10px] text-slate-400 dark:text-slate-500">unused</span>
+          )}
         </div>
         <span className="ml-auto shrink-0 text-xs text-slate-400">{fmt(conn.updatedAt)}</span>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(conn.id);
-          }}
-          className="ml-3 shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
-          title="Delete connection"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        {usedBy.length > 0 ? (
+          <span
+            className="ml-3 shrink-0 cursor-not-allowed rounded p-1 text-slate-300 dark:text-slate-600"
+            title={`In use by: ${usedBy.map((p) => p.name).join(", ")} — unlink from pipelines first`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(conn.id);
+            }}
+            className="ml-3 shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+            title="Delete connection"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </button>
 
       {open && (
         <div className="border-t border-slate-100 px-4 pb-4 pt-4 dark:border-slate-800">
+          {usedBy.length > 0 && (
+            <div className="mb-4 rounded-lg border border-sky-100 bg-sky-50/60 px-3 py-2.5 dark:border-sky-900 dark:bg-sky-900/10">
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">Used by {usedBy.length} pipeline{usedBy.length !== 1 ? "s" : ""}</p>
+              <ul className="mt-1.5 flex flex-wrap gap-2">
+                {usedBy.map((p) => (
+                  <li key={p.id}>
+                    <Link
+                      href={`/builder?pipeline=${encodeURIComponent(p.id)}`}
+                      className="inline-flex items-center gap-1 rounded border border-sky-200 bg-white px-2 py-0.5 text-xs font-medium text-sky-700 hover:bg-sky-50 dark:border-sky-800 dark:bg-slate-900 dark:text-sky-300 dark:hover:bg-sky-950/30"
+                    >
+                      {p.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {hints.length > 0 ? (
             <>
               <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
@@ -492,6 +529,7 @@ function CreateConnectionForm({ onCreated }: { onCreated: (c: Connection) => voi
 export default function ConnectionsPage() {
   const { isSignedIn } = useUser();
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [pipelineUsage, setPipelineUsage] = useState<Record<string, PipelineUsage[]>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [migrationPending, setMigrationPending] = useState(false);
@@ -501,20 +539,23 @@ export default function ConnectionsPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await apiFetch("/api/elt/connections");
-      if (res.status === 401) {
+      const [connRes, pipRes] = await Promise.all([
+        apiFetch("/api/elt/connections"),
+        apiFetch("/api/elt/pipelines"),
+      ]);
+      if (connRes.status === 401) {
         setConnections([]);
         setLoadError("You are not signed in, or your session expired. Sign in again to load connections.");
         return;
       }
-      const text = await res.text();
+      const text = await connRes.text();
       if (!text) {
         setConnections([]);
         return;
       }
       try {
         const data = JSON.parse(text);
-        if (!res.ok) {
+        if (!connRes.ok) {
           setConnections([]);
           setLoadError(typeof data.error === "string" ? data.error : "Could not load connections");
           return;
@@ -525,6 +566,25 @@ export default function ConnectionsPage() {
         setConnections([]);
         setLoadError("Unexpected response from server.");
       }
+      // Build connection → pipeline usage map
+      if (pipRes.ok) {
+        try {
+          const pipData = (await pipRes.json()) as {
+            pipelines?: { id: string; name: string; sourceConnectionId?: string | null; destinationConnectionId?: string | null }[];
+          };
+          const usage: Record<string, PipelineUsage[]> = {};
+          for (const p of pipData.pipelines ?? []) {
+            for (const cid of [p.sourceConnectionId, p.destinationConnectionId]) {
+              if (!cid) continue;
+              if (!usage[cid]) usage[cid] = [];
+              if (!usage[cid].some((x) => x.id === p.id)) usage[cid].push({ id: p.id, name: p.name });
+            }
+          }
+          setPipelineUsage(usage);
+        } catch {
+          /* usage map is optional context */
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -533,9 +593,11 @@ export default function ConnectionsPage() {
   useEffect(() => { load(); }, [load]);
 
   async function remove(id: string) {
+    if ((pipelineUsage[id]?.length ?? 0) > 0) return;
     const res = await apiFetch(`/api/elt/connections/${id}`, { method: "DELETE" });
     if (!res.ok) return;
     setConnections((prev) => prev.filter((c) => c.id !== id));
+    setPipelineUsage((prev) => { const next = { ...prev }; delete next[id]; return next; });
   }
 
   function onCreated(c: Connection) {
@@ -670,7 +732,7 @@ export default function ConnectionsPage() {
       ) : (
         <ul className="space-y-2">
           {visible.map((conn) => (
-            <ConnectionRow key={conn.id} conn={conn} onDelete={remove} />
+            <ConnectionRow key={conn.id} conn={conn} usedBy={pipelineUsage[conn.id] ?? []} onDelete={remove} />
           ))}
         </ul>
       )}

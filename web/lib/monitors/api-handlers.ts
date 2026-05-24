@@ -47,17 +47,18 @@ export async function monitorsGET() {
     throw e;
   }
 
-  const sensors = rows.map((row) => ({
+  const monitors = rows.map((row) => ({
     name: row.name,
     type: row.type,
     pipeline_id: row.pipelineId,
     pipeline_name: row.pipeline.name,
     execution_host: row.executionHost,
     config: row.config as Record<string, unknown>,
-    last_check: row.lastCheckAt?.toISOString(),
+    last_check: row.lastCheckAt?.toISOString() ?? null,
+    last_triggered: row.lastTriggeredAt?.toISOString() ?? null,
   }));
 
-  return NextResponse.json({ sensors, monitors: sensors });
+  return NextResponse.json({ monitors });
 }
 
 export async function monitorsPOST(request: NextRequest) {

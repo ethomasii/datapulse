@@ -24,9 +24,35 @@ export async function GET() {
       updatedAt: true,
       defaultTargetAgentTokenId: true,
       executionHost: true,
+      sourceConnectionId: true,
+      destinationConnectionId: true,
+      sourceConfiguration: true,
     },
   });
-  return NextResponse.json({ pipelines: rows });
+
+  const pipelines = rows.map((row) => {
+    const cfg = (row.sourceConfiguration ?? {}) as Record<string, unknown>;
+    const scheduleEnabled = Boolean(cfg.schedule_enabled ?? cfg.scheduleEnabled);
+    const cron = typeof cfg.cron_schedule === "string" ? cfg.cron_schedule : null;
+    const timezone = typeof cfg.schedule_timezone === "string" ? cfg.schedule_timezone : "UTC";
+    return {
+      id: row.id,
+      name: row.name,
+      tool: row.tool,
+      enabled: row.enabled,
+      sourceType: row.sourceType,
+      destinationType: row.destinationType,
+      description: row.description,
+      updatedAt: row.updatedAt,
+      defaultTargetAgentTokenId: row.defaultTargetAgentTokenId,
+      executionHost: row.executionHost,
+      sourceConnectionId: row.sourceConnectionId,
+      destinationConnectionId: row.destinationConnectionId,
+      scheduleInfo: { enabled: scheduleEnabled, cron, timezone },
+    };
+  });
+
+  return NextResponse.json({ pipelines });
 }
 
 export async function POST(req: Request) {

@@ -25,6 +25,7 @@ interface Pipeline {
   enabled: boolean;
   description?: string;
   updatedAt?: string;
+  scheduleInfo?: { enabled: boolean; cron: string | null; timezone: string };
 }
 
 export default function SchedulePage() {
@@ -32,6 +33,7 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
+  const [scheduleOnly, setScheduleOnly] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,7 +61,10 @@ export default function SchedulePage() {
     };
   }, []);
 
+  const scheduledCount = pipelines.filter((p) => p.scheduleInfo?.enabled && p.scheduleInfo.cron).length;
+
   const filtered = pipelines.filter((p) => {
+    if (scheduleOnly && !(p.scheduleInfo?.enabled && p.scheduleInfo.cron)) return false;
     const q = filter.toLowerCase();
     return (
       !q ||
@@ -137,14 +142,28 @@ export default function SchedulePage() {
           <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
             <Clock className="h-5 w-5 text-violet-600" aria-hidden />
             All Pipelines
+            {scheduledCount > 0 && (
+              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+                {scheduledCount} scheduled
+              </span>
+            )}
           </h2>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={scheduleOnly}
+                onChange={(e) => setScheduleOnly(e.target.checked)}
+                className="rounded"
+              />
+              Scheduled only
+            </label>
             <input
               type="search"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder="Filter by name or connector…"
-              className="w-56 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500"
+              className="w-48 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500"
             />
             <button
               onClick={() => {
@@ -218,9 +237,20 @@ export default function SchedulePage() {
                     <span className="truncate font-medium text-slate-900 dark:text-white">
                       {pipeline.name}
                     </span>
+                    {pipeline.scheduleInfo?.enabled && pipeline.scheduleInfo.cron ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+                        <Clock className="h-3 w-3" aria-hidden />
+                        {pipeline.scheduleInfo.cron}
+                        {pipeline.scheduleInfo.timezone !== 'UTC' ? ` · ${pipeline.scheduleInfo.timezone}` : ''}
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                        no schedule
+                      </span>
+                    )}
                     {!pipeline.enabled && (
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                        disabled
+                        pipeline disabled
                       </span>
                     )}
                   </div>
