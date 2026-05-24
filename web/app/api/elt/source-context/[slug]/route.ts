@@ -180,7 +180,7 @@ export async function GET(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { slug } = await params;
-  if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
+  if (!slug || !/^[a-z0-9_-]+$/.test(slug)) {
     return NextResponse.json({ error: "Invalid slug" }, { status: 400 });
   }
 

@@ -56,6 +56,7 @@ export const DLT_HUB_SOURCES: DltHubSource[] = [
     auth: ["API Key (STRIPE_API_KEY)"],
     params: ["start_date"],
     incremental: true,
+    contextSlug: "stripe",
     docsUrl: "https://github.com/dlt-hub/verified-sources/tree/master/sources/stripe_analytics",
   },
   {
@@ -66,6 +67,7 @@ export const DLT_HUB_SOURCES: DltHubSource[] = [
     auth: ["API Key + Store domain"],
     params: ["private_app_password", "store_url", "start_date"],
     incremental: true,
+    contextSlug: "shopify",
     docsUrl: "https://github.com/dlt-hub/verified-sources/tree/master/sources/shopify_dlt",
   },
   {
@@ -136,6 +138,7 @@ export const DLT_HUB_SOURCES: DltHubSource[] = [
     auth: ["Personal Access Token"],
     params: ["access_token"],
     incremental: false,
+    contextSlug: "asana",
     docsUrl: "https://github.com/dlt-hub/verified-sources/tree/master/sources/asana_dlt",
   },
   {
@@ -186,6 +189,7 @@ export const DLT_HUB_SOURCES: DltHubSource[] = [
     auth: ["Service Account JSON"],
     params: ["spreadsheet_url", "range_names"],
     incremental: false,
+    contextSlug: "google-sheets",
     docsUrl: "https://github.com/dlt-hub/verified-sources/tree/master/sources/google_sheets",
   },
   {
@@ -196,6 +200,7 @@ export const DLT_HUB_SOURCES: DltHubSource[] = [
     auth: ["Service Account JSON or OAuth"],
     params: ["property_id", "start_date"],
     incremental: true,
+    contextSlug: "google-analytics",
     docsUrl: "https://github.com/dlt-hub/verified-sources/tree/master/sources/google_analytics",
   },
   {
@@ -206,6 +211,7 @@ export const DLT_HUB_SOURCES: DltHubSource[] = [
     auth: ["Access Token + Account ID"],
     params: ["access_token", "account_id", "start_date"],
     incremental: true,
+    contextSlug: "facebook-ads",
     docsUrl: "https://github.com/dlt-hub/verified-sources/tree/master/sources/facebook_ads",
   },
   {
@@ -216,6 +222,7 @@ export const DLT_HUB_SOURCES: DltHubSource[] = [
     auth: ["OAuth + Developer Token"],
     params: ["developer_token", "customer_id", "start_date"],
     incremental: true,
+    contextSlug: "google-ads",
     docsUrl: "https://github.com/dlt-hub/verified-sources/tree/master/sources/google_ads",
   },
   {
@@ -226,6 +233,7 @@ export const DLT_HUB_SOURCES: DltHubSource[] = [
     auth: ["API Key"],
     params: ["api_key"],
     incremental: false,
+    contextSlug: "bing-webmaster",
     docsUrl: "https://github.com/dlt-hub/verified-sources/tree/master/sources/bing_webmaster",
   },
   {
@@ -276,6 +284,7 @@ export const DLT_HUB_SOURCES: DltHubSource[] = [
     auth: ["Postgres connection string with replication role"],
     params: ["credentials", "slot_name", "publication_name"],
     incremental: true,
+    contextSlug: "pg-replication",
     docsUrl: "https://github.com/dlt-hub/verified-sources/tree/master/sources/pg_replication",
   },
   {
