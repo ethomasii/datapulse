@@ -37,8 +37,8 @@ const SOURCE_CONNECTORS = [
 
 const DESTINATION_CONNECTORS = [
   "snowflake", "bigquery", "redshift", "postgres", "duckdb", "motherduck",
-  "databricks", "clickhouse", "mysql", "sqlite", "filesystem", "trino",
-  "elasticsearch", "mssql", "druid", "pinot",
+  "databricks", "clickhouse", "mysql", "sqlite", "s3", "gcs", "azure_blob",
+  "trino", "elasticsearch", "mssql", "druid", "pinot",
 ] as const;
 
 // Common non-secret config keys per connector (label → key)
