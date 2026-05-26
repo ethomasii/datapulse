@@ -72,6 +72,58 @@ function SortIcon({ col, sortCol, sortDir }: { col: SortCol; sortCol: SortCol; s
     : <ArrowDown className="ml-1 inline h-3 w-3 text-sky-600" />;
 }
 
+function TriggeredByBadge({ triggeredBy }: { triggeredBy: string | null }) {
+  if (!triggeredBy) return <span className="text-xs text-slate-400 dark:text-slate-500">—</span>;
+
+  if (triggeredBy.startsWith("monitor:")) {
+    const monitorName = triggeredBy.replace(/^monitor:/, "").replace(/:slice$/, "");
+    return (
+      <Link
+        href="/orchestration"
+        className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700 hover:underline dark:bg-violet-900/40 dark:text-violet-300"
+        title={`Monitor: ${monitorName}`}
+      >
+        Monitor: {monitorName}
+      </Link>
+    );
+  }
+
+  if (triggeredBy === "incoming_webhook" || triggeredBy.startsWith("webhook")) {
+    return (
+      <Link
+        href="/webhooks"
+        className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 hover:underline dark:bg-amber-900/40 dark:text-amber-300"
+      >
+        Webhook
+      </Link>
+    );
+  }
+
+  if (triggeredBy === "cron" || triggeredBy.startsWith("cron:")) {
+    return (
+      <Link
+        href="/schedule"
+        className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 hover:underline dark:bg-emerald-900/40 dark:text-emerald-300"
+      >
+        Schedule
+      </Link>
+    );
+  }
+
+  if (triggeredBy === "manual") {
+    return <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">Manual</span>;
+  }
+
+  return (
+    <span
+      className="block max-w-[140px] truncate font-mono text-[11px] text-slate-500 dark:text-slate-400"
+      title={triggeredBy}
+    >
+      {triggeredBy}
+    </span>
+  );
+}
+
 function SliceCell({
   triggeredBy,
   partitionColumn,
@@ -887,6 +939,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                     </th>
                   ))}
                   <th className="px-3 py-2 font-medium text-slate-600 dark:text-slate-400">Slice</th>
+                  <th className="px-3 py-2 font-medium text-slate-600 dark:text-slate-400">Triggered by</th>
                   <th className="px-3 py-2 font-medium">Gateway</th>
                   <th className="px-3 py-2 font-medium">
                     <button type="button" onClick={() => toggleSort("rows")} className="inline-flex items-center hover:text-sky-600">
@@ -960,6 +1013,9 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                           partitionColumn={r.partitionColumn}
                           partitionValue={r.partitionValue}
                         />
+                      </td>
+                      <td className="px-3 py-2 align-top">
+                        <TriggeredByBadge triggeredBy={r.triggeredBy} />
                       </td>
                       <td
                         className="max-w-[100px] truncate px-3 py-2 text-xs text-slate-600 dark:text-slate-300 sm:max-w-[140px]"
@@ -1077,8 +1133,8 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                   </div>
                   <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/60">
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Triggered by</div>
-                    <div className="mt-0.5 truncate text-xs text-slate-700 dark:text-slate-200" title={detail.run.triggeredBy ?? "—"}>
-                      {detail.run.triggeredBy ?? "—"}
+                    <div className="mt-0.5">
+                      <TriggeredByBadge triggeredBy={detail.run.triggeredBy} />
                     </div>
                   </div>
                 </div>
