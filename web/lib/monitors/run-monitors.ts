@@ -17,8 +17,8 @@ import {
 } from "@/lib/elt/run-partition-resolution";
 import { resolveSensorCheckIntervalSeconds } from "@/lib/plans/agent-schedule";
 
-export type TriggeredSensorRow = {
-  sensorName: string;
+export type TriggeredMonitorRow = {
+  monitorName: string;
   pipelineName: string;
   message: string;
   metadata: Record<string, unknown>;
@@ -581,7 +581,7 @@ export async function runMonitorChecksForUser(
   userId: string,
   options?: { pipelineFilter?: string }
 ): Promise<{
-  triggeredSensors: TriggeredSensorRow[];
+  triggeredMonitors: TriggeredMonitorRow[];
   errors: string[];
   checked: number;
 }> {
@@ -611,7 +611,7 @@ export async function runMonitorChecksForUser(
     Array.from(new Set(filtered.map((r) => r.userId)))
   );
 
-  const triggeredSensors: TriggeredSensorRow[] = [];
+  const triggeredMonitors: TriggeredMonitorRow[] = [];
   const errors: string[] = [];
   const now = new Date();
   let checked = 0;
@@ -651,8 +651,8 @@ export async function runMonitorChecksForUser(
             where: { id: m.id },
             data: { lastTriggeredAt: now },
           });
-          triggeredSensors.push({
-            sensorName: m.name,
+          triggeredMonitors.push({
+            monitorName: m.name,
             pipelineName: m.pipeline.name,
             message: result.message,
             metadata: { ...result.metadata, run_ids: q.runIds },
@@ -672,12 +672,12 @@ export async function runMonitorChecksForUser(
     }
   }
 
-  return { triggeredSensors, errors, checked };
+  return { triggeredMonitors, errors, checked };
 }
 
 /** Cron: evaluate every stored monitor across all users. */
 export async function runMonitorChecksForAllUsers(options?: CronMonitorScaleOptions): Promise<{
-  triggeredSensors: TriggeredSensorRow[];
+  triggeredMonitors: TriggeredMonitorRow[];
   errors: string[];
   users: number;
   monitors: number;
@@ -696,7 +696,7 @@ export async function runMonitorChecksForAllUsers(options?: CronMonitorScaleOpti
   const intervalByUser = await sensorIntervalSecondsByUserId(Array.from(new Set(rows.map((r) => r.userId))));
   const planeByUser = await executionPlaneByUserId(Array.from(new Set(rows.map((r) => r.userId))));
 
-  const triggeredSensors: TriggeredSensorRow[] = [];
+  const triggeredMonitors: TriggeredMonitorRow[] = [];
   const errors: string[] = [];
   const now = new Date();
   const userIds = new Set<string>();
@@ -753,8 +753,8 @@ export async function runMonitorChecksForAllUsers(options?: CronMonitorScaleOpti
             where: { id: m.id },
             data: { lastTriggeredAt: now },
           });
-          triggeredSensors.push({
-            sensorName: m.name,
+          triggeredMonitors.push({
+            monitorName: m.name,
             pipelineName: m.pipeline.name,
             message: result.message,
             metadata: { ...result.metadata, run_ids: q.runIds },
@@ -775,7 +775,7 @@ export async function runMonitorChecksForAllUsers(options?: CronMonitorScaleOpti
   }
 
   return {
-    triggeredSensors,
+    triggeredMonitors,
     errors,
     users: userIds.size,
     monitors: rows.length,

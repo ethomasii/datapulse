@@ -172,15 +172,14 @@ export async function monitorsCheckPOST(request: NextRequest) {
 
   const pipeline = typeof body.pipeline === "string" ? body.pipeline.trim() : "";
 
-  const { triggeredSensors, errors } = await runMonitorChecksForUser(user.id, {
+  const { triggeredMonitors, errors } = await runMonitorChecksForUser(user.id, {
     pipelineFilter: pipeline || undefined,
   });
 
   const errText = errors.join("\n");
   return NextResponse.json({
-    triggeredSensors,
-    monitorsTriggered: triggeredSensors,
-    totalTriggered: triggeredSensors.length,
+    triggeredMonitors,
+    totalTriggered: triggeredMonitors.length,
     output: "",
     hasErrors: errors.length > 0,
     errors: errText,

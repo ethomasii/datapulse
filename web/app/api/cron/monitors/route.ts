@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       ...result,
-      totalTriggered: result.triggeredSensors.length,
+      totalTriggered: result.triggeredMonitors.length,
     });
   } catch (err) {
     console.error("[cron/monitors]", err);
