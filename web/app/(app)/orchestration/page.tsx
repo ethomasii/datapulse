@@ -11,13 +11,14 @@ interface MonitorRow {
   type: string;
   pipeline_id: string;
   pipeline_name: string;
+  execution_host: string;
   config: Record<string, unknown>;
   last_check: string | null;
   last_triggered: string | null;
 }
 
 interface TriggeredMonitorRow {
-  sensorName: string;
+  monitorName: string;
   pipelineName: string;
   message: string;
   metadata: Record<string, unknown>;
@@ -34,6 +35,7 @@ function normalizeMonitorRow(raw: Record<string, unknown>): MonitorRow | null {
     type: typeof raw.type === "string" ? raw.type : "",
     pipeline_id: typeof raw.pipeline_id === "string" ? raw.pipeline_id : "",
     pipeline_name: typeof raw.pipeline_name === "string" ? raw.pipeline_name : "",
+    execution_host: typeof raw.execution_host === "string" ? raw.execution_host : "inherit",
     config,
     last_check: typeof raw.last_check === "string" ? raw.last_check : null,
     last_triggered: typeof raw.last_triggered === "string" ? raw.last_triggered : null,
@@ -42,6 +44,7 @@ function normalizeMonitorRow(raw: Record<string, unknown>): MonitorRow | null {
 
 export default function OrchestrationPage() {
   const [monitors, setMonitors] = useState<MonitorRow[]>([]);
+  const [pipelineHosts, setPipelineHosts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
   const [triggeredMonitors, setTriggeredMonitors] = useState<TriggeredMonitorRow[]>([]);
@@ -56,21 +59,30 @@ export default function OrchestrationPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch("/api/monitors", { credentials: "same-origin" });
-      const data = (await response.json()) as {
-        monitors?: Record<string, unknown>[];
-        error?: string;
-      };
-      if (!response.ok) {
-        setError(typeof data.error === "string" ? data.error : "Failed to load monitors");
+      const [monRes, plRes] = await Promise.all([
+        fetch("/api/monitors", { credentials: "same-origin" }),
+        fetch("/api/elt/pipelines", { credentials: "same-origin" }),
+      ]);
+      const monData = (await monRes.json()) as { monitors?: Record<string, unknown>[]; error?: string };
+      if (!monRes.ok) {
+        setError(typeof monData.error === "string" ? monData.error : "Failed to load monitors");
         setMonitors([]);
         return;
       }
-      const rawList = Array.isArray(data.monitors) ? data.monitors : [];
+      const rawList = Array.isArray(monData.monitors) ? monData.monitors : [];
       const next = rawList
         .map((row) => normalizeMonitorRow(row))
         .filter((row): row is MonitorRow => row !== null);
       setMonitors(next);
+
+      if (plRes.ok) {
+        const plData = (await plRes.json()) as { pipelines?: { id: string; executionHost: string }[] };
+        const hostMap: Record<string, string> = {};
+        for (const p of plData.pipelines ?? []) {
+          if (p.id) hostMap[p.id] = p.executionHost ?? "inherit";
+        }
+        setPipelineHosts(hostMap);
+      }
     } catch (err) {
       setError("Failed to load monitors");
       console.error("Error loading monitors:", err);
@@ -91,14 +103,14 @@ export default function OrchestrationPage() {
         body: JSON.stringify({}),
       });
       const data = (await response.json()) as {
-        triggeredSensors?: TriggeredMonitorRow[];
+        triggeredMonitors?: TriggeredMonitorRow[];
         error?: string;
       };
       if (!response.ok) {
         setError(typeof data.error === "string" ? data.error : "Failed to check monitors");
         return;
       }
-      setTriggeredMonitors(data.triggeredSensors || []);
+      setTriggeredMonitors(data.triggeredMonitors ?? []);
     } catch (err) {
       setError("Failed to check monitors");
       console.error("Error checking monitors:", err);
@@ -212,7 +224,7 @@ export default function OrchestrationPage() {
               <div key={index} className="rounded-lg border border-amber-200 bg-white p-4 dark:border-amber-700 dark:bg-amber-900/10">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="font-medium text-amber-900 dark:text-amber-100">{row.sensorName}</span>
+                    <span className="font-medium text-amber-900 dark:text-amber-100">{row.monitorName}</span>
                     <span className="mx-2 text-amber-600">→</span>
                     <span className="text-amber-800 dark:text-amber-200">{row.pipelineName}</span>
                   </div>
@@ -271,6 +283,23 @@ export default function OrchestrationPage() {
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getMonitorTypeColor(m.type)}`}>
                       {m.type.replace(/_/g, " ")}
                     </span>
+                    {(() => {
+                      const monitorHost = m.execution_host;
+                      const pipelineHost = pipelineHosts[m.pipeline_id];
+                      const effectiveMonitor = monitorHost === "inherit" ? (pipelineHost ?? "eltpulse_managed") : monitorHost;
+                      const effectivePipeline = pipelineHost ?? "eltpulse_managed";
+                      if (pipelineHost && effectiveMonitor !== effectivePipeline) {
+                        return (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                            title={`Monitor runs on '${effectiveMonitor}' but pipeline runs on '${effectivePipeline}' — they may not share the same execution environment`}
+                          >
+                            ⚠ host mismatch
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                   <button
                     onClick={() => deleteMonitor(m.name)}
