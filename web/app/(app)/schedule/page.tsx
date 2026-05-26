@@ -16,6 +16,68 @@ import {
 import Link from 'next/link';
 import { RelatedLinks } from '@/components/ui/related-links';
 
+/** Compute the next wall-clock time a 5-field cron expression fires, respecting a timezone. */
+function nextCronRun(cron: string, timezone: string): string | null {
+  try {
+    const parts = cron.trim().split(/\s+/);
+    if (parts.length !== 5) return null;
+    const [minPart, hourPart, domPart, , dowPart] = parts;
+
+    function matches(part: string, value: number): boolean {
+      if (part === '*') return true;
+      return part.split(',').some((seg) => {
+        if (seg.includes('/')) {
+          const [range, step] = seg.split('/');
+          const [start] = range === '*' ? [0] : range.split('-').map(Number);
+          return value >= start && (value - start) % Number(step) === 0;
+        }
+        if (seg.includes('-')) {
+          const [lo, hi] = seg.split('-').map(Number);
+          return value >= lo && value <= hi;
+        }
+        return Number(seg) === value;
+      });
+    }
+
+    const now = new Date();
+    const candidate = new Date(now.getTime() + 60_000); // start from next minute
+    candidate.setSeconds(0, 0);
+
+    for (let i = 0; i < 60 * 24 * 8; i++) {
+      // Get time components in the target timezone
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        hour: 'numeric', minute: 'numeric', weekday: 'short',
+        hour12: false,
+      }).formatToParts(candidate);
+      const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? '0');
+      const h = get('hour') % 24;
+      const m = get('minute');
+      const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(
+        parts.find((p) => p.type === 'weekday')?.value ?? ''
+      );
+
+      if (
+        (domPart === '*' || dowPart === '*' || matches(domPart, candidate.getUTCDate())) &&
+        (dowPart === '*' || matches(dowPart, dow)) &&
+        matches(hourPart, h) &&
+        matches(minPart, m)
+      ) {
+        return new Intl.DateTimeFormat('en-US', {
+          timeZone: timezone,
+          year: 'numeric', month: 'short', day: 'numeric',
+          hour: '2-digit', minute: '2-digit',
+          hour12: false,
+        }).format(candidate) + (timezone !== 'UTC' ? '' : ' UTC');
+      }
+      candidate.setTime(candidate.getTime() + 60_000);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 interface Pipeline {
   id: string;
   name: string;
@@ -238,11 +300,21 @@ export default function SchedulePage() {
                       {pipeline.name}
                     </span>
                     {pipeline.scheduleInfo?.enabled && pipeline.scheduleInfo.cron ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
-                        <Clock className="h-3 w-3" aria-hidden />
-                        {pipeline.scheduleInfo.cron}
-                        {pipeline.scheduleInfo.timezone !== 'UTC' ? ` · ${pipeline.scheduleInfo.timezone}` : ''}
-                      </span>
+                      <>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+                          <Clock className="h-3 w-3" aria-hidden />
+                          {pipeline.scheduleInfo.cron}
+                          {pipeline.scheduleInfo.timezone !== 'UTC' ? ` · ${pipeline.scheduleInfo.timezone}` : ''}
+                        </span>
+                        {(() => {
+                          const next = nextCronRun(pipeline.scheduleInfo!.cron!, pipeline.scheduleInfo!.timezone);
+                          return next ? (
+                            <span className="text-xs text-slate-500 dark:text-slate-400">
+                              Next: <span className="font-medium text-slate-700 dark:text-slate-200">{next}</span>
+                            </span>
+                          ) : null;
+                        })()}
+                      </>
                     ) : (
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-400 dark:bg-slate-800 dark:text-slate-500">
                         no schedule
