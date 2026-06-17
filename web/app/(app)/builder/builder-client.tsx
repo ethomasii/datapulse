@@ -22,7 +22,9 @@ import {
   Layers,
 } from "lucide-react";
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
+import { DbtConfigFields } from "@/components/dbt/dbt-config-fields";
 import { SourceCatalogWizard } from "@/components/elt/source-catalog-wizard";
+import { chooseTool } from "@/lib/elt/choose-tool";
 import { RelatedLinks } from "@/components/ui/related-links";
 import {
   DESTINATION_OPTIONS,
@@ -148,6 +150,18 @@ export function BuilderClient({
   const [dbtSelector, setDbtSelector] = useState("");
   const [dbtSliceValueVar, setDbtSliceValueVar] = useState("");
   const [dbtSliceColumnVar, setDbtSliceColumnVar] = useState("");
+
+  const resolvedTool = useMemo(
+    () => chooseTool(sourceType, destinationType),
+    [sourceType, destinationType]
+  );
+
+  useEffect(() => {
+    const src = searchParams.get("source");
+    const wantDbt = searchParams.get("dbt") === "1";
+    if (src) setSourceType(src);
+    if (wantDbt) setPostTransformType("dbt");
+  }, [searchParams]);
 
   function patchConnection(key: string, value: string) {
     setConnectionValues((prev) => ({ ...prev, [key]: value }));
@@ -1049,100 +1063,29 @@ export function BuilderClient({
                       </select>
                     </label>
                     {postTransformType === "dbt" && (
-                      <div className="space-y-3 rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-3 dark:border-amber-800/50 dark:bg-amber-950/20">
-                        <p className="text-xs leading-snug text-amber-950 dark:text-amber-100">
-                          Reference a <strong className="font-medium">dbt project</strong> (local path or git URL). After
-                          extract/load, a dbt run step is appended automatically. The slice string and optional partition
-                          column name are passed as dbt vars — defaults{" "}
-                          <code className="rounded bg-amber-100/80 px-0.5 font-mono text-[11px] dark:bg-amber-900/50">elt_partition_value</code>{" "}
-                          and{" "}
-                          <code className="rounded bg-amber-100/80 px-0.5 font-mono text-[11px] dark:bg-amber-900/50">elt_partition_column</code>.
-                          Rename below to match an existing project (e.g.{" "}
-                          <code className="font-mono text-[11px]">run_date</code>,{" "}
-                          <code className="font-mono text-[11px]">ds</code>).
-                        </p>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                          dbt project path or git URL
-                          <input
-                            type="text"
-                            value={dbtPackagePath}
-                            onChange={(e) => setDbtPackagePath(e.target.value)}
-                            placeholder="e.g. ./dbt_project or https://github.com/org/dbt-analytics"
-                            autoComplete="off"
-                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                          />
-                        </label>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                          Output dataset / schema (optional)
-                          <input
-                            type="text"
-                            value={dbtDatasetName}
-                            onChange={(e) => setDbtDatasetName(e.target.value)}
-                            placeholder="Defaults to pipeline_name_dbt"
-                            autoComplete="off"
-                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                          />
-                        </label>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                          Git branch / tag / commit (optional)
-                          <input
-                            type="text"
-                            value={dbtRepositoryBranch}
-                            onChange={(e) => setDbtRepositoryBranch(e.target.value)}
-                            placeholder="main"
-                            autoComplete="off"
-                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                          />
-                        </label>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                          dbt run scope
-                          <select
-                            value={dbtRunScope}
-                            onChange={(e) => setDbtRunScope(e.target.value === "selection" ? "selection" : "all")}
-                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                          >
-                            <option value="all">Full package (run_all — seed, sources tests, run)</option>
-                            <option value="selection">Selection only (extra --select on the run step)</option>
-                          </select>
-                        </label>
-                        {dbtRunScope === "selection" && (
-                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                            dbt selector
-                            <input
-                              type="text"
-                              value={dbtSelector}
-                              onChange={(e) => setDbtSelector(e.target.value)}
-                              placeholder="e.g. my_mart+ or tag:nightly"
-                              autoComplete="off"
-                              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                            />
-                          </label>
-                        )}
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                          dbt var name for slice value (optional)
-                          <input
-                            type="text"
-                            value={dbtSliceValueVar}
-                            onChange={(e) => setDbtSliceValueVar(e.target.value)}
-                            placeholder="default: elt_partition_value"
-                            autoComplete="off"
-                            spellCheck={false}
-                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                          />
-                        </label>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                          dbt var name for partition column (optional)
-                          <input
-                            type="text"
-                            value={dbtSliceColumnVar}
-                            onChange={(e) => setDbtSliceColumnVar(e.target.value)}
-                            placeholder="default: elt_partition_column"
-                            autoComplete="off"
-                            spellCheck={false}
-                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                          />
-                        </label>
-                      </div>
+                      <DbtConfigFields
+                        sourceSlug={sourceType}
+                        pipelineTool={resolvedTool}
+                        pipelineId={editingId}
+                        values={{
+                          packagePath: dbtPackagePath,
+                          datasetName: dbtDatasetName,
+                          repositoryBranch: dbtRepositoryBranch,
+                          runScope: dbtRunScope,
+                          selector: dbtSelector,
+                          sliceValueVar: dbtSliceValueVar,
+                          sliceColumnVar: dbtSliceColumnVar,
+                        }}
+                        onChange={(patch) => {
+                          if (patch.packagePath !== undefined) setDbtPackagePath(patch.packagePath);
+                          if (patch.datasetName !== undefined) setDbtDatasetName(patch.datasetName);
+                          if (patch.repositoryBranch !== undefined) setDbtRepositoryBranch(patch.repositoryBranch);
+                          if (patch.runScope !== undefined) setDbtRunScope(patch.runScope);
+                          if (patch.selector !== undefined) setDbtSelector(patch.selector);
+                          if (patch.sliceValueVar !== undefined) setDbtSliceValueVar(patch.sliceValueVar);
+                          if (patch.sliceColumnVar !== undefined) setDbtSliceColumnVar(patch.sliceColumnVar);
+                        }}
+                      />
                     )}
                     {postTransformType === "python" && (
                       <>

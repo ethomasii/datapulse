@@ -44,7 +44,9 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install httpx "dlt>=1.5.0" "fastapi>=0.115.0" "pydantic>=2" "uvicorn[standard]>=0.32.0"
+        run: |
+          pip install httpx "dlt>=1.5.0" "fastapi>=0.115.0" "pydantic>=2" "uvicorn[standard]>=0.32.0"
+          pip install "dbt-core>=1.8.0" "dbt-snowflake>=1.8.0" "dbt-bigquery>=1.8.0" "dbt-postgres>=1.8.0" "dbt-duckdb>=1.8.0"
 
       - name: Run managed batch
         working-directory: web/managed-worker-service

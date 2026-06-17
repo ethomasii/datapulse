@@ -14,6 +14,7 @@ import {
   ChevronUp,
   CircleHelp,
   FolderGit2,
+  GitBranch,
   LayoutGrid,
   LayoutDashboard,
   Layers,
@@ -51,6 +52,7 @@ const CORE_NAV: NavItem[] = [
   { href: "/connections", label: "Connections", icon: Cable },
   { href: "/connectors", label: "Connectors", icon: LayoutGrid },
   { href: "/scenarios", label: "Scenarios", icon: Route },
+  { href: "/dbt", label: "dbt", icon: GitBranch },
   { href: "/runs", label: "Runs", icon: PlayCircle },
 ];
 

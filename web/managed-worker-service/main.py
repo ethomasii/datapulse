@@ -29,6 +29,7 @@ import asyncio
 import contextlib
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -45,6 +46,8 @@ app = FastAPI(title="eltPulse managed worker", version="0.1.0")
 # Hard cap aligned with Vercel Python maxDuration (seconds → ms).
 _MAX_WALL_MS = 900_000
 _LOG_CHUNK = 3400
+_PHASE_MARKER = re.compile(r"\[eltpulse\]\s+phase:(\w+)", re.IGNORECASE)
+_PHASE_PROGRESS = {"extract": 15, "load": 70, "dbt": 90, "done": 100, "failed": 100}
 
 
 def _control_plane_base() -> str:
@@ -145,13 +148,14 @@ async def _append_log(
 ) -> None:
     msg = _sanitize(f"[{stream}] {line}", 4000)
     level = "warn" if stream == "stderr" else "info"
-    await _patch(
-        client,
-        base,
-        internal,
-        run_id,
-        {"status": "running", "appendLog": {"level": level, "message": msg}},
-    )
+    body: dict[str, Any] = {"status": "running", "appendLog": {"level": level, "message": msg}}
+    phase_match = _PHASE_MARKER.search(line)
+    if phase_match:
+        phase = phase_match.group(1).lower()
+        progress = _PHASE_PROGRESS.get(phase, 50)
+        body["telemetrySummary"] = {"currentPhase": phase, "progress": progress}
+        body["appendTelemetrySample"] = {"phase": phase, "progress": progress}
+    await _patch(client, base, internal, run_id, body)
 
 
 async def _pump_stream(

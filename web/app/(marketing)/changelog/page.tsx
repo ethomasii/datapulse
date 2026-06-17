@@ -14,6 +14,15 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    version: "0.9.0",
+    date: "2026-06-17",
+    highlights: [
+      "dbt v2 hub — interactive /dbt page with package browser, scaffold-to-Git API, and sprint roadmap.",
+      "Package picker in builder and canvas — dlt-hub packages, shared DbtConfigFields, ?dbt=1&source= deep links.",
+      "Run phases — extract → load → dbt telemetry when dlt_dbt is enabled; GHA worker installs dbt adapters.",
+    ],
+  },
+  {
     version: "0.8.0",
     date: "2026-06-17",
     highlights: [

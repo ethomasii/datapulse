@@ -1,6 +1,7 @@
 "use client";
 
 import type { RunTelemetry, TelemetrySample } from "@/lib/elt/run-telemetry";
+import { formatRunPhaseLabel } from "@/lib/elt/dbt-run-phases";
 import { effectiveRunTelemetry, formatBytes, formatRows } from "@/lib/elt/run-telemetry";
 
 function pickSeries(samples: TelemetrySample[]): { values: number[]; label: string; formatter: (n: number) => string } {
@@ -226,7 +227,7 @@ export function RunTelemetrySummaryCards({ telemetry }: { telemetry: RunTelemetr
           {s.currentPhase ? (
             <div>
               <span className="font-semibold text-slate-600 dark:text-slate-400">Phase: </span>
-              {s.currentPhase}
+              {formatRunPhaseLabel(s.currentPhase)}
             </div>
           ) : null}
           {s.currentResource ? (

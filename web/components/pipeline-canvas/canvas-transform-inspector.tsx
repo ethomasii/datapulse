@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { TRANSFORM_TOOLS } from "./transform-tools";
+import { DbtConfigFields } from "@/components/dbt/dbt-config-fields";
 
 const fieldClass =
   "mt-1 w-full rounded-lg border border-amber-200 bg-white px-2 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-800 dark:bg-slate-950 dark:text-white";
@@ -13,16 +14,25 @@ type Props = {
   onPatch: (patch: Record<string, unknown>) => void;
   /** Codegen embeds post-load dbt only for dlt Python pipelines. */
   pipelineTool: "dlt" | "sling";
+  pipelineId?: string;
+  sourceSlug?: string;
 };
 
-export function CanvasTransformInspector({ nodeId, initialData, onPatch, pipelineTool }: Props) {
+export function CanvasTransformInspector({
+  nodeId,
+  initialData,
+  onPatch,
+  pipelineTool,
+  pipelineId,
+  sourceSlug,
+}: Props) {
   const [label, setLabel] = useState(() => String(initialData.label ?? ""));
   const [hint, setHint] = useState(() => String(initialData.hint ?? ""));
   const [transformTool, setTransformTool] = useState(() => String(initialData.transformTool ?? ""));
   const [dbtPackagePath, setDbtPackagePath] = useState(() => String(initialData.dbtPackagePath ?? ""));
   const [dbtDatasetName, setDbtDatasetName] = useState(() => String(initialData.dbtDatasetName ?? ""));
   const [dbtRepositoryBranch, setDbtRepositoryBranch] = useState(() => String(initialData.dbtRepositoryBranch ?? ""));
-  const [dbtRunScope, setDbtRunScope] = useState(() =>
+  const [dbtRunScope, setDbtRunScope] = useState<"all" | "selection">(() =>
     String(initialData.dbtRunScope ?? "all") === "selection" ? "selection" : "all"
   );
   const [dbtSelector, setDbtSelector] = useState(() => String(initialData.dbtSelector ?? ""));
@@ -44,10 +54,6 @@ export function CanvasTransformInspector({ nodeId, initialData, onPatch, pipelin
     setDbtSliceColumnVar(String(initialData.dbtSliceColumnVar ?? ""));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- remount or nodeId change defines a new snapshot
   }, [nodeId]);
-
-  function patchDbt(partial: Record<string, unknown>) {
-    onPatch(partial);
-  }
 
   return (
     <div className="space-y-4">
@@ -82,127 +88,52 @@ export function CanvasTransformInspector({ nodeId, initialData, onPatch, pipelin
       ) : null}
 
       {transformTool === "dbt" && pipelineTool === "dlt" ? (
-        <div className="space-y-3 rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-3 dark:border-amber-800/50 dark:bg-amber-950/20">
-          <p className="text-[11px] leading-snug text-amber-950 dark:text-amber-100">
-            Reference a <strong className="font-medium">dbt project</strong> (local path or git URL). After extract/load,
-            a dbt run step is appended automatically. The slice string (<code className="font-mono text-[10px]">partition_key</code>)
-            and optional partition column name are passed as dbt vars — defaults{" "}
-            <code className="rounded bg-amber-100/80 px-0.5 font-mono text-[10px] dark:bg-amber-900/50">elt_partition_value</code>{" "}
-            and{" "}
-            <code className="rounded bg-amber-100/80 px-0.5 font-mono text-[10px] dark:bg-amber-900/50">elt_partition_column</code>
-            . Rename below to match an existing project (e.g. <code className="font-mono text-[10px]">run_date</code>,{" "}
-            <code className="font-mono text-[10px]">ds</code>).
-          </p>
-          <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
-            dbt project path or git URL
-            <input
-              type="text"
-              className={fieldClass}
-              value={dbtPackagePath}
-              onChange={(e) => {
-                const v = e.target.value;
-                setDbtPackagePath(v);
-                patchDbt({ dbtPackagePath: v });
-              }}
-              placeholder="e.g. ./dbt_project or https://github.com/org/dbt-analytics"
-              autoComplete="off"
-            />
-          </label>
-          <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
-            Output dataset / schema (optional)
-            <input
-              type="text"
-              className={fieldClass}
-              value={dbtDatasetName}
-              onChange={(e) => {
-                const v = e.target.value;
-                setDbtDatasetName(v);
-                patchDbt({ dbtDatasetName: v });
-              }}
-              placeholder="Defaults to pipeline_name_dbt"
-              autoComplete="off"
-            />
-          </label>
-          <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
-            Git branch / tag / commit (optional)
-            <input
-              type="text"
-              className={fieldClass}
-              value={dbtRepositoryBranch}
-              onChange={(e) => {
-                const v = e.target.value;
-                setDbtRepositoryBranch(v);
-                patchDbt({ dbtRepositoryBranch: v });
-              }}
-              placeholder="main"
-              autoComplete="off"
-            />
-          </label>
-          <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
-            dbt run scope
-            <select
-              className={fieldClass}
-              value={dbtRunScope}
-              onChange={(e) => {
-                const v = e.target.value === "selection" ? "selection" : "all";
-                setDbtRunScope(v);
-                patchDbt({ dbtRunScope: v });
-              }}
-            >
-              <option value="all">Full package (run_all — seed, sources tests, run)</option>
-              <option value="selection">Selection only (extra --select on the run step)</option>
-            </select>
-          </label>
-          {dbtRunScope === "selection" ? (
-            <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
-              dbt selector
-              <input
-                type="text"
-                className={fieldClass}
-                value={dbtSelector}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setDbtSelector(v);
-                  patchDbt({ dbtSelector: v });
-                }}
-                placeholder="e.g. my_mart+ or tag:nightly"
-                autoComplete="off"
-              />
-            </label>
-          ) : null}
-          <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
-            dbt var name for slice value (optional)
-            <input
-              type="text"
-              className={fieldClass}
-              value={dbtSliceValueVar}
-              onChange={(e) => {
-                const v = e.target.value;
-                setDbtSliceValueVar(v);
-                patchDbt({ dbtSliceValueVar: v });
-              }}
-              placeholder="default: elt_partition_value"
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </label>
-          <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
-            dbt var name for partition column (optional)
-            <input
-              type="text"
-              className={fieldClass}
-              value={dbtSliceColumnVar}
-              onChange={(e) => {
-                const v = e.target.value;
-                setDbtSliceColumnVar(v);
-                patchDbt({ dbtSliceColumnVar: v });
-              }}
-              placeholder="default: elt_partition_column"
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </label>
-        </div>
+        <DbtConfigFields
+          compact
+          fieldClass={fieldClass}
+          sourceSlug={sourceSlug}
+          pipelineTool={pipelineTool}
+          pipelineId={pipelineId}
+          values={{
+            packagePath: dbtPackagePath,
+            datasetName: dbtDatasetName,
+            repositoryBranch: dbtRepositoryBranch,
+            runScope: dbtRunScope,
+            selector: dbtSelector,
+            sliceValueVar: dbtSliceValueVar,
+            sliceColumnVar: dbtSliceColumnVar,
+          }}
+          onChange={(patch) => {
+            if (patch.packagePath !== undefined) {
+              setDbtPackagePath(patch.packagePath);
+              onPatch({ dbtPackagePath: patch.packagePath });
+            }
+            if (patch.datasetName !== undefined) {
+              setDbtDatasetName(patch.datasetName);
+              onPatch({ dbtDatasetName: patch.datasetName });
+            }
+            if (patch.repositoryBranch !== undefined) {
+              setDbtRepositoryBranch(patch.repositoryBranch);
+              onPatch({ dbtRepositoryBranch: patch.repositoryBranch });
+            }
+            if (patch.runScope !== undefined) {
+              setDbtRunScope(patch.runScope);
+              onPatch({ dbtRunScope: patch.runScope });
+            }
+            if (patch.selector !== undefined) {
+              setDbtSelector(patch.selector);
+              onPatch({ dbtSelector: patch.selector });
+            }
+            if (patch.sliceValueVar !== undefined) {
+              setDbtSliceValueVar(patch.sliceValueVar);
+              onPatch({ dbtSliceValueVar: patch.sliceValueVar });
+            }
+            if (patch.sliceColumnVar !== undefined) {
+              setDbtSliceColumnVar(patch.sliceColumnVar);
+              onPatch({ dbtSliceColumnVar: patch.sliceColumnVar });
+            }
+          }}
+        />
       ) : null}
 
       {(transformTool === "python" || transformTool === "sql") ? (

@@ -1,6 +1,7 @@
 import { RunIngestionExecutor, type Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
 import { applyPatchRunBody } from "@/lib/elt/apply-run-patch";
+import { pipelineHasDbtEnabled } from "@/lib/elt/dbt-run-phases";
 import { maybeDispatchRunWebhook } from "@/lib/elt/maybe-dispatch-run-webhook";
 import type { PatchRunBody } from "@/lib/elt/run-types";
 import type { ManagedWorkerBatchResult } from "@/lib/elt/managed-worker-stub-http";
@@ -58,6 +59,12 @@ async function patchManagedRunInProcess(runId: string, body: PatchRunBody): Prom
  * ELTPULSE_INTERNAL_API_SECRET — used for stub/demo execution and fast free-tier runs.
  */
 export async function stubCompleteManagedRunInProcess(runId: string): Promise<void> {
+  const run = await db.eltPipelineRun.findFirst({
+    where: { id: runId },
+    select: { pipeline: { select: { sourceConfiguration: true } } },
+  });
+  const hasDbt = pipelineHasDbtEnabled(run?.pipeline?.sourceConfiguration);
+
   await patchManagedRunInProcess(runId, { status: "running" });
   await patchManagedRunInProcess(runId, {
     status: "running",
@@ -73,11 +80,24 @@ export async function stubCompleteManagedRunInProcess(runId: string): Promise<vo
     telemetrySummary: { currentPhase: "load", progress: 80, rowsLoaded: 100, bytesLoaded: 50_000 },
     appendTelemetrySample: { progress: 80, rows: 100, bytes: 50_000, phase: "load" },
   });
+  if (hasDbt) {
+    await patchManagedRunInProcess(runId, {
+      status: "running",
+      appendLog: {
+        level: "info",
+        message: "Running dbt transform after load…",
+      },
+      telemetrySummary: { currentPhase: "dbt", progress: 92, rowsLoaded: 100, bytesLoaded: 50_000 },
+      appendTelemetrySample: { progress: 92, rows: 100, bytes: 50_000, phase: "dbt" },
+    });
+  }
   await patchManagedRunInProcess(runId, {
     status: "succeeded",
     appendLog: {
       level: "info",
-      message: "eltPulse managed sync completed successfully.",
+      message: hasDbt
+        ? "eltPulse managed sync and dbt transform completed successfully."
+        : "eltPulse managed sync completed successfully.",
     },
     telemetrySummary: { currentPhase: "done", progress: 100, rowsLoaded: 100, bytesLoaded: 50_000 },
     appendTelemetrySample: { progress: 100, rows: 100, bytes: 50_000, phase: "done" },

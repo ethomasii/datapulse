@@ -571,6 +571,8 @@ export function CanvasPageClient() {
             nodeId={focus.nodeId}
             initialData={focus.data}
             pipelineTool={pipelineTool}
+            pipelineId={selectedId}
+            sourceSlug={pipelineSourceType}
             onPatch={(p) => canvasControlRef.current?.patchNodeData(focus.nodeId, p)}
           />
         </div>
