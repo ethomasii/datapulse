@@ -1,13 +1,15 @@
 import { Suspense } from "react";
 import { requireDbUser } from "@/lib/auth/server";
+import { getAccessibleResourceOwnerIds, pipelineOwnerWhere } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
 import { partitionColumnFromSourceConfiguration } from "@/lib/elt/run-partition-resolution";
 import { RunsClient } from "./runs-client";
 
 export default async function RunsPage() {
   const user = await requireDbUser();
+  const ownerIds = await getAccessibleResourceOwnerIds(user.id);
   const pipelines = await db.eltPipeline.findMany({
-    where: { userId: user.id },
+    where: pipelineOwnerWhere(ownerIds),
     select: { id: true, name: true, sourceConfiguration: true },
     orderBy: { name: "asc" },
   });

@@ -66,6 +66,21 @@ const ITEMS: {
     desc: "Product preview hero, connector strip, testimonials, pricing preview, FAQ, richer footer.",
   },
   {
+    status: "shipped",
+    title: "Features page & product mockups",
+    desc: "/features with builder, runs, and quick-start previews plus case-study quotes.",
+  },
+  {
+    status: "shipped",
+    title: "Billing portal & usage",
+    desc: "Stripe Customer Portal, monthly usage on billing page, optional Stripe Billing Meter for rows.",
+  },
+  {
+    status: "shipped",
+    title: "Team invites & shared workspace",
+    desc: "Email invites, accept page, auto-join on signup, Team page, org members see owner pipelines.",
+  },
+  {
     status: "in-progress",
     title: "Managed Git commits",
     desc: "Push generated files into customer repos under the eltPulse GitHub org via app installation tokens.",
@@ -77,18 +92,13 @@ const ITEMS: {
   },
   {
     status: "in-progress",
-    title: "Real managed execution",
-    desc: "Production-grade eltPulse-managed workers (today: stub/local/GitHub dispatch; scaling to queue workers).",
-  },
-  {
-    status: "in-progress",
-    title: "Billing & checkout",
-    desc: "Stripe Checkout live — usage meters and Customer Portal still to wire.",
+    title: "Real managed execution at scale",
+    desc: "GHA/local/delegate paths shipped — production default still stub until env is configured on Vercel.",
   },
   {
     status: "planned",
-    title: "Team & roles",
-    desc: "Invite users, share pipelines, separate billing admin vs editor. Org invites scaffold shipped.",
+    title: "Team RBAC & editor roles",
+    desc: "Admin vs member vs viewer; pipeline edit permissions beyond shared read access.",
   },
   {
     status: "planned",

@@ -1,4 +1,5 @@
 import type { EltPipeline } from "@prisma/client";
+import { assertCanCreatePipeline } from "@/lib/plans/limits";
 import { assertUserOwnsGatewayToken } from "@/lib/agent/gateway-routing";
 import { db } from "@/lib/db/client";
 import { syncDltDbtWithCanvas, syncPostTransformWithCanvas } from "@/lib/elt/dbt-canvas";
@@ -159,6 +160,14 @@ export async function createPipelineDefinition(
   userId: string,
   body: CreatePipelineBody
 ): Promise<PersistPipelineSuccess | PersistPipelineFailure> {
+  const account = await db.user.findUnique({
+    where: { id: userId },
+    select: { subscription: { select: { tier: true } } },
+  });
+  const tier = account?.subscription?.tier ?? "free";
+  const limitMsg = await assertCanCreatePipeline(userId, tier);
+  if (limitMsg) return { ok: false, status: 403, message: limitMsg };
+
   const prep = await prepareWrite(userId, body);
   if (isPersistFailure(prep)) return prep;
 

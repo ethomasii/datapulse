@@ -1,6 +1,7 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { db } from "@/lib/db/client";
 import { seedDemoWorkspaceIfEmpty } from "@/lib/onboarding/demo-workspace";
+import { acceptPendingInvitesForUser } from "@/lib/organization/invites";
 import type { Subscription, User } from "@prisma/client";
 
 export type UserWithSubscription = User & {
@@ -50,7 +51,10 @@ export async function getCurrentDbUser(): Promise<UserWithSubscription | null> {
     include: { subscription: true },
   });
 
-  if (isNew) await seedDemoWorkspaceIfEmpty(user.id);
+  if (isNew) {
+    await seedDemoWorkspaceIfEmpty(user.id);
+    await acceptPendingInvitesForUser(user.id, email);
+  }
 
   return user;
 }

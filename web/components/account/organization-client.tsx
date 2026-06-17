@@ -83,10 +83,10 @@ export function OrganizationClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: inviteEmail.trim() }),
       });
-      const data = (await res.json()) as { error?: string };
+      const data = (await res.json()) as { error?: string; emailed?: boolean };
       if (!res.ok) throw new Error(data.error ?? "Failed to invite");
       setInviteEmail("");
-      setMessage("Invite recorded — they'll get access when they sign up with that email.");
+      setMessage(data.emailed ? "Invite sent by email." : "Invite recorded — share the invite link from Team.");
       await load();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Failed");

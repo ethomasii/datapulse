@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { Webhook } from "svix";
 import { db } from "@/lib/db/client";
 import { seedDemoWorkspaceIfEmpty } from "@/lib/onboarding/demo-workspace";
+import { acceptPendingInvitesForUser } from "@/lib/organization/invites";
 
 interface ClerkUserEvent {
   data: {
@@ -72,8 +73,11 @@ export async function POST(request: Request) {
     });
 
     if (type === "user.created") {
-      const user = await db.user.findUnique({ where: { clerkId: data.id }, select: { id: true } });
-      if (user) await seedDemoWorkspaceIfEmpty(user.id);
+      const user = await db.user.findUnique({ where: { clerkId: data.id }, select: { id: true, email: true } });
+      if (user) {
+        await seedDemoWorkspaceIfEmpty(user.id);
+        await acceptPendingInvitesForUser(user.id, user.email);
+      }
     }
   }
 

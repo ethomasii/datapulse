@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
+import { sendOrganizationInviteEmail } from "@/lib/organization/invites";
 
 async function getOwnedOrg(userId: string) {
   return db.organization.findUnique({
     where: { ownerUserId: userId },
-    select: { id: true },
+    select: { id: true, name: true },
   });
 }
 
@@ -53,10 +54,22 @@ export async function POST(req: Request) {
     const invite = await db.organizationInvite.upsert({
       where: { organizationId_email: { organizationId: org.id, email } },
       create: { organizationId: org.id, email, role: "member" },
-      update: { invitedAt: new Date() },
+      update: { invitedAt: new Date(), acceptedAt: null },
       select: { id: true, email: true },
     });
-    return NextResponse.json({ invite });
+
+    const orgDetails = await db.organization.findUnique({
+      where: { id: org.id },
+      select: { name: true },
+    });
+    const emailed = await sendOrganizationInviteEmail({
+      inviteId: invite.id,
+      email: invite.email,
+      organizationName: orgDetails?.name ?? "your team",
+      inviterName: user.name,
+    });
+
+    return NextResponse.json({ invite, emailed });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("organization_invite")) {

@@ -1,0 +1,33 @@
+import { NextResponse } from "next/server";
+import { getCurrentDbUser } from "@/lib/auth/server";
+import { getMonthlyRowsSynced } from "@/lib/billing/report-usage";
+import { PLAN_PIPELINE_LIMITS, countUserPipelines } from "@/lib/plans/limits";
+
+export async function GET() {
+  const user = await getCurrentDbUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const tier = user.subscription?.tier ?? "free";
+  const [pipelineCount, rowsThisMonth] = await Promise.all([
+    countUserPipelines(user.id),
+    getMonthlyRowsSynced(user.id),
+  ]);
+
+  const pipelineLimit = PLAN_PIPELINE_LIMITS[tier];
+
+  return NextResponse.json({
+    tier,
+    status: user.subscription?.status ?? "active",
+    stripeCustomerId: user.subscription?.stripeCustomerId ?? null,
+    currentPeriodEnd: user.subscription?.currentPeriodEnd ?? null,
+    usage: {
+      pipelines: pipelineCount,
+      pipelineLimit,
+      rowsSyncedThisMonth: rowsThisMonth,
+    },
+    features: {
+      portal: Boolean(user.subscription?.stripeCustomerId),
+      usageMeter: Boolean(process.env.STRIPE_USAGE_METER_EVENT_NAME),
+    },
+  });
+}

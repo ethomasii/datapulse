@@ -6,6 +6,7 @@ import {
   scopeForbiddenResponse,
   unauthorizedResponse,
 } from "@/lib/auth/api-user";
+import { getAccessibleResourceOwnerIds, pipelineOwnerWhere } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
 import { prismaSchemaDriftResponse } from "@/lib/db/prisma-schema-drift-response";
 import { createPipelineBodySchema } from "@/lib/elt/types";
@@ -16,8 +17,9 @@ export async function GET(req: Request) {
   if (!auth) return unauthorizedResponse();
   if (!hasScope(auth, API_SCOPES.PIPELINES_READ)) return scopeForbiddenResponse();
 
+  const ownerIds = await getAccessibleResourceOwnerIds(auth.user.id);
   const rows = await db.eltPipeline.findMany({
-    where: { userId: auth.user.id },
+    where: pipelineOwnerWhere(ownerIds),
     orderBy: { updatedAt: "desc" },
     select: {
       id: true,

@@ -207,10 +207,16 @@ export default function HomePage() {
               </li>
             ))}
           </ul>
+          <p className="mt-10 text-center">
+            <Link
+              href="/features"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-sky-600 hover:underline dark:text-sky-400"
+            >
+              Explore all features <ArrowRight className="h-4 w-4" />
+            </Link>
+          </p>
         </div>
       </section>
-
-      {/* How it works */}
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <h2 className="text-center text-2xl font-bold text-slate-900 dark:text-white">Three steps to flowing data</h2>
         <ol className="mt-12 grid gap-8 sm:grid-cols-3">

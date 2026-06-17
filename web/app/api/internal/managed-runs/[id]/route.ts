@@ -10,6 +10,7 @@ import { RunIngestionExecutor, type Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
 import { applyPatchRunBody } from "@/lib/elt/apply-run-patch";
+import { reportRowsSyncedUsage } from "@/lib/billing/report-usage";
 import { maybeDispatchRunWebhook } from "@/lib/elt/maybe-dispatch-run-webhook";
 import { patchRunBodySchema } from "@/lib/elt/run-types";
 import { resolveRouteParamId } from "@/lib/server/route-params";
@@ -128,6 +129,13 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
   if (patch.willBeTerminal && !patch.wasTerminal) {
     await maybeDispatchRunWebhook(run.id, existing.userId);
+    if (patch.nextStatus === "succeeded") {
+      const telemetry = patch.telemetryJson as { summary?: { rowsLoaded?: number } } | undefined;
+      const rows = telemetry?.summary?.rowsLoaded;
+      if (typeof rows === "number") {
+        void reportRowsSyncedUsage(existing.userId, rows);
+      }
+    }
   }
 
   return NextResponse.json({ run, cancel: false });

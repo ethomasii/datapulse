@@ -2,14 +2,13 @@ import {
   resolveControlPlaneBaseUrl,
   resolveManagedExecutorMode,
   runManagedWorkerBatchHttp,
-  stubCompleteManagedRunHttp,
 } from "@/lib/elt/managed-worker-stub-http";
 import { stubCompleteManagedRunInProcess } from "@/lib/elt/managed-stub-inprocess";
 
 /**
  * Process a single pending managed run immediately (don't wait for cron).
  * Stub mode uses in-process DB patches (works on Vercel without self-HTTP).
- * Other modes delegate via internal HTTP or worker batch.
+ * Real modes use local subprocess, GitHub Actions dispatch, or worker batch.
  */
 export async function processManagedRunImmediately(runId: string): Promise<void> {
   const mode = resolveManagedExecutorMode();
@@ -21,14 +20,31 @@ export async function processManagedRunImmediately(runId: string): Promise<void>
 
   const secret = process.env.ELTPULSE_INTERNAL_API_SECRET?.trim();
   const baseUrl = resolveControlPlaneBaseUrl();
+
+  if (mode === "gha") {
+    if (secret && baseUrl) {
+      const { runManagedWorkerGithubDispatchHttp } = await import(
+        "@/lib/elt/managed-worker-github-dispatch"
+      );
+      await runManagedWorkerGithubDispatchHttp();
+    } else {
+      await stubCompleteManagedRunInProcess(runId);
+    }
+    return;
+  }
+
   if (!secret || !baseUrl) {
-    // Fallback: still complete stub in-process so free-tier runs don't hang pending
     await stubCompleteManagedRunInProcess(runId);
     return;
   }
 
   if (mode === "local") {
-    await stubCompleteManagedRunHttp(baseUrl, secret, runId);
+    const { executeManagedRunLocalProcess } = await import("@/lib/elt/managed-executor-local");
+    try {
+      await executeManagedRunLocalProcess({ baseUrl, secret, runId });
+    } catch {
+      await stubCompleteManagedRunInProcess(runId);
+    }
     return;
   }
 

@@ -14,6 +14,19 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    version: "0.5.0",
+    date: "2026-06-17",
+    highlights: [
+      "Stripe Customer Portal — manage payment method, invoices, and subscription in-app.",
+      "Usage reporting — monthly row counts on billing; optional Stripe Billing Meter integration.",
+      "Team invites with email, accept page, auto-join on signup, and live Team page.",
+      "Org members see shared pipelines and runs from the workspace owner.",
+      "Real managed execution paths — local subprocess, GitHub Actions dispatch, vercel-python, delegate.",
+      "Features marketing page with product mockups, case studies, and competitor positioning.",
+      "Free tier pipeline limit (3) enforced at creation.",
+    ],
+  },
+  {
     version: "0.4.0",
     date: "2026-06-17",
     highlights: [

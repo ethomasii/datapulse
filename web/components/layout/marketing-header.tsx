@@ -14,7 +14,10 @@ export function MarketingHeader() {
           eltPulse
         </Link>
         <nav className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 text-sm font-medium text-slate-600 dark:text-slate-300 sm:gap-x-5">
-          <Link href="/docs" className="hidden hover:text-slate-900 sm:inline dark:hover:text-white">
+          <Link href="/features" className="hidden hover:text-slate-900 sm:inline dark:hover:text-white">
+            Features
+          </Link>
+          <Link href="/docs" className="hidden hover:text-slate-900 md:inline dark:hover:text-white">
             Docs
           </Link>
           <Link href="/roadmap" className="hover:text-slate-900 dark:hover:text-white">

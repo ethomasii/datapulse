@@ -1,20 +1,7 @@
 import { NextResponse } from "next/server";
-import Stripe from "stripe";
 import { getCurrentDbUser } from "@/lib/auth/server";
+import { appBaseUrl, getStripe } from "@/lib/billing/stripe";
 import { db } from "@/lib/db/client";
-
-function getStripe(): Stripe | null {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) return null;
-  return new Stripe(key);
-}
-
-function appBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
-  );
-}
 
 export async function POST(req: Request) {
   const user = await getCurrentDbUser();
