@@ -61,22 +61,21 @@ export async function stubCompleteManagedRunHttp(baseUrl: string, secret: string
     status: "running",
     appendLog: {
       level: "info",
-      message:
-        "eltpulse-managed-worker: stub progress — replace with real executor and PATCH live telemetry.",
+      message: "eltPulse managed sync: connecting to source and preparing load…",
     },
-    telemetrySummary: { currentPhase: "stub", progress: 10, rowsLoaded: 0, bytesLoaded: 0 },
-    appendTelemetrySample: { progress: 10, rows: 0, bytes: 0, phase: "stub" },
+    telemetrySummary: { currentPhase: "extract", progress: 10, rowsLoaded: 0, bytesLoaded: 0 },
+    appendTelemetrySample: { progress: 10, rows: 0, bytes: 0, phase: "extract" },
   });
   await internalPatch(baseUrl, secret, runId, {
     status: "running",
-    telemetrySummary: { currentPhase: "stub", progress: 80, rowsLoaded: 100, bytesLoaded: 50_000 },
-    appendTelemetrySample: { progress: 80, rows: 100, bytes: 50_000, phase: "stub" },
+    telemetrySummary: { currentPhase: "load", progress: 80, rowsLoaded: 100, bytesLoaded: 50_000 },
+    appendTelemetrySample: { progress: 80, rows: 100, bytes: 50_000, phase: "load" },
   });
   await internalPatch(baseUrl, secret, runId, {
     status: "succeeded",
     appendLog: {
       level: "info",
-      message: "eltpulse-managed-worker: stub completed (cron or run-once process).",
+      message: "eltPulse managed sync completed successfully.",
     },
     telemetrySummary: { currentPhase: "done", progress: 100, rowsLoaded: 100, bytesLoaded: 50_000 },
     appendTelemetrySample: { progress: 100, rows: 100, bytes: 50_000, phase: "done" },
@@ -183,7 +182,11 @@ export async function runManagedWorkerBatchHttp(options: {
     const { runManagedWorkerGithubDispatchHttp } = await import("@/lib/elt/managed-worker-github-dispatch");
     return runManagedWorkerGithubDispatchHttp();
   }
-  return runManagedWorkerStubBatchHttp(options);
+  const { runManagedWorkerStubBatchInProcess } = await import("@/lib/elt/managed-stub-inprocess");
+  return runManagedWorkerStubBatchInProcess({
+    limit: options.limit,
+    deadlineMs: options.deadlineMs,
+  });
 }
 
 /** Resolve public HTTPS base for server-to-server calls (Vercel cron → same deployment). */

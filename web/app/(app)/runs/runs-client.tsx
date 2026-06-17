@@ -23,6 +23,7 @@ import {
 import { RunTelemetryCompactCell, RunTelemetryView } from "@/components/elt/run-telemetry-view";
 import { formatBytes, formatRows, parseRunTelemetry } from "@/lib/elt/run-telemetry";
 import { RelatedLinks } from "@/components/ui/related-links";
+import { EmptyState } from "@/components/ui/empty-state";
 import { BarChart } from "@/components/ui/bar-chart";
 import { parseSliceFromTriggeredBy } from "@/lib/elt/slice-trigger";
 
@@ -857,21 +858,17 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
       {loading ? (
         <p className="text-slate-500">Loading runs…</p>
       ) : runs.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-slate-600 dark:border-slate-700 dark:text-slate-400">
-          {pipelineFilterId ? (
-            <>
-              No runs yet for this pipeline. Trigger a run from your gateway or orchestrator, or use{" "}
-              <Link href="/run-slices" className="font-medium text-teal-600 hover:underline dark:text-teal-400">
-                Run slices
-              </Link>{" "}
-              for backfills.
-            </>
-          ) : (
-            <>
-              No runs yet. Connect your runner to the API, trigger a run from this page, or set up a schedule or monitor to trigger runs automatically.
-            </>
-          )}
-        </p>
+        <EmptyState
+          icon={Play}
+          title={pipelineFilterId ? "No runs for this pipeline" : "No runs yet"}
+          description={
+            pipelineFilterId
+              ? "Trigger a run from the builder or use Run slices for partitioned backfills."
+              : "Create a pipeline with Quick start, then hit Run — managed execution works out of the box."
+          }
+          action={{ href: "/quick-start", label: "Quick start" }}
+          secondaryAction={{ href: "/builder", label: "Open builder" }}
+        />
       ) : (
         <>
           {selectedIds.size > 0 && (

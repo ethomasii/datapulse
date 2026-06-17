@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireDbUser } from "@/lib/auth/server";
+import { BillingUpgradeButton } from "@/components/account/billing-upgrade-button";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -26,15 +27,21 @@ export default async function BillingPage() {
           </div>
         </dl>
         <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
-          Stripe customer and subscription IDs sync via webhooks when <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">STRIPE_*</code>{" "}
-          env vars are configured. Upgrade and payment method management will surface here.
+          Stripe syncs your plan automatically. Upgrade below or view{" "}
+          <Link href="/pricing" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+            full pricing
+          </Link>
+          .
         </p>
-        <Link
-          href="/pricing"
-          className="mt-4 inline-flex text-sm font-medium text-sky-600 hover:underline dark:text-sky-400"
-        >
-          View pricing →
-        </Link>
+        {tier === "free" ? (
+          <div className="mt-4 flex flex-wrap gap-3">
+            <BillingUpgradeButton
+              tier="pro"
+              label="Upgrade to Pro — 14-day trial"
+              className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
+            />
+          </div>
+        ) : null}
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">

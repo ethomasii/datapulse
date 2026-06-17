@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { getCurrentDbUser } from "@/lib/auth/server";
+import {
+  API_SCOPES,
+  hasScope,
+  resolveApiUser,
+  scopeForbiddenResponse,
+  unauthorizedResponse,
+} from "@/lib/auth/api-user";
 import { db } from "@/lib/db/client";
 import { mergeConnectionSecretsEnc } from "@/lib/elt/connection-secrets-store";
 import { toPublicConnection } from "@/lib/elt/connection-public";
@@ -8,8 +14,10 @@ import { toPublicConnection } from "@/lib/elt/connection-public";
 type Params = { params: Promise<{ id: string }> };
 
 export async function PATCH(req: Request, { params }: Params) {
-  const user = await getCurrentDbUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await resolveApiUser(req);
+  if (!auth) return unauthorizedResponse();
+  if (!hasScope(auth, API_SCOPES.CONNECTIONS_WRITE)) return scopeForbiddenResponse();
+  const user = auth.user;
 
   const { id } = await params;
   const existing = await db.connection.findFirst({
@@ -79,9 +87,11 @@ export async function PATCH(req: Request, { params }: Params) {
   return NextResponse.json({ connection: connection ? toPublicConnection(connection) : null });
 }
 
-export async function DELETE(_req: Request, { params }: Params) {
-  const user = await getCurrentDbUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function DELETE(req: Request, { params }: Params) {
+  const auth = await resolveApiUser(req);
+  if (!auth) return unauthorizedResponse();
+  if (!hasScope(auth, API_SCOPES.CONNECTIONS_WRITE)) return scopeForbiddenResponse();
+  const user = auth.user;
 
   const { id } = await params;
   const res = await db.connection.deleteMany({ where: { id, userId: user.id } });

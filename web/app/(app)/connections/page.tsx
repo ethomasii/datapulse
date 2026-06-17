@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { Cable, Layers, Play, Plus, Trash2, ChevronDown, ChevronRight, Check, Shield, Waypoints } from "lucide-react";
 import { RelatedLinks } from "@/components/ui/related-links";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ConnectionStoredSecretsForm } from "@/components/elt/connection-stored-secrets-form";
 import { CopyEnvButton } from "@/components/elt/copy-env-button";
 import { getDestinationCredentials, getSourceCredentials } from "@/lib/elt/credentials-catalog";
@@ -718,17 +719,13 @@ export default function ConnectionsPage() {
       {loading ? (
         <p className="text-sm text-slate-400 dark:text-slate-500">Loading…</p>
       ) : visible.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-900">
-          <Cable className="mx-auto h-8 w-8 text-slate-300 dark:text-slate-600" aria-hidden />
-          <p className="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">
-            {connections.length === 0 ? "No connections yet" : `No ${filter} connections`}
-          </p>
-          {connections.length === 0 && (
-            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-              Create a source or destination connection to reuse it across pipelines.
-            </p>
-          )}
-        </div>
+        <EmptyState
+          icon={Cable}
+          title={connections.length === 0 ? "No connections yet" : `No ${filter} connections`}
+          description="Save warehouse and source credentials once — reuse them across every pipeline."
+          action={{ href: "/quick-start", label: "Quick start" }}
+          secondaryAction={{ href: "/builder", label: "Open builder" }}
+        />
       ) : (
         <ul className="space-y-2">
           {visible.map((conn) => (

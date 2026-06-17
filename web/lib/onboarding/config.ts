@@ -3,38 +3,46 @@ export type OnboardingStep = {
   label: string;
   description: string;
   href: string;
+  /** When true, step is optional and not counted toward "all done" progress. */
+  optional?: boolean;
 };
 
+/**
+ * Ordered for time-to-first-sync (Fivetran-style): credentials → pipeline → run.
+ * Gateway/self-hosted setup is advanced and optional — managed execution is the default.
+ */
 export const ONBOARDING_STEPS: OnboardingStep[] = [
+  {
+    id: "connection",
+    label: "Connect your warehouse",
+    description: "Save destination credentials once — reuse across pipelines",
+    href: "/quick-start",
+  },
   {
     id: "pipeline",
     label: "Create a pipeline",
-    description: "Define your first source → destination connection in the builder",
+    description: "Pick a source from the catalog or ask the AI assistant",
     href: "/builder",
-  },
-  {
-    id: "connection",
-    label: "Connect a data source",
-    description: "Link credentials for your warehouse or source system",
-    href: "/connections",
-  },
-  {
-    id: "gateway",
-    label: "Configure execution",
-    description: "Use eltPulse-managed workers or connect your own gateway",
-    href: "/gateway",
   },
   {
     id: "run",
     label: "Run your first sync",
-    description: "Trigger a pipeline run and watch live telemetry stream in",
-    href: "/runs",
+    description: "Hit Run in the builder — managed execution works out of the box",
+    href: "/builder",
   },
   {
     id: "webhook",
-    label: "Set up a webhook",
-    description: "Get notified when runs finish — wire into Slack, CI, or PagerDuty",
+    label: "Set up alerts",
+    description: "Get notified when runs finish — Slack, CI, or PagerDuty",
     href: "/webhooks",
+    optional: true,
+  },
+  {
+    id: "gateway",
+    label: "Self-hosted gateway",
+    description: "Optional: run pipelines in your VPC with a customer gateway",
+    href: "/gateway",
+    optional: true,
   },
 ];
 
@@ -42,3 +50,6 @@ export type OnboardingState = {
   completedIds: string[];
   dismissed: boolean;
 };
+
+/** Steps that count toward the main progress bar (excludes optional advanced setup). */
+export const CORE_ONBOARDING_STEPS = ONBOARDING_STEPS.filter((s) => !s.optional);

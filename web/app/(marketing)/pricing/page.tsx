@@ -39,7 +39,7 @@ const tiers = [
       "Git-native artifact export",
       "Email support",
     ],
-    cta: { href: "/sign-up", label: "Join waitlist" },
+    cta: { href: "/sign-up", label: "Start free trial" },
     highlighted: true,
     badge: "Most popular",
   },
@@ -208,6 +208,41 @@ export default function PricingPage() {
         >
           Talk to enterprise sales →
         </Link>
+      </section>
+
+      <section className="mt-12" aria-labelledby="pricing-faq">
+        <h2 id="pricing-faq" className="text-xl font-bold text-slate-900 dark:text-white">
+          Frequently asked questions
+        </h2>
+        <dl className="mt-6 space-y-6">
+          {[
+            {
+              q: "What counts as a pipeline on the Free plan?",
+              a: "Up to 3 saved pipeline definitions with full builder access. Runs and observability are included — managed execution is the default.",
+            },
+            {
+              q: "How does usage-based pricing work?",
+              a: "Pro and Team include a baseline row volume each month. Beyond that, you pay per row and egress at published rates. Hosted compute is cost-plus with a 15% markup.",
+            },
+            {
+              q: "Can I run pipelines on my own infrastructure?",
+              a: "Yes. Deploy a customer gateway in your VPC (Enterprise) or use the open-source core. You pay eltPulse for the control plane, not compute you run yourself.",
+            },
+            {
+              q: "Is there a free trial for Pro?",
+              a: "Yes — 14 days when you upgrade from Billing. No credit card required to start on the Free plan.",
+            },
+            {
+              q: "How does eltPulse compare to Fivetran or dlt?",
+              a: "Fivetran is push-button managed SaaS; dlt is code-first and flexible. eltPulse gives you both: catalog wizard ease plus Git-exportable artifacts you own.",
+            },
+          ].map(({ q, a }) => (
+            <div key={q}>
+              <dt className="font-semibold text-slate-900 dark:text-white">{q}</dt>
+              <dd className="mt-1 text-sm text-slate-600 dark:text-slate-400">{a}</dd>
+            </div>
+          ))}
+        </dl>
       </section>
 
       <p className="mt-10 text-center text-sm text-slate-500 dark:text-slate-400">

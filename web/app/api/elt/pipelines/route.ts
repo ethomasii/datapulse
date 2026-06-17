@@ -1,17 +1,23 @@
 import { NextResponse } from "next/server";
-import { getCurrentDbUser } from "@/lib/auth/server";
+import {
+  API_SCOPES,
+  hasScope,
+  resolveApiUser,
+  scopeForbiddenResponse,
+  unauthorizedResponse,
+} from "@/lib/auth/api-user";
 import { db } from "@/lib/db/client";
 import { prismaSchemaDriftResponse } from "@/lib/db/prisma-schema-drift-response";
 import { createPipelineBodySchema } from "@/lib/elt/types";
 import { createPipelineDefinition } from "@/lib/elt/persist-pipeline";
 
-export async function GET() {
-  const user = await getCurrentDbUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export async function GET(req: Request) {
+  const auth = await resolveApiUser(req);
+  if (!auth) return unauthorizedResponse();
+  if (!hasScope(auth, API_SCOPES.PIPELINES_READ)) return scopeForbiddenResponse();
+
   const rows = await db.eltPipeline.findMany({
-    where: { userId: user.id },
+    where: { userId: auth.user.id },
     orderBy: { updatedAt: "desc" },
     select: {
       id: true,
@@ -56,10 +62,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const user = await getCurrentDbUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await resolveApiUser(req);
+  if (!auth) return unauthorizedResponse();
+  if (!hasScope(auth, API_SCOPES.PIPELINES_WRITE)) return scopeForbiddenResponse();
+
   let json: unknown;
   try {
     json = await req.json();
@@ -75,9 +81,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const body = parsed.data;
   try {
-    const result = await createPipelineDefinition(user.id, body);
+    const result = await createPipelineDefinition(auth.user.id, parsed.data);
     if (!result.ok) {
       return NextResponse.json({ error: result.message }, { status: result.status });
     }

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { requireDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
-import { isManagedExecutionPlane } from "@/lib/elt/execution-plane";
 import { effectiveRunTelemetry, formatBytes, formatRows } from "@/lib/elt/run-telemetry";
 import { ONBOARDING_STEPS } from "@/lib/onboarding/config";
 import { OnboardingChecklist } from "@/components/onboarding/checklist";
@@ -67,14 +66,10 @@ export default async function DashboardPage() {
     ]);
 
   // Onboarding: compute which steps are done
-  const hasGateway =
-    !!user.agentToken ||
-    namedAgents.length > 0 ||
-    isManagedExecutionPlane(user.executionPlane);
   const completedIds = ONBOARDING_STEPS.map((s) => s.id).filter((id) => {
     if (id === "pipeline") return pipelineCount > 0;
     if (id === "connection") return connectionCount > 0;
-    if (id === "gateway") return hasGateway;
+    if (id === "gateway") return namedAgents.length > 0 || !!user.agentToken;
     if (id === "run") return !!anyRun;
     if (id === "webhook") return !!user.runsWebhookUrl;
     return false;
@@ -119,14 +114,15 @@ export default async function DashboardPage() {
         </div>
 
         {!hasChartData ? (
-          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-            No runs in the last {CHART_DAYS} days. Click{" "}
-            <strong className="font-medium">Record sample run</strong> on the{" "}
-            <Link href="/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-              Runs page
-            </Link>{" "}
-            to seed data.
-          </p>
+          <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-6 py-8 text-center dark:border-slate-700 dark:bg-slate-900/40">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              No runs yet. Start with{" "}
+              <Link href="/quick-start" className="font-semibold text-sky-600 hover:underline dark:text-sky-400">
+                Quick start
+              </Link>{" "}
+              to create and run your first pipeline in minutes.
+            </p>
+          </div>
         ) : (
           <div className="mt-6 grid gap-8 lg:grid-cols-2">
             <BarChart days={days} values={runsValues} label="Runs per day" barClass="fill-sky-500 dark:fill-sky-400" formatter={(n) => n.toString()} />

@@ -9,7 +9,7 @@ import {
   CheckCircle2,
   Zap,
 } from "lucide-react";
-import { ONBOARDING_STEPS } from "@/lib/onboarding/config";
+import { CORE_ONBOARDING_STEPS, ONBOARDING_STEPS } from "@/lib/onboarding/config";
 import { DismissOnboardingButton } from "./dismiss-button";
 
 const STEP_ICONS: Record<string, React.ElementType> = {
@@ -21,9 +21,11 @@ const STEP_ICONS: Record<string, React.ElementType> = {
 };
 
 export function OnboardingChecklist({ completedIds }: { completedIds: string[] }) {
-  const total = ONBOARDING_STEPS.length;
-  const done = ONBOARDING_STEPS.filter((s) => completedIds.includes(s.id)).length;
-  const nextStep = ONBOARDING_STEPS.find((s) => !completedIds.includes(s.id));
+  const total = CORE_ONBOARDING_STEPS.length;
+  const done = CORE_ONBOARDING_STEPS.filter((s) => completedIds.includes(s.id)).length;
+  const nextStep =
+    CORE_ONBOARDING_STEPS.find((s) => !completedIds.includes(s.id)) ??
+    ONBOARDING_STEPS.find((s) => !s.optional && !completedIds.includes(s.id));
   const allDone = done === total;
 
   return (
@@ -63,9 +65,9 @@ export function OnboardingChecklist({ completedIds }: { completedIds: string[] }
         </div>
       </div>
 
-      {/* Step cards */}
-      <div className="grid divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-900 sm:grid-cols-5 sm:divide-x sm:divide-y-0">
-        {ONBOARDING_STEPS.map((step, idx) => {
+      {/* Step cards — core path first, optional advanced steps below */}
+      <div className="grid divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-900 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        {CORE_ONBOARDING_STEPS.map((step, idx) => {
           const isComplete = completedIds.includes(step.id);
           const isPrimary = step.id === nextStep?.id;
           const Icon = STEP_ICONS[step.id] ?? ArrowRight;
@@ -151,6 +153,37 @@ export function OnboardingChecklist({ completedIds }: { completedIds: string[] }
           );
         })}
       </div>
+
+      {/* Optional advanced steps */}
+      {ONBOARDING_STEPS.some((s) => s.optional) && (
+        <div className="border-t border-slate-100 bg-slate-50/80 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/50">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            Optional
+          </p>
+          <ul className="mt-2 flex flex-wrap gap-3">
+            {ONBOARDING_STEPS.filter((s) => s.optional).map((step) => {
+              const isComplete = completedIds.includes(step.id);
+              return (
+                <li key={step.id}>
+                  <Link
+                    href={step.href}
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                      isComplete
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-sky-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                    }`}
+                  >
+                    {isComplete ? (
+                      <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+                    ) : null}
+                    {step.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

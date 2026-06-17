@@ -366,6 +366,12 @@ export function RepositoriesClient({
         </div>
       )}
 
+      <div className="rounded-xl border border-sky-200 bg-sky-50/60 px-4 py-3 text-sm text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-100">
+        <strong className="font-semibold">Git-native workflow:</strong> connect GitHub below, set your default repo, then
+        use <strong className="font-medium">Push pipeline</strong> on any saved pipeline to commit{" "}
+        <code className="text-xs">eltpulse/pipelines/*.yaml</code> — review in PRs like application code.
+      </div>
+
       <section className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Git connection</h2>
         {!githubLogin ? (

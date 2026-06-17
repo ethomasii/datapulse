@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
-import { getCurrentDbUser } from "@/lib/auth/server";
+import {
+  API_SCOPES,
+  hasScope,
+  resolveApiUser,
+  scopeForbiddenResponse,
+  unauthorizedResponse,
+} from "@/lib/auth/api-user";
 import { db } from "@/lib/db/client";
 import { maybeDispatchRunWebhook } from "@/lib/elt/maybe-dispatch-run-webhook";
 import { applyPatchRunBody } from "@/lib/elt/apply-run-patch";
@@ -8,15 +14,14 @@ import { patchRunBodySchema } from "@/lib/elt/run-types";
 
 type RouteContext = { params: { id: string } };
 
-export async function GET(_req: Request, context: RouteContext) {
-  const user = await getCurrentDbUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export async function GET(req: Request, context: RouteContext) {
+  const auth = await resolveApiUser(req);
+  if (!auth) return unauthorizedResponse();
+  if (!hasScope(auth, API_SCOPES.RUNS_READ)) return scopeForbiddenResponse();
 
   const { id } = context.params;
   const run = await db.eltPipelineRun.findFirst({
-    where: { id, userId: user.id },
+    where: { id, userId: auth.user.id },
     include: {
       pipeline: { select: { id: true, name: true, tool: true } },
       targetAgentToken: { select: { id: true, name: true } },
@@ -30,10 +35,10 @@ export async function GET(_req: Request, context: RouteContext) {
 }
 
 export async function PATCH(req: Request, context: RouteContext) {
-  const user = await getCurrentDbUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await resolveApiUser(req);
+  if (!auth) return unauthorizedResponse();
+  if (!hasScope(auth, API_SCOPES.RUNS_WRITE)) return scopeForbiddenResponse();
+  const user = auth.user;
 
   const { id } = context.params;
   const existing = await db.eltPipelineRun.findFirst({

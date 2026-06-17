@@ -1,17 +1,24 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
-import { getCurrentDbUser } from "@/lib/auth/server";
+import {
+  API_SCOPES,
+  hasScope,
+  resolveApiUser,
+  scopeForbiddenResponse,
+  unauthorizedResponse,
+} from "@/lib/auth/api-user";
 import { db } from "@/lib/db/client";
 import { mergeConnectionSecretsEnc } from "@/lib/elt/connection-secrets-store";
 import { toPublicConnection } from "@/lib/elt/connection-public";
 
-export async function GET() {
-  const user = await getCurrentDbUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function GET(req: Request) {
+  const auth = await resolveApiUser(req);
+  if (!auth) return unauthorizedResponse();
+  if (!hasScope(auth, API_SCOPES.CONNECTIONS_READ)) return scopeForbiddenResponse();
 
   try {
     const rows = await db.connection.findMany({
-      where: { userId: user.id },
+      where: { userId: auth.user.id },
       orderBy: { updatedAt: "desc" },
       select: {
         id: true,
@@ -47,8 +54,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const user = await getCurrentDbUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await resolveApiUser(req);
+  if (!auth) return unauthorizedResponse();
+  if (!hasScope(auth, API_SCOPES.CONNECTIONS_WRITE)) return scopeForbiddenResponse();
 
   let body: unknown;
   try {
@@ -81,38 +89,24 @@ export async function POST(req: Request) {
       );
     } catch {
       return NextResponse.json(
-        { error: "Could not encrypt secrets — set ELTPULSE_TOKEN_ENCRYPTION_KEY (32-byte base64) on the server" },
+        { error: "Could not encrypt secrets — set ELTPULSE_TOKEN_ENCRYPTION_KEY on the server" },
         { status: 503 }
       );
     }
   }
 
-  try {
-    const connection = await db.connection.create({
-      data: {
-        userId: user.id,
-        name: name.trim(),
-        connectionType,
-        connector: connector.trim(),
-        config: (config && typeof config === "object" && !Array.isArray(config) ? config : {}) as Prisma.InputJsonValue,
-        ...(connectionSecretsEnc !== null ? { connectionSecretsEnc } : {}),
-      },
-    });
-    return NextResponse.json({ connection: toPublicConnection(connection) }, { status: 201 });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (err && typeof err === "object" && "code" in err && (err as { code: string }).code === "P2002") {
-      return NextResponse.json({ error: "A connection with that name already exists" }, { status: 409 });
-    }
-    if (msg.includes("does not exist") || msg.includes("relation") || msg.includes("P2021")) {
-      return NextResponse.json({ error: "Database migration pending — run the add-connections.sql migration first" }, { status: 503 });
-    }
-    if (msg.includes("connection_secrets_enc") || msg.includes("Unknown column") || msg.includes("P2022")) {
-      return NextResponse.json(
-        { error: "Add column connection_secrets_enc (see prisma/add-connection-secrets-enc.sql) or run prisma db push" },
-        { status: 503 }
-      );
-    }
-    throw err;
-  }
+  const row = await db.connection.create({
+    data: {
+      userId: auth.user.id,
+      name: name.trim(),
+      connectionType: connectionType as "source" | "destination",
+      connector: connector.trim(),
+      config: (config && typeof config === "object" && !Array.isArray(config)
+        ? config
+        : {}) as Prisma.InputJsonValue,
+      connectionSecretsEnc,
+    },
+  });
+
+  return NextResponse.json({ connection: toPublicConnection(row) }, { status: 201 });
 }

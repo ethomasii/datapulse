@@ -49,18 +49,32 @@ export async function GET(request: Request) {
 
   const internal = process.env.ELTPULSE_INTERNAL_API_SECRET?.trim();
   const baseUrl = resolveControlPlaneBaseUrl();
-  if (!internal || !baseUrl) {
-    return NextResponse.json({
-      ok: true,
-      skipped: true,
-      reason: !internal
-        ? "Set ELTPULSE_INTERNAL_API_SECRET to run managed-worker cron ticks."
-        : "Set ELTPULSE_CRON_APP_URL (or deploy on Vercel with VERCEL_URL / NEXT_PUBLIC_APP_URL) for self-calls.",
-    });
+  const mode = resolveManagedExecutorMode();
+
+  if (mode === "stub" || (!internal || !baseUrl)) {
+    const url = new URL(request.url);
+    const limit = Math.min(20, Math.max(1, Number(url.searchParams.get("limit") ?? 5) || 5));
+    const budgetMs = Math.min(
+      120_000,
+      Math.max(5_000, Number(url.searchParams.get("budgetMs") ?? 45_000) || 45_000)
+    );
+    try {
+      const { runManagedWorkerStubBatchInProcess } = await import("@/lib/elt/managed-stub-inprocess");
+      const result = await runManagedWorkerStubBatchInProcess({ limit, deadlineMs: budgetMs });
+      return NextResponse.json({
+        ok: true,
+        limit,
+        budgetMs,
+        executor: "stub-inprocess",
+        ...result,
+      });
+    } catch (err) {
+      console.error("[cron/managed-worker]", err);
+      return NextResponse.json({ error: "Managed worker cron failed" }, { status: 500 });
+    }
   }
 
   const url = new URL(request.url);
-  const mode = resolveManagedExecutorMode();
   const limit = Math.min(20, Math.max(1, Number(url.searchParams.get("limit") ?? 5) || 5));
   const quickDispatch = mode === "gha";
   const longRunner = mode === "vercel-python" || mode === "delegate";

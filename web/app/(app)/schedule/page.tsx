@@ -16,28 +16,28 @@ import {
 import Link from 'next/link';
 import { RelatedLinks } from '@/components/ui/related-links';
 
+function cronPartMatches(part: string, value: number): boolean {
+  if (part === "*") return true;
+  return part.split(",").some((seg) => {
+    if (seg.includes("/")) {
+      const [range, step] = seg.split("/");
+      const [start] = range === "*" ? [0] : range.split("-").map(Number);
+      return value >= start && (value - start) % Number(step) === 0;
+    }
+    if (seg.includes("-")) {
+      const [lo, hi] = seg.split("-").map(Number);
+      return value >= lo && value <= hi;
+    }
+    return Number(seg) === value;
+  });
+}
+
 /** Compute the next wall-clock time a 5-field cron expression fires, respecting a timezone. */
 function nextCronRun(cron: string, timezone: string): string | null {
   try {
     const parts = cron.trim().split(/\s+/);
     if (parts.length !== 5) return null;
     const [minPart, hourPart, domPart, , dowPart] = parts;
-
-    function matches(part: string, value: number): boolean {
-      if (part === '*') return true;
-      return part.split(',').some((seg) => {
-        if (seg.includes('/')) {
-          const [range, step] = seg.split('/');
-          const [start] = range === '*' ? [0] : range.split('-').map(Number);
-          return value >= start && (value - start) % Number(step) === 0;
-        }
-        if (seg.includes('-')) {
-          const [lo, hi] = seg.split('-').map(Number);
-          return value >= lo && value <= hi;
-        }
-        return Number(seg) === value;
-      });
-    }
 
     const now = new Date();
     const candidate = new Date(now.getTime() + 60_000); // start from next minute
@@ -58,10 +58,10 @@ function nextCronRun(cron: string, timezone: string): string | null {
       );
 
       if (
-        (domPart === '*' || dowPart === '*' || matches(domPart, candidate.getUTCDate())) &&
-        (dowPart === '*' || matches(dowPart, dow)) &&
-        matches(hourPart, h) &&
-        matches(minPart, m)
+        (domPart === '*' || dowPart === '*' || cronPartMatches(domPart, candidate.getUTCDate())) &&
+        (dowPart === '*' || cronPartMatches(dowPart, dow)) &&
+        cronPartMatches(hourPart, h) &&
+        cronPartMatches(minPart, m)
       ) {
         return new Intl.DateTimeFormat('en-US', {
           timeZone: timezone,

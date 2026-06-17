@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
-import { getCurrentDbUser } from "@/lib/auth/server";
+import {
+  API_SCOPES,
+  hasScope,
+  resolveApiUser,
+  scopeForbiddenResponse,
+  unauthorizedResponse,
+} from "@/lib/auth/api-user";
 import { db } from "@/lib/db/client";
 import { prismaSchemaDriftResponse } from "@/lib/db/prisma-schema-drift-response";
 import { createPipelineBodySchema, type CreatePipelineBody } from "@/lib/elt/types";
@@ -57,11 +63,11 @@ const pipelinePatchSchema = z
 
 type Ctx = { params: { id: string } | Promise<{ id: string }> };
 
-export async function GET(_req: Request, ctx: Ctx) {
-  const user = await getCurrentDbUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export async function GET(req: Request, ctx: Ctx) {
+  const auth = await resolveApiUser(req);
+  if (!auth) return unauthorizedResponse();
+  if (!hasScope(auth, API_SCOPES.PIPELINES_READ)) return scopeForbiddenResponse();
+  const user = auth.user;
   const pipelineId = await resolveRouteParamId(ctx.params);
   try {
     const row = await db.eltPipeline.findFirst({
@@ -78,11 +84,11 @@ export async function GET(_req: Request, ctx: Ctx) {
   }
 }
 
-export async function DELETE(_req: Request, ctx: Ctx) {
-  const user = await getCurrentDbUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export async function DELETE(req: Request, ctx: Ctx) {
+  const auth = await resolveApiUser(req);
+  if (!auth) return unauthorizedResponse();
+  if (!hasScope(auth, API_SCOPES.PIPELINES_WRITE)) return scopeForbiddenResponse();
+  const user = auth.user;
   const pipelineId = await resolveRouteParamId(ctx.params);
   const res = await db.eltPipeline.deleteMany({
     where: { id: pipelineId, userId: user.id },
@@ -94,10 +100,10 @@ export async function DELETE(_req: Request, ctx: Ctx) {
 }
 
 export async function PUT(req: Request, ctx: Ctx) {
-  const user = await getCurrentDbUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await resolveApiUser(req);
+  if (!auth) return unauthorizedResponse();
+  if (!hasScope(auth, API_SCOPES.PIPELINES_WRITE)) return scopeForbiddenResponse();
+  const user = auth.user;
   const pipelineId = await resolveRouteParamId(ctx.params);
   let json: unknown;
   try {
@@ -206,10 +212,10 @@ export async function PUT(req: Request, ctx: Ctx) {
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {
-  const user = await getCurrentDbUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await resolveApiUser(req);
+  if (!auth) return unauthorizedResponse();
+  if (!hasScope(auth, API_SCOPES.PIPELINES_WRITE)) return scopeForbiddenResponse();
+  const user = auth.user;
   const pipelineId = await resolveRouteParamId(ctx.params);
   let json: unknown;
   try {

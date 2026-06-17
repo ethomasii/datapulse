@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { Webhook } from "svix";
 import { db } from "@/lib/db/client";
+import { seedDemoWorkspaceIfEmpty } from "@/lib/onboarding/demo-workspace";
 
 interface ClerkUserEvent {
   data: {
@@ -69,6 +70,11 @@ export async function POST(request: Request) {
         imageUrl: data.image_url ?? null,
       },
     });
+
+    if (type === "user.created") {
+      const user = await db.user.findUnique({ where: { clerkId: data.id }, select: { id: true } });
+      if (user) await seedDemoWorkspaceIfEmpty(user.id);
+    }
   }
 
   if (type === "user.deleted") {

@@ -1,5 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { db } from "@/lib/db/client";
+import { seedDemoWorkspaceIfEmpty } from "@/lib/onboarding/demo-workspace";
 import type { Subscription, User } from "@prisma/client";
 
 export type UserWithSubscription = User & {
@@ -32,7 +33,9 @@ export async function getCurrentDbUser(): Promise<UserWithSubscription | null> {
   const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
   const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ");
 
-  return db.user.upsert({
+  const isNew = !(await db.user.findUnique({ where: { clerkId: userId }, select: { id: true } }));
+
+  const user = await db.user.upsert({
     where: { clerkId: userId },
     create: {
       clerkId: userId,
@@ -46,6 +49,10 @@ export async function getCurrentDbUser(): Promise<UserWithSubscription | null> {
     update: {},
     include: { subscription: true },
   });
+
+  if (isNew) await seedDemoWorkspaceIfEmpty(user.id);
+
+  return user;
 }
 
 export async function requireDbUser(): Promise<UserWithSubscription> {

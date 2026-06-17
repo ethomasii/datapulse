@@ -8,8 +8,10 @@ import {
   BookOpen,
   Cable,
   CalendarClock,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   CircleHelp,
   FolderGit2,
   LayoutDashboard,
@@ -22,6 +24,7 @@ import {
   Users,
   Waypoints,
   Webhook,
+  Zap,
 } from "lucide-react";
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
 import clsx from "clsx";
@@ -30,6 +33,7 @@ import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 const NAV_COLLAPSED_KEY = "eltpulse-nav-collapsed";
+const NAV_ADVANCED_KEY = "eltpulse-nav-advanced";
 
 type NavItem = {
   href: string;
@@ -38,15 +42,19 @@ type NavItem = {
   soon?: boolean;
 };
 
-const PRODUCT_NAV: NavItem[] = [
+const CORE_NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/quick-start", label: "Quick start", icon: Zap },
   { href: "/builder", label: "Pipelines", icon: Layers },
+  { href: "/connections", label: "Connections", icon: Cable },
+  { href: "/runs", label: "Runs", icon: PlayCircle },
+];
+
+const ADVANCED_NAV: NavItem[] = [
   { href: "/sources", label: "Source Registry", icon: BookOpen },
   { href: "/orchestration", label: "Monitors", icon: Split },
   { href: "/schedule", label: "Schedules", icon: CalendarClock },
-  { href: "/runs", label: "Runs", icon: PlayCircle },
   { href: "/run-slices", label: "Run slices", icon: TableProperties },
-  { href: "/connections", label: "Connections", icon: Cable },
   { href: "/webhooks", label: "Webhooks", icon: Webhook },
   { href: "/gateway", label: "Gateway", icon: Waypoints },
   { href: "/repos", label: "Repositories", icon: FolderGit2 },
@@ -54,6 +62,8 @@ const PRODUCT_NAV: NavItem[] = [
   { href: "/help", label: "Help", icon: CircleHelp },
   { href: "/team", label: "Team", icon: Users, soon: true },
 ];
+
+const PRODUCT_NAV: NavItem[] = [...CORE_NAV, ...ADVANCED_NAV];
 
 const ACCOUNT_NAV: NavItem[] = [
   { href: "/account", label: "Account & Settings", icon: UserCircle },
@@ -136,16 +146,37 @@ function NavSection({
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  const advancedActive = ADVANCED_NAV.some((item) => navLinkActive(pathname, item.href));
 
   useEffect(() => {
     setMounted(true);
     try {
       setCollapsed(localStorage.getItem(NAV_COLLAPSED_KEY) === "1");
+      const stored = localStorage.getItem(NAV_ADVANCED_KEY);
+      if (stored === "1") setAdvancedOpen(true);
     } catch {
       /* ignore */
     }
   }, []);
+
+  useEffect(() => {
+    if (advancedActive) setAdvancedOpen(true);
+  }, [advancedActive]);
+
+  function toggleAdvanced() {
+    setAdvancedOpen((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem(NAV_ADVANCED_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
 
   function toggleCollapsed() {
     setCollapsed((v) => {
@@ -186,7 +217,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
         <nav className="flex flex-1 flex-col gap-6 overflow-y-auto p-3" aria-label="App">
-          <NavSection label="Product" items={PRODUCT_NAV} pathname={pathname} collapsed={collapsed} />
+          <NavSection label="Product" items={CORE_NAV} pathname={pathname} collapsed={collapsed} />
+          {!collapsed ? (
+            <div className="space-y-0.5">
+              <button
+                type="button"
+                onClick={toggleAdvanced}
+                className="mb-1 flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+              >
+                Advanced
+                {advancedOpen ? (
+                  <ChevronUp className="h-3.5 w-3.5" aria-hidden />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+                )}
+              </button>
+              {advancedOpen ? (
+                <ul className="space-y-0.5">
+                  {ADVANCED_NAV.map((item) => (
+                    <li key={item.href}>
+                      <NavLink item={item} pathname={pathname} collapsed={collapsed} />
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : (
+            <NavSection label="More" items={ADVANCED_NAV} pathname={pathname} collapsed={collapsed} />
+          )}
           <NavSection label="Account & Settings" items={ACCOUNT_NAV} pathname={pathname} collapsed={collapsed} />
         </nav>
         <div

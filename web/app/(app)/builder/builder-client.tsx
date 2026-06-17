@@ -19,6 +19,7 @@ import {
   TableProperties,
   Sparkles,
   LayoutGrid,
+  Layers,
 } from "lucide-react";
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
 import { SourceCatalogWizard } from "@/components/elt/source-catalog-wizard";
@@ -53,6 +54,8 @@ import { EltLoadingState } from "@/components/elt/elt-loading-state";
 import { PipelineCodeModal } from "@/components/elt/pipeline-code-modal";
 import { getRunSliceCapability } from "@/lib/elt/run-slice-capabilities";
 import { PartitionConfigEditor } from "@/components/elt/partition-config-editor";
+import { PipelineRunPanel } from "@/components/elt/pipeline-run-panel";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type PipelineExecutionHost = "inherit" | "eltpulse_managed" | "customer_gateway";
 
@@ -593,17 +596,13 @@ export function BuilderClient({
         {loading ? (
           <EltLoadingState className="mt-3" />
         ) : pipelines.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 p-8 text-center dark:border-slate-700 dark:bg-slate-900/40">
-            <p className="text-slate-600 dark:text-slate-300">No pipelines yet.</p>
-            <button
-              type="button"
-              onClick={openNewPipeline}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500"
-            >
-              <Plus className="h-4 w-4" />
-              Create your first pipeline
-            </button>
-          </div>
+          <EmptyState
+            icon={Layers}
+            title="No pipelines yet"
+            description="Use Quick start for a guided first pipeline, or browse 111+ connectors in the catalog."
+            action={{ href: "/quick-start", label: "Quick start" }}
+            secondaryAction={{ href: "/builder", label: "Open builder" }}
+          />
         ) : (
           <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
             <table className="w-full text-left text-sm">
@@ -830,6 +829,12 @@ export function BuilderClient({
             </div>
             )}
           </div>
+
+          {editingId ? (
+            <div className="mb-6">
+              <PipelineRunPanel pipelineId={editingId} />
+            </div>
+          ) : null}
 
           {/* Browse sources panel — catalog wizard, default for new pipelines */}
           {!editingId && createMode === "browse" && (

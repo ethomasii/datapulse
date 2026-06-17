@@ -1,17 +1,23 @@
 import { NextResponse } from "next/server";
 import type { Prisma, RunIngestionExecutor, RunStatus } from "@prisma/client";
 import { getActiveOrganizationForSession } from "@/lib/auth/active-org";
-import { getCurrentDbUser } from "@/lib/auth/server";
+import {
+  API_SCOPES,
+  hasScope,
+  resolveApiUser,
+  scopeForbiddenResponse,
+  unauthorizedResponse,
+} from "@/lib/auth/api-user";
 import { db } from "@/lib/db/client";
+import { processManagedRunImmediately } from "@/lib/elt/process-managed-run";
 import { resolveNewRunExecution } from "@/lib/agent/run-execution";
 import { RunPartitionResolutionError, resolveRunPartitionFields } from "@/lib/elt/run-partition-resolution";
 import { createRunBodySchema } from "@/lib/elt/run-types";
 
 export async function GET(req: Request) {
-  const user = await getCurrentDbUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await resolveApiUser(req);
+  if (!auth) return unauthorizedResponse();
+  if (!hasScope(auth, API_SCOPES.RUNS_READ)) return scopeForbiddenResponse();
 
   const url = new URL(req.url);
   const pipelineId = url.searchParams.get("pipelineId") ?? undefined;
@@ -24,7 +30,7 @@ export async function GET(req: Request) {
   const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit") ?? 50) || 50));
 
   const where: Prisma.EltPipelineRunWhereInput = {
-    userId: user.id,
+    userId: auth.user.id,
     ...(pipelineId ? { pipelineId } : {}),
     ...(statuses?.length ? { status: { in: statuses } } : {}),
     ...(environment ? { environment } : {}),
@@ -44,10 +50,9 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const user = await getCurrentDbUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await resolveApiUser(req);
+  if (!auth) return unauthorizedResponse();
+  if (!hasScope(auth, API_SCOPES.RUNS_WRITE)) return scopeForbiddenResponse();
 
   let json: unknown;
   try {
@@ -63,7 +68,7 @@ export async function POST(req: Request) {
 
   const body = parsed.data;
   const pipeline = await db.eltPipeline.findFirst({
-    where: { id: body.pipelineId, userId: user.id },
+    where: { id: body.pipelineId, userId: auth.user.id },
     select: {
       id: true,
       defaultTargetAgentTokenId: true,
@@ -75,19 +80,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Pipeline not found" }, { status: 404 });
   }
 
-  const orgCtx = await getActiveOrganizationForSession();
-  const organizationId = orgCtx?.id ?? user.organizationId ?? null;
+  const organizationId =
+    auth.via === "session"
+      ? ((await getActiveOrganizationForSession())?.id ?? auth.user.organizationId ?? null)
+      : (auth.user.organizationId ?? null);
 
   let targetAgentTokenId: string | null;
   let ingestionExecutor: RunIngestionExecutor;
   try {
     const resolved = await resolveNewRunExecution({
-      userId: user.id,
+      userId: auth.user.id,
       organizationId,
       executionHost: pipeline.executionHost,
       pipelineDefaultTargetAgentTokenId: pipeline.defaultTargetAgentTokenId,
       bodyOverride: body.targetAgentTokenId,
-      userExecutionPlane: user.executionPlane,
+      userExecutionPlane: auth.user.executionPlane,
     });
     targetAgentTokenId = resolved.targetAgentTokenId;
     ingestionExecutor = resolved.ingestionExecutor;
@@ -126,7 +133,7 @@ export async function POST(req: Request) {
 
   const run = await db.eltPipelineRun.create({
     data: {
-      userId: user.id,
+      userId: auth.user.id,
       pipelineId: pipeline.id,
       ingestionExecutor,
       status: body.status,
@@ -140,5 +147,23 @@ export async function POST(req: Request) {
     include: { pipeline: { select: { id: true, name: true } } },
   });
 
-  return NextResponse.json({ run }, { status: 201 });
+  const isManaged =
+    ingestionExecutor === "eltpulse_managed" || ingestionExecutor === "datapulse_managed";
+
+  if (isManaged) {
+    try {
+      await processManagedRunImmediately(run.id);
+    } catch {
+      /* cron picks up pending runs if immediate processing fails */
+    }
+  }
+
+  const refreshed = isManaged
+    ? await db.eltPipelineRun.findFirst({
+        where: { id: run.id },
+        include: { pipeline: { select: { id: true, name: true } } },
+      })
+    : null;
+
+  return NextResponse.json({ run: refreshed ?? run }, { status: 201 });
 }

@@ -1,90 +1,120 @@
 import Link from "next/link";
-import { BookOpen, CalendarClock, Layers, LifeBuoy, Mail, Play, Waypoints } from "lucide-react";
+import {
+  BookOpen,
+  CircleHelp,
+  Layers,
+  LifeBuoy,
+  Mail,
+  Play,
+  Rocket,
+  Waypoints,
+  Zap,
+} from "lucide-react";
 import { RelatedLinks } from "@/components/ui/related-links";
+
+const FAQ = [
+  {
+    q: "How do I run my first pipeline?",
+    a: "Use Quick start from the sidebar — pick a destination, source, and hit Create & run. Managed execution works without gateway setup.",
+    href: "/quick-start",
+  },
+  {
+    q: "Do I need Docker or a gateway?",
+    a: "No. eltPulse-managed execution is the default. Deploy a customer gateway only when you need pipelines in your VPC.",
+    href: "/gateway",
+  },
+  {
+    q: "How is this different from Fivetran?",
+    a: "You own the generated dlt/Sling code and can export to Git. eltPulse is the control plane; execution can be ours or yours.",
+    href: "/compare",
+  },
+  {
+    q: "Where are connectors documented?",
+    a: "Public docs cover getting started, pipelines, orchestration, and security. The Source Registry lists 111+ connectors.",
+    href: "/docs",
+  },
+];
 
 export default function HelpPage() {
   return (
-    <div className="w-full min-w-0 max-w-2xl mx-auto">
+    <div className="w-full min-w-0 max-w-3xl mx-auto">
       <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/40 dark:text-sky-100">
         <LifeBuoy className="h-3.5 w-3.5" aria-hidden />
-        Help center (preview)
+        Help center
       </div>
       <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Help</h1>
       <p className="mt-3 text-lg text-slate-600 dark:text-slate-300">
-        In-app help will aggregate runbooks, FAQs, and support status. For now, use the resources below — the same
-        pattern as shipping a real help hub before chat is wired.
+        Answers, runbooks, and links to get unstuck fast.
       </p>
 
-      <ul className="mt-10 space-y-4">
-        <li>
-          <Link
-            href="/orchestration"
-            className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-sky-300 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-sky-800"
-          >
-            <CalendarClock className="mt-0.5 h-6 w-6 shrink-0 text-amber-600" aria-hidden />
-            <div>
-              <p className="font-semibold text-slate-900 dark:text-white">Orchestration</p>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                Schedules and eltPulse sensors in our product, plus portable definitions if you prefer Airflow, Prefect,
-                or another engine — choice without lock-in.
-              </p>
-            </div>
-          </Link>
-        </li>
-        <li>
-          <Link
-            href="/docs"
-            className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-sky-300 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-sky-800"
-          >
-            <BookOpen className="mt-0.5 h-6 w-6 shrink-0 text-sky-600" aria-hidden />
-            <div>
-              <p className="font-semibold text-slate-900 dark:text-white">Documentation</p>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                Public guides: getting started, pipelines, integrations, security — no sign-in required.
-              </p>
-            </div>
-          </Link>
-        </li>
-        <li>
-          <Link
-            href="/roadmap"
-            className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-sky-300 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-sky-800"
-          >
-            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded bg-violet-100 text-xs font-bold text-violet-800 dark:bg-violet-950 dark:text-violet-200">
-              R
-            </span>
-            <div>
-              <p className="font-semibold text-slate-900 dark:text-white">Roadmap</p>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                What is shipped, in progress, and planned — with honest status labels.
-              </p>
-            </div>
-          </Link>
-        </li>
-        <li className="flex items-start gap-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-5 dark:border-slate-700 dark:bg-slate-900/40">
-          <Mail className="mt-0.5 h-6 w-6 shrink-0 text-slate-500" aria-hidden />
+      <section className="mt-10">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Start here</h2>
+        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+          {[
+            { href: "/quick-start", icon: Zap, title: "Quick start", desc: "First pipeline in 3 steps" },
+            { href: "/docs/getting-started", icon: Rocket, title: "Getting started", desc: "Full setup guide" },
+            { href: "/docs/pipelines", icon: Layers, title: "Pipelines", desc: "Builder, codegen, canvas" },
+            { href: "/docs/runs", icon: Play, title: "Runs", desc: "Telemetry and webhooks" },
+          ].map(({ href, icon: Icon, title, desc }) => (
+            <li key={href}>
+              <Link
+                href={href}
+                className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-sky-300 dark:border-slate-800 dark:bg-slate-900/60"
+              >
+                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-sky-600" aria-hidden />
+                <div>
+                  <p className="font-semibold text-slate-900 dark:text-white">{title}</p>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{desc}</p>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="mt-12">
+        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-500">
+          <CircleHelp className="h-4 w-4" /> FAQ
+        </h2>
+        <ul className="mt-4 space-y-3">
+          {FAQ.map(({ q, a, href }) => (
+            <li
+              key={q}
+              className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/60"
+            >
+              <p className="font-semibold text-slate-900 dark:text-white">{q}</p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{a}</p>
+              <Link href={href} className="mt-2 inline-block text-xs font-medium text-sky-600 hover:underline">
+                Learn more →
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="mt-12 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-5 dark:border-slate-700 dark:bg-slate-900/40">
+        <div className="flex items-start gap-3">
+          <Mail className="mt-0.5 h-5 w-5 text-slate-500" aria-hidden />
           <div>
             <p className="font-semibold text-slate-900 dark:text-white">Contact support</p>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-              Dedicated support channels (in-app messaging, email) will appear here by tier. Until then, use your
-              existing eltPulse contact path.
+              Email{" "}
+              <a href="mailto:hello@eltpulse.dev" className="font-medium text-sky-600 hover:underline">
+                hello@eltpulse.dev
+              </a>{" "}
+              — Pro and Team plans include priority support.
             </p>
           </div>
-        </li>
-      </ul>
+        </div>
+      </section>
 
-      <p className="mt-10 text-sm">
-        <Link href="/dashboard" className="text-sky-600 hover:underline dark:text-sky-400">
-          ← Back to dashboard
-        </Link>
-      </p>
-
-      <div className="mt-8">
-        <RelatedLinks links={[
-          { href: "/runs", icon: Play, label: "Runs", desc: "View execution history and live telemetry" },
-          { href: "/builder", icon: Layers, label: "Pipelines", desc: "Define source → destination connections" },
-          { href: "/orchestration", icon: Waypoints, label: "Orchestration", desc: "Schedules and event-driven sensors" },
-        ]} />
+      <div className="mt-10">
+        <RelatedLinks
+          links={[
+            { href: "/roadmap", icon: BookOpen, label: "Roadmap", desc: "What we're building next" },
+            { href: "/orchestration", icon: Waypoints, label: "Orchestration", desc: "Schedules and monitors" },
+          ]}
+        />
       </div>
     </div>
   );
