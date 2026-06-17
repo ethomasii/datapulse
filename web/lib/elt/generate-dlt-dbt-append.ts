@@ -88,7 +88,7 @@ export function dltDbtRunnerBeforeReturn(request: PipelineRequest): string {
     : "";
 
   return `
-    # Post-load dbt (dlt dbt runner) — https://dlthub.com/docs/dlt-ecosystem/transformations/dbt
+    # eltPulse post-load dbt transform
     print("[eltpulse] phase:dbt", flush=True)
     _dbt_pipeline = dlt.pipeline(
         pipeline_name="${escapePyString(request.name)}",

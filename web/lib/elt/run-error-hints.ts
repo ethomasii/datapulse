@@ -33,7 +33,13 @@ export function hintsForRunFailure(errorSummary: string | null | undefined): Run
     });
   }
 
-  if (text.includes("exit") || text.includes("python") || text.includes("dlt") || text.includes("sling")) {
+  if (
+    text.includes("exit") ||
+    text.includes("python") ||
+    text.includes("eltpulse-managed") ||
+    text.includes("connector sync") ||
+    text.includes("database replication")
+  ) {
     hints.push({
       title: "Execution failed in the worker",
       message: "Open run logs for stderr. Fix generated code or source config in the builder, then re-run.",

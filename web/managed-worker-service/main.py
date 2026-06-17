@@ -70,6 +70,12 @@ def _control_plane_base() -> str:
     )
 
 
+def _tool_run_label(tool: str) -> str:
+    if str(tool).lower() == "sling":
+        return "database replication"
+    return "connector sync"
+
+
 def _sanitize(text: str, max_len: int) -> str:
     t = text.replace("\x00", "")
     if len(t) <= max_len:
@@ -236,13 +242,13 @@ async def _execute_one_run(
             {
                 "status": "failed",
                 "errorSummary": _sanitize(
-                    "Sling CLI is not available on this Vercel Python worker. "
-                    "Use dlt pipelines, or run Sling on a VM / second deployment (executor #2).",
+                    "Database replication is not available on this managed worker. "
+                    "Use connector sync pipelines, or run database replication on a VM / second deployment (executor #2).",
                     8000,
                 ),
                 "appendLog": {
                     "level": "error",
-                    "message": _sanitize("managed-worker: sling binary not found on PATH.", 4000),
+                    "message": _sanitize("managed-worker: database replication runner not found.", 4000),
                 },
                 "telemetrySummary": {"currentPhase": "failed", "progress": 100},
             },
@@ -275,7 +281,7 @@ async def _execute_one_run(
                 "appendLog": {
                     "level": "info",
                     "message": _sanitize(
-                        f"eltpulse-managed (vercel-python): starting {tool} in {tmp} (pipeline {pname!r})",
+                        f"eltpulse-managed (vercel-python): starting {_tool_run_label(tool)} in {tmp} (pipeline {pname!r})",
                         4000,
                     ),
                 },
@@ -358,7 +364,7 @@ async def _execute_one_run(
                     "appendLog": {
                         "level": "info",
                         "message": _sanitize(
-                            f"eltpulse-managed (vercel-python): {tool} completed (exit 0).",
+                            "eltpulse-managed (vercel-python): pipeline completed (exit 0).",
                             4000,
                         ),
                     },
@@ -377,7 +383,7 @@ async def _execute_one_run(
                     "appendLog": {
                         "level": "error",
                         "message": _sanitize(
-                            f"eltpulse-managed (vercel-python): {tool} exited with code {code_out}",
+                            f"eltpulse-managed (vercel-python): pipeline exited with code {code_out}",
                             4000,
                         ),
                     },

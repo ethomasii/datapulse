@@ -437,10 +437,10 @@ const API_CONNECTORS: ConnectorDef[] = [
       { key: "resource_name", label: "Resource Name", type: "text", required: true, help: "Name for this data resource (will be used as table name)", placeholder: "users" },
       { key: "endpoint", label: "Endpoint Path", type: "text", required: true, help: "API endpoint path (e.g., /v1/users)", placeholder: "/v1/users" },
       { key: "http_method", label: "HTTP Method", type: "select", required: true, options: [{ value: "GET", label: "GET" }, { value: "POST", label: "POST" }], default: "GET" },
-      { key: "pagination_type", label: "Pagination Strategy", type: "select", required: false, options: [{ value: "none", label: "No Pagination" }, { value: "auto", label: "Auto-detect (DLT will try to detect)" }, { value: "offset", label: "Offset-based (page number or offset)" }, { value: "cursor", label: "Cursor-based (next page token)" }, { value: "json_link", label: "JSON Link (next page URL in response)" }], default: "auto", help: "How the API handles pagination" },
+      { key: "pagination_type", label: "Pagination Strategy", type: "select", required: false, options: [{ value: "none", label: "No Pagination" }, { value: "auto", label: "Auto-detect" }, { value: "offset", label: "Offset-based (page number or offset)" }, { value: "cursor", label: "Cursor-based (next page token)" }, { value: "json_link", label: "JSON Link (next page URL in response)" }], default: "auto", help: "How the API handles pagination" },
       { key: "data_selector", label: "Data Selector (JSON Path)", type: "text", required: false, help: "Path to data in response (e.g., 'data.items' or 'results')", placeholder: "data" },
       { key: "advanced_mode", label: "Advanced Mode", type: "boolean", default: false, help: "Enable advanced JSON configuration for complex APIs" },
-      { key: "advanced_config", label: "Advanced Configuration (JSON)", type: "textarea", required: false, show_if: { advanced_mode: true }, help: "Full REST API client configuration in JSON format. See DLT documentation for details.", placeholder: '{\n  "client": {\n    "base_url": "https://api.example.com"\n  },\n  "resources": [\n    {\n      "name": "users",\n      "endpoint": { "path": "/users" }\n    }\n  ]\n}' },
+      { key: "advanced_config", label: "Advanced Configuration (JSON)", type: "textarea", required: false, show_if: { advanced_mode: true }, help: "Full REST API client configuration in JSON format. See eltPulse connector docs for examples.", placeholder: '{\n  "client": {\n    "base_url": "https://api.example.com"\n  },\n  "resources": [\n    {\n      "name": "users",\n      "endpoint": { "path": "/users" }\n    }\n  ]\n}' },
     ],
   },
   {
@@ -455,7 +455,7 @@ const API_CONNECTORS: ConnectorDef[] = [
       { key: "GITHUB_TOKEN", label: "GitHub Personal Access Token", type: "password", required: true, help: "Create at https://github.com/settings/tokens", placeholder: "ghp_xxxxxxxxxxxx" },
     ],
     sourceConfigFields: [
-      { key: "repos", label: "Which repositories do you want to load?", type: "text", required: true, help: "Comma-separated list of repos in format owner/repo", placeholder: "dlt-hub/dlt, your-org/your-repo" },
+      { key: "repos", label: "Which repositories do you want to load?", type: "text", required: true, help: "Comma-separated list of repos in format owner/repo", placeholder: "my-org/my-repo, your-org/your-repo" },
       { key: "resources", label: "Select resources to load", type: "multiselect", required: false, help: "Select which GitHub resources to sync", options: [{ value: "issues", label: "Issues" }, { value: "pull_requests", label: "Pull Requests" }, { value: "commits", label: "Commits" }, { value: "stargazers", label: "Stargazers" }, { value: "workflows", label: "Workflows" }, { value: "releases", label: "Releases" }], default: ["issues", "pull_requests"] },
     ],
   },

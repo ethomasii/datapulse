@@ -2,8 +2,7 @@ import type { PipelineRequest } from "./types";
 import { escapePyString } from "./escape-py";
 import { dltDbtRunnerBeforeReturn } from "./generate-dlt-dbt-append";
 import { postTransformBeforeReturn } from "./generate-post-transform";
-
-const PY3Q = '"""';
+import { eltpulsePythonModuleHeader } from "./codegen-branding";
 
 function destinationBlock(request: PipelineRequest): {
   destination: string;
@@ -51,10 +50,7 @@ export function generateStripePipeline(request: PipelineRequest): string {
   const { destination, destinationComment, datasetName } = destinationBlock(request);
   const desc = request.description || `Load Stripe billing data to ${request.destinationType}`;
 
-  return `${PY3Q}dlt pipeline: ${escapePyString(request.name)}
-
-${escapePyString(desc)}
-${PY3Q}
+  return `${eltpulsePythonModuleHeader(request.name, desc)}
 
 import os
 import dlt
@@ -102,10 +98,7 @@ export function generatePostgresDltPipeline(request: PipelineRequest): string {
   const { destination, destinationComment, datasetName } = destinationBlock(request);
   const desc = request.description || `Replicate Postgres (${schema}) to ${request.destinationType}`;
 
-  return `${PY3Q}dlt pipeline: ${escapePyString(request.name)}
-
-${escapePyString(desc)}
-${PY3Q}
+  return `${eltpulsePythonModuleHeader(request.name, desc)}
 
 import os
 import dlt

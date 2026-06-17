@@ -76,14 +76,12 @@ function SourceCard({ source }: { source: DltHubSource }) {
           <Layers className="h-3 w-3" /> Build pipeline
         </Link>
         {source.docsUrl && (
-          <a
-            href={source.docsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href={`/connectors/${source.slug.replace(/_dlt$/, "")}`}
             className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-500 hover:text-slate-900 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400 dark:hover:text-white transition-colors"
           >
             <ExternalLink className="h-3 w-3" /> Docs
-          </a>
+          </Link>
         )}
       </div>
     </div>
@@ -151,14 +149,12 @@ export default function SourcesPage() {
           <p className="text-xs text-slate-500">Categories</p>
         </div>
         <div className="ml-auto flex items-center">
-          <a
-            href="https://github.com/dlt-hub/verified-sources"
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/connectors"
             className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-400 dark:hover:text-white transition-colors"
           >
-            <ExternalLink className="h-3.5 w-3.5" /> Open-source connector packages
-          </a>
+            <ExternalLink className="h-3.5 w-3.5" /> Browse connector catalog
+          </Link>
         </div>
       </div>
 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { DbtPackagePicker } from "@/components/dbt/dbt-package-picker";
+import { supportsInPipelineDbt } from "@/lib/elt/pipeline-tool-labels";
 import type { DbtHubPackage } from "@/lib/elt/dbt-hub-packages";
 import { dbtHubPackageDisplayName } from "@/lib/elt/dbt-hub-packages";
 
@@ -92,7 +93,7 @@ export function DbtConfigFields({
         <code className="font-mono text-[10px]">elt_partition_column</code>.
       </p>
 
-      {pipelineTool === "sling" ? (
+      {!supportsInPipelineDbt(pipelineTool) ? (
         <p className={`${intro} text-amber-900 dark:text-amber-200`}>
           In-pipeline dbt is available on <strong>connector sync</strong> pipelines (API and SaaS sources). For
           database-only replication, run dbt in CI or add a separate transform step.

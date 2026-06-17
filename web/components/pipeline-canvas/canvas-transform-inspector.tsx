@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TRANSFORM_TOOLS } from "./transform-tools";
+import { supportsInPipelineDbt } from "@/lib/elt/pipeline-tool-labels";
 import { DbtConfigFields } from "@/components/dbt/dbt-config-fields";
+import { TRANSFORM_TOOLS } from "./transform-tools";
 
 const fieldClass =
   "mt-1 w-full rounded-lg border border-amber-200 bg-white px-2 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-800 dark:bg-slate-950 dark:text-white";
@@ -12,7 +13,7 @@ type Props = {
   /** Snapshot when the node was selected; remount via `key={nodeId}` when switching nodes. */
   initialData: Record<string, unknown>;
   onPatch: (patch: Record<string, unknown>) => void;
-  /** Codegen embeds post-load dbt only for dlt Python pipelines. */
+  /** Codegen embeds post-load dbt only for connector sync pipelines. */
   pipelineTool: "dlt" | "sling";
   pipelineId?: string;
   sourceSlug?: string;
@@ -80,14 +81,14 @@ export function CanvasTransformInspector({
         </select>
       </label>
 
-      {transformTool === "dbt" && pipelineTool === "sling" ? (
+      {transformTool === "dbt" && !supportsInPipelineDbt(pipelineTool) ? (
         <p className="rounded-lg border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-xs leading-snug text-amber-950 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
           In-pipeline dbt is available on connector sync pipelines (API and SaaS sources). For database-only replication,
           document a separate dbt job in <strong className="font-medium">Notes</strong> or run transforms in CI.
         </p>
       ) : null}
 
-      {transformTool === "dbt" && pipelineTool === "dlt" ? (
+      {transformTool === "dbt" && supportsInPipelineDbt(pipelineTool) ? (
         <DbtConfigFields
           compact
           fieldClass={fieldClass}

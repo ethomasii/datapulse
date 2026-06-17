@@ -49,7 +49,7 @@ function PipelineSearchField({ id, value, onChange, placeholder }: PipelineSearc
         autoComplete="off"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder ?? "Search by name, id, tool, source…"}
+        placeholder={placeholder ?? "Search by name, id, sync mode, source…"}
         className="w-full rounded-md border border-slate-300 py-2 pl-8 pr-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
       />
     </div>

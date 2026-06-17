@@ -22,7 +22,7 @@ const DLT_SINCE: RunSliceCapability = {
   mode: "date_and_key",
   label: "Date slice via since / start_date",
   detail:
-    "The slice value is passed as a start_date or since parameter into the dlt source so each run pulls a bounded window.",
+    "The slice value is passed as a start_date or since parameter into the connector so each run pulls a bounded window.",
   mechanism: "source(start_date=partition_key)",
 };
 
@@ -30,7 +30,7 @@ const DLT_DATE_RANGE: RunSliceCapability = {
   mode: "date_and_key",
   label: "Date slice via date range",
   detail:
-    "The slice value sets the start of a date range passed into the dlt source so incremental loads align with that window.",
+    "The slice value sets the start of a date range passed into the connector so incremental loads align with that window.",
   mechanism: "source(start_date=partition_key, end_date=next_day)",
 };
 
@@ -57,7 +57,7 @@ const SLING_INCREMENTAL: RunSliceCapability = {
   mode: "date_and_key",
   label: "Date & key slice via update_key",
   detail:
-    "Sling uses update_key (timestamp/id column) and primary_key for incremental mode; the slice value scopes the incremental range for that run.",
+    "Database replication uses update_key (timestamp/id column) and primary_key for incremental mode; the slice value scopes the incremental range for that run.",
   mechanism: "stream update_key: {col}, mode: incremental",
 };
 

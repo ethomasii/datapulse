@@ -2,6 +2,7 @@ import type { PipelineRequest } from "./types";
 import { escapePyString } from "./escape-py";
 import { dltDbtRunnerBeforeReturn } from "./generate-dlt-dbt-append";
 import { postTransformBeforeReturn } from "./generate-post-transform";
+import { eltpulsePythonModuleHeader } from "./codegen-branding";
 
 // SWC/webpack misparses Python triple-quotes inside JS template literals.
 const PY3Q = '"""';
@@ -70,10 +71,7 @@ export function generateRestApiPipeline(request: PipelineRequest): string {
     ? "\n\nThis pipeline uses incremental loading with partition-style runs (cursor / time windows)."
     : "";
 
-  return `${PY3Q}dlt pipeline: ${escapePyString(request.name)}
-
-${escapePyString(desc)}${incNote}
-${PY3Q}
+  return `${eltpulsePythonModuleHeader(request.name, `${desc}${incNote}`)}
 
 import dlt
 from dlt.sources.rest_api import rest_api_source
@@ -163,10 +161,7 @@ export function generateRestApiAdvanced(request: PipelineRequest): string {
   const payload = JSON.stringify(advanced);
   const b64 = Buffer.from(payload, "utf8").toString("base64");
 
-  return `${PY3Q}dlt pipeline: ${escapePyString(request.name)}
-
-${escapePyString(desc)}
-${PY3Q}
+  return `${eltpulsePythonModuleHeader(request.name, desc)}
 
 import base64
 import json

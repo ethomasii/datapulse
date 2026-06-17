@@ -65,7 +65,7 @@ export function CanvasPageClient() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pipelineSourceType, setPipelineSourceType] = useState("");
   const [pipelineDestinationType, setPipelineDestinationType] = useState("");
-  /** Resolved runner: dlt emits post-load dbt in Python; sling does not. */
+  /** Resolved sync mode: connector sync supports in-pipeline dbt; database replication does not. */
   const [pipelineTool, setPipelineTool] = useState<"dlt" | "sling">("dlt");
   const [bindingsBusy, setBindingsBusy] = useState(false);
   const [bindingsError, setBindingsError] = useState<string | null>(null);

@@ -37,6 +37,7 @@ import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 const NAV_COLLAPSED_KEY = "eltpulse-nav-collapsed";
 const NAV_ADVANCED_KEY = "eltpulse-nav-advanced";
+const NAV_CATALOG_KEY = "eltpulse-nav-catalog";
 
 type NavItem = {
   href: string;
@@ -50,10 +51,13 @@ const CORE_NAV: NavItem[] = [
   { href: "/quick-start", label: "Quick start", icon: Zap },
   { href: "/builder", label: "Pipelines", icon: Layers },
   { href: "/connections", label: "Connections", icon: Cable },
+  { href: "/runs", label: "Runs", icon: PlayCircle },
+];
+
+const CATALOG_NAV: NavItem[] = [
   { href: "/connectors", label: "Connectors", icon: LayoutGrid },
   { href: "/scenarios", label: "Scenarios", icon: Route },
-  { href: "/dbt", label: "dbt", icon: GitBranch },
-  { href: "/runs", label: "Runs", icon: PlayCircle },
+  { href: "/dbt", label: "dbt transforms", icon: GitBranch },
 ];
 
 const ADVANCED_NAV: NavItem[] = [
@@ -68,8 +72,6 @@ const ADVANCED_NAV: NavItem[] = [
   { href: "/help", label: "Help", icon: CircleHelp },
   { href: "/team", label: "Team", icon: Users, soon: true },
 ];
-
-const PRODUCT_NAV: NavItem[] = [...CORE_NAV, ...ADVANCED_NAV];
 
 const ACCOUNT_NAV: NavItem[] = [
   { href: "/account", label: "Account & Settings", icon: UserCircle },
@@ -153,8 +155,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [catalogOpen, setCatalogOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
+  const catalogActive = CATALOG_NAV.some((item) => navLinkActive(pathname, item.href));
   const advancedActive = ADVANCED_NAV.some((item) => navLinkActive(pathname, item.href));
 
   useEffect(() => {
@@ -163,6 +167,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       setCollapsed(localStorage.getItem(NAV_COLLAPSED_KEY) === "1");
       const stored = localStorage.getItem(NAV_ADVANCED_KEY);
       if (stored === "1") setAdvancedOpen(true);
+      const catalogStored = localStorage.getItem(NAV_CATALOG_KEY);
+      if (catalogStored === "1") setCatalogOpen(true);
     } catch {
       /* ignore */
     }
@@ -171,6 +177,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (advancedActive) setAdvancedOpen(true);
   }, [advancedActive]);
+
+  useEffect(() => {
+    if (catalogActive) setCatalogOpen(true);
+  }, [catalogActive]);
+
+  function toggleCatalog() {
+    setCatalogOpen((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem(NAV_CATALOG_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
 
   function toggleAdvanced() {
     setAdvancedOpen((v) => {
@@ -196,7 +218,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     });
   }
 
-  const mobileAll: NavItem[] = [...PRODUCT_NAV, ...ACCOUNT_NAV];
+  const mobileAll: NavItem[] = [
+    ...CORE_NAV,
+    { href: "/connectors", label: "Catalog", icon: LayoutGrid },
+    ...ADVANCED_NAV.slice(0, 3),
+    ...ACCOUNT_NAV,
+  ];
 
   const asideWidth = collapsed ? "md:w-14" : "md:w-56";
   const mainPad = collapsed ? "md:pl-14" : "md:pl-56";
@@ -224,6 +251,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <nav className="flex flex-1 flex-col gap-6 overflow-y-auto p-3" aria-label="App">
           <NavSection label="Product" items={CORE_NAV} pathname={pathname} collapsed={collapsed} />
+          {!collapsed ? (
+            <div className="space-y-0.5">
+              <button
+                type="button"
+                onClick={toggleCatalog}
+                className={clsx(
+                  "mb-1 flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest transition",
+                  catalogActive
+                    ? "text-sky-700 dark:text-sky-300"
+                    : "text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                )}
+              >
+                Catalog
+                {catalogOpen ? (
+                  <ChevronUp className="h-3.5 w-3.5" aria-hidden />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+                )}
+              </button>
+              {catalogOpen ? (
+                <ul className="space-y-0.5">
+                  {CATALOG_NAV.map((item) => (
+                    <li key={item.href}>
+                      <NavLink item={item} pathname={pathname} collapsed={collapsed} />
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : (
+            <NavSection label="Catalog" items={CATALOG_NAV} pathname={pathname} collapsed={collapsed} />
+          )}
           {!collapsed ? (
             <div className="space-y-0.5">
               <button

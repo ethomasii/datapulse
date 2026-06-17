@@ -4,6 +4,7 @@ import { dltDbtRunnerBeforeReturn } from "./generate-dlt-dbt-append";
 import { postTransformBeforeReturn } from "./generate-post-transform";
 import { generateRestApiAdvanced, generateRestApiPipeline } from "./generate-dlt-rest";
 import { generatePostgresDltPipeline, generateStripePipeline } from "./generate-dlt-golden";
+import { eltpulsePythonModuleHeader, ELTPULSE_PIPELINES_DOCS } from "./codegen-branding";
 
 // SWC/webpack misparses Python triple-quotes inside JS template literals.
 // Use this constant so the parser never sees `"""` as a literal in source.
@@ -61,10 +62,7 @@ function generateGithubPipeline(request: PipelineRequest): string {
     request.description ||
     `Load GitHub data from ${repoOwner}/${repoName} to ${request.destinationType}`;
 
-  return `${PY3Q}dlt pipeline: ${escapePyString(request.name)}
-
-${escapePyString(desc)}
-${PY3Q}
+  return `${eltpulsePythonModuleHeader(request.name, desc)}
 
 import os
 import dlt
@@ -139,10 +137,7 @@ function generateGenericPipeline(request: PipelineRequest): string {
 
   const cfgJson = JSON.stringify(request.sourceConfiguration ?? {});
 
-  return `${PY3Q}dlt pipeline: ${escapePyString(request.name)}
-
-${escapePyString(desc)}
-${PY3Q}
+  return `${eltpulsePythonModuleHeader(request.name, desc)}
 
 import dlt
 
@@ -156,7 +151,7 @@ def run(partition_key: str = None):
     )
 
     # TODO: Configure your ${escapePyString(request.sourceType)} source
-    # See documentation: https://dlthub.com/docs/dlt-ecosystem/verified-sources
+    # See eltPulse connector docs: ${ELTPULSE_PIPELINES_DOCS}
     # Configuration (JSON): ${escapePyString(cfgJson)}
 
     # Example placeholder

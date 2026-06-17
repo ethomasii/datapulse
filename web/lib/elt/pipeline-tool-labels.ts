@@ -18,3 +18,12 @@ export function connectorSyncModeLabel(tool: string | null | undefined): string 
   if (t === "dlt") return "Connector sync";
   return null;
 }
+
+/** Whether post-load dbt is codegen-embedded for this pipeline (connector sync only). */
+export function supportsInPipelineDbt(tool: string | null | undefined): boolean {
+  return String(tool ?? "").toLowerCase().trim() !== "sling";
+}
+
+export function isDatabaseReplicationTool(tool: string | null | undefined): boolean {
+  return String(tool ?? "").toLowerCase().trim() === "sling";
+}

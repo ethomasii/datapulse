@@ -1,5 +1,6 @@
 import type { PipelineRequest } from "./types";
 import YAML from "yaml";
+import { eltpulseYamlFileHeader } from "./codegen-branding";
 
 /**
  * Partition config shape as stored in sourceConfiguration._partitionConfig.
@@ -83,5 +84,5 @@ export function generateSlingReplication(request: PipelineRequest): Record<strin
 }
 
 export function slingReplicationToYaml(replication: Record<string, unknown>): string {
-  return YAML.stringify(replication);
+  return `${eltpulseYamlFileHeader()}${YAML.stringify(replication)}`;
 }

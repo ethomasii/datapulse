@@ -10,6 +10,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { sanitizeForRunStorage } from "@/lib/elt/run-log-sanitize";
+import { pipelineToolLabel } from "@/lib/elt/pipeline-tool-labels";
 import {
   fetchPendingManagedRunIds,
   managedInternalGet,
@@ -210,7 +211,7 @@ export async function executeManagedRunLocalProcess(options: {
       appendLog: {
         level: "info",
         message: sanitizeForRunStorage(
-          `eltpulse-managed: starting local ${tool} in ${dir} (pipeline "${ctx.pipeline.name}")`,
+          `eltpulse-managed: starting ${pipelineToolLabel(tool).toLowerCase()} in ${dir} (pipeline "${ctx.pipeline.name}")`,
           4000
         ),
       },
@@ -261,7 +262,7 @@ export async function executeManagedRunLocalProcess(options: {
         status: "succeeded",
         appendLog: {
           level: "info",
-          message: sanitizeForRunStorage(`eltpulse-managed: ${tool} completed (exit 0).`, 4000),
+          message: sanitizeForRunStorage(`eltpulse-managed: pipeline completed (exit 0).`, 4000),
         },
         telemetrySummary: { currentPhase: "done", progress: 100 },
       });
@@ -272,7 +273,7 @@ export async function executeManagedRunLocalProcess(options: {
         appendLog: {
           level: "error",
           message: sanitizeForRunStorage(
-            `eltpulse-managed: ${tool} exited with code ${exitCode}`,
+            `eltpulse-managed: pipeline exited with code ${exitCode}`,
             4000
           ),
         },
