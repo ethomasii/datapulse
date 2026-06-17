@@ -25,6 +25,7 @@ export const DOCS_SECTIONS: DocNavSection[] = [
       { href: "/docs/connectors", label: "Connectors (docs)" },
       { href: "/connectors", label: "Connector catalog" },
       { href: "/scenarios", label: "Pipeline scenarios" },
+      { href: "/docs/dbt", label: "dbt transforms" },
       { href: "/docs/runs", label: "Runs" },
       { href: "/docs/orchestration", label: "Orchestration" },
       { href: "/docs/gateway", label: "Gateway" },

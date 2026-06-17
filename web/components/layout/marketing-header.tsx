@@ -20,6 +20,9 @@ export function MarketingHeader() {
           <Link href="/scenarios" className="hover:text-slate-900 dark:hover:text-white">
             Scenarios
           </Link>
+          <Link href="/dbt" className="hidden hover:text-slate-900 lg:inline dark:hover:text-white">
+            dbt
+          </Link>
           <Link href="/features" className="hidden hover:text-slate-900 md:inline dark:hover:text-white">
             Features
           </Link>
