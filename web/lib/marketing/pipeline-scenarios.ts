@@ -53,19 +53,19 @@ export const PIPELINE_SCENARIOS: PipelineScenario[] = [
     destinationSlug: "bigquery",
     persona: "Platform & DevEx teams",
     industry: "engineering",
-    benefits: ["Partition by day", "Verified dlt source", "Export to Git for review"],
+    benefits: ["Partition by day", "Verified connector", "Export to Git for review"],
     tags: ["developer", "analytics"],
   },
   {
     id: "postgres-snowflake",
     title: "Postgres OLTP → Snowflake warehouse",
     description:
-      "Replicate production Postgres tables to Snowflake with Sling — the classic operational-to-analytical handoff for BI and embedded analytics.",
+      "Replicate production Postgres tables to Snowflake — the classic operational-to-analytical handoff for BI and embedded analytics.",
     sourceSlug: "postgres",
     destinationSlug: "snowflake",
     persona: "Data engineers",
     industry: "data-platform",
-    benefits: ["Sling replication YAML", "Table-level streams", "Incremental cursors"],
+    benefits: ["Database replication", "Table-level streams", "Incremental cursors"],
     tags: ["database", "replication"],
   },
   {
@@ -149,7 +149,7 @@ export const PIPELINE_SCENARIOS: PipelineScenario[] = [
     destinationSlug: "snowflake",
     persona: "Data platform",
     industry: "data-platform",
-    benefits: ["File-based sources", "dlt filesystem loader", "Partition-friendly"],
+    benefits: ["File-based sources", "Batch-friendly loads", "Partition-friendly"],
     tags: ["files", "lake"],
   },
   {
@@ -161,7 +161,7 @@ export const PIPELINE_SCENARIOS: PipelineScenario[] = [
     destinationSlug: "redshift",
     persona: "AWS data teams",
     industry: "data-platform",
-    benefits: ["Sling database replication", "Proven pattern", "BYO execution"],
+    benefits: ["Database replication", "Proven pattern", "BYO execution"],
     tags: ["database", "aws"],
   },
   {

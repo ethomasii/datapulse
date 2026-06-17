@@ -46,7 +46,7 @@ export function hintsForRunFailure(errorSummary: string | null | undefined): Run
     hints.push({
       title: "Demo / stub execution",
       message:
-        "This run used demo telemetry. Configure GitHub Actions or a gateway for real dlt/Sling execution.",
+        "This run used demo telemetry. Configure GitHub Actions or a gateway for real pipeline execution.",
       href: "/gateway",
       hrefLabel: "Execution settings",
     });

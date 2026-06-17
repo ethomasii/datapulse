@@ -25,7 +25,7 @@ const FAQ = [
   },
   {
     q: "How is this different from Fivetran?",
-    a: "You own the generated dlt/Sling code and can export to Git. eltPulse is the control plane; execution can be ours or yours.",
+    a: "You own the generated pipeline code and can export to Git. eltPulse is the control plane; execution can be ours or yours.",
     href: "/compare",
   },
   {

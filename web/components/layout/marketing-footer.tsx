@@ -50,7 +50,7 @@ export function MarketingFooter() {
               eltPulse
             </Link>
             <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-              The control plane for ELT pipelines — as easy as Fivetran, as flexible as dlt. You own the code.
+              The control plane for ELT pipelines — as easy as Fivetran, with code you own. Design, run, and observe from one place.
             </p>
           </div>
           {columns.map((col) => (

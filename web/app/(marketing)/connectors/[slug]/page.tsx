@@ -15,6 +15,7 @@ import {
 } from "@/lib/marketing/connector-catalog";
 import { jsonLdScript, marketingPageMetadata } from "@/lib/marketing/seo";
 import { scenariosForConnector } from "@/lib/marketing/pipeline-scenarios";
+import { connectorSyncModeLabel } from "@/lib/elt/pipeline-tool-labels";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -37,9 +38,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       connector.name,
       connector.slug,
       connector.role,
-      connector.tool ?? "elt",
-      "dlt",
-      "Sling",
       "ELT",
       "data pipeline",
     ],
@@ -112,7 +110,7 @@ export default async function ConnectorDetailPage({ params }: Props) {
             </span>
             {connector.tool ? (
               <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200">
-                {connector.tool}
+                {connectorSyncModeLabel(connector.tool)}
               </span>
             ) : null}
             <span className="text-xs text-slate-500 dark:text-slate-400">{connector.category}</span>
@@ -210,7 +208,7 @@ export default async function ConnectorDetailPage({ params }: Props) {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-900"
           >
-            dlt verified source docs
+            Connector documentation
             <ExternalLink className="h-4 w-4" />
           </a>
         ) : null}

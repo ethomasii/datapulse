@@ -65,19 +65,19 @@ const rows: Row[] = [
     others: "Meltano OSS; Matillion commercial; many Singer taps are open — the product wrapper varies.",
   },
   {
-    dimension: "vs dltHub (dlt)",
+    dimension: "vs DIY / code-first ELT",
     eltpulse:
-      "Control plane + UI on top of dlt/Sling — catalog wizard, runs, schedules, Git export. You get dlt's flexibility without wiring runners yourself.",
+      "Control plane + UI on top of open sync engines — catalog wizard, runs, schedules, Git export. You get code flexibility without wiring runners yourself.",
     fivetran: "—",
     airbyte: "—",
     hevo: "—",
     others:
-      "dlt is the open-source Python library (5,000+ sources, LLM-native docs). dltHub is building managed cloud on top. eltPulse competes on ease-of-use + observability while staying code-native.",
+      "Roll-your-own Python pipelines are flexible but you own runners, secrets, retries, and observability. eltPulse adds the product layer while keeping artifacts in your repo.",
   },
   {
     dimension: "vs Fivetran + dbt (merged 2026)",
     eltpulse:
-      "Git-native artifacts, BYO execution, no vendor lock-in. Competitive on connector breadth via dlt hub; wins on code ownership and transparent pricing.",
+      "Git-native artifacts, BYO execution, no vendor lock-in. Broad connector catalog; wins on code ownership and transparent pricing.",
     fivetran:
       "Unified ingest + transform platform post-merger — push-button connectors, dbt Wizard AI, Agents Schema. ~$600M ARR combined; optimized for managed SaaS.",
     airbyte: "—",
@@ -97,7 +97,6 @@ export default function ComparePage() {
       <p className="mt-4 max-w-3xl text-lg text-slate-600 dark:text-slate-300">
         Buyers compare dozens of tools:{" "}
         <span className="font-medium text-slate-800 dark:text-slate-200">Fivetran</span>,{" "}
-        <span className="font-medium text-slate-800 dark:text-slate-200">dltHub</span>,{" "}
         <span className="font-medium text-slate-800 dark:text-slate-200">Airbyte</span>,{" "}
         <span className="font-medium text-slate-800 dark:text-slate-200">Hevo</span>, Matillion, Meltano, Stitch,
         Portable, and others. None of them are “wrong” — they optimize for different constraints. This page situates{" "}

@@ -233,8 +233,8 @@ export default function PricingPage() {
               a: "Yes — 14 days when you upgrade from Billing. No credit card required to start on the Free plan.",
             },
             {
-              q: "How does eltPulse compare to Fivetran or dlt?",
-              a: "Fivetran is push-button managed SaaS; dlt is code-first and flexible. eltPulse gives you both: catalog wizard ease plus Git-exportable artifacts you own.",
+              q: "How does eltPulse compare to Fivetran?",
+              a: "Fivetran is push-button managed SaaS. eltPulse gives you catalog wizard ease plus Git-exportable artifacts you own — run on our workers, GitHub Actions, or your gateway.",
             },
           ].map(({ q, a }) => (
             <div key={q}>

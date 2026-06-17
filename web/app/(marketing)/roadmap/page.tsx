@@ -38,7 +38,7 @@ const ITEMS: {
   {
     status: "shipped",
     title: "Source catalog & AI assistant",
-    desc: "111+ connectors from the dlt hub registry, catalog wizard, and AI pipeline scaffolding in the builder.",
+    desc: "111+ connectors in the catalog, wizard UI, and AI pipeline scaffolding in the builder.",
   },
   {
     status: "shipped",

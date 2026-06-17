@@ -63,7 +63,7 @@ describe("deriveDltDbtFromCanvasNodes", () => {
 });
 
 describe("syncDltDbtWithCanvas", () => {
-  it("writes dlt_dbt when canvas has dbt transform", () => {
+  it("writes dbt transform config when canvas has dbt transform", () => {
     const base: Record<string, unknown> = {
       canvas: {
         v: 1,
@@ -72,16 +72,17 @@ describe("syncDltDbtWithCanvas", () => {
       },
     };
     syncDltDbtWithCanvas(base);
-    expect(base.dlt_dbt).toMatchObject({
+    expect(base.dbt).toMatchObject({
       enabled: true,
       package_path: "https://github.com/o/p.git",
       run_scope: "all",
     });
+    expect(base.dlt_dbt).toBeUndefined();
   });
 
-  it("does not touch dlt_dbt when canvas has no transform nodes", () => {
+  it("does not touch dbt config when canvas has no transform nodes", () => {
     const base: Record<string, unknown> = {
-      dlt_dbt: { enabled: true, package_path: "/keep" },
+      dbt: { enabled: true, package_path: "/keep" },
       canvas: {
         v: 1,
         nodes: [{ id: "s", type: "sourceNode", position: { x: 0, y: 0 }, data: {} } as Node],
@@ -89,12 +90,12 @@ describe("syncDltDbtWithCanvas", () => {
       },
     };
     syncDltDbtWithCanvas(base);
-    expect(base.dlt_dbt).toEqual({ enabled: true, package_path: "/keep" });
+    expect(base.dbt).toEqual({ enabled: true, package_path: "/keep" });
   });
 
-  it("removes dlt_dbt when transform is not dbt", () => {
+  it("removes dbt config when transform is not dbt", () => {
     const base: Record<string, unknown> = {
-      dlt_dbt: { enabled: true, package_path: "/x" },
+      dbt: { enabled: true, package_path: "/x" },
       canvas: {
         v: 1,
         nodes: [
@@ -109,7 +110,7 @@ describe("syncDltDbtWithCanvas", () => {
       },
     };
     syncDltDbtWithCanvas(base);
-    expect(base.dlt_dbt).toBeUndefined();
+    expect(base.dbt).toBeUndefined();
   });
 });
 

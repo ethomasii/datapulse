@@ -18,9 +18,9 @@ const sourceCount = getSourceCount();
 
 export const metadata: Metadata = marketingPageMetadata({
   title: "Connectors — sources & destinations",
-  description: `Browse ${sourceCount}+ ingestion sources and warehouse destinations supported by eltPulse — powered by dlt and Sling.`,
+  description: `Browse ${sourceCount}+ ingestion sources and warehouse destinations supported by eltPulse.`,
   path: "/connectors",
-  keywords: ["connectors", "data sources", "Snowflake", "Stripe", "GitHub", "dlt", "Sling", "ELT"],
+  keywords: ["connectors", "data sources", "Snowflake", "Stripe", "GitHub", "ELT", "data warehouse"],
 });
 
 export default function ConnectorsPage() {
@@ -38,9 +38,9 @@ export default function ConnectorsPage() {
       </h1>
       <p className="mt-4 max-w-3xl text-lg text-slate-600 dark:text-slate-300">
         eltPulse ships with{" "}
-        <strong className="font-medium text-slate-800 dark:text-slate-100">{sourceCount}+ sources</strong> from the
-        dlt hub registry plus {stats.destinationCount} warehouse and database destinations. Pick a connector to see auth
-        requirements, tooling (dlt vs Sling), and real-world pipeline scenarios.
+        <strong className="font-medium text-slate-800 dark:text-slate-100">{sourceCount}+ sources</strong> plus{" "}
+        {stats.destinationCount} warehouse and database destinations. Pick a connector to see auth requirements, sync
+        mode, and real-world pipeline scenarios.
       </p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">

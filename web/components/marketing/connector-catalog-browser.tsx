@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { ConnectorIcon } from "@/components/marketing/connector-icon";
 import type { MarketingConnector, MarketingConnectorRole } from "@/lib/marketing/connector-catalog";
+import { connectorSyncModeLabel } from "@/lib/elt/pipeline-tool-labels";
 import { TRUST_LABELS, TRUST_STYLES } from "@/lib/elt/connector-trust";
 
 type Props = {
@@ -36,7 +37,7 @@ function ConnectorCard({ c }: { c: MarketingConnector }) {
       </div>
       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
         {c.role === "source" ? "Source" : "Destination"}
-        {c.tool ? ` · ${c.tool}` : ""}
+        {c.tool ? ` · ${connectorSyncModeLabel(c.tool) ?? c.tool}` : ""}
         {" · "}
         {c.category}
       </p>

@@ -1,5 +1,6 @@
 import type { Node } from "@xyflow/react";
 import { isPipelineCanvasGraph } from "@/lib/elt/canvas-source-config";
+import { setDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
 
 // ── Post-transform (Python / SQL) canvas sync ─────────────────────────────────
 
@@ -137,12 +138,13 @@ export function syncDltDbtWithCanvas(base: Record<string, unknown>): void {
     (n) => String((n.data as DbtTransformNodeData | undefined)?.transformTool) === "dbt"
   );
   if (!hasDbt) {
+    delete base.dbt;
     delete base.dlt_dbt;
     return;
   }
 
   const derived = deriveDltDbtFromCanvasNodes(nodes);
-  if (derived !== undefined) base.dlt_dbt = derived;
+  if (derived !== undefined) setDbtTransformConfig(base, derived);
 }
 
 /** Hydrate transform node fields from persisted `dlt_dbt` when the node has not been edited yet. */

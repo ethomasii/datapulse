@@ -49,7 +49,7 @@ export default function PipelinesDocsPage() {
         <code>POST /api/elt/pipelines/declaration</code> (same session auth as the rest of the app). The document must
         include <code>eltpulse_pipeline_declaration: 1</code> and the same fields as{" "}
         <code>POST /api/elt/pipelines</code> (e.g. <code>name</code>, <code>sourceType</code>,{" "}
-        <code>destinationType</code>, <code>sourceConfiguration</code>, optional <code>dlt_dbt</code>,{" "}
+        <code>destinationType</code>, <code>sourceConfiguration</code>, optional <code>dbt</code> transform config,{" "}
         <code>_partitionConfig</code>, execution settings).
       </p>
       <ul>

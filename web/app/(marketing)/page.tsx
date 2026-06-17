@@ -33,7 +33,7 @@ const features = [
     icon: Layers,
     title: "Any source, any destination",
     description:
-      "Pick from the connector catalog. eltPulse picks dlt or Sling and scaffolds production-ready code.",
+      "Pick from the connector catalog. eltPulse scaffolds production-ready sync code for your stack.",
   },
   {
     icon: Zap,
@@ -135,8 +135,8 @@ export default function HomePage() {
             </h1>
             <p className="mt-6 text-lg text-slate-600 dark:text-slate-300">
               As easy as <span className="font-medium text-slate-800 dark:text-slate-200">Fivetran</span>, as flexible
-              as <span className="font-medium text-slate-800 dark:text-slate-200">dlt</span>. Design, run, and observe
-              pipelines — you own the code, we handle orchestration.
+              as owning your own pipelines. Design, run, and observe data movement — you own the code, we handle
+              orchestration.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4 lg:justify-start">
               <Link
@@ -205,8 +205,9 @@ export default function HomePage() {
             Stop duct-taping your data stack
           </h2>
           <p className="mt-4 text-slate-600 dark:text-slate-300">
-            Fivetran is push-button but you don&apos;t own the logic. dlt is powerful but you still wire up runners,
-            secrets, and observability yourself. eltPulse gives you both: one-click scaffolding and full code export.
+            Fivetran is push-button but you don&apos;t own the logic. DIY open-source stacks are powerful but you still
+            wire up runners, secrets, and observability yourself. eltPulse gives you both: one-click scaffolding and
+            full code export.
           </p>
         </div>
       </section>
@@ -251,7 +252,7 @@ export default function HomePage() {
             {
               step: "2",
               title: "Build",
-              desc: "Pick a connector from the catalog or ask the AI assistant. Review generated dlt/Sling code.",
+              desc: "Pick a connector from the catalog or ask the AI assistant. Review and export generated pipeline code.",
             },
             {
               step: "3",

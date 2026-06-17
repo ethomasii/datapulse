@@ -19,7 +19,7 @@ const ENTRIES: Entry[] = [
     highlights: [
       "dbt v2 hub — interactive /dbt page with package browser, scaffold-to-Git API, and sprint roadmap.",
       "Package picker in builder and canvas — connector staging packages, shared DbtConfigFields, ?dbt=1&source= deep links.",
-      "Run phases — extract → load → dbt telemetry when dlt_dbt is enabled; GHA worker installs dbt adapters.",
+      "Run phases — sync → load → dbt telemetry when dbt transform is enabled; GHA worker installs dbt adapters.",
     ],
   },
   {
@@ -37,7 +37,7 @@ const ENTRIES: Entry[] = [
     highlights: [
       "Production GHA execution — dispatch targets a specific run, stub fallback removed in GHA mode, Gateway setup checklist.",
       "Auto Git push — pipeline declaration YAML commits to your connected repo on save (disable with ELTPULSE_AUTO_GIT_PUSH=false).",
-      "Golden-path codegen — Stripe (stripe_analytics), Postgres (Sling streams + dlt sql_database), Snowflake destination hints.",
+      "Golden-path codegen — Stripe, Postgres database sync, Snowflake destination hints.",
     ],
   },
   {
@@ -70,7 +70,7 @@ const ENTRIES: Entry[] = [
     date: "2026-06-17",
     highlights: [
       "Quick start wizard — destination → source → create & run in under a minute.",
-      "Marketing site refresh: product preview hero, expanded homepage sections, pricing FAQ, compare vs dlt/Fivetran+dbt.",
+      "Marketing site refresh: product preview hero, expanded homepage sections, pricing FAQ, compare vs Fivetran+dbt.",
       "Workspace API keys with scoped access to pipelines, runs, and connections.",
       "In-process managed executor — runs complete immediately on Vercel without gateway setup.",
       "Stripe Checkout scaffold, org invites, progressive app sidebar, and help center FAQ.",

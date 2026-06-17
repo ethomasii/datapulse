@@ -39,30 +39,28 @@ export const CREDENTIAL_HINTS: Record<string, CredentialHint[]> = {
     { key: "SNOWFLAKE_DATABASE", label: "Database" },
     { key: "SNOWFLAKE_WAREHOUSE", label: "Warehouse" },
   ],
-  /** dlt BigQuery destination — see https://dlthub.com/docs/dlt-ecosystem/destinations/bigquery */
   bigquery: [
     {
       key: "GOOGLE_APPLICATION_CREDENTIALS",
       label: "Service account JSON path",
-      help: "Or configure the bigquery block in .dlt/secrets.toml",
+      help: "Or configure BigQuery credentials in the exported project secrets file",
     },
     {
       key: "DESTINATION__BIGQUERY__CREDENTIALS",
       label: "Inline / env-style credentials (advanced)",
-      help: "Per dlt secrets resolution for named profiles",
+      help: "For named credential profiles in environment variables",
     },
   ],
-  /** dlt DuckDB — file path is the main secret */
   duckdb: [
     {
-      key: ".dlt/secrets.toml",
-      label: "duckdb.credentials",
-      help: "Typically database path for the DuckDB file (see dlt DuckDB destination)",
+      key: "DESTINATION__DUCKDB__CREDENTIALS",
+      label: "DuckDB database path",
+      help: "Path to the DuckDB file for local or embedded analytics",
     },
     {
-      key: "DESTINATION__DUCKDB__CREDENTIALS",
-      label: "Env-style path object",
-      help: "When using environment-based dlt configuration",
+      key: "DUCKDB_DATABASE",
+      label: "Database path (env)",
+      help: "When using environment-based configuration",
     },
   ],
   motherduck: [
@@ -72,23 +70,23 @@ export const CREDENTIAL_HINTS: Record<string, CredentialHint[]> = {
       help: "https://motherduck.com/docs",
     },
     {
-      key: ".dlt/secrets.toml",
-      label: "motherduck.credentials",
-      help: "Token and database in dlt secrets",
+      key: "MOTHERDUCK_DATABASE",
+      label: "MotherDuck database name",
+      help: "Token and database in exported project secrets",
     },
   ],
   sqlite: [
     {
-      key: ".dlt/secrets.toml",
-      label: "sqlite.credentials (file path)",
-      help: "dlt SQLite destination",
+      key: "SQLITE_DATABASE",
+      label: "SQLite file path",
+      help: "Path to the SQLite database file",
     },
   ],
   filesystem: [
     {
-      key: ".dlt/secrets.toml",
+      key: "FILESYSTEM_PATH",
       label: "filesystem / bucket credentials",
-      help: "Depends on layout (local path vs cloud); see dlt filesystem destination",
+      help: "Local path or cloud storage credentials depending on layout",
     },
   ],
   clickhouse: [

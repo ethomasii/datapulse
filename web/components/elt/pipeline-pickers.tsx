@@ -2,6 +2,7 @@
 
 import { useId, useMemo, useState } from "react";
 import { Search } from "lucide-react";
+import { pipelineToolLabel } from "@/lib/elt/pipeline-tool-labels";
 
 export type PipelinePickerRow = {
   id: string;
@@ -148,7 +149,7 @@ export function PipelineMultiPicker({
                 <span className="font-medium text-slate-900 dark:text-slate-100">{p.name}</span>
                 <span className="mt-0.5 block font-mono text-[11px] text-slate-500 dark:text-slate-400">{p.id}</span>
                 <span className="mt-0.5 block text-xs text-slate-500">
-                  {p.sourceType} → {p.destinationType} ({p.tool})
+                  {p.sourceType} → {p.destinationType} ({pipelineToolLabel(p.tool)})
                   {!p.enabled ? " · disabled" : ""}
                 </span>
               </span>
@@ -235,7 +236,7 @@ export function PipelineSinglePicker({ pipelines, value, onChange, loading }: Pi
                   <span className="font-medium text-slate-900 dark:text-slate-100">{p.name}</span>
                   <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">{p.id}</span>
                   <span className="text-xs text-slate-500">
-                    {p.sourceType} → {p.destinationType} ({p.tool})
+                    {p.sourceType} → {p.destinationType} ({pipelineToolLabel(p.tool)})
                     {!p.enabled ? " · disabled" : ""}
                   </span>
                 </button>

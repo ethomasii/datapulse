@@ -1,5 +1,6 @@
 import type { PipelineRequest } from "./types";
 import { escapePyString } from "./escape-py";
+import { readDbtTransformConfig } from "./dbt-run-phases";
 import { partitionColumnFromSourceConfiguration } from "./run-partition-resolution";
 
 function dbtDestination(request: PipelineRequest): string {
@@ -46,7 +47,7 @@ export function partitionColumnForDbtVars(request: PipelineRequest): string | nu
  * Optional post-load dbt step using the dlt dbt runner.
  * @see https://dlthub.com/docs/dlt-ecosystem/transformations/dbt
  *
- * Enable via `source_configuration.dlt_dbt`:
+ * Enable via `source_configuration.dbt` (legacy: `dlt_dbt`):
  * `{ "enabled": true, "package_path": "...", "slice_value_var"?, "slice_column_var"?, ... }`
  *
  * Slice runs: when `run(partition_key=...)` is used, the dbt step receives dlt `additional_vars` using the
@@ -54,9 +55,9 @@ export function partitionColumnForDbtVars(request: PipelineRequest): string | nu
  * Map to an existing project by setting those to the names your models already call `var(...)`.
  */
 export function dltDbtRunnerBeforeReturn(request: PipelineRequest): string {
-  const raw = request.sourceConfiguration?.dlt_dbt;
-  if (!raw || typeof raw !== "object") return "";
-  const d = raw as Record<string, unknown>;
+  const raw = readDbtTransformConfig(request.sourceConfiguration);
+  if (!raw) return "";
+  const d = raw;
   if (!Boolean(d.enabled)) return "";
   const packagePath = String(d.package_path ?? "").trim();
   if (!packagePath) return "";

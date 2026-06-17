@@ -4,6 +4,7 @@ import Link from "next/link";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { Activity } from "lucide-react";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { MarketingNavLinks } from "@/components/layout/marketing-nav";
 
 export function MarketingHeader() {
   return (
@@ -13,40 +14,11 @@ export function MarketingHeader() {
           <Activity className="h-6 w-6 text-sky-600" aria-hidden />
           eltPulse
         </Link>
-        <nav className="flex flex-wrap items-center justify-end gap-x-2 gap-y-2 text-sm font-medium text-slate-600 dark:text-slate-300 sm:gap-x-4">
-          <Link href="/connectors" className="hover:text-slate-900 dark:hover:text-white">
-            Connectors
-          </Link>
-          <Link href="/scenarios" className="hover:text-slate-900 dark:hover:text-white">
-            Scenarios
-          </Link>
-          <Link href="/dbt" className="hidden hover:text-slate-900 lg:inline dark:hover:text-white">
-            dbt
-          </Link>
-          <Link href="/features" className="hidden hover:text-slate-900 md:inline dark:hover:text-white">
-            Features
-          </Link>
-          <Link href="/docs" className="hidden hover:text-slate-900 md:inline dark:hover:text-white">
-            Docs
-          </Link>
-          <Link href="/roadmap" className="hover:text-slate-900 dark:hover:text-white">
-            Roadmap
-          </Link>
-          <Link href="/changelog" className="hidden hover:text-slate-900 md:inline dark:hover:text-white">
-            Changelog
-          </Link>
-          <Link href="/pricing" className="hover:text-slate-900 dark:hover:text-white">
-            Pricing
-          </Link>
-          <Link href="/compare" className="hidden hover:text-slate-900 lg:inline dark:hover:text-white">
-            Compare
-          </Link>
+        <nav className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 text-sm font-medium text-slate-600 dark:text-slate-300 sm:gap-x-5">
+          <MarketingNavLinks />
           <ThemeToggle />
           <SignedOut>
-            <Link
-              href="/sign-in"
-              className="hidden hover:text-slate-900 sm:inline dark:hover:text-white"
-            >
+            <Link href="/sign-in" className="hidden hover:text-slate-900 sm:inline dark:hover:text-white">
               Sign in
             </Link>
             <Link

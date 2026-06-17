@@ -1,4 +1,8 @@
-/** dlt-hub community dbt packages — shared by API, /dbt hub, and package picker. */
+/** Curated dbt Hub staging packages — shared by API, /dbt hub, and package picker. */
+
+export function dbtHubPackageDisplayName(packageId: string): string {
+  return packageId.replace(/^dlt-hub\//, "");
+}
 
 export type DbtHubPackage = {
   sourceKey: string;

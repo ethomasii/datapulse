@@ -27,7 +27,7 @@ const FEATURES = [
     icon: Layers,
     title: "111+ connectors",
     description:
-      "Snowflake, BigQuery, Postgres, Stripe, Salesforce, and more. Browse the catalog and pipeline scenarios — eltPulse picks dlt or Sling and scaffolds production-ready code.",
+      "Snowflake, BigQuery, Postgres, Stripe, Salesforce, and more. Browse the catalog and pipeline scenarios — eltPulse scaffolds production-ready sync code.",
     preview: "builder" as const,
   },
   {
@@ -55,7 +55,7 @@ const FEATURES = [
     icon: GitBranch,
     title: "Git-native artifacts",
     description:
-      "Export dlt/Sling projects to your repo. Pipeline YAML auto-pushes on save when GitHub is connected — review in PRs.",
+      "Export pipeline projects to your repo. Pipeline YAML auto-pushes on save when GitHub is connected — review in PRs.",
     preview: "builder" as const,
   },
   {
@@ -69,7 +69,7 @@ const FEATURES = [
     icon: Key,
     title: "Public API (beta)",
     description:
-      "Workspace API keys for pipelines, runs, and connections. Automate CI/CD the way dltHub power users do — without self-hosting the UI.",
+      "Workspace API keys for pipelines, runs, and connections. Automate CI/CD from your own runners — without self-hosting the control plane.",
     preview: null,
   },
   {
@@ -97,7 +97,7 @@ const CASE_STUDIES = [
   },
   {
     quote:
-      "Git export was the deciding factor — our dbt models and dlt pipelines live in one repo now. Reviewers see the full lineage in PRs.",
+      "Git export was the deciding factor — our dbt models and sync pipelines live in one repo now. Reviewers see the full lineage in PRs.",
     role: "Analytics lead",
     company: "E-commerce",
   },
@@ -123,7 +123,7 @@ export default function FeaturesPage() {
         <div className="mx-auto max-w-6xl">
           <p className="text-sm font-semibold uppercase tracking-wide text-sky-600">Platform</p>
           <h1 className="mt-2 max-w-3xl text-4xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-5xl">
-            Everything you need to compete with Fivetran, Airbyte, and dltHub
+            Everything you need to compete with Fivetran, Airbyte, and legacy managed ELT
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-slate-600 dark:text-slate-400">
             Visual builder, real execution paths, team collaboration, and transparent billing — built for data teams

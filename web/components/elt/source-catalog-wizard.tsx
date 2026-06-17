@@ -158,7 +158,7 @@ function SourceCard({ source, onSelect }: { source: DltHubSource; onSelect: () =
         </span>
         {source.sourceType === 'verified' && (
           <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-medium bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300">
-            dlt verified
+            Verified
           </span>
         )}
         {source.incremental && (
@@ -294,7 +294,7 @@ function ConfigureStep({
       {loading && (
         <div className="flex items-center gap-2 text-slate-500 py-4">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-sm">Fetching source config from dlthub.com…</span>
+          <span className="text-sm">Fetching connector configuration…</span>
         </div>
       )}
 
@@ -652,7 +652,7 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
       sourceType: 'rest_api',
       destinationType: destination,
       tool: 'dlt',
-      description: `${source.name} → ${destination} (${filteredResources.length} resources via dlthub context)`,
+      description: `${source.name} → ${destination} (${filteredResources.length} resources)`,
       sourceConfiguration: {
         advanced_config: JSON.stringify(advancedConfig),
         resource_name: filteredResources[0] ? (filteredResources[0] as { name: string }).name : 'data',

@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Info,
 } from 'lucide-react';
+import { pipelineToolLabel } from '@/lib/elt/pipeline-tool-labels';
 import Link from 'next/link';
 import { RelatedLinks } from '@/components/ui/related-links';
 
@@ -334,7 +335,7 @@ export default function SchedulePage() {
                       <>
                         <span className="mx-1 text-slate-300 dark:text-slate-700">·</span>
                         <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs dark:bg-slate-800">
-                          {pipeline.tool}
+                          {pipelineToolLabel(pipeline.tool)}
                         </span>
                       </>
                     )}

@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import type { DbtHubPackage } from "@/lib/elt/dbt-hub-packages";
 import { DbtPackagePicker } from "@/components/dbt/dbt-package-picker";
+import type { DbtHubPackage } from "@/lib/elt/dbt-hub-packages";
+import { dbtHubPackageDisplayName } from "@/lib/elt/dbt-hub-packages";
 
 export type DbtConfigValues = {
   packagePath: string;

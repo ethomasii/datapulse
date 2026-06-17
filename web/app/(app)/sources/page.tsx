@@ -157,7 +157,7 @@ export default function SourcesPage() {
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-400 dark:hover:text-white transition-colors"
           >
-            <ExternalLink className="h-3.5 w-3.5" /> Connector source code
+            <ExternalLink className="h-3.5 w-3.5" /> Open-source connector packages
           </a>
         </div>
       </div>
@@ -219,7 +219,7 @@ export default function SourcesPage() {
         ))
       )}
 
-      {/* Sling note */}
+      {/* Database replication note */}
       <section className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-6 dark:border-slate-700 dark:bg-slate-900/40">
         <div className="flex items-start gap-3">
           <RefreshCw className="mt-0.5 h-5 w-5 shrink-0 text-teal-600" />

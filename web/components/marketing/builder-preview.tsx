@@ -25,13 +25,12 @@ export function BuilderPreview() {
           </div>
         </div>
         <div className="p-3 sm:col-span-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Generated dlt</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Generated pipeline</p>
           <pre className="mt-2 overflow-hidden rounded-lg bg-slate-950 p-3 text-[9px] leading-relaxed text-emerald-400">
-            {`@dlt.resource
-def stripe_customers():
+            {`def stripe_customers():
     yield from rest_api(...)
 
-pipeline = dlt.pipeline(
+pipeline.run(
   destination="snowflake"
 )`}
           </pre>

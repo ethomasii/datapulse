@@ -666,7 +666,7 @@ function CreateMonitorForm({ onClose, onSuccess }: { onClose: () => void; onSucc
             <p className="mt-1 text-[11px] leading-snug text-slate-600 dark:text-slate-400">
               If you list values below, eltPulse queues <strong className="font-medium">one pending run per line</strong>{" "}
               with <code className="rounded bg-white px-0.5 font-mono text-[10px] dark:bg-slate-900">partitionValue</code>{" "}
-              set for your gateway (same as dlt <code className="font-mono text-[10px]">partition_key</code>). Leave empty
+              set for your gateway (same as the pipeline <code className="font-mono text-[10px]">partition_key</code>). Leave empty
               for a single run with no slice. Partition column defaults from the pipeline&apos;s Run slices config unless
               you override it.
             </p>

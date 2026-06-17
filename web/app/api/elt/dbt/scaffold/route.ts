@@ -5,6 +5,7 @@ import { db } from "@/lib/db/client";
 import { generateDbtScaffoldFiles, scaffoldPackagePathForPipeline } from "@/lib/elt/dbt-scaffold";
 import { resolveDbtHubPackage } from "@/lib/elt/dbt-hub-packages";
 import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
+import { setDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
 import { getGithubConnectionForUser } from "@/lib/db/github-connection-query";
 import { getGithubAccessTokenForUser } from "@/lib/integrations/github-access-token";
 import { githubJson, githubRepoContentsApiPath } from "@/lib/integrations/github-rest";
@@ -96,13 +97,13 @@ export async function POST(req: Request) {
   }
 
   const src = { ...(pipeline.sourceConfiguration as Record<string, unknown>) };
-  src.dlt_dbt = {
+  setDbtTransformConfig(src, {
     enabled: true,
     package_path: packagePath,
     dataset_name: `${pipeline.name.replace(/[^a-zA-Z0-9_]/g, "_")}_dbt`,
     run_scope: "all",
     hub_package: hub.package,
-  };
+  });
   await db.eltPipeline.update({
     where: { id: pipeline.id },
     data: { sourceConfiguration: src as object },

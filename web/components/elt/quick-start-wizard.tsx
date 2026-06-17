@@ -480,7 +480,7 @@ export function QuickStartWizard({
           </p>
           {executionLabel === "Demo (stub)" ? (
             <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-              Demo mode — configure GitHub Actions under Gateway for real dlt/Sling runs.
+              Demo mode — configure GitHub Actions under Gateway for real pipeline runs.
             </p>
           ) : null}
           <div className="mt-6 flex flex-wrap justify-center gap-3">

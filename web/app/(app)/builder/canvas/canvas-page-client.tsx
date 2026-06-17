@@ -34,6 +34,7 @@ import {
 } from "@/lib/elt/canvas-source-config";
 import { chooseTool } from "@/lib/elt/choose-tool";
 import { enrichTransformNodesFromDltDbt, enrichPostTransformNodes } from "@/lib/elt/dbt-canvas";
+import { readDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
 import { attachCanvasToSourceConfiguration } from "@/lib/elt/merge-canvas-into-source-config";
 import { minimalSourceConfigurationForNewPipeline } from "@/lib/elt/minimal-source-configuration";
 import { ensureGithubReposForForm } from "@/lib/elt/normalize-source-configuration";
@@ -272,7 +273,7 @@ export function CanvasPageClient() {
       hydrateFormFromSourceConfig(cfg, st, dt);
       const canvas = getCanvasFromSourceConfig(cfg);
       if (canvas && Array.isArray(canvas.nodes) && Array.isArray(canvas.edges)) {
-        const rawDbt = cfg.dlt_dbt;
+        const rawDbt = readDbtTransformConfig(cfg);
         const dbtObj =
           rawDbt && typeof rawDbt === "object" && !Array.isArray(rawDbt) ? (rawDbt as Record<string, unknown>) : null;
         const rawPt = cfg.post_transform;

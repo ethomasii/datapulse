@@ -40,7 +40,7 @@ function descriptionForSlug(slug: string, role: MarketingConnectorRole): string 
 
   const conn = ALL_CONNECTORS.find((c) => c.slug === slug);
   if (conn?.label) {
-    return `${conn.label} — ${role === "destination" ? "load pipeline output" : "extract data"} via eltPulse (dlt or Sling).`;
+    return `${conn.label} — ${role === "destination" ? "load pipeline output" : "extract data"} via eltPulse.`;
   }
 
   const label = connectorDisplayName(slug);

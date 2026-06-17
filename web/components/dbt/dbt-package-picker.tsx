@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { DbtHubPackage } from "@/lib/elt/dbt-hub-packages";
+import { dbtHubPackageDisplayName } from "@/lib/elt/dbt-hub-packages";
 
 type Props = {
   sourceSlug?: string;
@@ -60,7 +61,9 @@ export function DbtPackagePicker({ sourceSlug, onSelect, className = "" }: Props
               onClick={() => onSelect(pkg, `./dbt/${pkg.sourceKey}`)}
               className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm transition hover:border-sky-300 hover:bg-sky-50/50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-sky-800"
             >
-              <span className="font-mono text-xs font-semibold text-sky-700 dark:text-sky-300">{pkg.package}</span>
+              <span className="font-mono text-xs font-semibold text-sky-700 dark:text-sky-300">
+                {dbtHubPackageDisplayName(pkg.package)}
+              </span>
               <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">{pkg.description}</p>
               <p className="mt-1 font-mono text-[10px] text-slate-500">
                 Models: {pkg.models.join(", ")}

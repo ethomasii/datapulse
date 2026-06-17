@@ -15,6 +15,7 @@ import {
   Workflow,
 } from "lucide-react";
 import type { DbtHubPackage } from "@/lib/elt/dbt-hub-packages";
+import { dbtHubPackageDisplayName } from "@/lib/elt/dbt-hub-packages";
 
 const V2_ROADMAP = [
   { id: "packages", label: "Connector staging package picker", done: true },
@@ -24,7 +25,7 @@ const V2_ROADMAP = [
   { id: "manifest", label: "Manifest + model list on run detail", done: false },
   { id: "lineage", label: "Canvas lineage (source → staging → marts)", done: false },
   { id: "hooks", label: "Webhooks with dbt test failures", done: false },
-  { id: "sling", label: "Post-Sling dbt job type", done: false },
+  { id: "replication-dbt", label: "Post-replication dbt job type", done: false },
 ] as const;
 
 export function DbtHubPageClient() {
@@ -186,7 +187,9 @@ export function DbtHubPageClient() {
                     Connector
                   </Link>
                 </div>
-                <p className="mt-1 font-mono text-xs text-sky-700 dark:text-sky-300">{pkg.package}</p>
+                <p className="mt-1 font-mono text-xs text-sky-700 dark:text-sky-300">
+                  {dbtHubPackageDisplayName(pkg.package)}
+                </p>
                 <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{pkg.description}</p>
                 <p className="mt-2 font-mono text-[10px] text-slate-500">{pkg.models.join(" · ")}</p>
                 <div className="mt-3 flex flex-wrap gap-2">

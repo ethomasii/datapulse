@@ -25,6 +25,7 @@ import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
 import { DbtConfigFields } from "@/components/dbt/dbt-config-fields";
 import { SourceCatalogWizard } from "@/components/elt/source-catalog-wizard";
 import { chooseTool } from "@/lib/elt/choose-tool";
+import { readDbtTransformConfig, setDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
 import { RelatedLinks } from "@/components/ui/related-links";
 import {
   DESTINATION_OPTIONS,
@@ -265,22 +266,22 @@ export function BuilderClient({
     // dbt transform
     if (postTransformType === "dbt") {
       if (dbtPackagePath.trim()) {
-        const dltDbt: Record<string, unknown> = {
+        const dbtTransform: Record<string, unknown> = {
           enabled: true,
           package_path: dbtPackagePath.trim(),
           run_scope: dbtRunScope,
         };
-        if (dbtDatasetName.trim()) dltDbt.dataset_name = dbtDatasetName.trim();
-        if (dbtRepositoryBranch.trim()) dltDbt.package_repository_branch = dbtRepositoryBranch.trim();
-        if (dbtRunScope === "selection" && dbtSelector.trim()) dltDbt.selector = dbtSelector.trim();
-        if (dbtSliceValueVar.trim()) dltDbt.slice_value_var = dbtSliceValueVar.trim();
-        if (dbtSliceColumnVar.trim()) dltDbt.slice_column_var = dbtSliceColumnVar.trim();
-        next.dlt_dbt = dltDbt;
+        if (dbtDatasetName.trim()) dbtTransform.dataset_name = dbtDatasetName.trim();
+        if (dbtRepositoryBranch.trim()) dbtTransform.package_repository_branch = dbtRepositoryBranch.trim();
+        if (dbtRunScope === "selection" && dbtSelector.trim()) dbtTransform.selector = dbtSelector.trim();
+        if (dbtSliceValueVar.trim()) dbtTransform.slice_value_var = dbtSliceValueVar.trim();
+        if (dbtSliceColumnVar.trim()) dbtTransform.slice_column_var = dbtSliceColumnVar.trim();
+        setDbtTransformConfig(next, dbtTransform);
       } else {
-        next.dlt_dbt = { enabled: false };
+        setDbtTransformConfig(next, { enabled: false });
       }
     } else {
-      delete next.dlt_dbt;
+      setDbtTransformConfig(next, undefined);
     }
     return next;
   }
@@ -462,7 +463,7 @@ export function BuilderClient({
     setPipelineWebhookUrl(typeof p.runsWebhookUrl === "string" ? p.runsWebhookUrl : "");
     setCanvasGraph(getCanvasFromSourceConfig(cfg));
     const pt = cfg.post_transform as Record<string, unknown> | undefined;
-    const dbtCfg = cfg.dlt_dbt as Record<string, unknown> | undefined;
+    const dbtCfg = readDbtTransformConfig(cfg);
     if (dbtCfg?.enabled && dbtCfg?.package_path) {
       setPostTransformType("dbt");
       setDbtPackagePath(String(dbtCfg.package_path ?? ""));

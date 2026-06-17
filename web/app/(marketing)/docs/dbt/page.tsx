@@ -28,9 +28,7 @@ export default function DbtDocsPage() {
       </ol>
 
       <h2>Configuration shape</h2>
-      <p>
-        Transform settings are persisted on the pipeline (API field <code>sourceConfiguration.dlt_dbt</code>):
-      </p>
+      <p>Transform settings are persisted on the pipeline under <code>sourceConfiguration.dbt</code>:</p>
       <pre>{`{
   "enabled": true,
   "package_path": "./dbt",
@@ -53,7 +51,7 @@ export default function DbtDocsPage() {
       <h2>Connector staging packages</h2>
       <p>
         Many verified connectors have community staging packages on the dbt Hub (e.g.{" "}
-        <code>dlt-hub/stripe_source</code>). See the <Link href="/dbt">transform hub</Link> to browse by connector, or
+        <code>stripe_source</code>). See the <Link href="/dbt">transform hub</Link> to browse by connector, or start
         start from the <Link href="/connectors">connector catalog</Link>.
       </p>
 

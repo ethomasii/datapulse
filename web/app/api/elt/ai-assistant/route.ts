@@ -84,7 +84,7 @@ const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "suggest_rest_api_config",
-    description: "Given a REST API URL and optional docs snippet, suggest the dlt rest_api source configuration: pagination type, auth method, data_selector, and cursor field for incremental loading.",
+    description: "Given a REST API URL and optional docs snippet, suggest REST API source configuration: pagination type, auth method, data_selector, and cursor field for incremental loading.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -208,7 +208,7 @@ function toolGetSourceDetails(slug: string) {
   return {
     slug,
     name: slug,
-    description: "Source in built-in catalog (no dlt verified package — uses generic or Sling template).",
+    description: "Source in built-in catalog (uses generic connector sync or database replication template).",
     tool: chooseTool(slug, "duckdb"),
     in_catalog: true,
   };
