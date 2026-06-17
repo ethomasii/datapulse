@@ -82,6 +82,11 @@ const ITEMS: {
   },
   {
     status: "shipped",
+    title: "Assets v3 — warehouse verification",
+    desc: "Compare config-derived landing tables to live warehouse catalogs (Postgres, Snowflake, BigQuery, DuckDB, MotherDuck, Databricks, ClickHouse, MySQL, Trino, Redshift, SQLite); verified/missing badges on /assets.",
+  },
+  {
+    status: "shipped",
     title: "Assets v2 — freshness, lineage, dbt on runs",
     desc: "Fresh/stale badges, per-pipeline lineage graph, dbt manifest on run detail, webhook test failures, post-replication dbt in asset map.",
   },

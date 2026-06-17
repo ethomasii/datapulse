@@ -7,7 +7,7 @@ nextEnv.loadEnvConfig(process.cwd());
 const nextConfig = {
   experimental: {
     // Avoid bundling a stale Prisma client that drops model delegates (e.g. githubConnection).
-    serverComponentsExternalPackages: ["@prisma/client"],
+    serverComponentsExternalPackages: ["@prisma/client", "duckdb", "mysql2"],
   },
 };
 

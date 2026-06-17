@@ -4,13 +4,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  CheckCircle2,
   Database,
   GitBranch,
+  HelpCircle,
   Layers,
   Loader2,
   PlayCircle,
+  RefreshCw,
   Search,
   Table2,
+  XCircle,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RelatedLinks } from "@/components/ui/related-links";
@@ -18,12 +22,18 @@ import { AssetLineageGraph } from "@/components/assets/asset-lineage-graph";
 import { buildAssetLineageGraph } from "@/lib/elt/asset-lineage";
 import { computePipelineFreshness } from "@/lib/elt/asset-freshness";
 import { syncModeLabel } from "@/lib/elt/pipeline-tool-labels";
+import type { WarehouseVerificationSummary } from "@/lib/elt/asset-warehouse-reconcile";
 import type {
   PipelineAssetBundle,
+  WarehouseAssetStatus,
   WorkspaceAsset,
   WorkspaceAssetKind,
   WorkspaceAssetsResponse,
 } from "@/lib/elt/pipeline-assets";
+
+type AssetsPageData = WorkspaceAssetsResponse & {
+  warehouseVerification?: WarehouseVerificationSummary;
+};
 
 type ViewMode = "pipelines" | "flat";
 type KindFilter = "all" | WorkspaceAssetKind;
@@ -110,6 +120,56 @@ function AssetKindBadge({ kind }: { kind: WorkspaceAssetKind }) {
   );
 }
 
+const WAREHOUSE_STATUS_META: Record<
+  WarehouseAssetStatus,
+  { label: string; badge: string; icon: React.ComponentType<{ className?: string }> }
+> = {
+  verified: {
+    label: "In warehouse",
+    badge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200",
+    icon: CheckCircle2,
+  },
+  missing: {
+    label: "Missing",
+    badge: "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200",
+    icon: XCircle,
+  },
+  unknown: {
+    label: "Unknown",
+    badge: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+    icon: HelpCircle,
+  },
+  not_checked: {
+    label: "Not checked",
+    badge: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+    icon: HelpCircle,
+  },
+};
+
+function WarehouseStatusBadge({ status, runObserved }: { status?: WarehouseAssetStatus; runObserved?: boolean }) {
+  if (!status && !runObserved) return null;
+  if (runObserved && status !== "missing") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[9px] font-medium text-violet-800 dark:bg-violet-950/50 dark:text-violet-200"
+        title="Observed on last dbt run"
+      >
+        <CheckCircle2 className="h-3 w-3" aria-hidden />
+        Last run
+      </span>
+    );
+  }
+  if (!status || status === "not_checked") return null;
+  const meta = WAREHOUSE_STATUS_META[status];
+  const Icon = meta.icon;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${meta.badge}`}>
+      <Icon className="h-3 w-3" aria-hidden />
+      {meta.label}
+    </span>
+  );
+}
+
 function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBundle; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
   const allAssets = [bundle.source, ...bundle.rawAssets, ...bundle.transforms, ...bundle.postTransforms];
@@ -140,6 +200,11 @@ function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBund
             >
               {freshness.label}
             </span>
+            {bundle.warehouseChecked ? (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200">
+                Warehouse verified
+              </span>
+            ) : null}
           </div>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             <span className="font-medium text-slate-800 dark:text-slate-200">{bundle.sourceType}</span>
@@ -217,6 +282,9 @@ function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBund
               {bundle.lastRun.dbtManifest.source === "runner" ? " (runner-reported)" : " (from config)"}
             </p>
           ) : null}
+          {bundle.warehouseMessage ? (
+            <p className="text-xs text-slate-500 dark:text-slate-400">{bundle.warehouseMessage}</p>
+          ) : null}
           <ul className="space-y-2">
             {allAssets.map((asset) => (
               <li
@@ -234,6 +302,7 @@ function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBund
                   {asset.landingQualified ? (
                     <code className="truncate font-mono text-[11px] text-slate-500">{asset.landingQualified}</code>
                   ) : null}
+                  <WarehouseStatusBadge status={asset.warehouseStatus} runObserved={asset.runObserved} />
                 </div>
                 {asset.dbtPackage ? (
                   <span className="text-[11px] text-slate-500">{asset.dbtPackage.replace(/^dlt-hub\//, "")}</span>
@@ -248,24 +317,28 @@ function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBund
 }
 
 export function AssetsPageClient() {
-  const [data, setData] = useState<WorkspaceAssetsResponse | null>(null);
+  const [data, setData] = useState<AssetsPageData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [view, setView] = useState<ViewMode>("pipelines");
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (verifyWarehouse = false) => {
+    if (verifyWarehouse) setVerifying(true);
+    else setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/elt/assets");
+      const url = verifyWarehouse ? "/api/elt/assets?verifyWarehouse=1" : "/api/elt/assets";
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to load assets");
-      setData((await res.json()) as WorkspaceAssetsResponse);
+      setData((await res.json()) as AssetsPageData);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
-      setLoading(false);
+      if (verifyWarehouse) setVerifying(false);
+      else setLoading(false);
     }
   }, []);
 
@@ -312,7 +385,8 @@ export function AssetsPageClient() {
         <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Workspace assets</h1>
         <p className="mt-3 max-w-3xl text-slate-600 dark:text-slate-300">
           A config-derived inventory of what your pipelines ingest, where raw data lands, and which dbt models transform
-          it. eltPulse figures out the sync engine — you see sources, tables, and transforms in one place.
+          it. Verify against your warehouse to see which tables are present — Postgres, Snowflake, BigQuery,
+          DuckDB, MotherDuck, Databricks, ClickHouse, MySQL, Trino, Redshift, and SQLite are supported.
         </p>
       </div>
 
@@ -342,6 +416,24 @@ export function AssetsPageClient() {
             <SummaryCard label="Sources" value={data.summary.sources} icon={Database} />
           </div>
 
+          {data.warehouseVerification ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-950/50">
+              <p className="font-medium text-slate-900 dark:text-white">Warehouse verification</p>
+              <p className="mt-1 text-slate-600 dark:text-slate-400">
+                {data.warehouseVerification.verifiedAssets} verified · {data.warehouseVerification.missingAssets} missing
+                · {data.warehouseVerification.destinationsIntrospected} destination
+                {data.warehouseVerification.destinationsIntrospected === 1 ? "" : "s"} introspected
+              </p>
+              {data.warehouseVerification.messages.length > 0 ? (
+                <ul className="mt-2 list-inside list-disc text-xs text-amber-800 dark:text-amber-200">
+                  {data.warehouseVerification.messages.slice(0, 5).map((m) => (
+                    <li key={m}>{m}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative max-w-md flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
@@ -354,6 +446,15 @@ export function AssetsPageClient() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void load(true)}
+                disabled={verifying}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-sky-300 hover:text-sky-700 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              >
+                {verifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                Verify in warehouse
+              </button>
               <div className="flex rounded-lg border border-slate-200 p-0.5 dark:border-slate-700">
                 {(["pipelines", "flat"] as const).map((mode) => (
                   <button
@@ -404,6 +505,7 @@ export function AssetsPageClient() {
                     <th className="px-4 py-2 font-medium">Asset</th>
                     <th className="px-4 py-2 font-medium">Kind</th>
                     <th className="px-4 py-2 font-medium">Landing</th>
+                    <th className="px-4 py-2 font-medium">Warehouse</th>
                     <th className="px-4 py-2 font-medium">Pipeline</th>
                     <th className="px-4 py-2 font-medium" />
                   </tr>
@@ -417,6 +519,9 @@ export function AssetsPageClient() {
                       </td>
                       <td className="px-4 py-2.5 font-mono text-xs text-slate-500">
                         {asset.landingQualified ?? asset.landingDataset ?? "—"}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <WarehouseStatusBadge status={asset.warehouseStatus} runObserved={asset.runObserved} />
                       </td>
                       <td className="px-4 py-2.5 text-slate-600 dark:text-slate-400">{asset.pipelineName}</td>
                       <td className="px-4 py-2.5 text-right">

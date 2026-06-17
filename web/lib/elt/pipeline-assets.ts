@@ -12,11 +12,14 @@ import {
 } from "@/lib/elt/pipeline-tool-labels";
 import { parseRunTelemetry } from "@/lib/elt/run-telemetry";
 import type { AssetFreshness } from "@/lib/elt/asset-freshness";
+import { enrichBundleFromDbtManifest } from "@/lib/elt/asset-warehouse-reconcile";
 import { computePipelineFreshness } from "@/lib/elt/asset-freshness";
 
 export type PipelineSyncMode = "connector_sync" | "database_replication";
 
 export type WorkspaceAssetKind = "source" | "raw" | "transform" | "post_transform";
+
+export type WarehouseAssetStatus = "verified" | "missing" | "unknown" | "not_checked";
 
 export type WorkspaceAsset = {
   id: string;
@@ -39,6 +42,10 @@ export type WorkspaceAsset = {
   dbtPackage?: string;
   /** In-pipeline dbt (connector sync) vs post-replication job (database replication). */
   transformScope?: "in_pipeline" | "post_replication";
+  /** Present after warehouse verification or last-run dbt manifest match. */
+  warehouseStatus?: WarehouseAssetStatus;
+  /** Transform appeared in the last run dbt manifest. */
+  runObserved?: boolean;
   enabled: boolean;
 };
 
@@ -67,6 +74,9 @@ export type PipelineAssetBundle = {
   transforms: WorkspaceAsset[];
   postTransforms: WorkspaceAsset[];
   lastRun?: PipelineLastRunSummary;
+  /** Destination catalog was queried for this pipeline. */
+  warehouseChecked?: boolean;
+  warehouseMessage?: string;
   updatedAt: string;
 };
 
@@ -449,7 +459,9 @@ export function buildWorkspaceAssets(
   });
 
   const bundles = sorted.map((p) =>
-    attachLastRun(derivePipelineAssets(p), latestRunsByPipelineId.get(p.id))
+    enrichBundleFromDbtManifest(
+      attachLastRun(derivePipelineAssets(p), latestRunsByPipelineId.get(p.id))
+    )
   );
 
   const assets = bundles.flatMap((b) => [

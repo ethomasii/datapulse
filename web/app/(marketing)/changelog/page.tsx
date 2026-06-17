@@ -14,6 +14,15 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    version: "0.9.3",
+    date: "2026-06-17",
+    highlights: [
+      "Assets v3+ — warehouse verify for Postgres, Redshift, Snowflake, BigQuery, DuckDB, MotherDuck, Databricks, ClickHouse, MySQL, Trino, and SQLite.",
+      "Warehouse badges on /assets — verified, missing, and last-run dbt observed markers per asset.",
+      "GET /api/elt/assets?verifyWarehouse=1 introspects destination connections and reconciles landing targets.",
+    ],
+  },
+  {
     version: "0.9.2",
     date: "2026-06-17",
     highlights: [

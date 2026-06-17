@@ -6,14 +6,18 @@ import {
   scopeForbiddenResponse,
   unauthorizedResponse,
 } from "@/lib/auth/api-user";
-import { getAccessibleResourceOwnerIds, pipelineOwnerWhere } from "@/lib/auth/workspace-access";
+import { connectionOwnerWhere, getAccessibleResourceOwnerIds, pipelineOwnerWhere } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
+import { applyWarehouseVerificationToAssets } from "@/lib/elt/asset-warehouse-reconcile";
 import { buildWorkspaceAssets, type PipelineRunAssetInput } from "@/lib/elt/pipeline-assets";
+import { introspectDestinationConnection } from "@/lib/elt/warehouse-introspect";
 
 export async function GET(req: Request) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
   if (!hasScope(auth, API_SCOPES.PIPELINES_READ)) return scopeForbiddenResponse();
+
+  const verifyWarehouse = new URL(req.url).searchParams.get("verifyWarehouse") === "1";
 
   const ownerIds = await getAccessibleResourceOwnerIds(auth.user.id);
   const rows = await db.eltPipeline.findMany({
@@ -27,6 +31,7 @@ export async function GET(req: Request) {
       sourceType: true,
       destinationType: true,
       sourceConfiguration: true,
+      destinationConnectionId: true,
       updatedAt: true,
     },
   });
@@ -55,7 +60,49 @@ export async function GET(req: Request) {
     }
   }
 
-  const payload = buildWorkspaceAssets(rows, latestRunsByPipelineId);
+  let payload = buildWorkspaceAssets(rows, latestRunsByPipelineId);
+
+  if (verifyWarehouse) {
+    const pipelineDestinationConnectionId = new Map(
+      rows.map((r) => [r.id, r.destinationConnectionId] as const)
+    );
+    const connectionIds = Array.from(
+      new Set(
+        rows
+          .map((r) => r.destinationConnectionId)
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+
+    const introspectionByConnectionId = new Map<
+      string,
+      Awaited<ReturnType<typeof introspectDestinationConnection>>
+    >();
+
+    if (connectionIds.length > 0) {
+      const connections = await db.connection.findMany({
+        where: { id: { in: connectionIds }, ...connectionOwnerWhere(ownerIds) },
+        select: {
+          id: true,
+          connector: true,
+          config: true,
+          connectionSecretsEnc: true,
+        },
+      });
+      await Promise.all(
+        connections.map(async (conn) => {
+          const result = await introspectDestinationConnection(conn);
+          introspectionByConnectionId.set(conn.id, result);
+        })
+      );
+    }
+
+    payload = applyWarehouseVerificationToAssets(
+      payload,
+      pipelineDestinationConnectionId,
+      introspectionByConnectionId
+    );
+  }
 
   return NextResponse.json(payload);
 }
