@@ -390,7 +390,7 @@ async def health() -> dict[str, Any]:
     return {"ok": True, "service": "eltpulse-managed-worker", "python": sys.version}
 
 
-async def run_managed_batch(limit: int, deadline_ms: int) -> dict[str, Any]:
+async def run_managed_batch(limit: int, deadline_ms: int, run_id: str | None = None) -> dict[str, Any]:
     """Core batch loop (CLI, GitHub Actions, or HTTP after auth)."""
     internal = (os.environ.get("ELTPULSE_INTERNAL_API_SECRET") or "").strip()
     if not internal:
@@ -408,8 +408,13 @@ async def run_managed_batch(limit: int, deadline_ms: int) -> dict[str, Any]:
     processed = 0
     errors: list[str] = []
 
+    specific = (run_id or os.environ.get("ELTPULSE_MANAGED_RUN_ID") or "").strip()
+
     async with httpx.AsyncClient() as client:
-        ids = await _fetch_pending_ids(client, base, internal, limit)
+        if specific:
+            ids = [specific]
+        else:
+            ids = await _fetch_pending_ids(client, base, internal, limit)
         for run_id in ids:
             if time.monotonic() >= wall_deadline:
                 break

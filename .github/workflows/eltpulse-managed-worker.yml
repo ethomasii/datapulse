@@ -17,6 +17,16 @@ name: eltPulse managed worker
 
 on:
   workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Optional single managed run id to process first"
+        required: false
+        type: string
+      limit:
+        description: "Max pending runs to fetch when run_id is empty"
+        required: false
+        default: "5"
+        type: string
 
 concurrency:
   group: eltpulse-managed-worker
@@ -41,6 +51,7 @@ jobs:
         env:
           ELTPULSE_CONTROL_PLANE_URL: ${{ secrets.ELTPULSE_CONTROL_PLANE_URL }}
           ELTPULSE_INTERNAL_API_SECRET: ${{ secrets.ELTPULSE_INTERNAL_API_SECRET }}
-          ELTPULSE_MANAGED_LIMIT: ${{ vars.ELTPULSE_MANAGED_LIMIT || '5' }}
+          ELTPULSE_MANAGED_RUN_ID: ${{ inputs.run_id }}
+          ELTPULSE_MANAGED_LIMIT: ${{ inputs.limit || vars.ELTPULSE_MANAGED_LIMIT || '5' }}
           ELTPULSE_MANAGED_DEADLINE_MS: ${{ vars.ELTPULSE_MANAGED_DEADLINE_MS || '900000' }}
         run: python main.py

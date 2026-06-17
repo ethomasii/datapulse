@@ -9,6 +9,7 @@ import { mergeEltMetadataIntoSourceConfig } from "@/lib/elt/merge-elt-metadata";
 import { preparePipelinePersistenceAndArtifacts } from "@/lib/elt/pipeline-connection-fks";
 import type { CreatePipelineBody } from "@/lib/elt/types";
 import { normalizeRunWebhookUrl } from "@/lib/elt/validate-run-webhook-url";
+import { maybeAutoPushPipelineToGit } from "@/lib/integrations/github-push-pipeline";
 
 export type PersistPipelineFailure = { ok: false; status: number; message: string };
 
@@ -144,6 +145,7 @@ export async function upsertPipelineDefinition(
       where: { id: existing.id },
       data,
     });
+    void maybeAutoPushPipelineToGit(userId, pipeline.id);
     return { ok: true, pipeline, created: false };
   }
 
@@ -153,6 +155,7 @@ export async function upsertPipelineDefinition(
       ...data,
     },
   });
+  void maybeAutoPushPipelineToGit(userId, pipeline.id);
   return { ok: true, pipeline, created: true };
 }
 
@@ -226,6 +229,8 @@ export async function createPipelineDefinition(
       ...(body.executionHost !== undefined ? { executionHost: body.executionHost } : {}),
     },
   });
+
+  void maybeAutoPushPipelineToGit(userId, pipeline.id);
 
   return { ok: true, pipeline, created: true };
 }

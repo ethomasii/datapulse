@@ -22,14 +22,10 @@ export async function processManagedRunImmediately(runId: string): Promise<void>
   const baseUrl = resolveControlPlaneBaseUrl();
 
   if (mode === "gha") {
-    if (secret && baseUrl) {
-      const { runManagedWorkerGithubDispatchHttp } = await import(
-        "@/lib/elt/managed-worker-github-dispatch"
-      );
-      await runManagedWorkerGithubDispatchHttp();
-    } else {
-      await stubCompleteManagedRunInProcess(runId);
-    }
+    const { runManagedWorkerGithubDispatchHttp } = await import(
+      "@/lib/elt/managed-worker-github-dispatch"
+    );
+    await runManagedWorkerGithubDispatchHttp({ runId, limit: 1 });
     return;
   }
 

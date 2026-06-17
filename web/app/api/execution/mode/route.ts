@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
-import { resolveManagedExecutorMode } from "@/lib/elt/managed-worker-stub-http";
+import { getManagedExecutionStatus } from "@/lib/elt/managed-execution-status";
 
 export async function GET() {
-  const mode = resolveManagedExecutorMode();
-  const ghaConfigured = Boolean(
-    process.env.ELTPULSE_GITHUB_DISPATCH_TOKEN?.trim() &&
-      process.env.ELTPULSE_GITHUB_REPOSITORY?.trim()
-  );
-  const realCapable = mode !== "stub" || ghaConfigured;
+  const status = getManagedExecutionStatus();
+  const mode = status.mode;
 
   return NextResponse.json({
     mode,
@@ -23,7 +19,8 @@ export async function GET() {
               : mode === "delegate"
                 ? "Delegated worker"
                 : mode,
-    isStub: mode === "stub",
-    realCapable,
+    isStub: status.isStub,
+    realCapable: status.readyForRealRuns || status.mode !== "stub",
+    readyForRealRuns: status.readyForRealRuns,
   });
 }

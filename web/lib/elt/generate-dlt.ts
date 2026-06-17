@@ -3,6 +3,7 @@ import { escapePyString } from "./escape-py";
 import { dltDbtRunnerBeforeReturn } from "./generate-dlt-dbt-append";
 import { postTransformBeforeReturn } from "./generate-post-transform";
 import { generateRestApiAdvanced, generateRestApiPipeline } from "./generate-dlt-rest";
+import { generatePostgresDltPipeline, generateStripePipeline } from "./generate-dlt-golden";
 
 // SWC/webpack misparses Python triple-quotes inside JS template literals.
 // Use this constant so the parser never sees `"""` as a literal in source.
@@ -11,6 +12,8 @@ const PY3Q = '"""';
 export function generateDltPipeline(request: PipelineRequest): string {
   const { sourceType } = request;
   if (sourceType === "github") return generateGithubPipeline(request);
+  if (sourceType === "stripe" || sourceType === "stripe_analytics") return generateStripePipeline(request);
+  if (sourceType === "postgres" || sourceType === "postgresql") return generatePostgresDltPipeline(request);
   if (sourceType === "rest_api") {
     const c = request.sourceConfiguration;
     if (c.advanced_mode && c.advanced_config) {

@@ -40,13 +40,28 @@ export function generateSlingReplication(request: PipelineRequest): Record<strin
     streamDefaults.mode = "full-refresh";
   }
 
+  const schema =
+    typeof config.schema === "string" && config.schema.trim() ? config.schema.trim() : "public";
+  const destSchema =
+    typeof config.target_schema === "string" && config.target_schema.trim()
+      ? config.target_schema.trim()
+      : request.destinationType.toLowerCase() === "snowflake"
+        ? "PUBLIC"
+        : "public";
+
   if (typeof config.tables === "string" && config.tables.trim()) {
     const tables = config.tables.split(",").map((t) => t.trim()).filter(Boolean);
     for (const table of tables) {
-      streams[`public.${table}`] = { object: `${request.destinationType}.${table}` };
+      const srcKey = table.includes(".") ? table : `${schema}.${table}`;
+      const destTable = table.includes(".") ? table.split(".").pop()! : table;
+      streams[srcKey] = { object: `${destSchema}.${destTable}` };
+    }
+  } else if (request.sourceType === "postgres" || request.sourceType === "postgresql") {
+    for (const table of ["users", "orders"]) {
+      streams[`${schema}.${table}`] = { object: `${destSchema}.${table}` };
     }
   } else {
-    streams["# TODO: Configure your streams"] = { "# Example": "public.users" };
+    streams[`${schema}.users`] = { object: `${destSchema}.users` };
   }
 
   const sourceConn = request.sourceType.toUpperCase();

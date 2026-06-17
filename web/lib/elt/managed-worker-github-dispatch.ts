@@ -8,7 +8,10 @@
  * - ELTPULSE_GITHUB_WORKFLOW_FILE — optional, default `eltpulse-managed-worker.yml`
  * - ELTPULSE_GITHUB_DISPATCH_REF — optional, default `main`
  */
-export async function runManagedWorkerGithubDispatchHttp(): Promise<{
+export async function runManagedWorkerGithubDispatchHttp(options?: {
+  runId?: string;
+  limit?: number;
+}): Promise<{
   processed: number;
   errors: string[];
   githubDispatched: true;
@@ -35,6 +38,12 @@ export async function runManagedWorkerGithubDispatchHttp(): Promise<{
     name
   )}/actions/workflows/${encodeURIComponent(workflowFile)}/dispatches`;
 
+  const inputs: Record<string, string> = {};
+  const runId = options?.runId?.trim();
+  if (runId) inputs.run_id = runId;
+  const limit = options?.limit;
+  if (limit != null && limit > 0) inputs.limit = String(Math.min(limit, 20));
+
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -43,7 +52,10 @@ export async function runManagedWorkerGithubDispatchHttp(): Promise<{
       "X-GitHub-Api-Version": "2022-11-28",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ ref }),
+    body: JSON.stringify({
+      ref,
+      ...(Object.keys(inputs).length ? { inputs } : {}),
+    }),
   });
 
   if (res.status !== 204 && !res.ok) {

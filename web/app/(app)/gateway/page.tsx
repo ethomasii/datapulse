@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Check, Copy, Eye, EyeOff, Layers, Loader2, Play, Plus, RefreshCw, Star, Trash2, Waypoints, Webhook, Wifi, WifiOff } from "lucide-react";
 import { RelatedLinks } from "@/components/ui/related-links";
+import { ManagedExecutionSetup } from "@/components/elt/managed-execution-setup";
 
 const CONTROL_PLANE_URL =
   process.env.NEXT_PUBLIC_APP_URL ?? "https://app.eltpulse.dev";
@@ -427,6 +428,9 @@ ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
                 {heartbeat.version !== "unknown" ? ` · v${heartbeat.version}` : ""}
               </p>
             ) : null}
+            <div className="mt-3">
+              <ManagedExecutionSetup />
+            </div>
           </div>
         ) : null}
       </section>

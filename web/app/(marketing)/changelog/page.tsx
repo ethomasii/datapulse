@@ -14,6 +14,15 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    version: "0.7.0",
+    date: "2026-06-17",
+    highlights: [
+      "Production GHA execution — dispatch targets a specific run, stub fallback removed in GHA mode, Gateway setup checklist.",
+      "Auto Git push — pipeline declaration YAML commits to your connected repo on save (disable with ELTPULSE_AUTO_GIT_PUSH=false).",
+      "Golden-path codegen — Stripe (stripe_analytics), Postgres (Sling streams + dlt sql_database), Snowflake destination hints.",
+    ],
+  },
+  {
     version: "0.6.0",
     date: "2026-06-17",
     highlights: [
