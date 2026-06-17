@@ -14,6 +14,15 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    version: "0.9.4",
+    date: "2026-06-17",
+    highlights: [
+      "Assets v4 — per-asset freshness from run telemetry and dbt manifests; dbt config vs last-run diff on /assets.",
+      "Canvas data map — config-derived lineage graph in the canvas inspector with link to workspace catalog.",
+      "Assets deep link — /assets?pipeline= filters to a single pipeline (from canvas or builder).",
+    ],
+  },
+  {
     version: "0.9.3",
     date: "2026-06-17",
     highlights: [

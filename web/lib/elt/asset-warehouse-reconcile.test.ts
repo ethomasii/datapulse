@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { applyWarehouseVerificationToAssets, enrichBundleFromDbtManifest } from "@/lib/elt/asset-warehouse-reconcile";
+import { applyWarehouseVerificationToAssets } from "@/lib/elt/asset-warehouse-reconcile";
+import { enrichBundleFromDbtManifest } from "@/lib/elt/asset-dbt-enrich";
 import type { PipelineAssetBundle, WorkspaceAssetsResponse } from "@/lib/elt/pipeline-assets";
 
 function stubBundle(overrides: Partial<PipelineAssetBundle> = {}): PipelineAssetBundle {

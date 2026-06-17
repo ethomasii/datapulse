@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   CheckCircle2,
@@ -30,6 +31,7 @@ import type {
   WorkspaceAssetKind,
   WorkspaceAssetsResponse,
 } from "@/lib/elt/pipeline-assets";
+import type { AssetFreshnessMeta } from "@/lib/elt/asset-freshness";
 
 type AssetsPageData = WorkspaceAssetsResponse & {
   warehouseVerification?: WarehouseVerificationSummary;
@@ -170,6 +172,18 @@ function WarehouseStatusBadge({ status, runObserved }: { status?: WarehouseAsset
   );
 }
 
+function AssetFreshnessBadge({ meta }: { meta?: AssetFreshnessMeta }) {
+  if (!meta || meta.freshness === "never_run") return null;
+  return (
+    <span
+      className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${meta.badgeClass}`}
+      title={meta.detail}
+    >
+      {meta.label}
+    </span>
+  );
+}
+
 function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBundle; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
   const allAssets = [bundle.source, ...bundle.rawAssets, ...bundle.transforms, ...bundle.postTransforms];
@@ -282,6 +296,29 @@ function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBund
               {bundle.lastRun.dbtManifest.source === "runner" ? " (runner-reported)" : " (from config)"}
             </p>
           ) : null}
+          {bundle.dbtDiff &&
+          (bundle.dbtDiff.missingFromRun.length > 0 ||
+            bundle.dbtDiff.extraOnRun.length > 0 ||
+            bundle.dbtDiff.failedModels.length > 0) ? (
+            <div className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2 text-xs dark:border-violet-900 dark:bg-violet-950/30">
+              <p className="font-medium text-violet-900 dark:text-violet-100">dbt config vs last run</p>
+              {bundle.dbtDiff.missingFromRun.length > 0 ? (
+                <p className="mt-1 text-violet-800 dark:text-violet-200">
+                  Missing on run: {bundle.dbtDiff.missingFromRun.join(", ")}
+                </p>
+              ) : null}
+              {bundle.dbtDiff.extraOnRun.length > 0 ? (
+                <p className="mt-1 text-violet-800 dark:text-violet-200">
+                  Extra on run: {bundle.dbtDiff.extraOnRun.join(", ")}
+                </p>
+              ) : null}
+              {bundle.dbtDiff.failedModels.length > 0 ? (
+                <p className="mt-1 text-red-700 dark:text-red-300">
+                  Failed: {bundle.dbtDiff.failedModels.join(", ")}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           {bundle.warehouseMessage ? (
             <p className="text-xs text-slate-500 dark:text-slate-400">{bundle.warehouseMessage}</p>
           ) : null}
@@ -303,6 +340,7 @@ function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBund
                     <code className="truncate font-mono text-[11px] text-slate-500">{asset.landingQualified}</code>
                   ) : null}
                   <WarehouseStatusBadge status={asset.warehouseStatus} runObserved={asset.runObserved} />
+                  <AssetFreshnessBadge meta={asset.assetFreshness} />
                 </div>
                 {asset.dbtPackage ? (
                   <span className="text-[11px] text-slate-500">{asset.dbtPackage.replace(/^dlt-hub\//, "")}</span>
@@ -317,6 +355,8 @@ function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBund
 }
 
 export function AssetsPageClient() {
+  const searchParams = useSearchParams();
+  const pipelineFilter = searchParams.get("pipeline")?.trim() ?? "";
   const [data, setData] = useState<AssetsPageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
@@ -350,8 +390,12 @@ export function AssetsPageClient() {
 
   const filteredPipelines = useMemo(() => {
     if (!data) return [];
-    if (!q) return data.pipelines;
-    return data.pipelines.filter((b) => {
+    let list = data.pipelines;
+    if (pipelineFilter) {
+      list = list.filter((b) => b.pipelineId === pipelineFilter);
+    }
+    if (!q) return list;
+    return list.filter((b) => {
       const haystack = [
         b.pipelineName,
         b.sourceType,
@@ -364,16 +408,17 @@ export function AssetsPageClient() {
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [data, q]);
+  }, [data, q, pipelineFilter]);
 
   const filteredAssets = useMemo(() => {
     if (!data) return [];
     return data.assets.filter((a) => {
+      if (pipelineFilter && a.pipelineId !== pipelineFilter) return false;
       if (kindFilter !== "all" && a.kind !== kindFilter) return false;
       if (!q) return true;
       return assetMatches(a, q);
     });
-  }, [data, q, kindFilter]);
+  }, [data, q, kindFilter, pipelineFilter]);
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-6xl space-y-8">
@@ -409,6 +454,14 @@ export function AssetsPageClient() {
         />
       ) : (
         <>
+          {pipelineFilter ? (
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Showing assets for one pipeline.{" "}
+              <Link href="/assets" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+                View all
+              </Link>
+            </p>
+          ) : null}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <SummaryCard label="Pipelines" value={data.summary.pipelines} icon={Layers} />
             <SummaryCard label="Raw tables" value={data.summary.rawAssets} icon={Table2} />

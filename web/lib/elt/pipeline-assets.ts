@@ -11,9 +11,11 @@ import {
   pipelineSyncMode,
 } from "@/lib/elt/pipeline-tool-labels";
 import { parseRunTelemetry } from "@/lib/elt/run-telemetry";
-import type { AssetFreshness } from "@/lib/elt/asset-freshness";
-import { enrichBundleFromDbtManifest } from "@/lib/elt/asset-warehouse-reconcile";
+import type { AssetFreshness, AssetFreshnessMeta } from "@/lib/elt/asset-freshness";
 import { computePipelineFreshness } from "@/lib/elt/asset-freshness";
+import { enrichBundleAssetFreshness, resourcesTouchedFromTelemetry } from "@/lib/elt/asset-level-freshness";
+import { computeDbtAssetDiff, type DbtAssetDiff } from "@/lib/elt/asset-dbt-diff";
+import { enrichBundleFromDbtManifest } from "@/lib/elt/asset-dbt-enrich";
 
 export type PipelineSyncMode = "connector_sync" | "database_replication";
 
@@ -46,6 +48,8 @@ export type WorkspaceAsset = {
   warehouseStatus?: WarehouseAssetStatus;
   /** Transform appeared in the last run dbt manifest. */
   runObserved?: boolean;
+  /** Per-asset freshness from last run telemetry or dbt manifest. */
+  assetFreshness?: AssetFreshnessMeta;
   enabled: boolean;
 };
 
@@ -77,6 +81,8 @@ export type PipelineAssetBundle = {
   /** Destination catalog was queried for this pipeline. */
   warehouseChecked?: boolean;
   warehouseMessage?: string;
+  /** Config-declared dbt models vs last run manifest. */
+  dbtDiff?: DbtAssetDiff;
   updatedAt: string;
 };
 
@@ -422,9 +428,13 @@ export function attachLastRun(
   const base = { ...bundle };
   if (!run) {
     const meta = computePipelineFreshness(undefined, bundle.enabled);
-    return { ...base, freshness: meta.freshness, freshnessLabel: meta.label };
+    return enrichBundleAssetFreshness(
+      { ...base, freshness: meta.freshness, freshnessLabel: meta.label },
+      new Set()
+    );
   }
   const telemetry = parseRunTelemetry(run.telemetry);
+  const resourcesTouched = resourcesTouchedFromTelemetry(run.telemetry);
   const lastRun: PipelineLastRunSummary = {
     id: run.id,
     status: run.status,
@@ -439,12 +449,14 @@ export function attachLastRun(
     ...(telemetry.dbt ? { dbtManifest: telemetry.dbt } : {}),
   };
   const meta = computePipelineFreshness(lastRun, bundle.enabled);
-  return {
+  const withRun = {
     ...base,
     lastRun,
     freshness: meta.freshness,
     freshnessLabel: meta.label,
+    dbtDiff: computeDbtAssetDiff({ ...base, lastRun, freshness: meta.freshness, freshnessLabel: meta.label }) ?? undefined,
   };
+  return enrichBundleAssetFreshness(withRun, resourcesTouched);
 }
 
 /** Aggregate workspace assets across pipelines (newest pipeline first). */

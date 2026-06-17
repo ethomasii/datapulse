@@ -11,6 +11,7 @@ import { FormAccordion } from "@/components/elt/form-accordion";
 import { GuidedDestinationBlock } from "@/components/elt/guided-destination-block";
 import { GuidedSourceBlock } from "@/components/elt/guided-source-block";
 import { CanvasTransformInspector } from "@/components/pipeline-canvas/canvas-transform-inspector";
+import { CanvasAssetLineagePanel } from "@/components/pipeline-canvas/canvas-asset-lineage-panel";
 import {
   type CanvasInspectorFocus,
   type PipelineCanvasControl,
@@ -545,14 +546,25 @@ export function CanvasPageClient() {
 
     if (focus.kind === "none") {
       return (
-        <div className="flex flex-col gap-3 py-4">
-          <p className="text-sm font-semibold text-slate-900 dark:text-white">Select a node</p>
-          <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-            Click a <strong className="font-medium text-slate-800 dark:text-slate-200">source</strong> or{" "}
-            <strong className="font-medium text-slate-800 dark:text-slate-200">destination</strong> on the diagram, or a{" "}
-            <strong className="font-medium text-slate-800 dark:text-slate-200">transform</strong> when you have one.
-            Settings for that step appear here.
-          </p>
+        <div className="flex flex-col gap-4 py-2">
+          <div>
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">Select a node</p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+              Click a <strong className="font-medium text-slate-800 dark:text-slate-200">source</strong>,{" "}
+              <strong className="font-medium text-slate-800 dark:text-slate-200">destination</strong>, or{" "}
+              <strong className="font-medium text-slate-800 dark:text-slate-200">transform</strong> on the diagram.
+            </p>
+          </div>
+          {selectedId && selectedName && pipelineSourceType && pipelineDestinationType ? (
+            <CanvasAssetLineagePanel
+              pipelineId={selectedId}
+              pipelineName={selectedName}
+              tool={pipelineTool}
+              sourceType={pipelineSourceType}
+              destinationType={pipelineDestinationType}
+              sourceConfiguration={lineageSourceConfig}
+            />
+          ) : null}
         </div>
       );
     }
@@ -737,6 +749,12 @@ export function CanvasPageClient() {
   }
 
   const selectedName = pipelines.find((p) => p.id === selectedId)?.name;
+
+  const lineageSourceConfig = useMemo(
+    () => ({ ...lastFullSourceConfigRef.current, ...sourceCfg }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadedSig bumps when pipeline config is reloaded
+    [sourceCfg, loadedSig, selectedId]
+  );
   const showDockedInspector = pipelines.length > 0 && Boolean(selectedId) && !detailLoading;
 
   return (

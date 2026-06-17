@@ -82,6 +82,11 @@ const ITEMS: {
   },
   {
     status: "shipped",
+    title: "Assets v4 — per-asset freshness & canvas lineage",
+    desc: "Asset-level loaded/built badges from run telemetry; dbt config vs manifest diff; lineage panel on canvas builder.",
+  },
+  {
+    status: "shipped",
     title: "Assets v3 — warehouse verification",
     desc: "Compare config-derived landing tables to live warehouse catalogs (Postgres, Snowflake, BigQuery, DuckDB, MotherDuck, Databricks, ClickHouse, MySQL, Trino, Redshift, SQLite); verified/missing badges on /assets.",
   },
