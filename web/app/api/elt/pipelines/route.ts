@@ -6,6 +6,7 @@ import {
   scopeForbiddenResponse,
   unauthorizedResponse,
 } from "@/lib/auth/api-user";
+import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
 import { getAccessibleResourceOwnerIds, pipelineOwnerWhere } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
 import { prismaSchemaDriftResponse } from "@/lib/db/prisma-schema-drift-response";
@@ -67,6 +68,11 @@ export async function POST(req: Request) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
   if (!hasScope(auth, API_SCOPES.PIPELINES_WRITE)) return scopeForbiddenResponse();
+
+  const perms = await getWorkspacePermissions(auth.user.id);
+  if (!perms.canWrite) {
+    return NextResponse.json({ error: "View-only access" }, { status: 403 });
+  }
 
   let json: unknown;
   try {

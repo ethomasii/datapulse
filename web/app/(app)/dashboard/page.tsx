@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { requireDbUser } from "@/lib/auth/server";
+import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
+import { getMonthlyRowsSynced } from "@/lib/billing/report-usage";
+import { pipelineOwnerWhere } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
 import { effectiveRunTelemetry, formatBytes, formatRows } from "@/lib/elt/run-telemetry";
 import { ONBOARDING_STEPS } from "@/lib/onboarding/config";
@@ -31,37 +34,46 @@ const DASHBOARD_RUN_LIST = {
 
 export default async function DashboardPage() {
   const user = await requireDbUser();
+  const perms = await getWorkspacePermissions(user.id);
+  const ownerIds = perms.resourceOwnerIds;
+  const ownerWhere = pipelineOwnerWhere(ownerIds);
 
   const CHART_DAYS = 14;
   const chartCutoff = new Date();
   chartCutoff.setDate(chartCutoff.getDate() - CHART_DAYS + 1);
   chartCutoff.setHours(0, 0, 0, 0);
 
-  const [pipelineCount, connectionCount, anyRun, activeRuns, recentFinished, chartRuns, namedAgents] =
+  const [pipelineCount, connectionCount, anyRun, activeRuns, recentFinished, chartRuns, namedAgents, rowsMonth, lastSuccess] =
     await Promise.all([
-      db.eltPipeline.count({ where: { userId: user.id } }),
-      db.connection.count({ where: { userId: user.id } }),
-      db.eltPipelineRun.findFirst({ where: { userId: user.id }, select: { id: true } }),
+      db.eltPipeline.count({ where: ownerWhere }),
+      db.connection.count({ where: { userId: { in: ownerIds } } }),
+      db.eltPipelineRun.findFirst({ where: { userId: { in: ownerIds } }, select: { id: true } }),
       db.eltPipelineRun.findMany({
-        where: { userId: user.id, status: { in: ["pending", "running"] } },
+        where: { userId: { in: ownerIds }, status: { in: ["pending", "running"] } },
         orderBy: { startedAt: "desc" },
         take: 8,
         select: DASHBOARD_RUN_LIST,
       }),
       db.eltPipelineRun.findMany({
-        where: { userId: user.id, status: { in: ["succeeded", "failed", "cancelled"] } },
+        where: { userId: { in: ownerIds }, status: { in: ["succeeded", "failed", "cancelled"] } },
         orderBy: { startedAt: "desc" },
         take: 5,
         select: DASHBOARD_RUN_LIST,
       }),
       db.eltPipelineRun.findMany({
-        where: { userId: user.id, startedAt: { gte: chartCutoff } },
+        where: { userId: { in: ownerIds }, startedAt: { gte: chartCutoff } },
         orderBy: { startedAt: "asc" },
         select: { startedAt: true, status: true, telemetry: true, logEntries: true },
       }),
       db.agentToken.findMany({
-        where: { userId: user.id, revokedAt: null },
+        where: { userId: { in: ownerIds }, revokedAt: null },
         select: { lastSeenAt: true, lastSeenSource: true },
+      }),
+      getMonthlyRowsSynced(ownerIds[0] ?? user.id),
+      db.eltPipelineRun.findFirst({
+        where: { userId: { in: ownerIds }, status: "succeeded" },
+        orderBy: { finishedAt: "desc" },
+        select: { finishedAt: true, pipeline: { select: { name: true } } },
       }),
     ]);
 
@@ -101,6 +113,31 @@ export default async function DashboardPage() {
       </div>
 
       {showOnboarding && <OnboardingChecklist completedIds={completedIds} />}
+
+      <section className="grid gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-xs font-medium uppercase text-slate-500">Rows this month</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{rowsMonth.toLocaleString()}</p>
+          <Link href="/account/billing" className="mt-1 inline-block text-xs text-sky-600 hover:underline">
+            Usage &amp; billing →
+          </Link>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-xs font-medium uppercase text-slate-500">Pipelines</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{pipelineCount}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-xs font-medium uppercase text-slate-500">Last successful sync</p>
+          <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">
+            {lastSuccess?.pipeline?.name ?? "—"}
+          </p>
+          <p className="text-xs text-slate-500">
+            {lastSuccess?.finishedAt
+              ? new Date(lastSuccess.finishedAt).toLocaleString()
+              : "No successful runs yet"}
+          </p>
+        </div>
+      </section>
 
       {/* Activity charts */}
       <section className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Prisma, RunIngestionExecutor, RunStatus } from "@prisma/client";
 import { getActiveOrganizationForSession } from "@/lib/auth/active-org";
+import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
 import {
   API_SCOPES,
   hasScope,
@@ -8,6 +9,7 @@ import {
   scopeForbiddenResponse,
   unauthorizedResponse,
 } from "@/lib/auth/api-user";
+import { pipelineOwnerWhere } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
 import { processManagedRunImmediately } from "@/lib/elt/process-managed-run";
 import { resolveNewRunExecution } from "@/lib/agent/run-execution";
@@ -18,6 +20,9 @@ export async function GET(req: Request) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
   if (!hasScope(auth, API_SCOPES.RUNS_READ)) return scopeForbiddenResponse();
+
+  const perms = await getWorkspacePermissions(auth.user.id);
+  const ownerIds = perms.resourceOwnerIds;
 
   const url = new URL(req.url);
   const pipelineId = url.searchParams.get("pipelineId") ?? undefined;
@@ -30,7 +35,7 @@ export async function GET(req: Request) {
   const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit") ?? 50) || 50));
 
   const where: Prisma.EltPipelineRunWhereInput = {
-    userId: auth.user.id,
+    userId: { in: ownerIds },
     ...(pipelineId ? { pipelineId } : {}),
     ...(statuses?.length ? { status: { in: statuses } } : {}),
     ...(environment ? { environment } : {}),
@@ -54,6 +59,12 @@ export async function POST(req: Request) {
   if (!auth) return unauthorizedResponse();
   if (!hasScope(auth, API_SCOPES.RUNS_WRITE)) return scopeForbiddenResponse();
 
+  const perms = await getWorkspacePermissions(auth.user.id);
+  if (!perms.canWrite) {
+    return NextResponse.json({ error: "View-only access — ask an org admin to upgrade your role." }, { status: 403 });
+  }
+  const ownerIds = perms.resourceOwnerIds;
+
   let json: unknown;
   try {
     json = await req.json();
@@ -68,9 +79,10 @@ export async function POST(req: Request) {
 
   const body = parsed.data;
   const pipeline = await db.eltPipeline.findFirst({
-    where: { id: body.pipelineId, userId: auth.user.id },
+    where: { id: body.pipelineId, ...pipelineOwnerWhere(ownerIds) },
     select: {
       id: true,
+      userId: true,
       defaultTargetAgentTokenId: true,
       executionHost: true,
       sourceConfiguration: true,
@@ -89,7 +101,7 @@ export async function POST(req: Request) {
   let ingestionExecutor: RunIngestionExecutor;
   try {
     const resolved = await resolveNewRunExecution({
-      userId: auth.user.id,
+      userId: pipeline.userId,
       organizationId,
       executionHost: pipeline.executionHost,
       pipelineDefaultTargetAgentTokenId: pipeline.defaultTargetAgentTokenId,
@@ -133,7 +145,7 @@ export async function POST(req: Request) {
 
   const run = await db.eltPipelineRun.create({
     data: {
-      userId: auth.user.id,
+      userId: pipeline.userId,
       pipelineId: pipeline.id,
       ingestionExecutor,
       status: body.status,

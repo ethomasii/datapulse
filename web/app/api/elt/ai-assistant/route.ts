@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getCurrentDbUser } from "@/lib/auth/server";
+import { db } from "@/lib/db/client";
 import { DLT_HUB_SOURCES, getDltHubSource, getDltHubSourcesByCategory } from "@/lib/elt/dlt-hub-registry";
 import { SOURCE_GROUPS, DESTINATION_GROUPS } from "@/lib/elt/catalog";
 import { chooseTool } from "@/lib/elt/choose-tool";
@@ -434,17 +435,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "AI assistant not configured" }, { status: 503 });
   }
 
-  const body = await request.json() as { messages: Message[]; lastRunError?: string };
-  const { messages, lastRunError } = body;
+  const body = await request.json() as {
+    messages: Message[];
+    lastRunError?: string;
+    pipelineId?: string;
+  };
+  const { messages, lastRunError, pipelineId } = body;
   if (!Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: "messages required" }, { status: 400 });
   }
 
-  // Inject last run failure context as a system-level note appended to the first user message
-  const messagesWithContext = lastRunError
+  let runErrorContext = lastRunError;
+  if (!runErrorContext && pipelineId) {
+    const lastFail = await db.eltPipelineRun.findFirst({
+      where: { pipelineId, status: "failed" },
+      orderBy: { startedAt: "desc" },
+      select: { errorSummary: true },
+    });
+    runErrorContext = lastFail?.errorSummary ?? undefined;
+  }
+
+  const messagesWithContext = runErrorContext
     ? messages.map((m, i) =>
         i === 0
-          ? { ...m, content: `[Context: the last run of this pipeline failed with error: "${lastRunError}"]\n\n${m.content}` }
+          ? {
+              ...m,
+              content: `[Context: the last run of this pipeline failed with error: "${runErrorContext}"]\n\n${m.content}`,
+            }
           : m
       )
     : messages;

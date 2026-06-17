@@ -433,8 +433,8 @@ async function runOneMonitorCheck(
   if (type === "adls_file_count" || type === "kafka_message_count") {
     return {
       shouldTrigger: false,
-      message: `${type} checks are not yet wired in the cloud runner (coming soon)`,
-      metadata: {},
+      message: `${type} checks run on your self-hosted gateway or agent — add a monitor report from the connector host`,
+      metadata: { runner: "agent_required" },
     };
   }
 

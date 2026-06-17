@@ -20,6 +20,7 @@ export function TeamClient() {
   const [data, setData] = useState<TeamPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"member" | "viewer">("member");
   const [inviting, setInviting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -48,7 +49,7 @@ export function TeamClient() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail.trim() }),
+        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
       });
       const body = (await res.json()) as { error?: string; emailed?: boolean };
       if (!res.ok) throw new Error(body.error ?? "Failed to invite");
@@ -144,6 +145,14 @@ export function TeamClient() {
                 required
                 className="min-w-[220px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
               />
+              <select
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value as "member" | "viewer")}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
+              >
+                <option value="member">Member (edit)</option>
+                <option value="viewer">Viewer (read-only)</option>
+              </select>
               <button
                 type="submit"
                 disabled={inviting}

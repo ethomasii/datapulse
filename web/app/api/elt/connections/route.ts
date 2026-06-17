@@ -7,6 +7,8 @@ import {
   scopeForbiddenResponse,
   unauthorizedResponse,
 } from "@/lib/auth/api-user";
+import { getWorkspacePermissions, workspaceResourceUserId } from "@/lib/auth/org-permissions";
+import { connectionOwnerWhere } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
 import { mergeConnectionSecretsEnc } from "@/lib/elt/connection-secrets-store";
 import { toPublicConnection } from "@/lib/elt/connection-public";
@@ -16,9 +18,11 @@ export async function GET(req: Request) {
   if (!auth) return unauthorizedResponse();
   if (!hasScope(auth, API_SCOPES.CONNECTIONS_READ)) return scopeForbiddenResponse();
 
+  const ownerIds = (await getWorkspacePermissions(auth.user.id)).resourceOwnerIds;
+
   try {
     const rows = await db.connection.findMany({
-      where: { userId: auth.user.id },
+      where: connectionOwnerWhere(ownerIds),
       orderBy: { updatedAt: "desc" },
       select: {
         id: true,
@@ -57,6 +61,11 @@ export async function POST(req: Request) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
   if (!hasScope(auth, API_SCOPES.CONNECTIONS_WRITE)) return scopeForbiddenResponse();
+
+  const perms = await getWorkspacePermissions(auth.user.id);
+  if (!perms.canWrite) {
+    return NextResponse.json({ error: "View-only access" }, { status: 403 });
+  }
 
   let body: unknown;
   try {
@@ -97,7 +106,7 @@ export async function POST(req: Request) {
 
   const row = await db.connection.create({
     data: {
-      userId: auth.user.id,
+      userId: workspaceResourceUserId(perms, auth.user.id),
       name: name.trim(),
       connectionType: connectionType as "source" | "destination",
       connector: connector.trim(),

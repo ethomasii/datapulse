@@ -14,6 +14,18 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    version: "0.6.0",
+    date: "2026-06-17",
+    highlights: [
+      "Quick start credentials step — test connections, save encrypted secrets, link to pipeline before run.",
+      "Test connection API for Postgres, GitHub, Stripe, REST, and catalog connectors.",
+      "Team RBAC: invite as member or viewer; workspace-scoped runs, connections, and pipelines.",
+      "Run failure hints, execution mode badge (stub vs GHA), dashboard usage & freshness cards.",
+      "Connector trust badges (Verified / Beta / Catalog), incremental sync defaults on new pipelines.",
+      "AI assistant auto-loads last failed run when pipelineId is sent.",
+    ],
+  },
+  {
     version: "0.5.0",
     date: "2026-06-17",
     highlights: [

@@ -179,6 +179,8 @@ function ConnectionRow({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState<string | null>(null);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [cfg, setCfg] = useState<Record<string, string>>(conn.config as Record<string, string>);
   const [secretsDraft, setSecretsDraft] = useState<Record<string, string>>({});
@@ -193,6 +195,20 @@ function ConnectionRow({
     setSecretsDraft({});
     setClearSecrets(false);
   }, [conn.id, conn.updatedAt, conn.config, conn.hasStoredSecrets]);
+
+  async function testConnection() {
+    setTesting(true);
+    setTestMsg(null);
+    try {
+      const res = await apiFetch(`/api/elt/connections/${conn.id}/test`, { method: "POST" });
+      const data = (await res.json()) as { ok?: boolean; message?: string };
+      setTestMsg(data.message ?? (data.ok ? "OK" : "Failed"));
+    } catch {
+      setTestMsg("Test failed");
+    } finally {
+      setTesting(false);
+    }
+  }
 
   async function save() {
     setSaving(true);
@@ -330,12 +346,24 @@ function ConnectionRow({
           {saveErr ? (
             <p className="mt-3 text-xs text-red-600 dark:text-red-400">{saveErr}</p>
           ) : null}
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
-          >
+          {testMsg ? (
+            <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">{testMsg}</p>
+          ) : null}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void testConnection()}
+              disabled={testing}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800 disabled:opacity-50"
+            >
+              {testing ? "Testing…" : "Test connection"}
+            </button>
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
+            >
             {saved ? (
               <>
                 <Check className="h-4 w-4" /> Saved
@@ -345,7 +373,8 @@ function ConnectionRow({
             ) : (
               "Save changes"
             )}
-          </button>
+            </button>
+          </div>
         </div>
       )}
     </li>

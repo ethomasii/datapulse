@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Command } from "cmdk";
 import { ChevronsUpDown, Check, Search } from "lucide-react";
+import { getConnectorTrustTier, TRUST_LABELS, TRUST_STYLES } from "@/lib/elt/connector-trust";
 import { cn } from "@/lib/utils";
 
 export type ConnectorOption = {
@@ -152,7 +153,22 @@ export function ConnectorCombobox({
                         compact ? "px-2 py-0.5 text-[10px]" : "px-3 py-1.5 text-sm",
                       )}
                     >
-                      <span className="truncate">{opt.label}</span>
+                      <span className="flex min-w-0 items-center gap-1.5 truncate">
+                        <span className="truncate">{opt.label}</span>
+                        {(() => {
+                          const tier = getConnectorTrustTier(opt.slug);
+                          return (
+                            <span
+                              className={cn(
+                                "shrink-0 rounded px-1 py-0.5 text-[8px] font-semibold uppercase",
+                                TRUST_STYLES[tier]
+                              )}
+                            >
+                              {TRUST_LABELS[tier]}
+                            </span>
+                          );
+                        })()}
+                      </span>
                       {opt.slug === value && (
                         <Check className={cn("shrink-0 text-sky-600 dark:text-sky-400", compact ? "h-2.5 w-2.5" : "h-3.5 w-3.5")} />
                       )}

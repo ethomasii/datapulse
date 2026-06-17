@@ -39,9 +39,11 @@ export async function POST(req: Request) {
   }
 
   let email = "";
+  let role: "member" | "viewer" = "member";
   try {
-    const body = (await req.json()) as { email?: string };
+    const body = (await req.json()) as { email?: string; role?: string };
     email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    if (body.role === "viewer") role = "viewer";
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
@@ -53,8 +55,8 @@ export async function POST(req: Request) {
   try {
     const invite = await db.organizationInvite.upsert({
       where: { organizationId_email: { organizationId: org.id, email } },
-      create: { organizationId: org.id, email, role: "member" },
-      update: { invitedAt: new Date(), acceptedAt: null },
+      create: { organizationId: org.id, email, role },
+      update: { invitedAt: new Date(), acceptedAt: null, role },
       select: { id: true, email: true },
     });
 

@@ -1,5 +1,6 @@
 import type { EltPipeline } from "@prisma/client";
 import { assertCanCreatePipeline } from "@/lib/plans/limits";
+import { getWorkspacePermissions, workspaceResourceUserId } from "@/lib/auth/org-permissions";
 import { assertUserOwnsGatewayToken } from "@/lib/agent/gateway-routing";
 import { db } from "@/lib/db/client";
 import { syncDltDbtWithCanvas, syncPostTransformWithCanvas } from "@/lib/elt/dbt-canvas";
@@ -160,21 +161,26 @@ export async function createPipelineDefinition(
   userId: string,
   body: CreatePipelineBody
 ): Promise<PersistPipelineSuccess | PersistPipelineFailure> {
+  const perms = await getWorkspacePermissions(userId);
+  if (!perms.canWrite) {
+    return { ok: false, status: 403, message: "View-only access — you cannot create pipelines." };
+  }
+  const resourceUserId = workspaceResourceUserId(perms, userId);
   const account = await db.user.findUnique({
-    where: { id: userId },
+    where: { id: resourceUserId },
     select: { subscription: { select: { tier: true } } },
   });
   const tier = account?.subscription?.tier ?? "free";
-  const limitMsg = await assertCanCreatePipeline(userId, tier);
+  const limitMsg = await assertCanCreatePipeline(resourceUserId, tier);
   if (limitMsg) return { ok: false, status: 403, message: limitMsg };
 
-  const prep = await prepareWrite(userId, body);
+  const prep = await prepareWrite(resourceUserId, body);
   if (isPersistFailure(prep)) return prep;
 
   const dup = await db.eltPipeline.findUnique({
     where: {
       userId_name_tool: {
-        userId,
+        userId: resourceUserId,
         name: prep.bodyForArtifacts.name,
         tool: prep.resolvedTool,
       },
@@ -189,7 +195,7 @@ export async function createPipelineDefinition(
     };
   }
 
-  const gw = await resolveDefaultGateway(userId, body);
+  const gw = await resolveDefaultGateway(resourceUserId, body);
   if (isGatewayFailure(gw)) return gw;
 
   let runsWebhookUrl: string | null;
@@ -202,7 +208,7 @@ export async function createPipelineDefinition(
 
   const pipeline = await db.eltPipeline.create({
     data: {
-      userId,
+      userId: resourceUserId,
       name: prep.bodyForArtifacts.name,
       tool: prep.resolvedTool,
       sourceType: prep.bodyForArtifacts.sourceType,

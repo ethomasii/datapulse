@@ -10,10 +10,11 @@
  */
 
 import { getSourceConfigurationFields } from "./credentials-catalog";
+import { defaultSyncModeForSource } from "./sync-mode-defaults";
 
 export function minimalSourceConfigurationForNewPipeline(sourceType: string): Record<string, unknown> {
   const fields = getSourceConfigurationFields(sourceType);
-  const out: Record<string, unknown> = {};
+  const out: Record<string, unknown> = { ...defaultSyncModeForSource(sourceType) };
   for (const f of fields) {
     if (f.default !== undefined) {
       out[f.key] = f.default;

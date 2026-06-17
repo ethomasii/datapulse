@@ -16,7 +16,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     id: "connection",
     label: "Connect your warehouse",
     description: "Save destination credentials once — reuse across pipelines",
-    href: "/quick-start",
+    href: "/connections",
   },
   {
     id: "pipeline",

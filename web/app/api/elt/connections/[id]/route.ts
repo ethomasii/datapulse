@@ -7,6 +7,8 @@ import {
   scopeForbiddenResponse,
   unauthorizedResponse,
 } from "@/lib/auth/api-user";
+import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
+import { connectionOwnerWhere } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
 import { mergeConnectionSecretsEnc } from "@/lib/elt/connection-secrets-store";
 import { toPublicConnection } from "@/lib/elt/connection-public";
@@ -20,8 +22,13 @@ export async function PATCH(req: Request, { params }: Params) {
   const user = auth.user;
 
   const { id } = await params;
+  const perms = await getWorkspacePermissions(user.id);
+  if (!perms.canWrite) {
+    return NextResponse.json({ error: "View-only access" }, { status: 403 });
+  }
+  const ownerIds = perms.resourceOwnerIds;
   const existing = await db.connection.findFirst({
-    where: { id, userId: user.id },
+    where: { id, ...connectionOwnerWhere(ownerIds) },
     select: {
       id: true,
       connectionType: true,
@@ -72,18 +79,18 @@ export async function PATCH(req: Request, { params }: Params) {
   }
 
   if (Object.keys(data).length === 0) {
-    const row = await db.connection.findFirst({ where: { id, userId: user.id } });
+    const row = await db.connection.findFirst({ where: { id, ...connectionOwnerWhere(ownerIds) } });
     return NextResponse.json({ connection: row ? toPublicConnection(row) : null });
   }
 
   const count = await db.connection.updateMany({
-    where: { id, userId: user.id },
+    where: { id, ...connectionOwnerWhere(ownerIds) },
     data,
   });
   if (count.count === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const connection = await db.connection.findFirst({ where: { id, userId: user.id } });
+  const connection = await db.connection.findFirst({ where: { id, ...connectionOwnerWhere(ownerIds) } });
   return NextResponse.json({ connection: connection ? toPublicConnection(connection) : null });
 }
 
@@ -94,7 +101,8 @@ export async function DELETE(req: Request, { params }: Params) {
   const user = auth.user;
 
   const { id } = await params;
-  const res = await db.connection.deleteMany({ where: { id, userId: user.id } });
+  const ownerIds = (await getWorkspacePermissions(user.id)).resourceOwnerIds;
+  const res = await db.connection.deleteMany({ where: { id, ...connectionOwnerWhere(ownerIds) } });
   if (res.count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }

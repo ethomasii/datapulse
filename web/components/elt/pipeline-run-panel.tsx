@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Loader2, Play, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Play, XCircle } from "lucide-react";
+import { hintsForRunFailure } from "@/lib/elt/run-error-hints";
 
 type RunRow = {
   id: string;
   status: string;
   startedAt: string;
+  errorSummary?: string | null;
   telemetry?: unknown;
 };
 
@@ -18,7 +20,15 @@ export function PipelineRunPanel({ pipelineId }: { pipelineId: string | null }) 
   const [loading, setLoading] = useState(false);
   const [triggering, setTriggering] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [execLabel, setExecLabel] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    void fetch("/api/execution/mode", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((d: { label?: string }) => setExecLabel(d.label ?? null))
+      .catch(() => {});
+  }, []);
 
   const loadRuns = useCallback(async () => {
     if (!pipelineId) return;
@@ -43,6 +53,8 @@ export function PipelineRunPanel({ pipelineId }: { pipelineId: string | null }) 
 
   const latest = runs[0] ?? null;
   const isActive = latest && !TERMINAL.has(latest.status);
+  const failureHints =
+    latest?.status === "failed" ? hintsForRunFailure(latest.errorSummary) : [];
 
   useEffect(() => {
     if (!pipelineId || !isActive) {
@@ -101,7 +113,12 @@ export function PipelineRunPanel({ pipelineId }: { pipelineId: string | null }) 
         <div>
           <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Run this pipeline</h3>
           <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
-            Managed execution — no gateway setup required.
+            Managed execution{execLabel ? ` · ${execLabel}` : ""}.
+            {execLabel === "Demo (stub)" ? (
+              <Link href="/gateway" className="ml-1 text-sky-600 hover:underline">
+                Enable real runs
+              </Link>
+            ) : null}
           </p>
         </div>
         <button
@@ -122,17 +139,37 @@ export function PipelineRunPanel({ pipelineId }: { pipelineId: string | null }) 
       {error ? <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p> : null}
 
       {latest ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
-          {statusIcon}
-          <span className="font-medium capitalize">{latest.status}</span>
-          <span className="text-slate-400">·</span>
-          <span>{new Date(latest.startedAt).toLocaleString()}</span>
-          <Link
-            href={`/runs?pipeline=${encodeURIComponent(pipelineId)}&run=${encodeURIComponent(latest.id)}`}
-            className="font-medium text-sky-600 hover:underline dark:text-sky-400"
-          >
-            View logs →
-          </Link>
+        <div className="mt-3 space-y-2">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+            {statusIcon}
+            <span className="font-medium capitalize">{latest.status}</span>
+            <span className="text-slate-400">·</span>
+            <span>{new Date(latest.startedAt).toLocaleString()}</span>
+            <Link
+              href={`/runs?pipeline=${encodeURIComponent(pipelineId)}&run=${encodeURIComponent(latest.id)}`}
+              className="font-medium text-sky-600 hover:underline dark:text-sky-400"
+            >
+              View logs →
+            </Link>
+          </div>
+          {failureHints.length > 0 ? (
+            <ul className="space-y-2 rounded-lg border border-red-200 bg-red-50/80 p-3 dark:border-red-900/40 dark:bg-red-950/20">
+              {failureHints.map((h) => (
+                <li key={h.title} className="flex gap-2 text-xs">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-600" />
+                  <div>
+                    <p className="font-semibold text-red-900 dark:text-red-100">{h.title}</p>
+                    <p className="text-red-800/90 dark:text-red-200/90">{h.message}</p>
+                    {h.href ? (
+                      <Link href={h.href} className="font-medium text-sky-600 hover:underline">
+                        {h.hrefLabel ?? "Fix →"}
+                      </Link>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       ) : loading ? (
         <p className="mt-3 text-xs text-slate-500">Loading runs…</p>
