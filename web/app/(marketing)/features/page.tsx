@@ -27,7 +27,7 @@ const FEATURES = [
     icon: Layers,
     title: "111+ connectors",
     description:
-      "Snowflake, BigQuery, Postgres, Stripe, Salesforce, and more. eltPulse picks dlt or Sling and scaffolds production-ready code.",
+      "Snowflake, BigQuery, Postgres, Stripe, Salesforce, and more. Browse the catalog and pipeline scenarios — eltPulse picks dlt or Sling and scaffolds production-ready code.",
     preview: "builder" as const,
   },
   {
@@ -55,7 +55,7 @@ const FEATURES = [
     icon: GitBranch,
     title: "Git-native artifacts",
     description:
-      "Export dlt/Sling projects to your repo. Review in PRs. Managed Git push automation is on the roadmap for hands-off sync.",
+      "Export dlt/Sling projects to your repo. Pipeline YAML auto-pushes on save when GitHub is connected — review in PRs.",
     preview: "builder" as const,
   },
   {
@@ -162,6 +162,14 @@ export default function FeaturesPage() {
                   </div>
                   <h2 className="mt-4 text-2xl font-bold text-slate-900 dark:text-white">{feature.title}</h2>
                   <p className="mt-3 text-slate-600 dark:text-slate-400">{feature.description}</p>
+                  {feature.title.includes("connectors") ? (
+                    <Link
+                      href="/connectors"
+                      className="mt-3 inline-flex text-sm font-semibold text-sky-600 hover:underline dark:text-sky-400"
+                    >
+                      Browse connector catalog →
+                    </Link>
+                  ) : null}
                 </div>
                 {feature.preview ? (
                   <FeaturePreview kind={feature.preview} />

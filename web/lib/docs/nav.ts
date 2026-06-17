@@ -22,6 +22,7 @@ export const DOCS_SECTIONS: DocNavSection[] = [
     title: "Product",
     items: [
       { href: "/docs/pipelines", label: "Pipelines" },
+      { href: "/docs/connectors", label: "Connectors" },
       { href: "/docs/runs", label: "Runs" },
       { href: "/docs/orchestration", label: "Orchestration" },
       { href: "/docs/gateway", label: "Gateway" },

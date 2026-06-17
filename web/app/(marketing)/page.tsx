@@ -11,20 +11,21 @@ import {
   Workflow,
   Zap,
 } from "lucide-react";
+import { ConnectorIcon } from "@/components/marketing/connector-icon";
 import { ProductPreview } from "@/components/marketing/product-preview";
+import { getSourceCount } from "@/lib/marketing/connector-catalog";
 
-const CONNECTORS = [
-  "Snowflake",
-  "BigQuery",
-  "Postgres",
-  "DuckDB",
-  "GitHub",
-  "Stripe",
-  "Salesforce",
-  "HubSpot",
-  "S3",
-  "Kafka",
-  "+100 more",
+const CONNECTOR_CHIPS: { label: string; slug: string }[] = [
+  { label: "Snowflake", slug: "snowflake" },
+  { label: "BigQuery", slug: "bigquery" },
+  { label: "Postgres", slug: "postgres" },
+  { label: "DuckDB", slug: "duckdb" },
+  { label: "GitHub", slug: "github" },
+  { label: "Stripe", slug: "stripe_analytics" },
+  { label: "Salesforce", slug: "salesforce" },
+  { label: "HubSpot", slug: "hubspot" },
+  { label: "S3", slug: "s3" },
+  { label: "Kafka", slug: "kafka" },
 ];
 
 const features = [
@@ -32,7 +33,7 @@ const features = [
     icon: Layers,
     title: "Any source, any destination",
     description:
-      "Pick from 111+ connectors in the catalog. eltPulse picks dlt or Sling automatically and scaffolds production-ready code.",
+      "Pick from the connector catalog. eltPulse picks dlt or Sling and scaffolds production-ready code.",
   },
   {
     icon: Zap,
@@ -118,6 +119,7 @@ const pricingPreview = [
 ];
 
 export default function HomePage() {
+  const sourceCount = getSourceCount();
   return (
     <div>
       {/* Hero — two column with product preview */}
@@ -152,7 +154,14 @@ export default function HomePage() {
               </Link>
             </div>
             <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
-              111+ connectors · Managed execution included · Git-native export
+              <Link href="/connectors" className="hover:text-sky-600 dark:hover:text-sky-400">
+                {sourceCount}+ connectors
+              </Link>
+              {" · "}
+              <Link href="/scenarios" className="hover:text-sky-600 dark:hover:text-sky-400">
+                Pipeline scenarios
+              </Link>
+              {" · Managed execution · Git-native export"}
             </p>
           </div>
           <ProductPreview />
@@ -165,15 +174,28 @@ export default function HomePage() {
           Connect sources and destinations like
         </p>
         <div className="mx-auto mt-5 flex max-w-4xl flex-wrap items-center justify-center gap-3">
-          {CONNECTORS.map((name) => (
-            <span
-              key={name}
-              className="rounded-full border border-slate-200 bg-slate-50 px-4 py-1.5 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+          {CONNECTOR_CHIPS.map(({ label, slug }) => (
+            <Link
+              key={slug}
+              href={`/connectors/${slug}`}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-1.5 text-sm font-medium text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-sky-800"
             >
-              {name}
-            </span>
+              <ConnectorIcon slug={slug} name={label} size={16} />
+              {label}
+            </Link>
           ))}
+          <Link
+            href="/connectors"
+            className="rounded-full border border-dashed border-slate-300 px-4 py-1.5 text-sm font-medium text-sky-600 hover:border-sky-400 dark:border-slate-600 dark:text-sky-400"
+          >
+            +{Math.max(0, sourceCount - CONNECTOR_CHIPS.length)} more
+          </Link>
         </div>
+        <p className="mt-4 text-center text-sm">
+          <Link href="/scenarios" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+            See pipeline scenarios →
+          </Link>
+        </p>
       </section>
 
       {/* Problem statement */}
@@ -275,7 +297,7 @@ export default function HomePage() {
                   "Cron schedules & file-arrival monitors",
                   "Run slices for partitioned backfills",
                   "Outgoing webhooks on run completion",
-                  "GitHub repo sync (in progress)",
+                  "Auto Git push on pipeline save",
                 ].map((item) => (
                   <li key={item} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                     <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden />

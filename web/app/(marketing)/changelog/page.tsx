@@ -14,6 +14,15 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    version: "0.8.0",
+    date: "2026-06-17",
+    highlights: [
+      "Connector catalog — browse 120+ sources & destinations with brand icons, trust tiers, and per-connector pages.",
+      "Pipeline scenarios — industry filters and one-click Start this scenario into Quick start.",
+      "SEO — sitemap.xml, robots.txt, Open Graph metadata, and JSON-LD on connector pages.",
+    ],
+  },
+  {
     version: "0.7.0",
     date: "2026-06-17",
     highlights: [

@@ -11,6 +11,8 @@ const isPublicRoute = createRouteMatcher([
   "/roadmap(.*)",
   "/changelog(.*)",
   "/features(.*)",
+  "/connectors(.*)",
+  "/scenarios(.*)",
   "/invite/(.*)",
   "/sign-in(.*)",
   "/sign-up(.*)",

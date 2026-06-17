@@ -8,6 +8,8 @@ const columns = [
     title: "Product",
     links: [
       { href: "/features", label: "Features" },
+      { href: "/connectors", label: "Connectors" },
+      { href: "/scenarios", label: "Scenarios" },
       { href: "/quick-start", label: "Quick start" },
       { href: "/pricing", label: "Pricing" },
       { href: "/compare", label: "Compare" },
@@ -19,6 +21,7 @@ const columns = [
     title: "Resources",
     links: [
       { href: "/docs", label: "Documentation" },
+      { href: "/docs/connectors", label: "Connectors" },
       { href: "/docs/getting-started", label: "Getting started" },
       { href: "/docs/pipelines", label: "Pipelines" },
       { href: "/docs/gateway", label: "Gateway" },

@@ -1,45 +1,71 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
-  Database,
   KeyRound,
   Loader2,
   Sparkles,
   Zap,
 } from "lucide-react";
+import { ConnectorIcon } from "@/components/marketing/connector-icon";
 import { minimalSourceConfigurationForNewPipeline } from "@/lib/elt/minimal-source-configuration";
+import {
+  QUICK_START_DESTINATIONS,
+  QUICK_START_SOURCES,
+  isQuickStartDestination,
+  isQuickStartSource,
+  normalizeQuickStartDestination,
+  normalizeQuickStartSource,
+} from "@/lib/elt/quick-start-catalog";
 import {
   duckdbDestinationConfig,
   quickStartSecretFields,
 } from "@/lib/elt/quick-start-credentials";
 
-const DESTINATIONS = [
-  { slug: "duckdb", label: "DuckDB", hint: "Local file — great for trying eltPulse" },
-  { slug: "postgres", label: "PostgreSQL", hint: "Self-hosted or Neon" },
-  { slug: "snowflake", label: "Snowflake", hint: "Cloud warehouse" },
-  { slug: "bigquery", label: "BigQuery", hint: "Google Cloud" },
-];
-
-const SOURCES = [
-  { slug: "github", label: "GitHub", hint: "Issues, PRs, repos" },
-  { slug: "stripe", label: "Stripe", hint: "Customers, charges, products" },
-  { slug: "rest_api", label: "REST API", hint: "Any HTTP JSON API" },
-  { slug: "postgres", label: "PostgreSQL", hint: "Database replication" },
-];
-
 type Step = "destination" | "source" | "credentials" | "name" | "done";
 
 const STEP_LABELS = ["Destination", "Source", "Credentials", "Run"];
 
-export function QuickStartWizard() {
-  const [step, setStep] = useState<Step>("destination");
-  const [destination, setDestination] = useState("duckdb");
-  const [source, setSource] = useState("github");
+export type QuickStartWizardProps = {
+  initialSource?: string;
+  initialDestination?: string;
+  scenarioId?: string;
+  scenarioTitle?: string;
+};
+
+function initialStep(
+  initialSource?: string,
+  initialDestination?: string
+): Step {
+  if (!initialSource || !initialDestination) return "destination";
+  const dest = normalizeQuickStartDestination(initialDestination);
+  const src = normalizeQuickStartSource(initialSource);
+  const destFields = quickStartSecretFields("destination", dest);
+  const sourceFields = quickStartSecretFields("source", src);
+  if (destFields.length > 0 || sourceFields.length > 0) return "credentials";
+  return "name";
+}
+
+export function QuickStartWizard({
+  initialSource,
+  initialDestination,
+  scenarioId,
+  scenarioTitle,
+}: QuickStartWizardProps) {
+  const normDest = initialDestination
+    ? normalizeQuickStartDestination(initialDestination)
+    : "duckdb";
+  const normSource = initialSource ? normalizeQuickStartSource(initialSource) : "github";
+
+  const [step, setStep] = useState<Step>(() => initialStep(initialSource, initialDestination));
+  const [destination, setDestination] = useState(
+    isQuickStartDestination(normDest) ? normDest : "duckdb"
+  );
+  const [source, setSource] = useState(isQuickStartSource(normSource) ? normSource : "github");
   const [pipelineName, setPipelineName] = useState("");
   const [destSecrets, setDestSecrets] = useState<Record<string, string>>({});
   const [sourceSecrets, setSourceSecrets] = useState<Record<string, string>>({});
@@ -57,6 +83,12 @@ export function QuickStartWizard() {
   const destFields = quickStartSecretFields("destination", destination);
   const sourceFields = quickStartSecretFields("source", source);
   const needsCredentials = destFields.length > 0 || sourceFields.length > 0;
+
+  const pipelineSourceType = useMemo(() => {
+    if (source === "stripe") return "stripe_analytics";
+    if (source === "shopify") return "shopify_dlt";
+    return source;
+  }, [source]);
 
   const stepIndex =
     step === "destination" ? 0 : step === "source" ? 1 : step === "credentials" ? 2 : step === "name" ? 3 : 4;
@@ -160,11 +192,11 @@ export function QuickStartWizard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: effectiveName,
-          sourceType: source,
+          sourceType: pipelineSourceType,
           destinationType: destination,
           tool: "auto",
           description: `Quick-start pipeline: ${source} → ${destination}`,
-          sourceConfiguration: minimalSourceConfigurationForNewPipeline(source),
+          sourceConfiguration: minimalSourceConfigurationForNewPipeline(pipelineSourceType),
           sourceConnectionId: sourceConnId,
           destinationConnectionId: destConnId,
         }),
@@ -221,6 +253,17 @@ export function QuickStartWizard() {
         </div>
       </div>
 
+      {scenarioTitle ? (
+        <div className="mb-6 rounded-lg border border-violet-200 bg-violet-50/80 px-4 py-3 text-sm dark:border-violet-900 dark:bg-violet-950/30">
+          <p className="font-medium text-violet-950 dark:text-violet-100">
+            Scenario: {scenarioTitle}
+          </p>
+          <p className="mt-1 text-xs text-violet-800/90 dark:text-violet-200/80">
+            Source and destination are pre-filled{scenarioId ? ` (${scenarioId})` : ""}. Add credentials and run.
+          </p>
+        </div>
+      ) : null}
+
       {step !== "done" && (
         <div className="mb-8 flex gap-2">
           {STEP_LABELS.map((label, i) => (
@@ -240,7 +283,7 @@ export function QuickStartWizard() {
         <section className="space-y-4">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Where should data land?</h2>
           <ul className="grid gap-3 sm:grid-cols-2">
-            {DESTINATIONS.map((d) => (
+            {QUICK_START_DESTINATIONS.map((d) => (
               <li key={d.slug}>
                 <button
                   type="button"
@@ -252,7 +295,7 @@ export function QuickStartWizard() {
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <Database className="h-4 w-4 text-sky-600" aria-hidden />
+                    <ConnectorIcon slug={d.slug} name={d.label} size={20} />
                     <span className="font-semibold text-slate-900 dark:text-white">{d.label}</span>
                   </div>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{d.hint}</p>
@@ -276,7 +319,7 @@ export function QuickStartWizard() {
         <section className="space-y-4">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">What are you syncing?</h2>
           <ul className="grid gap-3 sm:grid-cols-2">
-            {SOURCES.map((s) => (
+            {QUICK_START_SOURCES.map((s) => (
               <li key={s.slug}>
                 <button
                   type="button"
@@ -287,7 +330,10 @@ export function QuickStartWizard() {
                       : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900"
                   }`}
                 >
-                  <span className="font-semibold text-slate-900 dark:text-white">{s.label}</span>
+                  <div className="flex items-center gap-2">
+                    <ConnectorIcon slug={s.slug} name={s.label} size={20} />
+                    <span className="font-semibold text-slate-900 dark:text-white">{s.label}</span>
+                  </div>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{s.hint}</p>
                 </button>
               </li>
