@@ -22,10 +22,10 @@ const V2_ROADMAP = [
   { id: "scaffold", label: "Scaffold dbt project to Git", done: true },
   { id: "phases", label: "Load → dbt run phases in telemetry", done: true },
   { id: "worker", label: "dbt on managed workers (GHA)", done: true },
-  { id: "manifest", label: "Manifest + model list on run detail", done: false },
-  { id: "lineage", label: "Canvas lineage (source → staging → marts)", done: false },
-  { id: "hooks", label: "Webhooks with dbt test failures", done: false },
-  { id: "replication-dbt", label: "Post-replication dbt job type", done: false },
+  { id: "manifest", label: "Manifest + model list on run detail", done: true },
+  { id: "lineage", label: "Canvas lineage (source → staging → marts)", done: true },
+  { id: "hooks", label: "Webhooks with dbt test failures", done: true },
+  { id: "replication-dbt", label: "Post-replication dbt job type", done: true },
 ] as const;
 
 export function DbtHubPageClient() {

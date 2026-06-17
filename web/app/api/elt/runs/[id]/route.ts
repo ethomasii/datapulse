@@ -23,7 +23,7 @@ export async function GET(req: Request, context: RouteContext) {
   const run = await db.eltPipelineRun.findFirst({
     where: { id, userId: auth.user.id },
     include: {
-      pipeline: { select: { id: true, name: true, tool: true } },
+      pipeline: { select: { id: true, name: true, tool: true, sourceType: true, sourceConfiguration: true } },
       targetAgentToken: { select: { id: true, name: true } },
     },
   });

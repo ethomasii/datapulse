@@ -14,6 +14,9 @@ import {
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RelatedLinks } from "@/components/ui/related-links";
+import { AssetLineageGraph } from "@/components/assets/asset-lineage-graph";
+import { buildAssetLineageGraph } from "@/lib/elt/asset-lineage";
+import { computePipelineFreshness } from "@/lib/elt/asset-freshness";
 import { syncModeLabel } from "@/lib/elt/pipeline-tool-labels";
 import type {
   PipelineAssetBundle,
@@ -110,6 +113,8 @@ function AssetKindBadge({ kind }: { kind: WorkspaceAssetKind }) {
 function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBundle; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
   const allAssets = [bundle.source, ...bundle.rawAssets, ...bundle.transforms, ...bundle.postTransforms];
+  const freshness = computePipelineFreshness(bundle.lastRun, bundle.enabled);
+  const lineage = buildAssetLineageGraph(bundle);
 
   return (
     <article className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
@@ -128,6 +133,12 @@ function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBund
             ) : null}
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
               {syncModeLabel(bundle.syncMode)}
+            </span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${freshness.badgeClass}`}
+              title={freshness.detail}
+            >
+              {freshness.label}
             </span>
           </div>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
@@ -161,9 +172,21 @@ function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBund
             ) : (
               " · no runs yet"
             )}
+            {bundle.lastRun?.rowsLoaded !== undefined ? (
+              <> · {new Intl.NumberFormat().format(bundle.lastRun.rowsLoaded)} rows</>
+            ) : null}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {bundle.lastRun ? (
+            <Link
+              href={`/runs?run=${bundle.lastRun.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:border-sky-300 hover:text-sky-700 dark:border-slate-700 dark:text-slate-300"
+            >
+              Last run
+            </Link>
+          ) : null}
           <Link
             href={`/builder?pipeline=${bundle.pipelineId}`}
             onClick={(e) => e.stopPropagation()}
@@ -182,7 +205,18 @@ function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBund
       </button>
 
       {open ? (
-        <div className="border-t border-slate-100 px-5 py-4 dark:border-slate-800">
+        <div className="space-y-4 border-t border-slate-100 px-5 py-4 dark:border-slate-800">
+          <AssetLineageGraph graph={lineage} />
+          {bundle.lastRun?.dbtManifest && bundle.lastRun.dbtManifest.models.length > 0 ? (
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              Last run dbt:{" "}
+              <span className="font-medium text-violet-700 dark:text-violet-300">
+                {bundle.lastRun.dbtManifest.models.filter((m) => m.status === "success").length}/
+                {bundle.lastRun.dbtManifest.models.length} models succeeded
+              </span>
+              {bundle.lastRun.dbtManifest.source === "runner" ? " (runner-reported)" : " (from config)"}
+            </p>
+          ) : null}
           <ul className="space-y-2">
             {allAssets.map((asset) => (
               <li
@@ -192,6 +226,11 @@ function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBund
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <AssetKindBadge kind={asset.kind} />
                   <span className="text-sm font-medium text-slate-900 dark:text-white">{asset.displayName}</span>
+                  {asset.transformScope === "post_replication" ? (
+                    <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-900 dark:bg-amber-950/50">
+                      Post-replication
+                    </span>
+                  ) : null}
                   {asset.landingQualified ? (
                     <code className="truncate font-mono text-[11px] text-slate-500">{asset.landingQualified}</code>
                   ) : null}

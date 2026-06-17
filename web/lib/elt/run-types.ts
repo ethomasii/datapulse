@@ -67,6 +67,37 @@ export const patchRunBodySchema = z.object({
   appendTelemetrySample: telemetrySampleSchema.optional(),
   /** Replace entire samples array (e.g. backfill after run). Max length enforced server-side. */
   telemetrySamples: z.array(telemetrySampleSchema).max(TELEMETRY_SAMPLES_MAX).optional(),
+  /** dbt model/test results from transform phase — stored under `telemetry.dbt`. */
+  dbtManifest: z
+    .object({
+      packagePath: z.string().max(512).optional(),
+      datasetName: z.string().max(256).optional(),
+      models: z
+        .array(
+          z.object({
+            name: z.string().max(256),
+            status: z.enum(["success", "skipped", "error"]),
+            executionTimeMs: z.number().finite().nonnegative().optional(),
+          })
+        )
+        .max(500)
+        .optional()
+        .default([]),
+      tests: z
+        .array(
+          z.object({
+            name: z.string().max(256),
+            status: z.enum(["pass", "fail", "warn", "error", "skipped"]),
+            message: z.string().max(2000).optional(),
+          })
+        )
+        .max(500)
+        .optional()
+        .default([]),
+      recordedAt: z.string().max(64).optional(),
+      source: z.enum(["config", "runner"]).optional(),
+    })
+    .optional(),
 });
 
 export type LogEntry = z.infer<typeof logEntrySchema>;

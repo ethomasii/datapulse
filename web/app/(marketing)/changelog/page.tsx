@@ -14,6 +14,15 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    version: "0.9.2",
+    date: "2026-06-17",
+    highlights: [
+      "Assets v2 — freshness badges (fresh/stale/failed), lineage graph per pipeline, last-run row counts.",
+      "dbt on runs — manifest panel on run detail; PATCH dbtManifest on runs; webhooks include dbtTestFailures.",
+      "Post-replication dbt — database replication pipelines can declare dbt transforms in the asset map.",
+    ],
+  },
+  {
     version: "0.9.1",
     date: "2026-06-17",
     highlights: [

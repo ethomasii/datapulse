@@ -21,6 +21,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { RunTelemetryCompactCell, RunTelemetryView } from "@/components/elt/run-telemetry-view";
+import { RunDbtManifestPanel } from "@/components/elt/run-dbt-manifest-panel";
 import { formatBytes, formatRows, parseRunTelemetry } from "@/lib/elt/run-telemetry";
 import { RelatedLinks } from "@/components/ui/related-links";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -43,7 +44,7 @@ type RunRow = {
   errorSummary: string | null;
   webhookStatus: string | null;
   telemetry?: unknown;
-  pipeline: { id: string; name: string };
+  pipeline: { id: string; name: string; sourceType?: string; sourceConfiguration?: unknown };
   targetAgentToken?: { id: string; name: string } | null;
 };
 
@@ -1182,6 +1183,13 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                 )}
 
                 <RunTelemetryView telemetryRaw={detail.run.telemetry} logEntriesRaw={detail.run.logEntries} />
+
+                <RunDbtManifestPanel
+                  telemetryRaw={detail.run.telemetry}
+                  runStatus={detail.run.status}
+                  sourceType={detail.run.pipeline?.sourceType}
+                  sourceConfiguration={detail.run.pipeline?.sourceConfiguration}
+                />
 
                 <div>
                   <span className="text-xs font-medium uppercase text-slate-500">Structured logs</span>

@@ -100,3 +100,23 @@ describe("buildWorkspaceAssets", () => {
     expect(result.assets.length).toBeGreaterThan(result.summary.pipelines);
   });
 });
+
+describe("post-replication dbt", () => {
+  it("derives transforms for database replication with dbt config", () => {
+    const bundle = derivePipelineAssets({
+      id: "p3",
+      name: "pg_dbt",
+      tool: "sling",
+      enabled: true,
+      sourceType: "postgres",
+      destinationType: "snowflake",
+      updatedAt: "2026-06-17T00:00:00.000Z",
+      sourceConfiguration: {
+        tables: "users",
+        dbt: { enabled: true, package_path: "./dbt" },
+      },
+    });
+    expect(bundle.transforms).toHaveLength(1);
+    expect(bundle.transforms[0]?.transformScope).toBe("post_replication");
+  });
+});

@@ -68,7 +68,8 @@ export function applyPatchRunBody(
   const telemetryTouched =
     body.telemetrySummary !== undefined ||
     body.appendTelemetrySample !== undefined ||
-    body.telemetrySamples !== undefined;
+    body.telemetrySamples !== undefined ||
+    body.dbtManifest !== undefined;
 
   const telemetryJson = telemetryTouched
     ? (runTelemetryToJson(
@@ -76,6 +77,7 @@ export function applyPatchRunBody(
           telemetrySummary: body.telemetrySummary,
           appendTelemetrySample: body.appendTelemetrySample,
           telemetrySamples: body.telemetrySamples,
+          dbtManifest: body.dbtManifest,
         })
       ) as Prisma.InputJsonValue)
     : undefined;

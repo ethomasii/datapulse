@@ -3,6 +3,9 @@
  * Stored as JSON on `EltPipelineRun.telemetry` — gateway and managed workers PATCH the same shape.
  */
 
+import type { DbtRunManifest } from "@/lib/elt/dbt-run-manifest";
+import { sanitizeDbtRunManifest } from "@/lib/elt/dbt-run-manifest";
+
 export const TELEMETRY_SAMPLES_MAX = 2000;
 
 export type TelemetrySummary = {
@@ -30,6 +33,8 @@ export type TelemetrySample = {
 export type RunTelemetry = {
   summary: TelemetrySummary;
   samples: TelemetrySample[];
+  /** dbt model/test results from the transform phase (v2). */
+  dbt?: DbtRunManifest;
   /** Numeric rollup was inferred from structured log lines (no telemetry summary on the run). */
   derivedFromLogs?: boolean;
 };
@@ -175,7 +180,8 @@ export function parseRunTelemetry(raw: unknown): RunTelemetry {
       if (s) samples.push(s);
     }
   }
-  return { summary, samples: samples.slice(-TELEMETRY_SAMPLES_MAX) };
+  const dbt = sanitizeDbtRunManifest(o.dbt) ?? undefined;
+  return { summary, samples: samples.slice(-TELEMETRY_SAMPLES_MAX), ...(dbt ? { dbt } : {}) };
 }
 
 function inferSummaryFromSamples(samples: TelemetrySample[]): TelemetrySummary | null {
@@ -212,6 +218,7 @@ export type TelemetryPatchInput = {
   telemetrySummary?: Partial<TelemetrySummary>;
   appendTelemetrySample?: Partial<TelemetrySample>;
   telemetrySamples?: TelemetrySample[];
+  dbtManifest?: DbtRunManifest;
 };
 
 export function mergeRunTelemetry(existingRaw: unknown, patch: TelemetryPatchInput): RunTelemetry {
@@ -247,11 +254,22 @@ export function mergeRunTelemetry(existingRaw: unknown, patch: TelemetryPatchInp
     }
   }
 
-  return { summary, samples };
+  let dbt = base.dbt;
+  if (patch.dbtManifest !== undefined) {
+    const sanitized = sanitizeDbtRunManifest(patch.dbtManifest);
+    if (sanitized) dbt = sanitized;
+  }
+
+  return { summary, samples, ...(dbt ? { dbt } : {}) };
 }
 
 export function runTelemetryToJson(t: RunTelemetry): Record<string, unknown> {
-  return { summary: t.summary, samples: t.samples };
+  return {
+    summary: t.summary,
+    samples: t.samples,
+    ...(t.dbt ? { dbt: t.dbt } : {}),
+    ...(t.derivedFromLogs ? { derivedFromLogs: true } : {}),
+  };
 }
 
 export function formatBytes(n: number): string {

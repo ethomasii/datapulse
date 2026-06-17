@@ -1,5 +1,6 @@
 import { db } from "@/lib/db/client";
 import { parseRunTelemetry } from "@/lib/elt/run-telemetry";
+import { dbtFailedTests } from "@/lib/elt/dbt-run-manifest";
 import { deliverRunWebhook, type RunWebhookPayload } from "@/lib/elt/run-webhook";
 
 function appBaseUrl(): string {
@@ -26,6 +27,7 @@ export async function maybeDispatchRunWebhook(runId: string, userId: string): Pr
   const base = appBaseUrl();
   const tel = parseRunTelemetry((run as { telemetry?: unknown }).telemetry);
   const hasSummary = Object.keys(tel.summary).length > 0;
+  const failures = dbtFailedTests(tel.dbt);
   const payload: RunWebhookPayload = {
     source: "eltpulse",
     event,
@@ -39,6 +41,8 @@ export async function maybeDispatchRunWebhook(runId: string, userId: string): Pr
     finishedAt: run.finishedAt?.toISOString() ?? null,
     runUrl: `${base}/runs?run=${run.id}`,
     ...(hasSummary ? { telemetrySummary: tel.summary as Record<string, unknown> } : {}),
+    ...(tel.dbt ? { dbtManifest: tel.dbt } : {}),
+    ...(failures.length > 0 ? { dbtTestFailures: failures } : {}),
   };
 
   const r = await deliverRunWebhook(webhookUrl, payload);

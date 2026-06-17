@@ -5,12 +5,14 @@
 
 import { readDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
 import { dbtHubPackageDisplayName, resolveDbtHubPackage } from "@/lib/elt/dbt-hub-packages";
+import type { DbtRunManifest } from "@/lib/elt/dbt-run-manifest";
 import { generateSlingReplication } from "@/lib/elt/generate-sling";
 import {
   pipelineSyncMode,
-  supportsInPipelineDbt,
 } from "@/lib/elt/pipeline-tool-labels";
 import { parseRunTelemetry } from "@/lib/elt/run-telemetry";
+import type { AssetFreshness } from "@/lib/elt/asset-freshness";
+import { computePipelineFreshness } from "@/lib/elt/asset-freshness";
 
 export type PipelineSyncMode = "connector_sync" | "database_replication";
 
@@ -35,6 +37,8 @@ export type WorkspaceAsset = {
   parentId?: string;
   description?: string;
   dbtPackage?: string;
+  /** In-pipeline dbt (connector sync) vs post-replication job (database replication). */
+  transformScope?: "in_pipeline" | "post_replication";
   enabled: boolean;
 };
 
@@ -45,6 +49,7 @@ export type PipelineLastRunSummary = {
   finishedAt: string | null;
   rowsLoaded?: number;
   currentPhase?: string;
+  dbtManifest?: DbtRunManifest;
 };
 
 export type PipelineAssetBundle = {
@@ -55,6 +60,8 @@ export type PipelineAssetBundle = {
   destinationType: string;
   enabled: boolean;
   landingDataset: string;
+  freshness: AssetFreshness;
+  freshnessLabel: string;
   source: WorkspaceAsset;
   rawAssets: WorkspaceAsset[];
   transforms: WorkspaceAsset[];
@@ -213,15 +220,16 @@ function resolveTransformAssets(
   pipeline: PipelineAssetInput,
   config: Record<string, unknown>,
   syncMode: PipelineSyncMode,
-  landingDataset: string
+  _landingDataset: string
 ): WorkspaceAsset[] {
-  if (!supportsInPipelineDbt(pipeline.tool)) return [];
-
   const dbt = readDbtTransformConfig(config);
   if (!dbt || !Boolean(dbt.enabled)) return [];
 
   const packagePath = String(dbt.package_path ?? "").trim();
   if (!packagePath) return [];
+
+  const transformScope: "in_pipeline" | "post_replication" =
+    syncMode === "database_replication" ? "post_replication" : "in_pipeline";
 
   const hubPkg = resolveDbtHubPackage(pipeline.sourceType);
   const dbtDatasetRaw =
@@ -230,6 +238,10 @@ function resolveTransformAssets(
       : `${pipeline.name}_dbt`;
   const dbtDataset = dbtDatasetRaw.replace(/[^a-zA-Z0-9_]/g, "_");
   const models = hubPkg?.models?.length ? hubPkg.models : [];
+  const scopeNote =
+    transformScope === "post_replication"
+      ? "Post-replication dbt job (separate from sync runner)"
+      : "In-pipeline dbt transform";
 
   if (models.length === 0) {
     return [
@@ -245,7 +257,8 @@ function resolveTransformAssets(
         destinationType: pipeline.destinationType,
         landingDataset: dbtDataset,
         dbtPackage: packagePath,
-        description: hubPkg?.description ?? "Custom or local dbt package",
+        transformScope,
+        description: hubPkg?.description ?? scopeNote,
         enabled: pipeline.enabled,
       },
     ];
@@ -265,7 +278,8 @@ function resolveTransformAssets(
     landingQualified: `${dbtDataset}.${model}`,
     parentId: `${pipeline.id}:source`,
     dbtPackage: packagePath,
-    description: hubPkg?.description,
+    transformScope,
+    description: scopeNote,
     enabled: pipeline.enabled,
   }));
 }
@@ -370,7 +384,7 @@ export function derivePipelineAssets(pipeline: PipelineAssetInput): PipelineAsse
   const transforms = resolveTransformAssets(pipeline, config, syncMode, landingDataset);
   const postTransforms = resolvePostTransformAssets(pipeline, config, syncMode);
 
-  return {
+  const bundle: PipelineAssetBundle = {
     pipelineId: pipeline.id,
     pipelineName: pipeline.name,
     syncMode,
@@ -378,6 +392,8 @@ export function derivePipelineAssets(pipeline: PipelineAssetInput): PipelineAsse
     destinationType: pipeline.destinationType,
     enabled: pipeline.enabled,
     landingDataset,
+    freshness: "never_run",
+    freshnessLabel: "Never run",
     source: sourceAsset,
     rawAssets,
     transforms,
@@ -385,28 +401,39 @@ export function derivePipelineAssets(pipeline: PipelineAssetInput): PipelineAsse
     updatedAt:
       pipeline.updatedAt instanceof Date ? pipeline.updatedAt.toISOString() : String(pipeline.updatedAt),
   };
+
+  return bundle;
 }
 
 export function attachLastRun(
   bundle: PipelineAssetBundle,
   run: PipelineRunAssetInput | undefined
 ): PipelineAssetBundle {
-  if (!run) return bundle;
+  const base = { ...bundle };
+  if (!run) {
+    const meta = computePipelineFreshness(undefined, bundle.enabled);
+    return { ...base, freshness: meta.freshness, freshnessLabel: meta.label };
+  }
   const telemetry = parseRunTelemetry(run.telemetry);
+  const lastRun: PipelineLastRunSummary = {
+    id: run.id,
+    status: run.status,
+    startedAt: run.startedAt instanceof Date ? run.startedAt.toISOString() : String(run.startedAt),
+    finishedAt: run.finishedAt
+      ? run.finishedAt instanceof Date
+        ? run.finishedAt.toISOString()
+        : String(run.finishedAt)
+      : null,
+    rowsLoaded: telemetry.summary.rowsLoaded,
+    currentPhase: telemetry.summary.currentPhase,
+    ...(telemetry.dbt ? { dbtManifest: telemetry.dbt } : {}),
+  };
+  const meta = computePipelineFreshness(lastRun, bundle.enabled);
   return {
-    ...bundle,
-    lastRun: {
-      id: run.id,
-      status: run.status,
-      startedAt: run.startedAt instanceof Date ? run.startedAt.toISOString() : String(run.startedAt),
-      finishedAt: run.finishedAt
-        ? run.finishedAt instanceof Date
-          ? run.finishedAt.toISOString()
-          : String(run.finishedAt)
-        : null,
-      rowsLoaded: telemetry.summary.rowsLoaded,
-      currentPhase: telemetry.summary.currentPhase,
-    },
+    ...base,
+    lastRun,
+    freshness: meta.freshness,
+    freshnessLabel: meta.label,
   };
 }
 

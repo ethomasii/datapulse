@@ -16,6 +16,10 @@ export type RunWebhookPayload = {
   runUrl: string;
   /** Final rollup if the runner reported metrics (rows/bytes/progress). */
   telemetrySummary?: Record<string, unknown>;
+  /** dbt model/test results when transform phase ran. */
+  dbtManifest?: Record<string, unknown>;
+  /** Failed dbt tests only — convenient for alerting rules. */
+  dbtTestFailures?: Array<{ name: string; status: string; message?: string }>;
 };
 
 export async function deliverRunWebhook(url: string, payload: RunWebhookPayload): Promise<{ ok: boolean; httpStatus?: number }> {

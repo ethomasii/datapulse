@@ -82,6 +82,11 @@ const ITEMS: {
   },
   {
     status: "shipped",
+    title: "Assets v2 — freshness, lineage, dbt on runs",
+    desc: "Fresh/stale badges, per-pipeline lineage graph, dbt manifest on run detail, webhook test failures, post-replication dbt in asset map.",
+  },
+  {
+    status: "shipped",
     title: "Workspace asset catalog (v1)",
     desc: "Config-derived /assets page — sources, raw landing targets, dbt models, and last-run status per pipeline.",
   },

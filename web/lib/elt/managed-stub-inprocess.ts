@@ -2,6 +2,7 @@ import { RunIngestionExecutor, type Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
 import { applyPatchRunBody } from "@/lib/elt/apply-run-patch";
 import { pipelineHasDbtEnabled } from "@/lib/elt/dbt-run-phases";
+import { buildStubDbtRunManifest } from "@/lib/elt/dbt-run-manifest";
 import { maybeDispatchRunWebhook } from "@/lib/elt/maybe-dispatch-run-webhook";
 import type { PatchRunBody } from "@/lib/elt/run-types";
 import type { ManagedWorkerBatchResult } from "@/lib/elt/managed-worker-stub-http";
@@ -61,9 +62,10 @@ async function patchManagedRunInProcess(runId: string, body: PatchRunBody): Prom
 export async function stubCompleteManagedRunInProcess(runId: string): Promise<void> {
   const run = await db.eltPipelineRun.findFirst({
     where: { id: runId },
-    select: { pipeline: { select: { sourceConfiguration: true } } },
+    select: { pipeline: { select: { sourceType: true, sourceConfiguration: true } } },
   });
   const hasDbt = pipelineHasDbtEnabled(run?.pipeline?.sourceConfiguration);
+  const sourceType = run?.pipeline?.sourceType ?? "";
 
   await patchManagedRunInProcess(runId, { status: "running" });
   await patchManagedRunInProcess(runId, {
@@ -101,6 +103,9 @@ export async function stubCompleteManagedRunInProcess(runId: string): Promise<vo
     },
     telemetrySummary: { currentPhase: "done", progress: 100, rowsLoaded: 100, bytesLoaded: 50_000 },
     appendTelemetrySample: { progress: 100, rows: 100, bytes: 50_000, phase: "done" },
+    ...(hasDbt && run?.pipeline
+      ? { dbtManifest: buildStubDbtRunManifest(sourceType, run.pipeline.sourceConfiguration) }
+      : {}),
   });
 }
 
