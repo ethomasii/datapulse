@@ -11,6 +11,7 @@ import {
   Workflow,
   Zap,
 } from "lucide-react";
+import { ProductPreview } from "@/components/marketing/product-preview";
 
 const CONNECTORS = [
   "Snowflake",
@@ -119,40 +120,42 @@ const pricingPreview = [
 export default function HomePage() {
   return (
     <div>
-      {/* Hero */}
-      <section className="border-b border-slate-200 bg-gradient-to-b from-white to-slate-50 px-4 py-20 dark:border-slate-800 dark:from-slate-950 dark:to-slate-900 sm:px-6">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-200">
-            <Sparkles className="h-3.5 w-3.5" aria-hidden />
-            ELT-as-code, without the boilerplate
-          </p>
-          <h1 className="text-balance text-4xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-5xl">
-            ELT pipelines without the friction
-          </h1>
-          <p className="mt-6 text-lg text-slate-600 dark:text-slate-300">
-            eltPulse is the{" "}
-            <span className="font-medium text-slate-800 dark:text-slate-200">control plane</span> for designing,
-            running, and observing data pipelines — as easy as Fivetran, as flexible as dlt. You own the code; we
-            handle orchestration.
-          </p>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-            <Link
-              href="/sign-up"
-              className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-sky-500"
-            >
-              Start free — no card required
-              <ArrowRight className="h-4 w-4" aria-hidden />
-            </Link>
-            <Link
-              href="/docs/getting-started"
-              className="text-sm font-medium text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline dark:text-slate-300 dark:hover:text-white"
-            >
-              Read the docs
-            </Link>
+      {/* Hero — two column with product preview */}
+      <section className="border-b border-slate-200 bg-gradient-to-b from-white via-slate-50/50 to-slate-50 px-4 py-16 dark:border-slate-800 dark:from-slate-950 dark:via-slate-900/50 dark:to-slate-900 sm:px-6 sm:py-20">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2 lg:gap-16">
+          <div className="text-center lg:text-left">
+            <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-200">
+              <Sparkles className="h-3.5 w-3.5" aria-hidden />
+              Now with Quick start — first sync in minutes
+            </p>
+            <h1 className="text-balance text-4xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-5xl lg:text-[2.75rem] lg:leading-tight">
+              ELT pipelines without the friction
+            </h1>
+            <p className="mt-6 text-lg text-slate-600 dark:text-slate-300">
+              As easy as <span className="font-medium text-slate-800 dark:text-slate-200">Fivetran</span>, as flexible
+              as <span className="font-medium text-slate-800 dark:text-slate-200">dlt</span>. Design, run, and observe
+              pipelines — you own the code, we handle orchestration.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-4 lg:justify-start">
+              <Link
+                href="/sign-up"
+                className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/25 hover:bg-sky-500"
+              >
+                Start free — no card required
+                <ArrowRight className="h-4 w-4" aria-hidden />
+              </Link>
+              <Link
+                href="/docs/getting-started"
+                className="text-sm font-medium text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline dark:text-slate-300 dark:hover:text-white"
+              >
+                Read the docs
+              </Link>
+            </div>
+            <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+              111+ connectors · Managed execution included · Git-native export
+            </p>
           </div>
-          <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
-            Free plan includes 3 pipelines. Managed execution included.
-          </p>
+          <ProductPreview />
         </div>
       </section>
 

@@ -14,6 +14,18 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    version: "0.4.0",
+    date: "2026-06-17",
+    highlights: [
+      "Quick start wizard — destination → source → create & run in under a minute.",
+      "Marketing site refresh: product preview hero, expanded homepage sections, pricing FAQ, compare vs dlt/Fivetran+dbt.",
+      "Workspace API keys with scoped access to pipelines, runs, and connections.",
+      "In-process managed executor — runs complete immediately on Vercel without gateway setup.",
+      "Stripe Checkout scaffold, org invites, progressive app sidebar, and help center FAQ.",
+      "Demo pipeline seeded on signup; inline Run panel in the pipeline builder.",
+    ],
+  },
+  {
     version: "0.3.0",
     date: "2026-03-30",
     highlights: [

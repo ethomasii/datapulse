@@ -51,6 +51,21 @@ const ITEMS: {
     desc: "Agent tokens, heartbeat, Docker/K8s deploy manifests, and eltPulse-managed execution (default).",
   },
   {
+    status: "shipped",
+    title: "Quick start & onboarding UX",
+    desc: "Guided wizard, progressive sidebar, empty states, demo pipeline on signup, inline Run in builder.",
+  },
+  {
+    status: "shipped",
+    title: "Public API keys (beta)",
+    desc: "Workspace API keys for pipelines, runs, and connections — create in Account → Developers.",
+  },
+  {
+    status: "shipped",
+    title: "Marketing site v2",
+    desc: "Product preview hero, connector strip, testimonials, pricing preview, FAQ, richer footer.",
+  },
+  {
     status: "in-progress",
     title: "Managed Git commits",
     desc: "Push generated files into customer repos under the eltPulse GitHub org via app installation tokens.",
@@ -66,19 +81,19 @@ const ITEMS: {
     desc: "Production-grade eltPulse-managed workers (today: stub/local/GitHub dispatch; scaling to queue workers).",
   },
   {
+    status: "in-progress",
+    title: "Billing & checkout",
+    desc: "Stripe Checkout live — usage meters and Customer Portal still to wire.",
+  },
+  {
     status: "planned",
     title: "Team & roles",
-    desc: "Invite users, share pipelines, separate billing admin vs editor.",
+    desc: "Invite users, share pipelines, separate billing admin vs editor. Org invites scaffold shipped.",
   },
   {
     status: "planned",
-    title: "Billing & checkout",
-    desc: "Stripe self-serve upgrades, usage meters, and included row volume per tier.",
-  },
-  {
-    status: "research",
-    title: "API & automation",
-    desc: "Public or workspace-scoped API keys for CRUD on pipelines and triggering syncs.",
+    title: "Full public API",
+    desc: "OpenAPI reference, webhooks API, and broader route coverage beyond current beta keys.",
   },
 ];
 
