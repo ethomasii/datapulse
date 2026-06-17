@@ -9,6 +9,7 @@ import { chooseTool } from "@/lib/elt/choose-tool";
 import { getConnectorTrustTier, type ConnectorTrustTier } from "@/lib/elt/connector-trust";
 import { ALL_CONNECTORS } from "@/lib/elt/connectors-registry";
 import { DLT_HUB_SOURCE_BY_SLUG } from "@/lib/elt/dlt-hub-registry";
+import { connectorDisplayName } from "@/lib/marketing/connector-display-names";
 
 /** Marketing-friendly aliases → canonical catalog slug */
 const SLUG_ALIASES: Record<string, string> = {
@@ -33,13 +34,6 @@ export type MarketingConnector = {
   docsUrl: string | null;
 };
 
-function titleCaseSlug(slug: string): string {
-  return slug
-    .split("_")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-}
-
 function descriptionForSlug(slug: string, role: MarketingConnectorRole): string {
   const dlt = DLT_HUB_SOURCE_BY_SLUG[slug];
   if (dlt?.description) return dlt.description;
@@ -49,7 +43,7 @@ function descriptionForSlug(slug: string, role: MarketingConnectorRole): string 
     return `${conn.label} — ${role === "destination" ? "load pipeline output" : "extract data"} via eltPulse (dlt or Sling).`;
   }
 
-  const label = titleCaseSlug(slug);
+  const label = connectorDisplayName(slug);
   if (role === "destination") {
     return `Load transformed data into ${label}. Supported as a pipeline destination in eltPulse.`;
   }
@@ -68,7 +62,7 @@ function buildConnector(
 
   return {
     slug,
-    name: dlt?.name ?? name,
+    name: dlt?.name ?? connectorDisplayName(slug, name),
     description: descriptionForSlug(slug, role),
     category,
     role,

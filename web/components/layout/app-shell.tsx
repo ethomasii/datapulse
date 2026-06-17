@@ -14,10 +14,12 @@ import {
   ChevronUp,
   CircleHelp,
   FolderGit2,
+  LayoutGrid,
   LayoutDashboard,
   Layers,
   PlayCircle,
   Plug,
+  Route,
   Split,
   TableProperties,
   UserCircle,
@@ -47,6 +49,8 @@ const CORE_NAV: NavItem[] = [
   { href: "/quick-start", label: "Quick start", icon: Zap },
   { href: "/builder", label: "Pipelines", icon: Layers },
   { href: "/connections", label: "Connections", icon: Cable },
+  { href: "/connectors", label: "Connectors", icon: LayoutGrid },
+  { href: "/scenarios", label: "Scenarios", icon: Route },
   { href: "/runs", label: "Runs", icon: PlayCircle },
 ];
 
