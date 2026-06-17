@@ -81,6 +81,11 @@ const ITEMS: {
     desc: "Email invites, accept page, auto-join on signup, Team page, org members see owner pipelines.",
   },
   {
+    status: "shipped",
+    title: "Workspace asset catalog (v1)",
+    desc: "Config-derived /assets page — sources, raw landing targets, dbt models, and last-run status per pipeline.",
+  },
+  {
     status: "in-progress",
     title: "Managed Git commits",
     desc: "Push generated files into customer repos under the eltPulse GitHub org via app installation tokens.",

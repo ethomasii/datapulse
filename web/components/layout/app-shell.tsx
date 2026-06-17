@@ -22,6 +22,7 @@ import {
   Plug,
   Route,
   Split,
+  Table2,
   TableProperties,
   UserCircle,
   Users,
@@ -55,6 +56,7 @@ const CORE_NAV: NavItem[] = [
 ];
 
 const CATALOG_NAV: NavItem[] = [
+  { href: "/assets", label: "Assets", icon: Table2 },
   { href: "/connectors", label: "Connectors", icon: LayoutGrid },
   { href: "/scenarios", label: "Scenarios", icon: Route },
   { href: "/dbt", label: "dbt transforms", icon: GitBranch },
@@ -220,8 +222,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const mobileAll: NavItem[] = [
     ...CORE_NAV,
+    { href: "/assets", label: "Assets", icon: Table2 },
     { href: "/connectors", label: "Catalog", icon: LayoutGrid },
-    ...ADVANCED_NAV.slice(0, 3),
+    ...ADVANCED_NAV.slice(0, 2),
     ...ACCOUNT_NAV,
   ];
 

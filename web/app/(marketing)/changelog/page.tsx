@@ -14,6 +14,15 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    version: "0.9.1",
+    date: "2026-06-17",
+    highlights: [
+      "Workspace assets — config-derived data map at /assets: sources, raw landing tables, and dbt models across pipelines.",
+      "Assets API — GET /api/elt/assets aggregates pipeline config with latest run summaries.",
+      "Pipelines API — syncMode field (connector_sync / database_replication) alongside internal tool id.",
+    ],
+  },
+  {
     version: "0.9.0",
     date: "2026-06-17",
     highlights: [

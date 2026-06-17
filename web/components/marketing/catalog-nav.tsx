@@ -14,8 +14,10 @@ const POPULAR = [
 ] as const;
 
 const TABS = [
+  { href: "/assets", label: "Assets", match: (p: string) => p === "/assets" },
   { href: "/connectors", label: "All connectors", match: (p: string) => p === "/connectors" || p.startsWith("/connectors/") },
   { href: "/scenarios", label: "Scenarios", match: (p: string) => p === "/scenarios" },
+  { href: "/dbt", label: "dbt", match: (p: string) => p === "/dbt" || p.startsWith("/dbt/") },
 ] as const;
 
 export function CatalogNav() {

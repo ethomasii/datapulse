@@ -29,6 +29,11 @@ const FAQ = [
     href: "/compare",
   },
   {
+    q: "Where can I see everything we're ingesting?",
+    a: "Open Assets under Catalog in the sidebar — a config-derived map of sources, raw tables, and dbt models across your pipelines.",
+    href: "/assets",
+  },
+  {
     q: "Where are connectors documented?",
     a: "Public docs cover getting started, pipelines, orchestration, and security. The Source Registry lists 111+ connectors.",
     href: "/docs",
@@ -52,6 +57,7 @@ export default function HelpPage() {
         <ul className="mt-4 grid gap-3 sm:grid-cols-2">
           {[
             { href: "/quick-start", icon: Zap, title: "Quick start", desc: "First pipeline in 3 steps" },
+            { href: "/assets", icon: Layers, title: "Workspace assets", desc: "Data map from pipeline config" },
             { href: "/docs/getting-started", icon: Rocket, title: "Getting started", desc: "Full setup guide" },
             { href: "/docs/pipelines", icon: Layers, title: "Pipelines", desc: "Builder, codegen, canvas" },
             { href: "/docs/runs", icon: Play, title: "Runs", desc: "Telemetry and webhooks" },

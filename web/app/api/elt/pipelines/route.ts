@@ -6,6 +6,7 @@ import {
   scopeForbiddenResponse,
   unauthorizedResponse,
 } from "@/lib/auth/api-user";
+import { pipelineSyncMode } from "@/lib/elt/pipeline-tool-labels";
 import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
 import { getAccessibleResourceOwnerIds, pipelineOwnerWhere } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
@@ -48,6 +49,7 @@ export async function GET(req: Request) {
       id: row.id,
       name: row.name,
       tool: row.tool,
+      syncMode: pipelineSyncMode(row.tool),
       enabled: row.enabled,
       sourceType: row.sourceType,
       destinationType: row.destinationType,

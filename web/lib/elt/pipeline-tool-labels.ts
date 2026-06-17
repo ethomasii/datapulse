@@ -27,3 +27,15 @@ export function supportsInPipelineDbt(tool: string | null | undefined): boolean 
 export function isDatabaseReplicationTool(tool: string | null | undefined): boolean {
   return String(tool ?? "").toLowerCase().trim() === "sling";
 }
+
+/** API-safe sync mode — never expose internal runner ids to end users. */
+export function pipelineSyncMode(tool: string | null | undefined): "connector_sync" | "database_replication" {
+  return isDatabaseReplicationTool(tool) ? "database_replication" : "connector_sync";
+}
+
+export function syncModeLabel(mode: string | null | undefined): string {
+  const m = String(mode ?? "").toLowerCase().trim();
+  if (m === "database_replication" || m === "sling") return "Database replication";
+  if (m === "connector_sync" || m === "dlt" || m === "auto") return "Connector sync";
+  return pipelineToolLabel(mode);
+}

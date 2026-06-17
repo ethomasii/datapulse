@@ -22,6 +22,7 @@ export const DOCS_SECTIONS: DocNavSection[] = [
     title: "Product",
     items: [
       { href: "/docs/pipelines", label: "Pipelines" },
+      { href: "/assets", label: "Workspace assets" },
       { href: "/docs/connectors", label: "Connectors (docs)" },
       { href: "/connectors", label: "Connector catalog" },
       { href: "/scenarios", label: "Pipeline scenarios" },
