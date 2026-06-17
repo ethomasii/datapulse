@@ -1,7 +1,7 @@
 /** Run phase helpers for load → dbt transform orchestration (v2). */
 
 export const RUN_PHASE_LABELS: Record<string, string> = {
-  extract: "Extract",
+  extract: "Sync",
   load: "Load",
   dbt: "dbt transform",
   transform: "dbt transform",

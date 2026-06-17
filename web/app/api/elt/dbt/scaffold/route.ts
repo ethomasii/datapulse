@@ -41,7 +41,7 @@ export async function POST(req: Request) {
   const hub = resolveDbtHubPackage(sourceSlug);
   if (!hub) {
     return NextResponse.json(
-      { error: `No dlt-hub dbt package for source "${sourceSlug}"` },
+      { error: `No staging dbt package for connector "${sourceSlug}"` },
       { status: 400 }
     );
   }

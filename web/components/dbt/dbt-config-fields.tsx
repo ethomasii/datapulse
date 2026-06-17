@@ -86,23 +86,15 @@ export function DbtConfigFields({
   return (
     <div className="space-y-3 rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-3 dark:border-amber-800/50 dark:bg-amber-950/20">
       <p className={`${intro} leading-snug text-amber-950 dark:text-amber-100`}>
-        Post-load dbt via{" "}
-        <a
-          href="https://dlthub.com/docs/dlt-ecosystem/transformations/dbt"
-          className="font-medium underline"
-          target="_blank"
-          rel="noreferrer"
-        >
-          dlt&apos;s dbt runner
-        </a>
-        . Slice vars default to <code className="font-mono text-[10px]">elt_partition_value</code> /{" "}
+        After eltPulse loads data into your warehouse, the pipeline runs dbt from your project path. Slice vars default
+        to <code className="font-mono text-[10px]">elt_partition_value</code> /{" "}
         <code className="font-mono text-[10px]">elt_partition_column</code>.
       </p>
 
       {pipelineTool === "sling" ? (
         <p className={`${intro} text-amber-900 dark:text-amber-200`}>
-          dbt hooks apply to <strong>dlt</strong> pipelines. For Sling replication, run dbt separately or switch tool to
-          dlt for API sources.
+          In-pipeline dbt is available on <strong>connector sync</strong> pipelines (API and SaaS sources). For
+          database-only replication, run dbt in CI or add a separate transform step.
         </p>
       ) : null}
 

@@ -38,20 +38,20 @@ export function DbtPackagePicker({ sourceSlug, onSelect, className = "" }: Props
   }, [sourceSlug]);
 
   if (loading) {
-    return <p className={`text-xs text-slate-500 ${className}`}>Loading dlt-hub packages…</p>;
+    return <p className={`text-xs text-slate-500 ${className}`}>Loading staging packages…</p>;
   }
 
   if (packages.length === 0) {
     return (
       <p className={`text-xs text-slate-500 ${className}`}>
-        No hub package for this source — use a custom git URL or local path.
+        No staging package for this connector — use a custom git URL or local path.
       </p>
     );
   }
 
   return (
     <div className={`space-y-2 ${className}`}>
-      <p className="text-xs font-medium text-slate-700 dark:text-slate-300">Recommended dlt-hub packages</p>
+      <p className="text-xs font-medium text-slate-700 dark:text-slate-300">Recommended staging packages</p>
       <ul className="space-y-2">
         {packages.map((pkg) => (
           <li key={pkg.sourceKey}>

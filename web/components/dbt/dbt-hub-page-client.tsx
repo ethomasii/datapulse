@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import {
+  Activity,
   ArrowRight,
   CheckCircle2,
   Circle,
@@ -16,7 +17,7 @@ import {
 import type { DbtHubPackage } from "@/lib/elt/dbt-hub-packages";
 
 const V2_ROADMAP = [
-  { id: "packages", label: "dlt-hub package picker", done: true },
+  { id: "packages", label: "Connector staging package picker", done: true },
   { id: "scaffold", label: "Scaffold dbt project to Git", done: true },
   { id: "phases", label: "Load → dbt run phases in telemetry", done: true },
   { id: "worker", label: "dbt on managed workers (GHA)", done: true },
@@ -102,21 +103,28 @@ export function DbtHubPageClient() {
             <li className="flex gap-3">
               <Layers className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
               <span>
-                <strong className="text-slate-900 dark:text-white">Load</strong> — dlt extracts API/file data or Sling
-                replicates databases into your warehouse.
+                <strong className="text-slate-900 dark:text-white">Sync</strong> — eltPulse extracts from your connector
+                (API, files, or database replication) into the warehouse you chose.
               </span>
             </li>
             <li className="flex gap-3">
               <GitBranch className="mt-0.5 h-4 w-4 shrink-0 text-violet-600" />
               <span>
-                <strong className="text-slate-900 dark:text-white">Transform</strong> — generated Python calls dlt&apos;s
-                dbt runner after <code className="text-xs">pipeline.run()</code>.
+                <strong className="text-slate-900 dark:text-white">Load</strong> — raw tables land in a dataset or schema
+                ready for modeling.
               </span>
             </li>
             <li className="flex gap-3">
               <LineChart className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
               <span>
-                <strong className="text-slate-900 dark:text-white">Observe</strong> — runs show extract, load, and dbt
+                <strong className="text-slate-900 dark:text-white">Transform</strong> — your dbt project runs in the same
+                pipeline run, using the same destination credentials.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <Activity className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+              <span>
+                <strong className="text-slate-900 dark:text-white">Observe</strong> — runs show sync, load, and dbt
                 phases separately in telemetry.
               </span>
             </li>
@@ -146,9 +154,9 @@ export function DbtHubPageClient() {
       </section>
 
       <section className="mt-16">
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white">dlt-hub package browser</h2>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white">Staging packages by connector</h2>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-          Pick a package in the builder or scaffold a project straight to your connected GitHub repo.
+          Curated dbt Hub packages that match eltPulse connectors — pick one in the builder or scaffold straight to Git.
         </p>
         <div className="relative mt-4 max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />

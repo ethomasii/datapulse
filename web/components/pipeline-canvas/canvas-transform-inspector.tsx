@@ -82,8 +82,8 @@ export function CanvasTransformInspector({
 
       {transformTool === "dbt" && pipelineTool === "sling" ? (
         <p className="rounded-lg border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-xs leading-snug text-amber-950 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
-          Post-load dbt is only available for API and file-based pipelines. For database pipelines, use{" "}
-          <strong className="font-medium">Notes</strong> to document a separate dbt job, or run dbt in CI against the same warehouse.
+          In-pipeline dbt is available on connector sync pipelines (API and SaaS sources). For database-only replication,
+          document a separate dbt job in <strong className="font-medium">Notes</strong> or run transforms in CI.
         </p>
       ) : null}
 

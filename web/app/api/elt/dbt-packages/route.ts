@@ -11,7 +11,7 @@ export async function GET(req: Request) {
       return NextResponse.json({
         available: false,
         source,
-        message: `No dlt-hub dbt package mapped for source "${source}". Use a custom dbt project path.`,
+        message: `No staging dbt package mapped for connector "${source}". Use a custom dbt project path.`,
       });
     }
     return NextResponse.json({ available: true, source, package: pkg });

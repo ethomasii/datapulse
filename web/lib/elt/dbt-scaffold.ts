@@ -41,8 +41,8 @@ Scaffolded by eltPulse for source **${hubPackage.sourceKey}**.
 - Hub package: \`${hubPackage.package}\`
 - Docs: ${hubPackage.docsUrl}
 
-After load, eltPulse runs dbt via [dlt's dbt runner](https://dlthub.com/docs/dlt-ecosystem/transformations/dbt).
-Set pipeline \`dlt_dbt.package_path\` to \`./${base}\` or this folder in your repo.
+After load, eltPulse runs your dbt project in the same pipeline run.
+Set pipeline transform \`package_path\` to \`./${base}\` or this folder in your repo.
 `;
 
   return [
