@@ -13,7 +13,7 @@ function strList(v) {
 }
 var joinTablesComponent = {
   id: "join_tables",
-  aliases: ["dataframe_join"],
+  aliases: ["dataframe_join", "lookup", "dataframe_lookup"],
   name: "Join tables",
   category: "transformation",
   description: "Join two loaded warehouse tables after sync (pandas via destination SQL client).",
@@ -137,7 +137,7 @@ var joinTablesComponent = {
   }
 };
 
-// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-ywkMkX/join_tables.ts
+// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-SfOGBH/join_tables.ts
 function compile(config) {
   return joinTablesComponent.compile(config);
 }

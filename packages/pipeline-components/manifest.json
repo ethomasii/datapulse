@@ -2,7 +2,7 @@
   "version": "1",
   "repository": "ethomasii/eltpulse-pipeline-components",
   "description": "Native executable pipeline components for eltPulse declarative v2",
-  "last_exported": "2026-06-18T20:48:05.031Z",
+  "last_exported": "2026-06-18T21:29:04.998Z",
   "sourceRepository": "eltpulsehq/datapulse",
   "sourcePath": "web/lib/elt/native-components/definitions",
   "components": [
@@ -33,6 +33,11 @@
     "sqs_to_database_asset",
     "kafka_to_database_asset",
     "rest_api_fetcher",
-    "sql_to_database_asset"
+    "sql_to_database_asset",
+    "pivot",
+    "cross_join",
+    "anti_join",
+    "data_cleansing",
+    "datetime_parser"
   ]
 }

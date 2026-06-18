@@ -1,0 +1,41 @@
+{
+  "id": "anti_join",
+  "aliases": [
+    "except_join",
+    "left_anti_join"
+  ],
+  "name": "Anti join",
+  "category": "transformation",
+  "description": "Rows in left table not present in right (left anti join).",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "left_table",
+      "label": "Left table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "right_table",
+      "label": "Right table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "on",
+      "label": "Join key(s)",
+      "type": "string_list",
+      "required": true
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

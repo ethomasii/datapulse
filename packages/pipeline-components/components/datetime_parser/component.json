@@ -1,0 +1,40 @@
+{
+  "id": "datetime_parser",
+  "aliases": [
+    "parse_dates",
+    "date_parser"
+  ],
+  "name": "Parse datetime columns",
+  "category": "transformation",
+  "description": "Parse string columns to datetime with optional format.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "columns",
+      "label": "Columns to parse",
+      "type": "string_list",
+      "required": true
+    },
+    {
+      "key": "format",
+      "label": "strftime format (optional)",
+      "type": "string",
+      "placeholder": "%Y-%m-%d"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

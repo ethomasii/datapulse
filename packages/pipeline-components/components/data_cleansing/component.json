@@ -1,0 +1,44 @@
+{
+  "id": "data_cleansing",
+  "aliases": [
+    "clean_data",
+    "data_cleaning"
+  ],
+  "name": "Data cleansing",
+  "category": "transformation",
+  "description": "Trim strings, optional lowercase, drop all-null rows.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "string_columns",
+      "label": "String columns to trim",
+      "type": "string_list"
+    },
+    {
+      "key": "lowercase_columns",
+      "label": "Columns to lowercase",
+      "type": "string_list"
+    },
+    {
+      "key": "drop_null_rows",
+      "label": "Drop rows where all values null",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

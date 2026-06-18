@@ -1,0 +1,34 @@
+{
+  "id": "cross_join",
+  "aliases": [
+    "cartesian_join"
+  ],
+  "name": "Cross join",
+  "category": "transformation",
+  "description": "Cartesian product of two tables.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "left_table",
+      "label": "Left table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "right_table",
+      "label": "Right table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

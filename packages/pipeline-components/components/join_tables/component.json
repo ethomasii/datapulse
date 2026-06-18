@@ -1,7 +1,9 @@
 {
   "id": "join_tables",
   "aliases": [
-    "dataframe_join"
+    "dataframe_join",
+    "lookup",
+    "dataframe_lookup"
   ],
   "name": "Join tables",
   "category": "transformation",
