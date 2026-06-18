@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
 import { DbtConfigFields } from "@/components/dbt/dbt-config-fields";
+import { applyDbtProjectToForm, DbtProjectPicker } from "@/components/dbt/dbt-project-picker";
 import { SourceCatalogWizard } from "@/components/elt/source-catalog-wizard";
 import { chooseTool } from "@/lib/elt/choose-tool";
 import { readDbtTransformConfig, setDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
@@ -151,6 +152,7 @@ export function BuilderClient({
   const [dbtSelector, setDbtSelector] = useState("");
   const [dbtSliceValueVar, setDbtSliceValueVar] = useState("");
   const [dbtSliceColumnVar, setDbtSliceColumnVar] = useState("");
+  const [linkedDbtProjectId, setLinkedDbtProjectId] = useState<string | null>(null);
 
   const resolvedTool = useMemo(
     () => chooseTool(sourceType, destinationType),
@@ -306,6 +308,56 @@ export function BuilderClient({
     return next;
   }
 
+  function parseGitFromDbtPath(path: string): { gitUrl: string | null; packagePath: string } {
+    const trimmed = path.trim();
+    if (/^https?:\/\//i.test(trimmed)) {
+      return { gitUrl: trimmed, packagePath: trimmed };
+    }
+    return { gitUrl: null, packagePath: trimmed };
+  }
+
+  function applyLinkedDbtProject(project: Parameters<typeof applyDbtProjectToForm>[0]) {
+    const fields = applyDbtProjectToForm(project);
+    setPostTransformType("dbt");
+    setDbtPackagePath(fields.packagePath);
+    setDbtDatasetName(fields.datasetName);
+    setDbtRepositoryBranch(fields.repositoryBranch);
+    setDbtRunScope(fields.runScope);
+    setDbtSelector(fields.selector);
+  }
+
+  async function syncLinkedDbtProjectBeforeSave(): Promise<boolean> {
+    if (postTransformType !== "dbt" || !linkedDbtProjectId) return true;
+    const { gitUrl, packagePath } = parseGitFromDbtPath(dbtPackagePath);
+    if (!packagePath) {
+      setError("dbt project path or Git URL is required");
+      return false;
+    }
+    try {
+      const res = await fetch(`/api/elt/dbt/projects/${linkedDbtProjectId}`, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          packagePath,
+          gitUrl,
+          gitBranch: dbtRepositoryBranch.trim() || "main",
+          targetSchema: dbtDatasetName.trim() || null,
+          runScope: dbtRunScope,
+          selector: dbtRunScope === "selection" ? dbtSelector.trim() || null : null,
+        }),
+      });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(typeof err.error === "string" ? err.error : "Failed to update linked dbt project");
+      }
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update linked dbt project");
+      return false;
+    }
+  }
+
   async function createPipeline(e: React.FormEvent) {
     e.preventDefault();
     setCreating(true);
@@ -325,6 +377,10 @@ export function BuilderClient({
     }
 
     try {
+      if (!(await syncLinkedDbtProjectBeforeSave())) {
+        setCreating(false);
+        return;
+      }
       const res = await fetch(editingId ? `/api/elt/pipelines/${editingId}` : "/api/elt/pipelines", {
         method: editingId ? "PUT" : "POST",
         credentials: "same-origin",
@@ -346,6 +402,11 @@ export function BuilderClient({
           scheduleCron: scheduleCron || undefined,
           scheduleTimezone: scheduleTimezone || undefined,
           runsWebhookUrl: pipelineWebhookUrl,
+          ...(editingId
+            ? { dbtProjectId: postTransformType === "dbt" ? linkedDbtProjectId : null }
+            : linkedDbtProjectId && postTransformType === "dbt"
+              ? { dbtProjectId: linkedDbtProjectId }
+              : {}),
         }),
       });
       if (!res.ok) {
@@ -413,6 +474,7 @@ export function BuilderClient({
     setDbtSelector("");
     setDbtSliceValueVar("");
     setDbtSliceColumnVar("");
+    setLinkedDbtProjectId(null);
     resetConnectorForNewSourceType("github", "duckdb");
   }
 
@@ -453,6 +515,7 @@ export function BuilderClient({
       runsWebhookUrl?: string | null;
       sourceConnectionId?: string | null;
       destinationConnectionId?: string | null;
+      dbtProjectId?: string | null;
     };
     setEditingId(id);
     setName(p.name);
@@ -482,11 +545,13 @@ export function BuilderClient({
     setScheduleTimezone(typeof cfg.schedule_timezone === "string" ? cfg.schedule_timezone : "UTC");
     setPipelineWebhookUrl(typeof p.runsWebhookUrl === "string" ? p.runsWebhookUrl : "");
     setCanvasGraph(getCanvasFromSourceConfig(cfg));
+    setLinkedDbtProjectId(p.dbtProjectId ?? null);
     const pt = cfg.post_transform as Record<string, unknown> | undefined;
     const dbtCfg = readDbtTransformConfig(cfg);
-    if (dbtCfg?.enabled && dbtCfg?.package_path) {
+    const dbtPath = String(dbtCfg?.git_url ?? dbtCfg?.package_path ?? "").trim();
+    if (dbtCfg?.enabled && dbtPath) {
       setPostTransformType("dbt");
-      setDbtPackagePath(String(dbtCfg.package_path ?? ""));
+      setDbtPackagePath(dbtPath);
       setDbtDatasetName(String(dbtCfg.dataset_name ?? ""));
       setDbtRepositoryBranch(String(dbtCfg.package_repository_branch ?? ""));
       setDbtRunScope(dbtCfg.run_scope === "selection" ? "selection" : "all");
@@ -504,6 +569,7 @@ export function BuilderClient({
       setDbtSelector("");
       setDbtSliceValueVar("");
       setDbtSliceColumnVar("");
+      setLinkedDbtProjectId(null);
     }
   }
 
@@ -792,15 +858,15 @@ export function BuilderClient({
               <div className="mb-4 w-full rounded-lg border border-violet-200 bg-violet-50 px-4 py-3 text-sm dark:border-violet-900 dark:bg-violet-950/40">
                 <p className="font-medium text-violet-900 dark:text-violet-100">Enable dbt on this pipeline</p>
                 <p className="mt-1 text-violet-800 dark:text-violet-200">
-                  Scroll to <strong>Post-load transform</strong>, choose <strong>dbt</strong>, pick a package (browse the{" "}
+                  Scroll to <strong>Post-load transform</strong>, choose <strong>dbt</strong>, link an existing{" "}
+                  <Link href="/catalog/dbt" className="font-semibold underline">
+                    workspace project
+                  </Link>{" "}
+                  or pick a package from the{" "}
                   <Link href="/catalog/transform-hub" className="font-semibold underline">
                     Transform hub
                   </Link>
-                  ), then save. The project shows under{" "}
-                  <Link href="/catalog/dbt" className="font-semibold underline">
-                    My dbt projects
-                  </Link>
-                  .
+                  , then save.
                 </p>
               </div>
             ) : null}
@@ -1102,11 +1168,22 @@ export function BuilderClient({
                       </select>
                     </label>
                     {postTransformType === "dbt" && (
-                      <DbtConfigFields
-                        sourceSlug={sourceType}
-                        pipelineTool={resolvedTool}
-                        pipelineId={editingId}
-                        values={{
+                      <>
+                        <DbtProjectPicker
+                          value={linkedDbtProjectId}
+                          pipelineId={editingId}
+                          sourceSlug={sourceType}
+                          onChange={(id, project) => {
+                            setLinkedDbtProjectId(id);
+                            if (project) applyLinkedDbtProject(project);
+                          }}
+                        />
+                        <DbtConfigFields
+                          sourceSlug={sourceType}
+                          pipelineTool={resolvedTool}
+                          pipelineId={editingId}
+                          dbtProjectId={linkedDbtProjectId}
+                          values={{
                           packagePath: dbtPackagePath,
                           datasetName: dbtDatasetName,
                           repositoryBranch: dbtRepositoryBranch,
@@ -1125,6 +1202,7 @@ export function BuilderClient({
                           if (patch.sliceColumnVar !== undefined) setDbtSliceColumnVar(patch.sliceColumnVar);
                         }}
                       />
+                      </>
                     )}
                     {postTransformType === "python" && (
                       <>

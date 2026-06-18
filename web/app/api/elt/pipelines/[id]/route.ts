@@ -21,6 +21,7 @@ import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-
 import { normalizeRunWebhookUrl } from "@/lib/elt/validate-run-webhook-url";
 import { mergeSourceConfigurationForSourceTypeChange } from "@/lib/elt/merge-source-config-on-type-change";
 import { syncDltDbtWithCanvas } from "@/lib/elt/dbt-canvas";
+import { linkDbtProjectToPipeline, unlinkDbtProjectFromPipeline } from "@/lib/elt/dbt-projects";
 import { resolveRouteParamId } from "@/lib/server/route-params";
 import { assertUserOwnsGatewayToken } from "@/lib/agent/gateway-routing";
 
@@ -203,7 +204,16 @@ export async function PUT(req: Request, ctx: Ctx) {
       },
     });
 
-    return NextResponse.json({ pipeline: row });
+    if (body.dbtProjectId !== undefined) {
+      if (body.dbtProjectId) {
+        await linkDbtProjectToPipeline(user.id, body.dbtProjectId, row.id);
+      } else {
+        await unlinkDbtProjectFromPipeline(user.id, row.id);
+      }
+    }
+
+    const refreshed = await db.eltPipeline.findUnique({ where: { id: row.id } });
+    return NextResponse.json({ pipeline: refreshed ?? row });
   } catch (e) {
     const drift = prismaSchemaDriftResponse(e);
     if (drift) return drift;

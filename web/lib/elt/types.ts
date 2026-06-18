@@ -36,6 +36,8 @@ export const createPipelineBodySchema = z.object({
   sourceConnectionId: z.string().min(1).nullable().optional(),
   /** FK to saved destination Connection (must match `destinationType`). Null clears. */
   destinationConnectionId: z.string().min(1).nullable().optional(),
+  /** Link pipeline to a workspace DbtProject (null unlinks). */
+  dbtProjectId: z.string().min(1).nullable().optional(),
 });
 
 export type CreatePipelineBody = z.infer<typeof createPipelineBodySchema>;
