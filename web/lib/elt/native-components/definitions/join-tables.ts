@@ -11,7 +11,7 @@ function strList(v: unknown): string[] {
 
 export const joinTablesComponent: NativeComponentDefinition = {
   id: "join_tables",
-  aliases: ["dataframe_join"],
+  aliases: ["dataframe_join", "lookup", "dataframe_lookup"],
   name: "Join tables",
   category: "transformation",
   description: "Join two loaded warehouse tables after sync (pandas via destination SQL client).",

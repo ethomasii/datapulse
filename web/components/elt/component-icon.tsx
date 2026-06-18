@@ -39,8 +39,13 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
 };
 
 const ID_ICONS: Record<string, LucideIcon> = {
-  filter_rows: Filter,
-  join_tables: Merge,
+  pivot: Filter,
+  cross_join: Merge,
+  anti_join: Filter,
+  lookup: Merge,
+  data_cleansing: Sparkles,
+  datetime_parser: Activity,
+  group_aggregate: BarChart2,
   union_tables: Layers,
   select_columns: Table2,
   drop_duplicates: Box,

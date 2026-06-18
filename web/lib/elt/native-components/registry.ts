@@ -25,6 +25,13 @@ import {
   sampleRowsComponent,
   addColumnExprComponent,
 } from "./definitions/table-ops";
+import {
+  pivotComponent,
+  crossJoinComponent,
+  antiJoinComponent,
+  dataCleansingComponent,
+  datetimeParserComponent,
+} from "./definitions/analytics-transforms";
 import type { NativeComponentDefinition } from "./types";
 
 const ALL_NATIVE: NativeComponentDefinition[] = [
@@ -56,6 +63,11 @@ const ALL_NATIVE: NativeComponentDefinition[] = [
   kafkaIngestComponent,
   restApiIngestComponent,
   sqlToDatabaseComponent,
+  pivotComponent,
+  crossJoinComponent,
+  antiJoinComponent,
+  dataCleansingComponent,
+  datetimeParserComponent,
 ];
 
 const byId = new Map<string, NativeComponentDefinition>();

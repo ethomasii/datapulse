@@ -52,6 +52,13 @@ export const TOP_COMPONENT_ROUTES: Record<string, ComponentRoute> = {
   dbt_docs_enriched_project: { target: "dbt", badge: "native", hint: "Link DbtProject + catalog enrichment" },
   filter_rows: { target: "python", badge: "python", hint: "Post-load Python transform step on worker" },
   join_tables: { target: "python", badge: "python", hint: "Pandas transform — Python component step" },
+  lookup: { target: "python", badge: "native", hint: "Left join lookup against reference table" },
+  pivot: { target: "python", badge: "native", hint: "Pivot long → wide with pandas" },
+  cross_join: { target: "python", badge: "native", hint: "Cartesian product of two tables" },
+  anti_join: { target: "python", badge: "native", hint: "Rows in left not in right" },
+  data_cleansing: { target: "python", badge: "native", hint: "Trim, lowercase, drop null rows" },
+  datetime_parser: { target: "python", badge: "native", hint: "Parse string columns to datetime" },
+  group_aggregate: { target: "python", badge: "native", hint: "Group by + aggregations" },
   litellm_inference_asset: { target: "dagster", badge: "dagster", hint: "Requires Dagster runtime or custom Python" },
   terraform_asset: { target: "dagster", badge: "dagster", hint: "Infrastructure — optional Dagster executor" },
   external_snowflake_table: {

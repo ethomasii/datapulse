@@ -7,6 +7,7 @@ import { resolveComponentCompiler } from "@/lib/elt/component-packages";
 import { loadWorkspaceCatalogUrls } from "@/lib/elt/workspace-catalog-sources";
 import { previewTableFromConfig } from "@/lib/elt/pipeline-asset-keys";
 import { runReadOnlyQuery } from "@/lib/elt/warehouse-readonly-query";
+import { runStepPython } from "@/lib/elt/run-step-python";
 import { resolveRouteParamId } from "@/lib/server/route-params";
 
 const bodySchema = z.object({
@@ -69,6 +70,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const previewTable = previewTableFromConfig(cfg);
   let preview: Record<string, unknown> | null = null;
   let sqlResults: Array<{ sql: string; ok: boolean; message?: string }> = [];
+  let pythonResult: Awaited<ReturnType<typeof runStepPython>> | null = null;
 
   if (pipeline.destinationConnectionId) {
     const conn = await db.connection.findFirst({
@@ -100,6 +102,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       }
     }
 
+    if (conn && compiled.python?.length) {
+      pythonResult = await runStepPython(conn, compiled.python);
+    }
+
     if (conn && previewTable) {
       const quoted = quoteTableRef(previewTable);
       if (quoted) {
@@ -118,11 +124,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   const hasPython = Boolean(compiled.python?.length);
-  const message = hasPython
-    ? "Step compiled. Python transforms materialize on full pipeline run — preview shows current warehouse state."
-    : preview
-      ? "Step compiled and preview loaded."
-      : "Step compiled. Link destination + set output table to preview.";
+  const pythonExecuted = pythonResult?.ok === true;
+  const message = pythonExecuted
+    ? "Python step executed — preview refreshed from output table."
+    : hasPython && pythonResult
+      ? pythonResult.message
+      : hasPython
+        ? "Step compiled. Python transforms materialize on full pipeline run."
+        : preview
+          ? "Step compiled and preview loaded."
+          : "Step compiled. Link destination + set output table to preview.";
 
   return NextResponse.json({
     component_id: body.component_id,
@@ -135,8 +146,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       warnings: compiled.warnings ?? [],
     },
     sql_results: sqlResults,
+    python_result: pythonResult,
     preview,
     message,
-    needs_full_run: hasPython,
+    needs_full_run: hasPython && !pythonExecuted,
   });
 }

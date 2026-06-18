@@ -31,4 +31,9 @@ export const PACKAGE_COMPILE_ENTRIES = [
   { id: "kafka_to_database_asset", module: "definitions/ingestion-hints", export: "kafkaIngestComponent" },
   { id: "rest_api_fetcher", module: "definitions/ingestion-hints", export: "restApiIngestComponent" },
   { id: "sql_to_database_asset", module: "definitions/ingestion-hints", export: "sqlToDatabaseComponent" },
+  { id: "pivot", module: "definitions/analytics-transforms", export: "pivotComponent" },
+  { id: "cross_join", module: "definitions/analytics-transforms", export: "crossJoinComponent" },
+  { id: "anti_join", module: "definitions/analytics-transforms", export: "antiJoinComponent" },
+  { id: "data_cleansing", module: "definitions/analytics-transforms", export: "dataCleansingComponent" },
+  { id: "datetime_parser", module: "definitions/analytics-transforms", export: "datetimeParserComponent" },
 ] as const;

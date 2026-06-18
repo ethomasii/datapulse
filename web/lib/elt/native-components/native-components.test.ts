@@ -103,7 +103,7 @@ describe("native-components", () => {
     expect(sensors.length).toBe(1);
   });
 
-  it("lists 28 native components", () => {
-    expect(listNativeComponents().length).toBe(28);
+  it("lists 33 native components", () => {
+    expect(listNativeComponents().length).toBe(33);
   });
 });

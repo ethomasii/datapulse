@@ -19,6 +19,7 @@ import {
   type AiPipelineComponentInput,
 } from "@/lib/elt/ai-pipeline-canvas-build";
 import { applyCanvasGraphEdits, type CanvasGraphEditAction } from "@/lib/elt/canvas-graph-edit";
+import { AI_PIPELINE_PLAYBOOKS, listPlaybooksForPrompt, matchPlaybook } from "@/lib/elt/ai-pipeline-playbook";
 import { extractComponentsFromCanvas } from "@/lib/elt/canvas-component-sync";
 import { getCanvasFromSourceConfig } from "@/lib/elt/canvas-source-config";
 import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-graph";
@@ -51,7 +52,11 @@ When the user mentions monitors, sensors, quality checks, freshness, or data val
 2. **New pipeline**: pass \`components\` on **generate_pipeline** — each item needs \`component_id\` and sensible \`config\` (e.g. dq_check: table + not_null columns; s3_monitor: prefix/bucket defaults).
 3. **Existing pipeline** (pipeline context below): call **add_pipeline_components** with the same \`components\` array — nodes land on the visual canvas and sync to v2 YAML on apply.
 4. **Wire the graph** (connect/disconnect steps, add dbt transform after load): call **edit_pipeline_canvas** with \`actions[]\` — use node labels or ids like "source", "dest", "join", "filter".
-4. Prefer native compile targets (quality, monitor, dlt) over dagster badge items.
+5. **Playbooks** — call **list_pipeline_playbooks** for curated recipes; apply with add_pipeline_components + edit_pipeline_canvas in one turn when the user describes a pattern (clean data, join enrich, S3 sensor, DQ).
+6. Prefer **native** component ids (filter_rows, join_tables, lookup, group_aggregate, data_cleansing, datetime_parser, pivot, anti_join, dq_check) — they compile and run inline on the canvas.
+
+## Curated playbooks (use list_pipeline_playbooks)
+${listPlaybooksForPrompt()}
 
 Component config defaults:
 - dq_check / freshness_check: table = main entity table, not_null = ["id"]
@@ -357,9 +362,50 @@ const TOOLS: Anthropic.Tool[] = [
       required: ["actions"],
     },
   },
+  {
+    name: "list_pipeline_playbooks",
+    description:
+      "List curated high-value pipeline recipes (ingest+DQ, join enrich, clean+parse, S3 sensor, dbt after load). Use when user describes a pattern without naming specific component ids.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: {
+          type: "string",
+          description: "Optional filter — e.g. 'clean data', 'join', 's3 sensor'",
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 // ── Tool implementations ─────────────────────────────────────────────────────
+
+function toolListPipelinePlaybooks(query?: string) {
+  const q = query?.trim().toLowerCase();
+  const matched = q ? matchPlaybook(q) : null;
+  const playbooks = q
+    ? AI_PIPELINE_PLAYBOOKS.filter(
+        (p) =>
+          p.id.includes(q) ||
+          p.title.toLowerCase().includes(q) ||
+          p.triggers.some((t) => t.includes(q) || q.includes(t))
+      )
+    : AI_PIPELINE_PLAYBOOKS;
+  return {
+    playbooks: playbooks.map((p) => ({
+      id: p.id,
+      title: p.title,
+      description: p.description,
+      components: p.components,
+      graph_edits: p.graphEdits,
+    })),
+    best_match: matched
+      ? { id: matched.id, title: matched.title, components: matched.components, graph_edits: matched.graphEdits }
+      : null,
+    hint: "Apply with add_pipeline_components (components[]) then edit_pipeline_canvas (graph_edits) on existing pipelines, or components[] on generate_pipeline for new ones.",
+  };
+}
 
 function toolSearchSources(query: string) {
   const q = query.toLowerCase();
@@ -1216,6 +1262,8 @@ When they describe a brand-new pipeline instead, use **generate_pipeline** witho
             pipeline_id: typeof inp.pipeline_id === "string" ? inp.pipeline_id : undefined,
             actions: inp.actions,
           });
+        } else if (name === "list_pipeline_playbooks") {
+          result = toolListPipelinePlaybooks(typeof inp.query === "string" ? inp.query : undefined);
         } else if (name === "list_dbt_projects") {
           result = await toolListDbtProjects(
             user.id,

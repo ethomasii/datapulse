@@ -12,6 +12,12 @@ type RunStepResult = {
     tests?: string[];
     warnings?: string[];
   };
+  python_result?: {
+    ok: boolean;
+    stdout: string;
+    stderr: string;
+    message: string;
+  };
   sql_results?: Array<{ sql: string; ok: boolean; message?: string }>;
   preview?: {
     table?: string;
@@ -115,7 +121,22 @@ export function RunStepPanel({
           ))}
         </ul>
       ) : null}
-      {result?.needs_full_run ? (
+      {result?.python_result ? (
+        <div className="mt-2 rounded border border-slate-200 bg-white p-2 font-mono text-[10px] dark:border-slate-700 dark:bg-slate-950">
+          <p className={result.python_result.ok ? "text-emerald-700" : "text-amber-700"}>
+            {result.python_result.message}
+          </p>
+          {result.python_result.stdout ? (
+            <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap text-slate-600 dark:text-slate-400">
+              {result.python_result.stdout}
+            </pre>
+          ) : null}
+          {result.python_result.stderr ? (
+            <pre className="mt-1 max-h-16 overflow-auto whitespace-pre-wrap text-red-600">{result.python_result.stderr}</pre>
+          ) : null}
+        </div>
+      ) : null}
+      {result?.needs_full_run && !result.python_result?.ok ? (
         <p className="mt-2 text-[10px] text-slate-500">
           Python transform code is compiled — save pipeline and run to materialize output tables.
         </p>

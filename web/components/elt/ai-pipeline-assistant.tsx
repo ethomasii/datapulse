@@ -34,13 +34,14 @@ const STARTER_PROMPTS = [
 ];
 
 const CANVAS_STARTER_PROMPTS = [
-  'Add an S3 file sensor for s3://my-bucket/incoming/',
-  'Add not-null checks on id for the main table',
-  'Add a freshness check after load',
-  'Connect the join step to the filter step',
-  'Add dbt models after the warehouse load',
-  'Add a filter-rows transform between load and dbt',
-  'Wire a data quality check on orders.id before load',
+  'Build a SaaS ingest pipeline with filter active rows and DQ on id',
+  'Join loaded data to a customers dimension table',
+  'Clean strings, parse created_at dates, and dedupe by id',
+  'Add S3 file sensor and ingest CSVs from s3://my-bucket/incoming/',
+  'Group by date and sum amount after load',
+  'Find orphan rows with anti-join against reference table',
+  'Add dbt staging models after the warehouse load',
+  'Pivot metrics by category column',
 ];
 
 const FOLLOW_UPS = [
