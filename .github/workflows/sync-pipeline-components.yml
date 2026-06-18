@@ -1,0 +1,52 @@
+name: sync-pipeline-components
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/lib/elt/native-components/**"
+      - "packages/pipeline-components/**"
+      - "web/lib/elt/data/native-components-manifest.json"
+      - "scripts/export-native-catalog.ts"
+      - "scripts/export-pipeline-components-catalog.mjs"
+      - "scripts/ci-push-pipeline-components-catalog.sh"
+      - ".github/workflows/sync-pipeline-components.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  export-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web deps (tsx export)
+        run: npm ci
+        working-directory: web
+
+      - name: Export catalog
+        run: node scripts/export-pipeline-components-catalog.mjs
+
+      - name: Publish catalog branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: bash scripts/ci-push-pipeline-components-catalog.sh
+
+      - name: Publish standalone repo (when it exists)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh repo view ethomasii/pipeline-components >/dev/null 2>&1; then
+            node scripts/publish-pipeline-components.mjs
+          else
+            echo "ethomasii/pipeline-components not created yet; catalog branch is canonical."
+          fi

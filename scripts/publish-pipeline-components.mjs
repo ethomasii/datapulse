@@ -67,22 +67,28 @@ const run = (cmd, opts = {}) => execSync(cmd, { cwd: tmp, stdio: "inherit", ...o
 
 const activeGh = ghUser();
 if (activeGh && activeGh !== "ethomasii") {
-  console.warn(
-    `Note: gh API is ${activeGh}; git push uses SSH as ethomasii.`
-  );
+  console.log(`Using SSH as ethomasii (gh API: ${activeGh}).`);
 }
 
 let repoExists = remoteExists(sshRemote);
-if (!repoExists && activeGh === "ethomasii") {
-  console.log(`Creating ${repo}…`);
-  try {
-    execSync(
-      `gh repo create ${repo} --public --description "Native executable pipeline components for eltPulse declarative v2"`,
-      { stdio: "inherit", env: ghEnv() }
-    );
-    repoExists = remoteExists(sshRemote);
-  } catch {
-    /* fall through */
+if (!repoExists) {
+  // Try gh create when authenticated as ethomasii, or with explicit PAT.
+  const createToken = process.env.PIPELINE_COMPONENTS_GH_TOKEN;
+  const canCreate = activeGh === "ethomasii" || createToken;
+  if (canCreate) {
+    console.log(`Creating ${repo}…`);
+    try {
+      execSync(
+        `gh repo create ${repo} --public --description "Native executable pipeline components for eltPulse declarative v2"`,
+        {
+          stdio: "inherit",
+          env: createToken ? { ...process.env, GH_TOKEN: createToken } : ghEnv(),
+        }
+      );
+      repoExists = remoteExists(sshRemote);
+    } catch {
+      /* fall through */
+    }
   }
 }
 
@@ -106,6 +112,3 @@ console.log(`${repo} not found — publishing to ${fallbackRepo} branch ${fallba
 const fallbackRemote = `git@github.com:${fallbackRepo}.git`;
 run(`git push --force ${fallbackRemote} ${branch}:refs/heads/${fallbackBranch}`);
 console.log(`Published https://github.com/${fallbackRepo}/tree/${fallbackBranch}`);
-console.log(
-  `When ready, create https://github.com/new?name=pipeline-components and re-run to push to ${repo}.`
-);

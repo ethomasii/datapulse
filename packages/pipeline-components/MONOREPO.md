@@ -9,19 +9,8 @@ Executable compilers live in the datapulse monorepo (`web/lib/elt/native-compone
 ## Publish workflow
 
 1. Add or change a native component in `web/lib/elt/native-components/definitions/` and register in `registry.ts`.
-2. Export catalog from datapulse root:
-
-```bash
-node scripts/export-pipeline-components-catalog.mjs
-```
-
-3. Push via SSH as **ethomasii** (no gh login required for publish):
-
-```bash
-node scripts/publish-pipeline-components.mjs
-```
-
-Creates `ethomasii/pipeline-components` when gh is logged in as ethomasii; otherwise pushes to `ethomasii/datapulse` branch `pipeline-components-catalog`.
+2. Push to `main` — CI exports and publishes the catalog branch automatically.
+3. Or run locally: `node scripts/manage-pipeline-components.mjs`
 
 Manual alternative (same pattern as `integrations/`):
 

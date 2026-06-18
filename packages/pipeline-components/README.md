@@ -10,11 +10,20 @@ This repository publishes **metadata + form schemas** (`components/*/component.j
 
 ## Sync from datapulse
 
+**Automatic:** pushing to `main` updates the catalog via GitHub Actions (`sync-pipeline-components` workflow).
+
+**Manual:**
+
 ```bash
-# In datapulse repo root:
+# One command — export, test, publish:
+node scripts/manage-pipeline-components.mjs
+
+# Or step by step:
 node scripts/export-pipeline-components-catalog.mjs
 node scripts/publish-pipeline-components.mjs
 ```
+
+Published catalog: [ethomasii/datapulse `pipeline-components-catalog`](https://github.com/ethomasii/datapulse/tree/pipeline-components-catalog) (or `ethomasii/pipeline-components` when the standalone repo exists).
 
 ## Layout
 
