@@ -209,7 +209,7 @@ function finalizeCompiledConfig(
 ): void {
   const { pythonBlocks, sqlStatements, testLines, quality, compiled } = state;
 
-  if (pythonBlocks.length || sqlStatements.length) {
+  if (pythonBlocks.length) {
     const existing = config.post_transform;
     const existingObj =
       existing && typeof existing === "object" ? (existing as Record<string, unknown>) : null;

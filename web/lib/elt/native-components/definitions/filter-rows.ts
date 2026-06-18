@@ -1,13 +1,44 @@
 import { escapePyString } from "@/lib/elt/escape-py";
+import type { NativeComponentDefinition } from "../types";
 import { inputTable, outputTable } from "./_config-helpers";
+import {
+  pandasQueryToSqlWhere,
+  sqlCreateTableAs,
+  sqlQualifiedTable,
+  useDataframeExecution,
+} from "./_sql-helpers";
+
+function compileFilterRowsDataframe(
+  table: string,
+  condition: string,
+  output: string
+): string[] {
+  const outSchema = output.includes(".") ? output.split(".")[0]! : "public";
+  const outName = output.includes(".") ? output.split(".").pop()! : output;
+
+  return [
+    `# ── filter_rows (dataframe): ${table} ──`,
+    "import pandas as pd",
+    "try:",
+    "    _dest_client = pipeline._get_destination_clients(pipeline.state)[0]",
+    "    _sql = _dest_client.sql_client()",
+    `    _df = pd.read_sql('SELECT * FROM ${escapePyString(table)}', _sql._engine)`,
+    `    _filtered = _df.query(${JSON.stringify(condition)})`,
+    `    _filtered.to_sql("${escapePyString(outName)}", _sql._engine, schema="${escapePyString(outSchema)}", if_exists="replace", index=False)`,
+    `    print(f"[filter_rows] kept {len(_filtered)} / {len(_df)} rows → ${escapePyString(output)}")`,
+    "except Exception as _filt_err:",
+    '    print(f"[filter_rows] failed: {_filt_err}")',
+    "    raise",
+  ];
+}
 
 export const filterRowsComponent: NativeComponentDefinition = {
   id: "filter_rows",
-  aliases: ["dataframe_filter", "row_filter", "filter", "warehouse_filter", "select_records"],
+  aliases: ["dataframe_filter", "row_filter", "filter", "warehouse_filter", "select_records", "audience_segment"],
   name: "Filter rows",
   category: "transformation",
-  description: "Filter rows in a loaded table with a pandas query expression.",
-  compileTarget: "python",
+  description: "Filter rows in warehouse SQL (default) or in-memory dataframe when execution=dataframe.",
+  compileTarget: "dbt",
   fields: [
     {
       key: "table",
@@ -19,7 +50,7 @@ export const filterRowsComponent: NativeComponentDefinition = {
     {
       key: "condition",
       label: "Filter condition",
-      description: "pandas query expression, e.g. status == 'active' and amount > 0",
+      description: "SQL WHERE clause (default). Pandas query when execution=dataframe.",
       type: "text",
       required: true,
     },
@@ -29,6 +60,14 @@ export const filterRowsComponent: NativeComponentDefinition = {
       description: "Leave empty to overwrite source table",
       type: "string",
     },
+    {
+      key: "execution",
+      label: "Execution",
+      description: "warehouse = SQL push-down (default); dataframe = worker pandas",
+      type: "select",
+      options: ["warehouse", "dataframe"],
+      default: "warehouse",
+    },
   ],
   compile(config) {
     const table = inputTable(config);
@@ -36,27 +75,22 @@ export const filterRowsComponent: NativeComponentDefinition = {
     const output = outputTable(config, table);
 
     if (!table || !condition) {
-      return { warnings: ["filter_rows: table and condition are required"], python: [] };
+      return { warnings: ["filter_rows: table and condition are required"], sql: [], python: [] };
     }
 
-    const outSchema = output.includes(".") ? output.split(".")[0]! : "public";
-    const outName = output.includes(".") ? output.split(".").pop()! : output;
+    if (useDataframeExecution(config)) {
+      return { python: compileFilterRowsDataframe(table, condition, output) };
+    }
 
-    const python = [
-      `# ── filter_rows: ${table} ──`,
-      "import pandas as pd",
-      "try:",
-      "    _dest_client = pipeline._get_destination_clients(pipeline.state)[0]",
-      "    _sql = _dest_client.sql_client()",
-      `    _df = pd.read_sql('SELECT * FROM ${escapePyString(table)}', _sql._engine)`,
-      `    _filtered = _df.query(${JSON.stringify(condition)})`,
-      `    _filtered.to_sql("${escapePyString(outName)}", _sql._engine, schema="${escapePyString(outSchema)}", if_exists="replace", index=False)`,
-      `    print(f"[filter_rows] kept {len(_filtered)} / {len(_df)} rows → ${escapePyString(output)}")`,
-      "except Exception as _filt_err:",
-      '    print(f"[filter_rows] failed: {_filt_err}")',
-      "    raise",
+    const where = pandasQueryToSqlWhere(condition);
+    const src = sqlQualifiedTable(table);
+    const sql = [
+      sqlCreateTableAs(
+        output,
+        `SELECT *\nFROM ${src}\nWHERE ${where}`
+      ),
     ];
 
-    return { python };
+    return { sql };
   },
 };

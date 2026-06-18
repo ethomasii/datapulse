@@ -30,9 +30,11 @@ type Props = {
   categoryFilter?: string;
   compileTargetFilter?: string;
   className?: string;
+  /** Default to transform + quality tabs (canvas designer). */
+  transformDesigner?: boolean;
 };
 
-const PALETTE_TABS = [
+const ALL_PALETTE_TABS = [
   { id: "", label: "All" },
   { id: "ingestion", label: "Ingest" },
   { id: "transformation", label: "Transform" },
@@ -40,10 +42,24 @@ const PALETTE_TABS = [
   { id: "sensor", label: "Sensor" },
 ] as const;
 
+const TRANSFORM_PALETTE_TABS = [
+  { id: "transformation", label: "Transform" },
+  { id: "check", label: "Check" },
+  { id: "", label: "All" },
+] as const;
+
 /** Searchable palette fed by GET /api/elt/components — builder + canvas. */
-export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter, className }: Props) {
+export function ComponentPalette({
+  onSelect,
+  categoryFilter,
+  compileTargetFilter,
+  className,
+  transformDesigner = false,
+}: Props) {
+  const tabs = transformDesigner ? TRANSFORM_PALETTE_TABS : ALL_PALETTE_TABS;
+  const initialCategory = categoryFilter ?? (transformDesigner ? "transformation" : "");
   const [q, setQ] = useState("");
-  const [category, setCategory] = useState(categoryFilter ?? "");
+  const [category, setCategory] = useState(initialCategory);
   const [executableOnly, setExecutableOnly] = useState(true);
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<ComponentListItem[]>([]);
@@ -97,9 +113,11 @@ export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter
       <div className="border-b border-slate-200 p-3 dark:border-slate-700">
         <p className="text-sm font-semibold text-slate-900 dark:text-white">Component catalog</p>
         <p className="mt-0.5 text-xs text-slate-500">
-          {executableOnly
-            ? `${total} executable components — faithful compilers only`
-            : `${total} templates — drag onto canvas or click to add`}
+          {transformDesigner
+            ? `${total} transform components — warehouse SQL push-down or dataframe`
+            : executableOnly
+              ? `${total} executable components — faithful compilers only`
+              : `${total} templates — drag onto canvas or click to add`}
         </p>
         <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
           <input
@@ -121,7 +139,7 @@ export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter
           />
         </div>
         <div className="mt-2 flex flex-wrap gap-1">
-          {PALETTE_TABS.map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab.id || "all"}
               type="button"

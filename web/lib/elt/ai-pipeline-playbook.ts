@@ -136,6 +136,106 @@ export const AI_PIPELINE_PLAYBOOKS: AiPipelinePlaybook[] = [
     ],
     graphEdits: [{ op: "connect", source: "dest", target: "orphan" }],
   },
+  {
+    id: "warehouse_cdp_customer_360",
+    title: "Customer 360 (warehouse CDP)",
+    description:
+      "Join events to customer dimension and roll up lifetime metrics — governed transforms on lakehouse data.",
+    triggers: [
+      "customer 360",
+      "customer360",
+      "customer lake",
+      "customerlake",
+      "unified profile",
+      "cdp",
+      "customer data platform",
+    ],
+    components: [
+      {
+        component_id: "join_tables",
+        label: "Enrich events",
+        config: {
+          how: "left",
+          on: ["customer_id"],
+          output_table: "marts.events_enriched",
+        },
+      },
+      {
+        component_id: "group_aggregate",
+        label: "Customer metrics",
+        config: {
+          table: "marts.events_enriched",
+          group_by: ["customer_id"],
+          aggregations: '{"amount":"sum","event_id":"count"}',
+          output_table: "marts.customer_360",
+        },
+      },
+    ],
+    graphEdits: [
+      { op: "connect", source: "dest", target: "join" },
+      { op: "connect", source: "join", target: "rollup" },
+    ],
+  },
+  {
+    id: "warehouse_cdp_audience_segment",
+    title: "Audience segment (warehouse CDP)",
+    description: "Filter active high-value customers into an activation-ready segment table.",
+    triggers: [
+      "audience",
+      "segment",
+      "segmentation",
+      "marketing audience",
+      "activation audience",
+      "high value customers",
+    ],
+    components: [
+      {
+        component_id: "filter_rows",
+        label: "VIP segment",
+        config: {
+          condition: "status = 'active' AND lifetime_value > 1000",
+          output_table: "marts.segment_vip",
+        },
+      },
+    ],
+    graphEdits: [{ op: "connect", source: "dest", target: "segment" }],
+  },
+  {
+    id: "warehouse_cdp_identity_stitch",
+    title: "Identity stitch + dedupe",
+    description: "Join identifier graph to events, then dedupe stitched profiles for activation.",
+    triggers: [
+      "identity resolution",
+      "identity stitch",
+      "stitch identities",
+      "resolve identity",
+      "dedupe profiles",
+    ],
+    components: [
+      {
+        component_id: "join_tables",
+        label: "Stitch IDs",
+        config: {
+          how: "left",
+          on: ["email_hash"],
+          output_table: "marts.events_stitched",
+        },
+      },
+      {
+        component_id: "drop_duplicates",
+        label: "Dedupe profiles",
+        config: {
+          table: "marts.events_stitched",
+          subset: ["canonical_customer_id"],
+          output_table: "marts.identity_resolved",
+        },
+      },
+    ],
+    graphEdits: [
+      { op: "connect", source: "dest", target: "stitch" },
+      { op: "connect", source: "stitch", target: "dedupe" },
+    ],
+  },
 ];
 
 export function matchPlaybook(query: string): AiPipelinePlaybook | null {

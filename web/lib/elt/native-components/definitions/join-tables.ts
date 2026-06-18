@@ -1,6 +1,12 @@
 import { escapePyString } from "@/lib/elt/escape-py";
 import type { NativeComponentDefinition } from "../types";
 import { joinHowFromTemplate } from "./_config-helpers";
+import {
+  sqlCreateTableAs,
+  sqlJoinKeyword,
+  sqlQualifiedTable,
+  useDataframeExecution,
+} from "./_sql-helpers";
 
 function strList(v: unknown): string[] {
   if (Array.isArray(v)) return v.map(String).filter(Boolean);
@@ -8,6 +14,75 @@ function strList(v: unknown): string[] {
     return v.split(",").map((s) => s.trim()).filter(Boolean);
   }
   return [];
+}
+
+function compileJoinDataframe(
+  left: string,
+  right: string,
+  output: string,
+  how: string,
+  on: string[],
+  leftOn: string[],
+  rightOn: string[],
+  warnings: string[]
+): { python: string[]; warnings?: string[] } {
+  const onPy = on.length ? `[${on.map((c) => `"${escapePyString(c)}"`).join(", ")}]` : "None";
+  const leftOnPy = leftOn.length
+    ? `[${leftOn.map((c) => `"${escapePyString(c)}"`).join(", ")}]`
+    : "None";
+  const rightOnPy = rightOn.length
+    ? `[${rightOn.map((c) => `"${escapePyString(c)}"`).join(", ")}]`
+    : "None";
+
+  const mergeKw =
+    on.length > 0
+      ? `on=${onPy}`
+      : leftOn.length && rightOn.length
+        ? `left_on=${leftOnPy}, right_on=${rightOnPy}`
+        : "";
+
+  const outParts = output.split(".");
+  const outSchema = outParts.length > 1 ? outParts[0]! : "public";
+  const outName = outParts.length > 1 ? outParts.slice(1).join(".") : output;
+
+  const python = [
+    `# ── join_tables (dataframe): ${left} ⋈ ${right} → ${output} ──`,
+    "import pandas as pd",
+    "try:",
+    "    _dest_client = pipeline._get_destination_clients(pipeline.state)[0]",
+    "    _sql = _dest_client.sql_client()",
+    `    _left = pd.read_sql('SELECT * FROM ${escapePyString(left)}', _sql._engine)`,
+    `    _right = pd.read_sql('SELECT * FROM ${escapePyString(right)}', _sql._engine)`,
+    mergeKw
+      ? `    _joined = _left.merge(_right, how="${escapePyString(how)}", ${mergeKw}, suffixes=("_left", "_right"))`
+      : `    _joined = _left.merge(_right, how="${escapePyString(how)}", suffixes=("_left", "_right"))`,
+    `    _joined.to_sql("${escapePyString(outName)}", _sql._engine, schema="${escapePyString(outSchema)}", if_exists="replace", index=False)`,
+    `    print(f"[join_tables] wrote {len(_joined)} rows to ${escapePyString(output)}")`,
+    "except Exception as _join_err:",
+    '    print(f"[join_tables] failed: {_join_err}")',
+    "    raise",
+  ];
+
+  return { python, warnings: warnings.length ? warnings : undefined };
+}
+
+function buildJoinOnClause(on: string[], leftOn: string[], rightOn: string[]): string {
+  if (on.length) {
+    return on
+      .map((c) => `l."${c.replace(/"/g, '""')}" = r."${c.replace(/"/g, '""')}"`)
+      .join(" AND ");
+  }
+  if (leftOn.length && rightOn.length) {
+    const pairs = Math.min(leftOn.length, rightOn.length);
+    const clauses: string[] = [];
+    for (let i = 0; i < pairs; i++) {
+      const lo = leftOn[i]!;
+      const ro = rightOn[i]!;
+      clauses.push(`l."${lo.replace(/"/g, '""')}" = r."${ro.replace(/"/g, '""')}"`);
+    }
+    return clauses.join(" AND ");
+  }
+  return "1 = 1";
 }
 
 export const joinTablesComponent: NativeComponentDefinition = {
@@ -22,11 +97,12 @@ export const joinTablesComponent: NativeComponentDefinition = {
     "right_join",
     "outer_join",
     "full_outer_join",
+    "customer_360_join",
   ],
   name: "Join tables",
   category: "transformation",
-  description: "Join two loaded warehouse tables after sync (pandas via destination SQL client).",
-  compileTarget: "python",
+  description: "Join two warehouse tables via SQL push-down (default) or dataframe merge.",
+  compileTarget: "dbt",
   dagsterOnlyFields: [
     "asset_name",
     "left_asset_key",
@@ -101,12 +177,17 @@ export const joinTablesComponent: NativeComponentDefinition = {
       required: true,
       placeholder: "staging.orders_enriched",
     },
+    {
+      key: "execution",
+      label: "Execution",
+      type: "select",
+      options: ["warehouse", "dataframe"],
+      default: "warehouse",
+    },
   ],
   compile(config) {
-    const left =
-      String(config.left_table ?? config.left_asset_key ?? "").trim();
-    const right =
-      String(config.right_table ?? config.right_asset_key ?? "").trim();
+    const left = String(config.left_table ?? config.left_asset_key ?? "").trim();
+    const right = String(config.right_table ?? config.right_asset_key ?? "").trim();
     const output = String(config.output_table ?? config.asset_name ?? "").trim();
     const how = joinHowFromTemplate(config, "inner");
     const on = strList(config.on);
@@ -115,54 +196,30 @@ export const joinTablesComponent: NativeComponentDefinition = {
 
     const warnings: string[] = [];
     if (!left || !right) {
-      return { warnings: ["join_tables: left_table and right_table are required"], python: [] };
+      return { warnings: ["join_tables: left_table and right_table are required"], sql: [], python: [] };
     }
     if (!output) {
-      return { warnings: ["join_tables: output_table is required"], python: [] };
+      return { warnings: ["join_tables: output_table is required"], sql: [], python: [] };
     }
     if (!on.length && !(leftOn.length && rightOn.length)) {
-      warnings.push("join_tables: provide 'on' or both left_on and right_on — defaulting to no merge keys");
+      warnings.push("join_tables: provide 'on' or both left_on and right_on");
     }
 
-    const onPy = on.length
-      ? `[${on.map((c) => `"${escapePyString(c)}"`).join(", ")}]`
-      : "None";
-    const leftOnPy = leftOn.length
-      ? `[${leftOn.map((c) => `"${escapePyString(c)}"`).join(", ")}]`
-      : "None";
-    const rightOnPy = rightOn.length
-      ? `[${rightOn.map((c) => `"${escapePyString(c)}"`).join(", ")}]`
-      : "None";
+    if (useDataframeExecution(config)) {
+      return compileJoinDataframe(left, right, output, how, on, leftOn, rightOn, warnings);
+    }
 
-    const mergeKw =
-      on.length > 0
-        ? `on=${onPy}`
-        : leftOn.length && rightOn.length
-          ? `left_on=${leftOnPy}, right_on=${rightOnPy}`
-          : "";
-
-    const outParts = output.split(".");
-    const outSchema = outParts.length > 1 ? outParts[0]! : "public";
-    const outName = outParts.length > 1 ? outParts.slice(1).join(".") : output;
-
-    const python = [
-      `# ── join_tables: ${left} ⋈ ${right} → ${output} ──`,
-      "import pandas as pd",
-      "try:",
-      "    _dest_client = pipeline._get_destination_clients(pipeline.state)[0]",
-      "    _sql = _dest_client.sql_client()",
-      `    _left = pd.read_sql('SELECT * FROM ${escapePyString(left)}', _sql._engine)`,
-      `    _right = pd.read_sql('SELECT * FROM ${escapePyString(right)}', _sql._engine)`,
-      mergeKw
-        ? `    _joined = _left.merge(_right, how="${escapePyString(how)}", ${mergeKw}, suffixes=("_left", "_right"))`
-        : `    _joined = _left.merge(_right, how="${escapePyString(how)}", suffixes=("_left", "_right"))`,
-      `    _joined.to_sql("${escapePyString(outName)}", _sql._engine, schema="${escapePyString(outSchema)}", if_exists="replace", index=False)`,
-      `    print(f"[join_tables] wrote {len(_joined)} rows to ${escapePyString(output)}")`,
-      "except Exception as _join_err:",
-      '    print(f"[join_tables] failed: {_join_err}")',
-      "    raise",
+    const joinKw = sqlJoinKeyword(how);
+    const onClause = buildJoinOnClause(on, leftOn, rightOn);
+    const leftQ = sqlQualifiedTable(left);
+    const rightQ = sqlQualifiedTable(right);
+    const sql = [
+      sqlCreateTableAs(
+        output,
+        `SELECT l.*, r.*\nFROM ${leftQ} AS l\n${joinKw} ${rightQ} AS r\n  ON ${onClause}`
+      ),
     ];
 
-    return { python, warnings: warnings.length ? warnings : undefined };
+    return { sql, warnings: warnings.length ? warnings : undefined };
   },
 };

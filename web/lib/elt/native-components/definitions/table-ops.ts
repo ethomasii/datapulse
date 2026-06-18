@@ -2,6 +2,12 @@ import { escapePyString } from "@/lib/elt/escape-py";
 import type { NativeComponentDefinition } from "../types";
 import { inputTable, outputTable } from "./_config-helpers";
 import { pandasReadTable, pandasWriteTable, strList } from "./_pandas-helpers";
+import {
+  sqlAggExpr,
+  sqlCreateTableAs,
+  sqlQualifiedTable,
+  useDataframeExecution,
+} from "./_sql-helpers";
 
 function outputParts(output: string) {
   const outSchema = output.includes(".") ? output.split(".")[0]! : "public";
@@ -11,11 +17,11 @@ function outputParts(output: string) {
 
 export const groupAggregateComponent: NativeComponentDefinition = {
   id: "group_aggregate",
-  aliases: ["aggregate_table", "group_by", "summarize", "make_group"],
+  aliases: ["aggregate_table", "group_by", "summarize", "make_group", "customer_metrics"],
   name: "Group & aggregate",
   category: "transformation",
-  description: "Group by columns and compute aggregations (pandas groupby).",
-  compileTarget: "python",
+  description: "Group by columns and aggregate in warehouse SQL (default) or dataframe groupby.",
+  compileTarget: "dbt",
   fields: [
     { key: "table", label: "Table", type: "string", required: true },
     { key: "group_by", label: "Group by columns", type: "string_list", required: true },
@@ -27,6 +33,13 @@ export const groupAggregateComponent: NativeComponentDefinition = {
       required: true,
     },
     { key: "output_table", label: "Output table", type: "string", required: true },
+    {
+      key: "execution",
+      label: "Execution",
+      type: "select",
+      options: ["warehouse", "dataframe"],
+      default: "warehouse",
+    },
   ],
   compile(config) {
     const table = inputTable(config);
@@ -38,29 +51,45 @@ export const groupAggregateComponent: NativeComponentDefinition = {
       try {
         aggs = JSON.parse(raw) as Record<string, string>;
       } catch {
-        return { warnings: ["group_aggregate: aggregations must be valid JSON"], python: [] };
+        return { warnings: ["group_aggregate: aggregations must be valid JSON"], sql: [], python: [] };
       }
     } else if (raw && typeof raw === "object") {
       aggs = Object.fromEntries(Object.entries(raw as Record<string, unknown>).map(([k, v]) => [k, String(v)]));
     }
     if (!table || !output || !groupBy.length || !Object.keys(aggs).length) {
-      return { warnings: ["group_aggregate: table, group_by, aggregations, output_table required"], python: [] };
+      return { warnings: ["group_aggregate: table, group_by, aggregations, output_table required"], sql: [], python: [] };
     }
-    const { outSchema, outName } = outputParts(output);
-    const groupPy = `[${groupBy.map((c) => JSON.stringify(c)).join(", ")}]`;
-    const aggPy = JSON.stringify(aggs);
-    const python = [
-      `# ── group_aggregate: ${table} → ${output} ──`,
-      "try:",
-      ...pandasReadTable(table).map((l) => (l.startsWith("import") ? l : `    ${l}`)),
-      `    _df = _df.groupby(${groupPy}, as_index=False).agg(${aggPy})`,
-      `    _df.to_sql("${escapePyString(outName)}", _sql._engine, schema="${escapePyString(outSchema)}", if_exists="replace", index=False)`,
-      `    print(f"[group_aggregate] wrote {len(_df)} rows to ${escapePyString(output)}")`,
-      "except Exception as _grp_err:",
-      '    print(f"[group_aggregate] failed: {_grp_err}")',
-      "    raise",
+
+    if (useDataframeExecution(config)) {
+      const { outSchema, outName } = outputParts(output);
+      const groupPy = `[${groupBy.map((c) => JSON.stringify(c)).join(", ")}]`;
+      const aggPy = JSON.stringify(aggs);
+      const python = [
+        `# ── group_aggregate (dataframe): ${table} → ${output} ──`,
+        "try:",
+        ...pandasReadTable(table).map((l) => (l.startsWith("import") ? l : `    ${l}`)),
+        `    _df = _df.groupby(${groupPy}, as_index=False).agg(${aggPy})`,
+        `    _df.to_sql("${escapePyString(outName)}", _sql._engine, schema="${escapePyString(outSchema)}", if_exists="replace", index=False)`,
+        `    print(f"[group_aggregate] wrote {len(_df)} rows to ${escapePyString(output)}")`,
+        "except Exception as _grp_err:",
+        '    print(f"[group_aggregate] failed: {_grp_err}")',
+        "    raise",
+      ];
+      return { python };
+    }
+
+    const groupCols = groupBy.map((c) => `"${c.replace(/"/g, '""')}"`).join(", ");
+    const aggCols = Object.entries(aggs)
+      .map(([col, fn]) => `${sqlAggExpr(col, fn)} AS "${col.replace(/"/g, '""')}_agg"`)
+      .join(",\n  ");
+    const src = sqlQualifiedTable(table);
+    const sql = [
+      sqlCreateTableAs(
+        output,
+        `SELECT\n  ${groupCols},\n  ${aggCols}\nFROM ${src}\nGROUP BY ${groupCols}`
+      ),
     ];
-    return { python };
+    return { sql };
   },
 };
 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ComponentPalette, type ComponentListItem } from "@/components/elt/component-palette";
+import { ComponentCatalogSettings } from "@/components/elt/component-catalog-settings";
 
 export function ComponentCatalogClient() {
   const [selected, setSelected] = useState<ComponentListItem | null>(null);
@@ -10,27 +11,28 @@ export function ComponentCatalogClient() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Component catalog</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Transform catalog</h1>
         <p className="mt-2 text-slate-600 dark:text-slate-300">
-          864+ pipeline component templates for discovery and configuration. Each compiles to ingest, replicate,
-          transform, monitor, or quality steps in your eltPulse pipeline.
+          Warehouse-native transforms for governed customer analytics — filter, join, aggregate, and segment
+          on data that already lives in your lakehouse. SQL push-down by default; dataframe path when you need
+          in-memory logic on the worker.
         </p>
-        <p className="mt-1 text-sm text-slate-500">
-          Add templates on the{" "}
+        <p className="mt-2 text-sm text-slate-500">
+          Build Customer 360, audience segments, and activation-ready marts without copying data out of the
+          warehouse. Use the{" "}
           <Link href="/builder/canvas" className="text-sky-600 underline dark:text-sky-400">
             visual canvas
           </Link>{" "}
-          or in{" "}
-          <Link href="/builder" className="text-sky-600 underline dark:text-sky-400">
-            Spec YAML
-          </Link>
-          . See <code className="text-xs">examples/component-routing-table.md</code>.
+          AI builder or add your own compile packages below.
         </p>
       </div>
+
+      <ComponentCatalogSettings />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <ComponentPalette
           className="h-[min(70vh,640px)]"
+          transformDesigner
           onSelect={(c) => setSelected(c)}
         />
         <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
@@ -56,7 +58,7 @@ export function ComponentCatalogClient() {
               </Link>
             </>
           ) : (
-            <p className="text-sm text-slate-500">Select a component to see compile route and hints.</p>
+            <p className="text-sm text-slate-500">Select a transform to see compile route and hints.</p>
           )}
         </div>
       </div>

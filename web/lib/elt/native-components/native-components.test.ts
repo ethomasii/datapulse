@@ -12,7 +12,7 @@ describe("native-components", () => {
     expect(getNativeComponent("dataframe_join")?.id).toBe("join_tables");
   });
 
-  it("join_tables emits pandas merge python", () => {
+  it("join_tables emits warehouse SQL by default", () => {
     const out = joinTablesComponent.compile({
       left_table: "staging.orders",
       right_table: "staging.customers",
@@ -20,8 +20,21 @@ describe("native-components", () => {
       output_table: "staging.orders_enriched",
       how: "left",
     });
+    expect(out.sql?.join("\n")).toContain("LEFT JOIN");
+    expect(out.sql?.join("\n")).toContain('"staging"."orders"');
+    expect(out.python).toBeUndefined();
+  });
+
+  it("join_tables dataframe mode emits pandas merge", () => {
+    const out = joinTablesComponent.compile({
+      left_table: "staging.orders",
+      right_table: "staging.customers",
+      on: ["customer_id"],
+      output_table: "staging.orders_enriched",
+      how: "left",
+      execution: "dataframe",
+    });
     expect(out.python?.join("\n")).toContain("merge");
-    expect(out.python?.join("\n")).toContain("staging.orders");
   });
 
   it("dq_check emits test lines", () => {
@@ -50,8 +63,8 @@ describe("native-components", () => {
     });
     expect(result.compiled).toBe(true);
     const pt = config.post_transform as { type: string; code: string };
-    expect(pt.type).toBe("python");
-    expect(pt.code).toContain("join_tables");
+    expect(pt.type).toBe("sql");
+    expect(pt.code).toContain("JOIN");
   });
 
   it("dagsterAttributesToFields skips partition metadata", () => {

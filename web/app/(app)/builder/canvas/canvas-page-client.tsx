@@ -1216,6 +1216,7 @@ export function CanvasPageClient() {
                     </div>
                     <ComponentPalette
                       className="mb-4 h-[280px] lg:h-[320px]"
+                      transformDesigner
                       onSelect={(c) => canvasControlRef.current?.addComponentNode(c)}
                     />
                   </>
