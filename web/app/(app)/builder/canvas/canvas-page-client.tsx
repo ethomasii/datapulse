@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Edge, Node } from "@xyflow/react";
 import { Loader2, Plus } from "lucide-react";
+import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
+import { ComponentPalette } from "@/components/elt/component-palette";
 import { CopyEnvButton } from "@/components/elt/copy-env-button";
 import { EltLoadingState } from "@/components/elt/elt-loading-state";
 import { FormAccordion } from "@/components/elt/form-accordion";
@@ -45,6 +47,7 @@ import { ensureGithubReposForForm } from "@/lib/elt/normalize-source-configurati
 import clsx from "clsx";
 import { hydrateCanvasFromSourceConfiguration, extractSpecComponents } from "@/lib/elt/spec-components-to-canvas";
 import { TransformDagPanel } from "@/components/pipeline-canvas/transform-dag-panel";
+import { IngestPanel } from "@/components/pipeline-canvas/ingest-panel";
 
 type PipelineRow = { id: string; name: string };
 
@@ -94,7 +97,7 @@ export function CanvasPageClient() {
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [linkedDbtProjectId, setLinkedDbtProjectId] = useState<string | null>(null);
-  const [canvasView, setCanvasView] = useState<"designer" | "dag">("designer");
+  const [canvasView, setCanvasView] = useState<"designer" | "dag" | "ingest">("designer");
 
   const { permissions } = useWorkspacePermissions();
   const canWrite = permissions?.canWrite ?? true;
@@ -1047,6 +1050,18 @@ export function CanvasPageClient() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => setCanvasView("ingest")}
+                    className={clsx(
+                      "rounded-md px-3 py-1.5 text-xs font-medium",
+                      canvasView === "ingest"
+                        ? "bg-emerald-600 text-white"
+                        : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                    )}
+                  >
+                    Ingest
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setCanvasView("dag")}
                     className={clsx(
                       "rounded-md px-3 py-1.5 text-xs font-medium",
@@ -1059,7 +1074,11 @@ export function CanvasPageClient() {
                   </button>
                 </div>
                 <span className="text-xs text-slate-500">
-                  Lakeflow-style DT graph from component edges → <code className="text-[10px]">after[]</code>
+                  {canvasView === "ingest"
+                    ? "Source → landing tables · configure extract in the sidebar"
+                    : canvasView === "dag"
+                      ? "Lakeflow-style DT graph from component edges → after[]"
+                      : "Drag components onto the canvas · drop on a wire to insert"}
                 </span>
               </div>
               {canvasView === "designer" ? (
@@ -1083,6 +1102,17 @@ export function CanvasPageClient() {
                   onInspectorFocusChange={setInspectorFocus}
                 />
               </div>
+              ) : canvasView === "ingest" ? (
+              <IngestPanel
+                pipelineId={selectedId}
+                pipelineName={selectedName ?? "pipeline"}
+                tool={pipelineTool}
+                sourceType={pipelineSourceType}
+                destinationType={pipelineDestinationType}
+                sourceConfiguration={lineageSourceConfig}
+                canvasNodes={loadedGraph?.nodes ?? []}
+                onSwitchToDesigner={() => setCanvasView("designer")}
+              />
               ) : (
               <div className="min-h-[max(28rem,min(calc(100dvh-8rem),56rem))] rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950">
                 <TransformDagPanel
@@ -1101,7 +1131,77 @@ export function CanvasPageClient() {
                 )}
                 aria-label="Pipeline settings"
               >
-                {inspectorFocus.kind === "none" ? (
+                {canvasView === "ingest" ? (
+                  <div className="space-y-4">
+                    <div className="border-b border-slate-200 pb-3 dark:border-slate-600">
+                      <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Ingest configuration</h2>
+                      <p className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-400">
+                        Source connector, credentials, and ingest components.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void handleSaveSourceConfiguration()}
+                        disabled={sourceConfigSaving || !canWrite}
+                        className="mt-2 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                      >
+                        {sourceConfigSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                        Save ingest config
+                      </button>
+                    </div>
+                    <FormAccordion
+                      id="ingest-inspector-source"
+                      title="Source connector"
+                      subtitle={pipelineSourceType.replace(/_/g, " ")}
+                      defaultOpen
+                    >
+                      <GuidedSourceBlock
+                        sourceType={pipelineSourceType || "github"}
+                        schemaFields={schemaFields}
+                        sourceCfg={sourceCfg}
+                        onSourceCfgChange={setSourceCfg}
+                        connectionValues={connectionValues}
+                        onConnectionPatch={patchConnection}
+                        genericConnectorJson={
+                          schemaFields.length === 0
+                            ? { value: connectorJson, onChange: setConnectorJson }
+                            : undefined
+                        }
+                      />
+                      <div className="mt-3">
+                        <CopyEnvButton values={sourceEnvValues} />
+                      </div>
+                    </FormAccordion>
+                    <FormAccordion
+                      id="ingest-inspector-dest"
+                      title="Destination / warehouse"
+                      subtitle={pipelineDestinationType.replace(/_/g, " ")}
+                    >
+                      <GuidedDestinationBlock
+                        destinationType={pipelineDestinationType || "duckdb"}
+                        sourceCfg={sourceCfg}
+                        onSourceCfgChange={setSourceCfg}
+                        connectionValues={connectionValues}
+                        onConnectionPatch={patchConnection}
+                      />
+                      <div className="mt-3">
+                        <CopyEnvButton values={destinationEnvValues} />
+                      </div>
+                    </FormAccordion>
+                    {sourceConfigError ? (
+                      <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                        {sourceConfigError}
+                      </p>
+                    ) : null}
+                    <ComponentPalette
+                      className="h-[240px]"
+                      categoryFilter="ingestion"
+                      onSelect={(c) => {
+                        setCanvasView("designer");
+                        canvasControlRef.current?.addComponentNode(c);
+                      }}
+                    />
+                  </div>
+                ) : inspectorFocus.kind === "none" ? (
                   <>
                     <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
                       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">

@@ -1,6 +1,7 @@
 "use client";
 
 import type { NativeComponentField } from "@/lib/elt/native-components";
+import { applyPickedAssetToConfig } from "@/lib/elt/catalog-asset-link";
 import { isTableAssetField } from "@/lib/elt/table-asset-fields";
 import { PipelineTableAssetPicker } from "@/components/elt/pipeline-table-asset-picker";
 
@@ -111,13 +112,7 @@ export function ComponentSchemaForm({ fields, values, readOnly = false, onChange
                 value={val}
                 readOnly={readOnly}
                 placeholder={field.placeholder ?? "schema.table"}
-                onChange={(tableRef) => {
-                  const next = { ...values, [field.key]: tableRef };
-                  if (field.key === "table" || field.key === "output_table" || field.key === "table_name") {
-                    next.asset_key = tableRef;
-                  }
-                  onChange(next);
-                }}
+                onChange={(tableRef, asset) => onChange(applyPickedAssetToConfig(values, field.key, tableRef, asset))}
               />
             </label>
           );

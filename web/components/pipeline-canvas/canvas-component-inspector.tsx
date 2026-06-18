@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { ComponentCatalogAssetPanel } from "@/components/elt/component-catalog-asset-panel";
 import { ComponentSchemaForm } from "@/components/elt/component-schema-form";
 import { ComponentDataPreview } from "@/components/elt/component-data-preview";
 import type { NativeComponentField } from "@/lib/elt/native-components";
@@ -136,6 +137,13 @@ export function CanvasComponentInspector({
       {detail?.hasCompiler ? (
         <ComponentDataPreview pipelineId={pipelineId} config={config} readOnly={readOnly} />
       ) : null}
+
+      <ComponentCatalogAssetPanel
+        pipelineId={pipelineId}
+        config={config}
+        readOnly={readOnly}
+        onChange={(next) => saveConfig(next)}
+      />
 
       {formFields.length > 0 && !showAdvancedJson ? (
         <>

@@ -89,7 +89,12 @@ export function enrichComponentListAssets(
 /** Warehouse table ref for read-only preview from step config. */
 export function previewTableFromConfig(config: Record<string, unknown>): string | null {
   const table = String(
-    config.output_table ?? config.table ?? config.left_table ?? config.right_table ?? ""
+    config.output_table ??
+      config.table ??
+      config.left_table ??
+      config.right_table ??
+      config.asset_key ??
+      ""
   ).trim();
   return table || null;
 }

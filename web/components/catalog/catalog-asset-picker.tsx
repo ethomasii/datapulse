@@ -8,9 +8,18 @@ type Props = {
   selected: string[];
   onChange: (keys: string[]) => void;
   maxHeight?: string;
+  /** When set, only assets from this pipeline are listed. */
+  pipelineId?: string;
+  readOnly?: boolean;
 };
 
-export function CatalogAssetPicker({ selected, onChange, maxHeight = "max-h-48" }: Props) {
+export function CatalogAssetPicker({
+  selected,
+  onChange,
+  maxHeight = "max-h-48",
+  pipelineId,
+  readOnly = false,
+}: Props) {
   const [assets, setAssets] = useState<WorkspaceAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -18,7 +27,9 @@ export function CatalogAssetPicker({ selected, onChange, maxHeight = "max-h-48" 
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch("/api/elt/assets");
+        const qs = new URLSearchParams();
+        if (pipelineId) qs.set("pipelineId", pipelineId);
+        const res = await fetch(`/api/elt/assets?${qs}`, { credentials: "same-origin" });
         if (res.ok) {
           const body = (await res.json()) as WorkspaceAssetsResponse;
           setAssets(body.assets ?? []);
@@ -27,7 +38,7 @@ export function CatalogAssetPicker({ selected, onChange, maxHeight = "max-h-48" 
         setLoading(false);
       }
     })();
-  }, []);
+  }, [pipelineId]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -81,6 +92,7 @@ export function CatalogAssetPicker({ selected, onChange, maxHeight = "max-h-48" 
                   type="checkbox"
                   checked={selected.includes(a.id)}
                   onChange={() => toggle(a.id)}
+                  disabled={readOnly}
                   className="mt-1"
                 />
                 <span className="min-w-0 flex-1">
