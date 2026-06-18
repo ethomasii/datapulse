@@ -20,6 +20,12 @@ import {
 } from "@/lib/elt/ai-pipeline-canvas-build";
 import { applyCanvasGraphEdits, type CanvasGraphEditAction } from "@/lib/elt/canvas-graph-edit";
 import { AI_PIPELINE_PLAYBOOKS, listPlaybooksForPrompt, matchPlaybook } from "@/lib/elt/ai-pipeline-playbook";
+import {
+  buildTransformPipeline,
+  inferTransformMode,
+  type TransformBuildMode,
+  type TransformBuildStep,
+} from "@/lib/elt/ai-transform-build";
 import { extractComponentsFromCanvas } from "@/lib/elt/canvas-component-sync";
 import { getCanvasFromSourceConfig } from "@/lib/elt/canvas-source-config";
 import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-graph";
@@ -45,6 +51,24 @@ When a user describes a pipeline (e.g. "Load GitHub issues into Snowflake"), cal
 - EL+T with dbt: set post_transform_type="dbt" and dbt_package_path to a Git URL or ./dbt path; use list_dbt_projects to link an existing workspace project via dbt_project_id when one matches
 
 After generating, give ONE short sentence: "Pipeline ready — click Save, then edit the repo/credentials in the builder or canvas."
+
+## Transform-only focus (two execution paths)
+
+When the user asks to **filter, sort, aggregate, dedupe, or reshape loaded data** (not ingest):
+
+1. Call **build_transform_steps** with structured \`steps[]\` and \`mode\`:
+   - **dataframe** — in-memory path: native components (filter_rows, sort_rows, group_aggregate) chained after load on the worker.
+   - **dbt** — push-down path: warehouse SQL (CREATE TABLE AS …) after load; use when they mention dbt, warehouse, Snowflake, push-down, or scale.
+2. If \`mode\` is unclear, default **dataframe** for quick edits; use **dbt** when they say warehouse SQL / dbt / push down.
+3. Apply results:
+   - **New pipeline**: pass returned \`components\`, \`post_transform_type\`, \`post_transform_code\`, dbt fields on **generate_pipeline**.
+   - **Existing pipeline**: **add_pipeline_components** (dataframe) or **edit_pipeline_canvas** (\`graph_edits\`) + patch post_transform via save.
+4. \`source_table\` default: \`staging.{pipeline_name}\` or main loaded table from context — never ask if a reasonable default exists.
+5. Do **not** add ingest/sensor components for pure transform requests.
+
+Example — "filter active orders, sort by created_at desc, sum amount by day":
+- dataframe → build_transform_steps → filter + sort + aggregate components wired after dest
+- dbt → build_transform_steps mode=dbt → post_transform SQL CTAS chain + sql transform node on canvas
 
 ## NL → canvas components
 When the user mentions monitors, sensors, quality checks, freshness, or data validation:
@@ -253,7 +277,33 @@ const TOOLS: Anthropic.Tool[] = [
         components: {
           ...AI_COMPONENT_ITEMS_SCHEMA,
           description:
-            "Optional component templates to place on the visual canvas (monitors, quality checks, transforms). Use search_components first.",
+            "Optional transform components (filter_rows, sort_rows, group_aggregate). Prefer build_transform_steps for NL transform requests.",
+        },
+        transform_mode: {
+          type: "string",
+          enum: ["dataframe", "dbt", "auto"],
+          description: "With transform_steps: dataframe = in-memory components; dbt = warehouse SQL",
+        },
+        transform_source_table: {
+          type: "string",
+          description: "With transform_steps: input table e.g. staging.orders",
+        },
+        transform_steps: {
+          type: "array",
+          description: "Structured transform steps — alternative to calling build_transform_steps separately",
+          items: {
+            type: "object",
+            properties: {
+              op: { type: "string", enum: ["filter", "sort", "aggregate", "select_columns", "drop_duplicates", "limit"] },
+              condition: { type: "string" },
+              columns: { type: "array", items: { type: "string" } },
+              ascending: { type: "boolean" },
+              group_by: { type: "array", items: { type: "string" } },
+              aggregations: { type: "object" },
+              limit: { type: "number" },
+            },
+            required: ["op"],
+          },
         },
       },
       required: ["name", "source_type", "destination_type"],
@@ -363,6 +413,52 @@ const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "build_transform_steps",
+    description:
+      "Build a filter/sort/aggregate transform chain. Returns components (dataframe path) or warehouse SQL + graph_edits (dbt push-down path). Use for transform-only requests.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        mode: {
+          type: "string",
+          enum: ["dataframe", "dbt", "auto"],
+          description: "dataframe = in-memory components; dbt = warehouse SQL push-down; auto = infer from user wording",
+        },
+        source_table: {
+          type: "string",
+          description: "Input warehouse table, e.g. staging.orders",
+        },
+        steps: {
+          type: "array",
+          description: "Ordered transform steps",
+          items: {
+            type: "object",
+            properties: {
+              op: {
+                type: "string",
+                enum: ["filter", "sort", "aggregate", "select_columns", "drop_duplicates", "limit"],
+              },
+              condition: { type: "string", description: "filter: pandas/SQL condition" },
+              columns: { type: "array", items: { type: "string" } },
+              ascending: { type: "boolean" },
+              group_by: { type: "array", items: { type: "string" } },
+              aggregations: {
+                type: "object",
+                description: 'aggregate: e.g. {"amount":"sum","id":"count"}',
+              },
+              limit: { type: "number" },
+              output_suffix: { type: "string" },
+            },
+            required: ["op"],
+          },
+        },
+        dbt_package_path: { type: "string", description: "Optional linked dbt project path" },
+        dbt_target_schema: { type: "string" },
+      },
+      required: ["source_table", "steps"],
+    },
+  },
+  {
     name: "list_pipeline_playbooks",
     description:
       "List curated high-value pipeline recipes (ingest+DQ, join enrich, clean+parse, S3 sensor, dbt after load). Use when user describes a pattern without naming specific component ids.",
@@ -380,6 +476,66 @@ const TOOLS: Anthropic.Tool[] = [
 ];
 
 // ── Tool implementations ─────────────────────────────────────────────────────
+
+function toolBuildTransformSteps(params: {
+  mode?: string;
+  source_table?: string;
+  steps?: unknown;
+  dbt_package_path?: string;
+  dbt_target_schema?: string;
+  user_query?: string;
+}) {
+  const rawSteps = Array.isArray(params.steps) ? params.steps : [];
+  const steps: TransformBuildStep[] = rawSteps
+    .map((s) => {
+      if (!s || typeof s !== "object") return null;
+      const o = s as Record<string, unknown>;
+      const op = String(o.op ?? "").trim() as TransformBuildStep["op"];
+      if (!op) return null;
+      return {
+        op,
+        ...(typeof o.condition === "string" ? { condition: o.condition } : {}),
+        ...(Array.isArray(o.columns) ? { columns: o.columns.map(String) } : {}),
+        ...(typeof o.ascending === "boolean" ? { ascending: o.ascending } : {}),
+        ...(Array.isArray(o.group_by) ? { group_by: o.group_by.map(String) } : {}),
+        ...(o.aggregations && typeof o.aggregations === "object"
+          ? { aggregations: o.aggregations as Record<string, string> }
+          : {}),
+        ...(typeof o.limit === "number" ? { limit: o.limit } : {}),
+        ...(typeof o.output_suffix === "string" ? { output_suffix: o.output_suffix } : {}),
+      } satisfies TransformBuildStep;
+    })
+    .filter((x): x is TransformBuildStep => x !== null);
+
+  const modeRaw = String(params.mode ?? "auto").toLowerCase();
+  const mode: TransformBuildMode =
+    modeRaw === "dbt" ? "dbt" : modeRaw === "dataframe" ? "dataframe" : inferTransformMode(params.user_query ?? "");
+
+  const built = buildTransformPipeline({
+    mode,
+    source_table: String(params.source_table ?? "").trim(),
+    steps,
+    dbt_package_path: params.dbt_package_path,
+    dbt_target_schema: params.dbt_target_schema,
+  });
+
+  return {
+    ...built,
+    next_action:
+      built.mode === "dataframe" && built.components.length
+        ? "Pass components[] to generate_pipeline or add_pipeline_components; optional graph_edits via edit_pipeline_canvas."
+        : "Pass post_transform_type + post_transform_code to generate_pipeline; wire graph_edits via edit_pipeline_canvas.",
+    generate_pipeline_fields: {
+      components: built.components.length ? built.components : undefined,
+      post_transform_type: built.post_transform_type,
+      post_transform_code: built.post_transform_code,
+      dbt_package_path: built.dbt_package_path,
+      dbt_target_schema: built.dbt_target_schema,
+      dbt_selector: built.dbt_selector,
+      dbt_run_scope: built.dbt_run_scope,
+    },
+  };
+}
 
 function toolListPipelinePlaybooks(query?: string) {
   const q = query?.trim().toLowerCase();
@@ -745,6 +901,9 @@ type GeneratePipelineParams = {
   dbt_project_id?: string;
   post_transform_code?: string;
   components?: AiPipelineComponentInput[];
+  transform_mode?: TransformBuildMode | "auto";
+  transform_steps?: TransformBuildStep[];
+  transform_source_table?: string;
 };
 
 export type PatchPipelinePayload = {
@@ -977,6 +1136,36 @@ async function toolGeneratePipeline(userId: string, params: GeneratePipelinePara
     sourceConfiguration: { ...(params.source_configuration ?? {}) },
   };
 
+  const genWarnings: string[] = [];
+  const componentInputs = normalizeAiComponents(params.components);
+
+  if (params.transform_steps?.length && params.transform_source_table) {
+    const modeRaw = String(params.transform_mode ?? "auto").toLowerCase();
+    const mode: TransformBuildMode =
+      modeRaw === "dbt" ? "dbt" : modeRaw === "dataframe" ? "dataframe" : "dataframe";
+    const built = buildTransformPipeline({
+      mode,
+      source_table: params.transform_source_table,
+      steps: params.transform_steps,
+      dbt_package_path: params.dbt_package_path,
+      dbt_target_schema: params.dbt_target_schema,
+    });
+    if (built.components.length) {
+      componentInputs.push(...built.components);
+    }
+    if (built.post_transform_type && built.post_transform_code) {
+      params.post_transform_type = built.post_transform_type;
+      params.post_transform_code = built.post_transform_code;
+    }
+    if (built.dbt_package_path) {
+      params.dbt_package_path = built.dbt_package_path;
+      params.dbt_selector = built.dbt_selector;
+      params.dbt_run_scope = built.dbt_run_scope;
+      if (built.dbt_target_schema) params.dbt_target_schema = built.dbt_target_schema;
+    }
+    genWarnings.push(...built.messages);
+  }
+
   const { dbtProjectId, warnings } = applyPostTransformToConfig(
     body.sourceConfiguration as Record<string, unknown>,
     params,
@@ -984,10 +1173,9 @@ async function toolGeneratePipeline(userId: string, params: GeneratePipelinePara
     params.destination_type
   );
   if (dbtProjectId) body.dbtProjectId = dbtProjectId;
+  genWarnings.push(...warnings);
 
-  const componentInputs = normalizeAiComponents(params.components);
   let componentSummary: string[] | undefined;
-  const genWarnings = [...warnings];
 
   if (componentInputs.length) {
     const applied = applyCanvasComponentsToSourceConfig(
@@ -1261,6 +1449,15 @@ When they describe a brand-new pipeline instead, use **generate_pipeline** witho
           result = await toolEditPipelineCanvas(user.id, pipelineId, {
             pipeline_id: typeof inp.pipeline_id === "string" ? inp.pipeline_id : undefined,
             actions: inp.actions,
+          });
+        } else if (name === "build_transform_steps") {
+          result = toolBuildTransformSteps({
+            mode: typeof inp.mode === "string" ? inp.mode : undefined,
+            source_table: typeof inp.source_table === "string" ? inp.source_table : undefined,
+            steps: inp.steps,
+            dbt_package_path: typeof inp.dbt_package_path === "string" ? inp.dbt_package_path : undefined,
+            dbt_target_schema: typeof inp.dbt_target_schema === "string" ? inp.dbt_target_schema : undefined,
+            user_query: messages[messages.length - 1]?.content ?? "",
           });
         } else if (name === "list_pipeline_playbooks") {
           result = toolListPipelinePlaybooks(typeof inp.query === "string" ? inp.query : undefined);

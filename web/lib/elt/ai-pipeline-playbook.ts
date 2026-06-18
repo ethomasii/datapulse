@@ -85,19 +85,40 @@ export const AI_PIPELINE_PLAYBOOKS: AiPipelinePlaybook[] = [
     ],
   },
   {
-    id: "dbt_after_load",
-    title: "dbt after load",
-    description: "Add dbt transform node after warehouse load.",
-    triggers: ["dbt after load", "staging models", "el+t"],
+    id: "transform_filter_sort",
+    title: "Filter + sort (dataframe)",
+    description: "Filter rows then sort — in-memory transform chain after load.",
+    triggers: ["filter and sort", "filter rows sort", "active rows sorted"],
+    components: [],
+    graphEdits: [],
+  },
+  {
+    id: "transform_aggregate_daily",
+    title: "Daily aggregate (dataframe)",
+    description: "Group by date and sum metrics after load.",
+    triggers: ["aggregate by day", "daily rollup", "group by date sum"],
+    components: [
+      {
+        component_id: "group_aggregate",
+        label: "Daily metrics",
+        config: { group_by: ["date"], aggregations: '{"amount":"sum","id":"count"}' },
+      },
+    ],
+    graphEdits: [{ op: "connect", source: "dest", target: "group" }],
+  },
+  {
+    id: "transform_dbt_sql",
+    title: "Warehouse SQL transforms (dbt path)",
+    description: "Push-down SQL after load — use build_transform_steps with mode=dbt.",
+    triggers: ["dbt transform", "push down", "warehouse sql", "sql model after load"],
     components: [],
     graphEdits: [
       {
         op: "add_transform",
-        tool: "dbt",
-        label: "dbt staging",
+        tool: "sql",
+        label: "Warehouse SQL",
         after: "dest",
-        package_path: "./dbt",
-        selector: "staging.*",
+        code: "-- use build_transform_steps to generate CTAS chain",
       },
     ],
   },
@@ -132,23 +153,19 @@ export function listPlaybooksForPrompt(): string {
   ).join("\n");
 }
 
-/** Native components prioritized for AI search hints. */
+/** Transform-native components prioritized for AI (dataframe path). */
 export const AI_NATIVE_COMPONENT_IDS = [
   "filter_rows",
-  "join_tables",
-  "lookup",
+  "sort_rows",
   "group_aggregate",
   "select_columns",
   "drop_duplicates",
+  "join_tables",
+  "lookup",
+  "limit_rows",
   "data_cleansing",
   "datetime_parser",
   "pivot",
   "anti_join",
-  "cross_join",
   "sql_transform",
-  "dq_check",
-  "freshness_check",
-  "s3_monitor",
-  "s3_to_database_asset",
-  "rest_api_fetcher",
 ] as const;
