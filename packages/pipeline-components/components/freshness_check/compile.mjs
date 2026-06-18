@@ -37,7 +37,7 @@ SELECT MAX(${tsCol}) AS latest FROM ${table} HAVING MAX(${tsCol}) < NOW() - INTE
   }
 };
 
-// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-gKMp94/freshness_check.ts
+// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-0FtTsZ/freshness_check.ts
 function compile(config) {
   return freshnessCheckComponent.compile(config);
 }

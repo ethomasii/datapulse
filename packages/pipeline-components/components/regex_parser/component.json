@@ -1,0 +1,83 @@
+{
+  "id": "regex_parser",
+  "name": "Regex parser",
+  "category": "transformation",
+  "description": "Extract, match, replace, or split text with regular expressions.",
+  "compileTarget": "python",
+  "dagsterOnlyFields": [
+    "group_name",
+    "partition_type",
+    "partition_start",
+    "partition_date_column",
+    "partition_values",
+    "owners",
+    "asset_tags",
+    "kinds",
+    "freshness_max_lag_minutes",
+    "freshness_cron",
+    "include_preview_metadata",
+    "preview_rows",
+    "deps",
+    "retry_policy_max_retries",
+    "retry_policy_delay_seconds",
+    "retry_policy_backoff",
+    "dynamic_partition_name",
+    "partition_dimensions"
+  ],
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "column",
+      "label": "Column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "pattern",
+      "label": "Regex pattern",
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "mode",
+      "label": "Mode",
+      "type": "select",
+      "options": [
+        "extract",
+        "match",
+        "replace",
+        "split"
+      ],
+      "default": "extract"
+    },
+    {
+      "key": "replacement",
+      "label": "Replacement (replace mode)",
+      "type": "string"
+    },
+    {
+      "key": "output_columns",
+      "label": "Output column names",
+      "type": "string_list"
+    },
+    {
+      "key": "output_column",
+      "label": "Output column (match/replace)",
+      "type": "string"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

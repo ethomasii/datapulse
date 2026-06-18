@@ -1,0 +1,57 @@
+{
+  "id": "fix_message_parser",
+  "name": "FIX message parser",
+  "category": "transformation",
+  "description": "Parse FIX trading messages (tag=value) into flat rows with symbol, side, qty, price.",
+  "compileTarget": "python",
+  "dagsterOnlyFields": [
+    "group_name",
+    "partition_type",
+    "partition_start",
+    "partition_date_column",
+    "partition_values",
+    "owners",
+    "asset_tags",
+    "kinds",
+    "freshness_max_lag_minutes",
+    "freshness_cron",
+    "include_preview_metadata",
+    "preview_rows",
+    "deps",
+    "retry_policy_max_retries",
+    "retry_policy_delay_seconds",
+    "retry_policy_backoff",
+    "dynamic_partition_name",
+    "partition_dimensions"
+  ],
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "message_column",
+      "label": "Message column",
+      "type": "string",
+      "default": "message"
+    },
+    {
+      "key": "msg_type_filter",
+      "label": "MsgType filter",
+      "type": "string_list",
+      "description": "e.g. D, 8"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

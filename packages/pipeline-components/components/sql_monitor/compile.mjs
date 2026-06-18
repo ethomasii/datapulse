@@ -35,7 +35,7 @@ var sqlMonitorComponent = {
   compile: (cfg) => buildSensorMonitor("sql_monitor", "SQL monitor", cfg)
 };
 
-// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-gKMp94/sql_monitor.ts
+// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-0FtTsZ/sql_monitor.ts
 function compile(config) {
   return sqlMonitorComponent.compile(config);
 }

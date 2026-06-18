@@ -1,0 +1,78 @@
+{
+  "id": "html_parser",
+  "name": "HTML parser",
+  "category": "transformation",
+  "description": "Strip HTML tags or extract text/links/tables (requires beautifulsoup4).",
+  "compileTarget": "python",
+  "dagsterOnlyFields": [
+    "group_name",
+    "partition_type",
+    "partition_start",
+    "partition_date_column",
+    "partition_values",
+    "owners",
+    "asset_tags",
+    "kinds",
+    "freshness_max_lag_minutes",
+    "freshness_cron",
+    "include_preview_metadata",
+    "preview_rows",
+    "deps",
+    "retry_policy_max_retries",
+    "retry_policy_delay_seconds",
+    "retry_policy_backoff",
+    "dynamic_partition_name",
+    "partition_dimensions"
+  ],
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "columns",
+      "label": "HTML columns",
+      "type": "string_list",
+      "required": true
+    },
+    {
+      "key": "mode",
+      "label": "Mode",
+      "type": "select",
+      "options": [
+        "strip_tags",
+        "extract_text",
+        "extract_links",
+        "extract_tables"
+      ],
+      "default": "strip_tags"
+    },
+    {
+      "key": "parser",
+      "label": "BS parser",
+      "type": "select",
+      "options": [
+        "html.parser",
+        "lxml",
+        "html5lib"
+      ],
+      "default": "html.parser"
+    },
+    {
+      "key": "new_column_suffix",
+      "label": "New column suffix",
+      "type": "string"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

@@ -103,8 +103,23 @@ describe("native-components", () => {
     expect(sensors.length).toBe(1);
   });
 
-  it("lists 46 native components", () => {
-    expect(listNativeComponents().length).toBe(46);
+  it("lists 51 native components", () => {
+    expect(listNativeComponents().length).toBe(51);
+  });
+
+  it("hl7_v2_parser emits segment parsing python", () => {
+    const def = getNativeComponent("hl7_v2_parser");
+    expect(def?.id).toBe("hl7_v2_parser");
+    const out = def!.compile({
+      table: "staging.hl7_messages",
+      message_column: "message",
+      keep_segments: ["MSH", "PID", "OBX"],
+      output_table: "staging.hl7_segments",
+    });
+    const code = out.python?.join("\n") ?? "";
+    expect(code).toContain("_hl7_parse_message");
+    expect(code).toContain("MSH");
+    expect(code).toContain("staging.hl7_segments");
   });
 
   it("resolves catalog aliases to native compilers", () => {

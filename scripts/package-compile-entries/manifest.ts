@@ -49,4 +49,9 @@ export const PACKAGE_COMPILE_ENTRIES = [
   { id: "audit_columns", module: "definitions/more-transforms", export: "auditColumnsComponent" },
   { id: "semi_join", module: "definitions/more-transforms", export: "semiJoinComponent" },
   { id: "gcs_to_database_asset", module: "definitions/ingestion-hints", export: "gcsIngestComponent" },
+  { id: "hl7_v2_parser", module: "definitions/domain-parsers", export: "hl7V2ParserComponent" },
+  { id: "fix_message_parser", module: "definitions/domain-parsers", export: "fixMessageParserComponent" },
+  { id: "email_parser", module: "definitions/domain-parsers", export: "emailParserComponent" },
+  { id: "regex_parser", module: "definitions/domain-parsers", export: "regexParserComponent" },
+  { id: "html_parser", module: "definitions/domain-parsers", export: "htmlParserComponent" },
 ] as const;

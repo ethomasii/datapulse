@@ -46,6 +46,13 @@ import {
   auditColumnsComponent,
   semiJoinComponent,
 } from "./definitions/more-transforms";
+import {
+  hl7V2ParserComponent,
+  fixMessageParserComponent,
+  emailParserComponent,
+  regexParserComponent,
+  htmlParserComponent,
+} from "./definitions/domain-parsers";
 import type { NativeComponentDefinition } from "./types";
 
 const ALL_NATIVE: NativeComponentDefinition[] = [
@@ -95,6 +102,11 @@ const ALL_NATIVE: NativeComponentDefinition[] = [
   auditColumnsComponent,
   semiJoinComponent,
   gcsIngestComponent,
+  hl7V2ParserComponent,
+  fixMessageParserComponent,
+  emailParserComponent,
+  regexParserComponent,
+  htmlParserComponent,
 ];
 
 const byId = new Map<string, NativeComponentDefinition>();

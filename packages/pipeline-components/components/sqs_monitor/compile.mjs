@@ -34,7 +34,7 @@ var sqsMonitorComponent = {
   compile: (cfg) => buildSensorMonitor("sqs_monitor", "SQS monitor", cfg)
 };
 
-// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-gKMp94/sqs_monitor.ts
+// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-0FtTsZ/sqs_monitor.ts
 function compile(config) {
   return sqsMonitorComponent.compile(config);
 }

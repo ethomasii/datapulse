@@ -1,0 +1,62 @@
+{
+  "id": "hl7_v2_parser",
+  "name": "HL7 v2 parser",
+  "category": "transformation",
+  "description": "Parse pipe-delimited HL7 v2 messages (MSH, PID, OBX, ORC, OBR, PV1, EVN, DG1, AL1).",
+  "compileTarget": "python",
+  "dagsterOnlyFields": [
+    "group_name",
+    "partition_type",
+    "partition_start",
+    "partition_date_column",
+    "partition_values",
+    "owners",
+    "asset_tags",
+    "kinds",
+    "freshness_max_lag_minutes",
+    "freshness_cron",
+    "include_preview_metadata",
+    "preview_rows",
+    "deps",
+    "retry_policy_max_retries",
+    "retry_policy_delay_seconds",
+    "retry_policy_backoff",
+    "dynamic_partition_name",
+    "partition_dimensions"
+  ],
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "message_column",
+      "label": "Message column",
+      "type": "string",
+      "default": "message"
+    },
+    {
+      "key": "keep_segments",
+      "label": "Keep segments",
+      "type": "string_list",
+      "description": "MSH, PID, OBX, ORC, OBR, PV1, EVN, DG1, AL1",
+      "default": [
+        "MSH",
+        "PID",
+        "OBX"
+      ]
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

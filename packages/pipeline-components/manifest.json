@@ -2,7 +2,7 @@
   "version": "1",
   "repository": "ethomasii/eltpulse-pipeline-components",
   "description": "Native executable pipeline components for eltPulse declarative v2",
-  "last_exported": "2026-06-18T21:56:03.415Z",
+  "last_exported": "2026-06-18T22:06:01.966Z",
   "sourceRepository": "eltpulsehq/datapulse",
   "sourcePath": "web/lib/elt/native-components/definitions",
   "components": [
@@ -51,6 +51,11 @@
     "count_records",
     "audit_columns",
     "semi_join",
-    "gcs_to_database_asset"
+    "gcs_to_database_asset",
+    "hl7_v2_parser",
+    "fix_message_parser",
+    "email_parser",
+    "regex_parser",
+    "html_parser"
   ]
 }
