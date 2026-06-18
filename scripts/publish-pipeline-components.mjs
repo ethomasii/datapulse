@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Publish packages/pipeline-components to github.com/ethomasii/pipeline-components
+ * Publish packages/pipeline-components to github.com/ethomasii/eltpulse-pipeline-components
  *
  * Usage:
  *   node scripts/export-pipeline-components-catalog.mjs
@@ -17,7 +17,7 @@ import { fileURLToPath } from "url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const src = join(root, "packages/pipeline-components");
-const repo = process.env.PIPELINE_COMPONENTS_REPO ?? "ethomasii/pipeline-components";
+const repo = process.env.PIPELINE_COMPONENTS_REPO ?? "ethomasii/eltpulse-pipeline-components";
 const branch = process.env.PIPELINE_COMPONENTS_BRANCH ?? "main";
 const fallbackRepo = process.env.PIPELINE_COMPONENTS_FALLBACK ?? "ethomasii/datapulse";
 const fallbackBranch =

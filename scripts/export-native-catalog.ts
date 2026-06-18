@@ -37,7 +37,7 @@ for (const def of listNativeComponents()) {
 
 const manifest = {
   version: "1",
-  repository: "ethomasii/pipeline-components",
+  repository: "ethomasii/eltpulse-pipeline-components",
   description: "Native executable pipeline components for eltPulse declarative v2",
   last_exported: new Date().toISOString(),
   sourceRepository: "eltpulsehq/datapulse",

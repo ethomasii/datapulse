@@ -23,7 +23,7 @@ node scripts/export-pipeline-components-catalog.mjs
 node scripts/publish-pipeline-components.mjs
 ```
 
-Published catalog: [ethomasii/datapulse `pipeline-components-catalog`](https://github.com/ethomasii/datapulse/tree/pipeline-components-catalog) (or `ethomasii/pipeline-components` when the standalone repo exists).
+Published catalog: [ethomasii/eltpulse-pipeline-components](https://github.com/ethomasii/eltpulse-pipeline-components)
 
 ## Layout
 

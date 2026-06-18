@@ -1,8 +1,8 @@
 {
   "version": "1",
-  "repository": "ethomasii/pipeline-components",
+  "repository": "ethomasii/eltpulse-pipeline-components",
   "description": "Native executable pipeline components for eltPulse declarative v2",
-  "last_exported": "2026-06-18T19:57:44.120Z",
+  "last_exported": "2026-06-18T20:08:30.693Z",
   "sourceRepository": "eltpulsehq/datapulse",
   "sourcePath": "web/lib/elt/native-components/definitions",
   "components": [

@@ -39,7 +39,7 @@ eltPulse-native components live in `web/lib/elt/native-components/`. They are **
 
 ## External repo
 
-**GitHub:** [ethomasii/pipeline-components](https://github.com/ethomasii/pipeline-components) — metadata catalog synced from this monorepo (or branch `pipeline-components-catalog` on ethomasii/datapulse until the standalone repo is created).
+**GitHub:** [ethomasii/eltpulse-pipeline-components](https://github.com/ethomasii/eltpulse-pipeline-components) — metadata catalog synced from this monorepo.
 
 ```bash
 node scripts/export-pipeline-components-catalog.mjs   # components/*/component.json + manifest

@@ -1,8 +1,8 @@
 # pipeline-components monorepo sync
 
-The canonical **customer-facing** repo is [github.com/ethomasii/pipeline-components](https://github.com/ethomasii/pipeline-components).
+The canonical **customer-facing** repo is [github.com/ethomasii/eltpulse-pipeline-components](https://github.com/ethomasii/eltpulse-pipeline-components).
 
-Until that standalone repo exists, catalog publishes to branch `pipeline-components-catalog` on [ethomasii/datapulse](https://github.com/ethomasii/datapulse).
+Until that standalone repo exists, catalog publishes to branch `pipeline-components-catalog` on [ethomasii/datapulse](https://github.com/ethomasii/datapulse) as a fallback.
 
 Executable compilers live in the datapulse monorepo (`web/lib/elt/native-components/definitions/`). This folder holds **exported metadata** (`components/*/component.json`) for discovery and external tooling.
 
@@ -17,7 +17,7 @@ Manual alternative (same pattern as `integrations/`):
 ```bash
 cd packages/pipeline-components
 rsync -a --delete --exclude '.git' ./ /tmp/pipeline-components-push/
-cd /tmp/pipeline-components-push && git init && git remote add origin git@github.com:ethomasii/pipeline-components.git
+cd /tmp/pipeline-components-push && git init && git remote add origin git@github.com:ethomasii/eltpulse-pipeline-components.git
 git add -A && git commit -m "sync from datapulse" && git branch -M main && git push -u origin main
 ```
 
