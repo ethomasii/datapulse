@@ -10,12 +10,14 @@ import {
 } from "@/lib/auth/api-user";
 import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
+import { parseTags } from "@/lib/elt/catalog-entries";
 export async function GET(req: Request) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
   if (!hasScope(auth, API_SCOPES.PIPELINES_READ)) return scopeForbiddenResponse();
 
   const pipelineId = new URL(req.url).searchParams.get("pipelineId")?.trim() || undefined;
+  const q = new URL(req.url).searchParams.get("q")?.trim().toLowerCase() || "";
   const ownerIds = await getAccessibleResourceOwnerIds(auth.user.id);
 
   const rows = await db.catalogEntry.findMany({
@@ -26,7 +28,23 @@ export async function GET(req: Request) {
     orderBy: { updatedAt: "desc" },
   });
 
-  return NextResponse.json({ entries: rows });
+  const entries = q
+    ? rows.filter((row) => {
+        const tags = parseTags(row.tags);
+        const hay = [
+          row.assetKey,
+          row.displayName ?? "",
+          row.description ?? "",
+          row.kind,
+          ...tags,
+        ]
+          .join(" ")
+          .toLowerCase();
+        return hay.includes(q);
+      })
+    : rows;
+
+  return NextResponse.json({ entries });
 }
 
 const patchSchema = z.object({

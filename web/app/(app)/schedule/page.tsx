@@ -16,68 +16,8 @@ import {
 import { pipelineToolLabel } from '@/lib/elt/pipeline-tool-labels';
 import Link from 'next/link';
 import { RelatedLinks } from '@/components/ui/related-links';
-
-function cronPartMatches(part: string, value: number): boolean {
-  if (part === "*") return true;
-  return part.split(",").some((seg) => {
-    if (seg.includes("/")) {
-      const [range, step] = seg.split("/");
-      const [start] = range === "*" ? [0] : range.split("-").map(Number);
-      return value >= start && (value - start) % Number(step) === 0;
-    }
-    if (seg.includes("-")) {
-      const [lo, hi] = seg.split("-").map(Number);
-      return value >= lo && value <= hi;
-    }
-    return Number(seg) === value;
-  });
-}
-
-/** Compute the next wall-clock time a 5-field cron expression fires, respecting a timezone. */
-function nextCronRun(cron: string, timezone: string): string | null {
-  try {
-    const parts = cron.trim().split(/\s+/);
-    if (parts.length !== 5) return null;
-    const [minPart, hourPart, domPart, , dowPart] = parts;
-
-    const now = new Date();
-    const candidate = new Date(now.getTime() + 60_000); // start from next minute
-    candidate.setSeconds(0, 0);
-
-    for (let i = 0; i < 60 * 24 * 8; i++) {
-      // Get time components in the target timezone
-      const parts = new Intl.DateTimeFormat('en-US', {
-        timeZone: timezone,
-        hour: 'numeric', minute: 'numeric', weekday: 'short',
-        hour12: false,
-      }).formatToParts(candidate);
-      const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? '0');
-      const h = get('hour') % 24;
-      const m = get('minute');
-      const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(
-        parts.find((p) => p.type === 'weekday')?.value ?? ''
-      );
-
-      if (
-        (domPart === '*' || dowPart === '*' || cronPartMatches(domPart, candidate.getUTCDate())) &&
-        (dowPart === '*' || cronPartMatches(dowPart, dow)) &&
-        cronPartMatches(hourPart, h) &&
-        cronPartMatches(minPart, m)
-      ) {
-        return new Intl.DateTimeFormat('en-US', {
-          timeZone: timezone,
-          year: 'numeric', month: 'short', day: 'numeric',
-          hour: '2-digit', minute: '2-digit',
-          hour12: false,
-        }).format(candidate) + (timezone !== 'UTC' ? '' : ' UTC');
-      }
-      candidate.setTime(candidate.getTime() + 60_000);
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
+import { nextCronRun } from '@/lib/elt/cron-match';
+import { formatRunPhaseLabel } from '@/lib/elt/dbt-run-phases';
 
 interface Pipeline {
   id: string;
@@ -88,7 +28,11 @@ interface Pipeline {
   enabled: boolean;
   description?: string;
   updatedAt?: string;
+  hasDbt?: boolean;
   scheduleInfo?: { enabled: boolean; cron: string | null; timezone: string };
+  dbtScheduleInfo?: { enabled: boolean; cron: string | null; timezone: string; mode: string } | null;
+  schedulePhases?: string[];
+  dbtSchedulePhases?: string[];
 }
 
 export default function SchedulePage() {
@@ -124,10 +68,14 @@ export default function SchedulePage() {
     };
   }, []);
 
-  const scheduledCount = pipelines.filter((p) => p.scheduleInfo?.enabled && p.scheduleInfo.cron).length;
+  const scheduledCount = pipelines.filter(
+    (p) =>
+      (p.scheduleInfo?.enabled && p.scheduleInfo.cron) ||
+      (p.dbtScheduleInfo?.enabled && p.dbtScheduleInfo.cron)
+  ).length;
 
   const filtered = pipelines.filter((p) => {
-    if (scheduleOnly && !(p.scheduleInfo?.enabled && p.scheduleInfo.cron)) return false;
+    if (scheduleOnly && !(p.scheduleInfo?.enabled && p.scheduleInfo.cron) && !(p.dbtScheduleInfo?.enabled && p.dbtScheduleInfo.cron)) return false;
     const q = filter.toLowerCase();
     return (
       !q ||
@@ -171,12 +119,15 @@ export default function SchedulePage() {
               </li>
               <li>
                 Vercel Cron calls{' '}
-                <code className="font-mono text-xs">/api/cron/managed-worker</code> every minute.
+                <code className="font-mono text-xs">/api/cron/pipeline-schedules</code> every minute to
+                evaluate due sync and dbt-only schedules, then{' '}
+                <code className="font-mono text-xs">/api/cron/managed-worker</code> processes pending runs.
               </li>
               <li>
-                That endpoint evaluates each enabled pipeline&apos;s <code className="font-mono text-xs">cron_schedule</code>{' '}
-                and <code className="font-mono text-xs">schedule_timezone</code>, determines which
-                runs are due, and dispatches them to the gateway or managed worker.
+                Sync schedules create runs with phases{' '}
+                <strong>Sync → Load → dbt</strong> when dbt is enabled. Separate dbt-only schedules
+                (under <code className="font-mono text-xs">sourceConfiguration.dbt</code>) run transform
+                only via <code className="font-mono text-xs">schedule:dbt</code>.
               </li>
               <li>
                 Track dispatched runs on the{' '}
@@ -189,9 +140,9 @@ export default function SchedulePage() {
             <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-mono text-violet-700 dark:text-violet-300">
               <span className="rounded bg-violet-100 px-2 py-1 dark:bg-violet-900/40">Vercel Cron (every minute)</span>
               <ArrowRight className="h-3 w-3 shrink-0" />
-              <span className="rounded bg-violet-100 px-2 py-1 dark:bg-violet-900/40">/api/cron/managed-worker</span>
+              <span className="rounded bg-violet-100 px-2 py-1 dark:bg-violet-900/40">/api/cron/pipeline-schedules</span>
               <ArrowRight className="h-3 w-3 shrink-0" />
-              <span className="rounded bg-violet-100 px-2 py-1 dark:bg-violet-900/40">picks up pending runs</span>
+              <span className="rounded bg-violet-100 px-2 py-1 dark:bg-violet-900/40">enqueue due sync / dbt runs</span>
               <ArrowRight className="h-3 w-3 shrink-0" />
               <span className="rounded bg-violet-100 px-2 py-1 dark:bg-violet-900/40">dispatches to gateway / managed worker</span>
             </div>
@@ -318,9 +269,35 @@ export default function SchedulePage() {
                       </>
                     ) : (
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-400 dark:bg-slate-800 dark:text-slate-500">
-                        no schedule
+                        no sync schedule
                       </span>
                     )}
+                    {pipeline.dbtScheduleInfo?.enabled && pipeline.dbtScheduleInfo.cron ? (
+                      <>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-fuchsia-100 px-2 py-0.5 text-xs font-semibold text-fuchsia-800 dark:bg-fuchsia-900/40 dark:text-fuchsia-200">
+                          dbt {pipeline.dbtScheduleInfo.cron}
+                          {pipeline.dbtScheduleInfo.timezone !== 'UTC'
+                            ? ` · ${pipeline.dbtScheduleInfo.timezone}`
+                            : ''}
+                        </span>
+                        {(() => {
+                          const next = nextCronRun(
+                            pipeline.dbtScheduleInfo!.cron!,
+                            pipeline.dbtScheduleInfo!.timezone
+                          );
+                          return next ? (
+                            <span className="text-xs text-slate-500 dark:text-slate-400">
+                              dbt next:{' '}
+                              <span className="font-medium text-slate-700 dark:text-slate-200">{next}</span>
+                            </span>
+                          ) : null;
+                        })()}
+                      </>
+                    ) : pipeline.hasDbt ? (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                        dbt: follows sync
+                      </span>
+                    ) : null}
                     {!pipeline.enabled && (
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                         pipeline disabled
@@ -340,6 +317,21 @@ export default function SchedulePage() {
                       </>
                     )}
                   </div>
+                  {pipeline.schedulePhases?.length ? (
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Sync run phases:{' '}
+                      {pipeline.schedulePhases.map((p) => formatRunPhaseLabel(p)).join(' → ')}
+                      {pipeline.dbtSchedulePhases &&
+                      pipeline.dbtScheduleInfo?.mode === 'dbt_only' &&
+                      pipeline.dbtScheduleInfo.enabled ? (
+                        <>
+                          {' '}
+                          · dbt-only:{' '}
+                          {pipeline.dbtSchedulePhases.map((p) => formatRunPhaseLabel(p)).join(' → ')}
+                        </>
+                      ) : null}
+                    </p>
+                  ) : null}
                   {pipeline.description && (
                     <p className="truncate text-xs text-slate-400 dark:text-slate-500">
                       {pipeline.description}

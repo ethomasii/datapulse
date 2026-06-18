@@ -31,14 +31,41 @@ const V3_ROADMAP = [
   { id: "projects", label: "dbt Projects workspace (this page)", done: true },
   { id: "git", label: "Git-backed project browser + scaffold", done: true },
   { id: "manifest", label: "Manifest on runs + config diff", done: true },
-  { id: "schedule", label: "Scheduled dbt via pipeline tasks", done: false },
-  { id: "compile", label: "dbt compile/run from UI (native executor)", done: false },
+  { id: "schedule", label: "Scheduled dbt via pipeline tasks", done: true },
+  { id: "compile", label: "dbt compile/run from UI (native executor)", done: true },
   { id: "tracing", label: "OpenTelemetry-style run tracing", done: false },
 ] as const;
 
 export function CatalogDbtProjectsClient() {
   const [projects, setProjects] = useState<DbtProject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [running, setRunning] = useState<string | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
+
+  async function triggerDbt(pipelineId: string, action: "run" | "compile" | "test") {
+    setRunning(`${pipelineId}:${action}`);
+    setRunError(null);
+    try {
+      const res = await fetch("/api/elt/dbt/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ pipelineId, action }),
+      });
+      const data = (await res.json()) as { error?: unknown; run?: { id: string } };
+      if (!res.ok) {
+        setRunError(typeof data.error === "string" ? data.error : "Failed to start dbt run");
+        return;
+      }
+      if (data.run?.id) {
+        window.location.href = `/runs?highlight=${encodeURIComponent(data.run.id)}`;
+      }
+    } catch {
+      setRunError("Failed to start dbt run");
+    } finally {
+      setRunning(null);
+    }
+  }
 
   useEffect(() => {
     void (async () => {
@@ -86,6 +113,12 @@ export function CatalogDbtProjectsClient() {
           ))}
         </ul>
       </div>
+
+      {runError ? (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+          {runError}
+        </p>
+      ) : null}
 
       {loading ? (
         <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
@@ -141,6 +174,32 @@ export function CatalogDbtProjectsClient() {
               ) : null}
 
               <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={!p.enabled || running !== null}
+                  onClick={() => void triggerDbt(p.pipelineId, "run")}
+                  className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800 hover:border-violet-300 disabled:opacity-50 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200"
+                >
+                  {running === `${p.pipelineId}:run` ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <PlayCircle className="h-3.5 w-3.5" />
+                  )}{" "}
+                  Run dbt
+                </button>
+                <button
+                  type="button"
+                  disabled={!p.enabled || running !== null}
+                  onClick={() => void triggerDbt(p.pipelineId, "compile")}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-sky-300 dark:border-slate-700 dark:text-slate-200"
+                >
+                  {running === `${p.pipelineId}:compile` ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <GitBranch className="h-3.5 w-3.5" />
+                  )}{" "}
+                  Compile
+                </button>
                 <Link
                   href={`/builder?pipeline=${p.pipelineId}&dbt=1`}
                   className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-sky-300 dark:border-slate-700 dark:text-slate-200"

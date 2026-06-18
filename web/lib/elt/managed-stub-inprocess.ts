@@ -1,7 +1,12 @@
 import { RunIngestionExecutor, type Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
 import { applyPatchRunBody } from "@/lib/elt/apply-run-patch";
-import { pipelineHasDbtEnabled } from "@/lib/elt/dbt-run-phases";
+import {
+  dbtUiActionFromTriggeredBy,
+  isDbtOnlyTriggeredBy,
+  pipelineHasDbtEnabled,
+  resolveRunPhasesForTrigger,
+} from "@/lib/elt/dbt-run-phases";
 import { buildStubDbtRunManifest } from "@/lib/elt/dbt-run-manifest";
 import { maybeDispatchRunWebhook } from "@/lib/elt/maybe-dispatch-run-webhook";
 import type { PatchRunBody } from "@/lib/elt/run-types";
@@ -62,48 +67,73 @@ async function patchManagedRunInProcess(runId: string, body: PatchRunBody): Prom
 export async function stubCompleteManagedRunInProcess(runId: string): Promise<void> {
   const run = await db.eltPipelineRun.findFirst({
     where: { id: runId },
-    select: { pipeline: { select: { sourceType: true, sourceConfiguration: true } } },
+    select: {
+      triggeredBy: true,
+      pipeline: { select: { sourceType: true, sourceConfiguration: true } },
+    },
   });
-  const hasDbt = pipelineHasDbtEnabled(run?.pipeline?.sourceConfiguration);
+  const sourceConfiguration = run?.pipeline?.sourceConfiguration;
+  const hasDbt = pipelineHasDbtEnabled(sourceConfiguration);
   const sourceType = run?.pipeline?.sourceType ?? "";
+  const triggeredBy = run?.triggeredBy ?? null;
+  const phases = resolveRunPhasesForTrigger(sourceConfiguration, triggeredBy);
+  const dbtOnly = isDbtOnlyTriggeredBy(triggeredBy);
+  const dbtAction = dbtUiActionFromTriggeredBy(triggeredBy);
 
   await patchManagedRunInProcess(runId, { status: "running" });
-  await patchManagedRunInProcess(runId, {
-    status: "running",
-    appendLog: {
-      level: "info",
-      message: "eltPulse managed sync: connecting to source and preparing load…",
-    },
-    telemetrySummary: { currentPhase: "extract", progress: 10, rowsLoaded: 0, bytesLoaded: 0 },
-    appendTelemetrySample: { progress: 10, rows: 0, bytes: 0, phase: "extract" },
-  });
-  await patchManagedRunInProcess(runId, {
-    status: "running",
-    telemetrySummary: { currentPhase: "load", progress: 80, rowsLoaded: 100, bytesLoaded: 50_000 },
-    appendTelemetrySample: { progress: 80, rows: 100, bytes: 50_000, phase: "load" },
-  });
-  if (hasDbt) {
+
+  if (phases.includes("extract")) {
     await patchManagedRunInProcess(runId, {
       status: "running",
       appendLog: {
         level: "info",
-        message: "Running dbt transform after load…",
+        message: "eltPulse managed sync: connecting to source and preparing load…",
       },
+      telemetrySummary: { currentPhase: "extract", progress: 10, rowsLoaded: 0, bytesLoaded: 0 },
+      appendTelemetrySample: { progress: 10, rows: 0, bytes: 0, phase: "extract" },
+    });
+  }
+  if (phases.includes("load")) {
+    await patchManagedRunInProcess(runId, {
+      status: "running",
+      telemetrySummary: { currentPhase: "load", progress: 80, rowsLoaded: 100, bytesLoaded: 50_000 },
+      appendTelemetrySample: { progress: 80, rows: 100, bytes: 50_000, phase: "load" },
+    });
+  }
+  if (phases.includes("dbt") && hasDbt) {
+    const dbtMessage =
+      dbtAction === "compile"
+        ? "dbt compile: resolving project manifest…"
+        : dbtAction === "test"
+          ? "dbt test: running project tests…"
+          : dbtOnly
+            ? "Scheduled dbt transform (sync skipped)…"
+            : "Running dbt transform after load…";
+    await patchManagedRunInProcess(runId, {
+      status: "running",
+      appendLog: { level: "info", message: dbtMessage },
       telemetrySummary: { currentPhase: "dbt", progress: 92, rowsLoaded: 100, bytesLoaded: 50_000 },
       appendTelemetrySample: { progress: 92, rows: 100, bytes: 50_000, phase: "dbt" },
     });
   }
+
+  const successMessage =
+    dbtAction === "compile"
+      ? "dbt compile completed successfully."
+      : dbtAction === "test"
+        ? "dbt test completed successfully."
+        : dbtOnly && hasDbt
+          ? "Scheduled dbt transform completed successfully."
+          : hasDbt
+            ? "eltPulse managed sync and dbt transform completed successfully."
+            : "eltPulse managed sync completed successfully.";
+
   await patchManagedRunInProcess(runId, {
     status: "succeeded",
-    appendLog: {
-      level: "info",
-      message: hasDbt
-        ? "eltPulse managed sync and dbt transform completed successfully."
-        : "eltPulse managed sync completed successfully.",
-    },
+    appendLog: { level: "info", message: successMessage },
     telemetrySummary: { currentPhase: "done", progress: 100, rowsLoaded: 100, bytesLoaded: 50_000 },
     appendTelemetrySample: { progress: 100, rows: 100, bytes: 50_000, phase: "done" },
-    ...(hasDbt && run?.pipeline
+    ...(hasDbt && run?.pipeline && dbtAction !== "compile"
       ? { dbtManifest: buildStubDbtRunManifest(sourceType, run.pipeline.sourceConfiguration) }
       : {}),
   });

@@ -6,6 +6,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/pipeline-schedules",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/managed-worker",
       "schedule": "*/15 * * * *"
     }

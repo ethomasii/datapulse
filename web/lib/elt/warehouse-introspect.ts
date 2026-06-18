@@ -5,6 +5,7 @@
 
 import { parseStoredConnectionSecrets } from "@/lib/elt/connection-secrets-store";
 import {
+  introspectAzureBlob,
   introspectBigQuery,
   introspectClickhouse,
   introspectDatabricks,
@@ -56,6 +57,7 @@ export const WAREHOUSE_INTROSPECTION_CONNECTORS = [
   "sqlite",
   "s3",
   "gcs",
+  "azure_blob",
   "filesystem",
 ] as const;
 
@@ -143,6 +145,8 @@ export async function introspectDestinationConnection(
       return introspectS3(secrets, config);
     case "gcs":
       return introspectGcs(secrets, config);
+    case "azure_blob":
+      return introspectAzureBlob(secrets, config);
     case "filesystem":
       return introspectFilesystem(secrets, config);
     default:

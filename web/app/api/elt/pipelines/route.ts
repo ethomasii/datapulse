@@ -7,6 +7,12 @@ import {
   unauthorizedResponse,
 } from "@/lib/auth/api-user";
 import { pipelineSyncMode } from "@/lib/elt/pipeline-tool-labels";
+import {
+  pipelineHasDbtEnabled,
+  readDbtScheduleInfo,
+  readPipelineScheduleInfo,
+  resolveRunPhasesForTrigger,
+} from "@/lib/elt/dbt-run-phases";
 import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
 import { getAccessibleResourceOwnerIds, pipelineOwnerWhere } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
@@ -42,9 +48,13 @@ export async function GET(req: Request) {
 
   const pipelines = rows.map((row) => {
     const cfg = (row.sourceConfiguration ?? {}) as Record<string, unknown>;
-    const scheduleEnabled = Boolean(cfg.schedule_enabled ?? cfg.scheduleEnabled);
-    const cron = typeof cfg.cron_schedule === "string" ? cfg.cron_schedule : null;
-    const timezone = typeof cfg.schedule_timezone === "string" ? cfg.schedule_timezone : "UTC";
+    const scheduleInfo = readPipelineScheduleInfo(cfg);
+    const dbtScheduleInfo = readDbtScheduleInfo(cfg);
+    const hasDbt = pipelineHasDbtEnabled(cfg);
+    const schedulePhases = hasDbt
+      ? resolveRunPhasesForTrigger(cfg, "schedule:sync")
+      : resolveRunPhasesForTrigger(cfg, null);
+    const dbtSchedulePhases = dbtScheduleInfo?.mode === "dbt_only" ? (["dbt"] as const) : schedulePhases;
     return {
       id: row.id,
       name: row.name,
@@ -59,7 +69,11 @@ export async function GET(req: Request) {
       executionHost: row.executionHost,
       sourceConnectionId: row.sourceConnectionId,
       destinationConnectionId: row.destinationConnectionId,
-      scheduleInfo: { enabled: scheduleEnabled, cron, timezone },
+      scheduleInfo,
+      dbtScheduleInfo,
+      hasDbt,
+      schedulePhases,
+      dbtSchedulePhases,
     };
   });
 

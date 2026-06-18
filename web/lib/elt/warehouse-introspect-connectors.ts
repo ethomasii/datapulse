@@ -2,7 +2,7 @@
  * Per-connector warehouse table introspection implementations.
  */
 
-import { createHash, createPrivateKey, createPublicKey, createSign, randomUUID } from "crypto";
+import { createHash, createHmac, createPrivateKey, createPublicKey, createSign, randomUUID } from "crypto";
 import { fetchGcpAccessToken } from "@/lib/elt/gcp-access-token";
 import type { WarehouseIntrospectionResult, WarehouseTableRef } from "@/lib/elt/warehouse-introspect";
 
@@ -839,5 +839,129 @@ export async function introspectFilesystem(
       "filesystem",
       `Could not list filesystem path (must exist on the app host): ${detail.slice(0, 160)}`
     );
+  }
+}
+
+function azureSharedKeySignature(
+  accountName: string,
+  accountKey: string,
+  method: string,
+  canonicalizedResource: string,
+  headers: Record<string, string>
+): string {
+  const headerLines = Object.keys(headers)
+    .map((k) => k.toLowerCase())
+    .sort()
+    .map((k) => {
+      const orig = Object.keys(headers).find((h) => h.toLowerCase() === k)!;
+      return `${k}:${headers[orig]!.trim()}`;
+    })
+    .join("\n");
+  const stringToSign = [
+    method,
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    headerLines ? `${headerLines}\n` : "",
+    canonicalizedResource,
+  ].join("\n");
+  const key = Buffer.from(accountKey, "base64");
+  return createHmac("sha256", key).update(stringToSign, "utf8").digest("base64");
+}
+
+async function listAzureBlobPage(
+  accountName: string,
+  accountKey: string,
+  container: string,
+  prefix: string,
+  marker?: string
+): Promise<{ names: string[]; nextMarker?: string }> {
+  const date = new Date().toUTCString();
+  const version = "2020-10-02";
+  const params = new URLSearchParams({
+    restype: "container",
+    comp: "list",
+    maxresults: "1000",
+  });
+  if (prefix) params.set("prefix", prefix);
+  if (marker) params.set("marker", marker);
+  const sorted = Array.from(params.entries()).sort(([a], [b]) => a.localeCompare(b));
+  const query = sorted.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
+  const url = `https://${accountName}.blob.core.windows.net/${container}?${query}`;
+
+  const headers: Record<string, string> = {
+    "x-ms-date": date,
+    "x-ms-version": version,
+  };
+  const resourceLines = [`/${accountName}/${container}`, ...sorted.map(([k, v]) => `${k}:${v}`)].join("\n");
+  const signature = azureSharedKeySignature(accountName, accountKey, "GET", resourceLines, headers);
+  const res = await fetch(url, {
+    headers: {
+      ...headers,
+      Authorization: `SharedKey ${accountName}:${signature}`,
+    },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  if (!res.ok) {
+    throw new Error(`Azure Blob list returned ${res.status}`);
+  }
+  const xml = await res.text();
+  const names: string[] = [];
+  const nameRe = /<Name>([^<]+)<\/Name>/g;
+  let match: RegExpExecArray | null;
+  while ((match = nameRe.exec(xml)) !== null) {
+    const name = match[1] ?? "";
+    if (name && !name.endsWith("/")) names.push(name);
+  }
+  const nextMatch = xml.match(/<NextMarker>([^<]*)<\/NextMarker>/);
+  const nextMarker = nextMatch?.[1]?.trim() || undefined;
+  return { names, nextMarker: nextMarker || undefined };
+}
+
+export async function introspectAzureBlob(
+  secrets: Record<string, string>,
+  config: Record<string, unknown>
+): Promise<WarehouseIntrospectionResult> {
+  const accountName =
+    secret(secrets, "AZURE_STORAGE_ACCOUNT_NAME") || configString(config, "account_name", "account");
+  const accountKey = secret(secrets, "AZURE_STORAGE_ACCOUNT_KEY") || configString(config, "account_key");
+  const container = configString(config, "container", "bucket");
+  const prefix = configString(config, "prefix", "path");
+
+  if (!accountName || !accountKey || !container) {
+    return fail("azure_blob", "Azure Blob destination needs account name, key, and container.");
+  }
+
+  try {
+    const tables: WarehouseTableRef[] = [];
+    let marker: string | undefined;
+    do {
+      const page = await listAzureBlobPage(accountName, accountKey, container, prefix, marker);
+      for (const name of page.names) {
+        tables.push({
+          schema: container,
+          table: name,
+          qualified: `azure://${container}/${name}`,
+        });
+        if (tables.length >= TABLE_LIMIT) break;
+      }
+      marker = page.nextMarker;
+    } while (marker && tables.length < TABLE_LIMIT);
+
+    return ok(
+      "azure_blob",
+      `Found ${tables.length} object(s) in az://${container}${prefix ? `/${prefix}` : ""}.`,
+      tables
+    );
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return fail("azure_blob", `Could not list Azure Blob objects: ${detail.slice(0, 180)}`);
   }
 }
