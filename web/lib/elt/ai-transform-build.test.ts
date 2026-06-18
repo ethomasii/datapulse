@@ -27,7 +27,7 @@ describe("ai-transform-build", () => {
     expect(result.components[0]?.config?.table).toBe("staging.orders");
   });
 
-  it("builds dbt SQL push-down aggregate", () => {
+  it("builds dbt warehouse component chain", () => {
     const result = buildTransformPipeline({
       mode: "dbt",
       source_table: "staging.orders",
@@ -40,14 +40,14 @@ describe("ai-transform-build", () => {
         },
       ],
     });
-    expect(result.post_transform_type).toBe("sql");
-    expect(result.post_transform_code).toContain("CREATE OR REPLACE TABLE");
-    expect(result.post_transform_code).toContain("GROUP BY");
-    expect(result.graph_edits.some((e) => e.op === "add_transform")).toBe(true);
+    expect(result.components).toHaveLength(2);
+    expect(result.components[0]?.config?.execution).toBe("warehouse");
+    expect(result.graph_edits.length).toBeGreaterThan(0);
   });
 
-  it("infers dbt mode from warehouse keywords", () => {
+  it("infers dbt mode from warehouse and lake keywords", () => {
     expect(inferTransformMode("push down aggregate in snowflake")).toBe("dbt");
-    expect(inferTransformMode("filter active rows")).toBe("dataframe");
+    expect(inferTransformMode("single lake medallion")).toBe("dbt");
+    expect(inferTransformMode("quick dataframe filter")).toBe("dataframe");
   });
 });

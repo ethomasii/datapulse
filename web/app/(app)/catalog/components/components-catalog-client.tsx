@@ -13,17 +13,16 @@ export function ComponentCatalogClient() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Transform catalog</h1>
         <p className="mt-2 text-slate-600 dark:text-slate-300">
-          Warehouse-native transforms for governed customer analytics — filter, join, aggregate, and segment
-          on data that already lives in your lakehouse. SQL push-down by default; dataframe path when you need
-          in-memory logic on the worker.
+          Build pipelines on a single lake — filter, join, aggregate, and segment data where it lands after
+          ingest. Warehouse SQL push-down by default; switch to dataframe when you need worker-side logic.
         </p>
         <p className="mt-2 text-sm text-slate-500">
-          Build Customer 360, audience segments, and activation-ready marts without copying data out of the
-          warehouse. Use the{" "}
+          Start from one ingested table (or wire a few sources), chain transforms on the{" "}
           <Link href="/builder/canvas" className="text-sky-600 underline dark:text-sky-400">
             visual canvas
-          </Link>{" "}
-          AI builder or add your own compile packages below.
+          </Link>
+          , or ask the AI builder for a lake starter (medallion, source→mart, entity 360). Add custom compile
+          packages below.
         </p>
       </div>
 

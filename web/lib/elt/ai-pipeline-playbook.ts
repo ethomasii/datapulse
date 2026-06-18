@@ -138,9 +138,9 @@ export const AI_PIPELINE_PLAYBOOKS: AiPipelinePlaybook[] = [
   },
   {
     id: "warehouse_cdp_customer_360",
-    title: "Customer 360 (warehouse CDP)",
+    title: "Entity 360 profile",
     description:
-      "Join events to customer dimension and roll up lifetime metrics — governed transforms on lakehouse data.",
+      "Join facts to an entity dimension and roll up metrics — CDP-style but works for any entity type.",
     triggers: [
       "customer 360",
       "customer360",
@@ -178,8 +178,8 @@ export const AI_PIPELINE_PLAYBOOKS: AiPipelinePlaybook[] = [
   },
   {
     id: "warehouse_cdp_audience_segment",
-    title: "Audience segment (warehouse CDP)",
-    description: "Filter active high-value customers into an activation-ready segment table.",
+    title: "Audience / segment filter",
+    description: "Filter high-value active rows into an activation-ready segment table on the lake.",
     triggers: [
       "audience",
       "segment",
@@ -234,6 +234,39 @@ export const AI_PIPELINE_PLAYBOOKS: AiPipelinePlaybook[] = [
     graphEdits: [
       { op: "connect", source: "dest", target: "stitch" },
       { op: "connect", source: "stitch", target: "dedupe" },
+    ],
+  },
+  {
+    id: "single_lake_quick_mart",
+    title: "Single source → quick mart",
+    description: "Project, filter, aggregate one ingested table — fastest path from load to mart.",
+    triggers: ["single source mart", "one table pipeline", "quick mart", "fun pipeline"],
+    components: [
+      {
+        component_id: "select_columns",
+        label: "Project",
+        config: { columns: ["id", "created_at", "amount", "status"], output_table: "marts.source_projected" },
+      },
+      {
+        component_id: "filter_rows",
+        label: "Active rows",
+        config: { table: "marts.source_projected", condition: "status = 'active'", output_table: "marts.source_active" },
+      },
+      {
+        component_id: "group_aggregate",
+        label: "Daily mart",
+        config: {
+          table: "marts.source_active",
+          group_by: ["created_at"],
+          aggregations: '{"amount":"sum","id":"count"}',
+          output_table: "marts.daily_metrics",
+        },
+      },
+    ],
+    graphEdits: [
+      { op: "connect", source: "dest", target: "project" },
+      { op: "connect", source: "project", target: "filter" },
+      { op: "connect", source: "filter", target: "mart" },
     ],
   },
 ];

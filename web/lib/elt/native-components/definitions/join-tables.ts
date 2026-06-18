@@ -4,6 +4,7 @@ import { joinHowFromTemplate } from "./_config-helpers";
 import {
   sqlCreateTableAs,
   sqlJoinKeyword,
+  sqlJoinOnClause,
   sqlQualifiedTable,
   useDataframeExecution,
 } from "./_sql-helpers";
@@ -67,22 +68,7 @@ function compileJoinDataframe(
 }
 
 function buildJoinOnClause(on: string[], leftOn: string[], rightOn: string[]): string {
-  if (on.length) {
-    return on
-      .map((c) => `l."${c.replace(/"/g, '""')}" = r."${c.replace(/"/g, '""')}"`)
-      .join(" AND ");
-  }
-  if (leftOn.length && rightOn.length) {
-    const pairs = Math.min(leftOn.length, rightOn.length);
-    const clauses: string[] = [];
-    for (let i = 0; i < pairs; i++) {
-      const lo = leftOn[i]!;
-      const ro = rightOn[i]!;
-      clauses.push(`l."${lo.replace(/"/g, '""')}" = r."${ro.replace(/"/g, '""')}"`);
-    }
-    return clauses.join(" AND ");
-  }
-  return "1 = 1";
+  return sqlJoinOnClause(on, leftOn, rightOn);
 }
 
 export const joinTablesComponent: NativeComponentDefinition = {
@@ -210,7 +196,7 @@ export const joinTablesComponent: NativeComponentDefinition = {
     }
 
     const joinKw = sqlJoinKeyword(how);
-    const onClause = buildJoinOnClause(on, leftOn, rightOn);
+    const onClause = sqlJoinOnClause(on, leftOn, rightOn);
     const leftQ = sqlQualifiedTable(left);
     const rightQ = sqlQualifiedTable(right);
     const sql = [

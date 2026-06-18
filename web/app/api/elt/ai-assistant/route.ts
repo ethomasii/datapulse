@@ -21,6 +21,12 @@ import {
 import { applyCanvasGraphEdits, type CanvasGraphEditAction } from "@/lib/elt/canvas-graph-edit";
 import { AI_PIPELINE_PLAYBOOKS, listPlaybooksForPrompt, matchPlaybook } from "@/lib/elt/ai-pipeline-playbook";
 import {
+  buildLakePipeline,
+  LAKE_PIPELINE_STARTERS,
+  listLakeStartersForPrompt,
+  matchLakeStarter,
+} from "@/lib/elt/lake-pipeline-starters";
+import {
   buildTransformPipeline,
   inferTransformMode,
   type TransformBuildMode,
@@ -57,18 +63,22 @@ After generating, give ONE short sentence: "Pipeline ready — click Save, then 
 When the user asks to **filter, sort, aggregate, dedupe, or reshape loaded data** (not ingest):
 
 1. Call **build_transform_steps** with structured \`steps[]\` and \`mode\`:
-   - **dataframe** — in-memory path: native components (filter_rows, sort_rows, group_aggregate) chained after load on the worker.
-   - **dbt** — push-down path: warehouse SQL (CREATE TABLE AS …) after load; use when they mention dbt, warehouse, Snowflake, push-down, or scale.
-2. If \`mode\` is unclear, default **dataframe** for quick edits; use **dbt** when they say warehouse SQL / dbt / push down.
-3. Apply results:
-   - **New pipeline**: pass returned \`components\`, \`post_transform_type\`, \`post_transform_code\`, dbt fields on **generate_pipeline**.
-   - **Existing pipeline**: **add_pipeline_components** (dataframe) or **edit_pipeline_canvas** (\`graph_edits\`) + patch post_transform via save.
-4. \`source_table\` default: \`staging.{pipeline_name}\` or main loaded table from context — never ask if a reasonable default exists.
-5. Do **not** add ingest/sensor components for pure transform requests.
+   - **dbt** (default) — warehouse SQL push-down: native components with \`execution=warehouse\` chained after load.
+   - **dataframe** — in-memory path on the worker when they say dataframe/pandas/in-memory.
+2. If \`mode\` is unclear, default **dbt** for lake/single-source/mart requests; **dataframe** only when they ask for worker/pandas.
+3. For **single-lake pipeline patterns** (medallion, source→mart, enrich+DQ, union): call **build_lake_pipeline** with a starter_id + source_table.
+4. Apply results via **generate_pipeline** / **add_pipeline_components** + **edit_pipeline_canvas** (\`graph_edits\`).
+5. \`source_table\` default: \`staging.{pipeline_name}\` — never ask if a reasonable default exists.
+6. Do **not** add ingest/sensor components for pure transform requests.
+
+## Single-lake starters (agnostic — any entity, any warehouse)
+${listLakeStartersForPrompt()}
 
 Example — "filter active orders, sort by created_at desc, sum amount by day":
-- dataframe → build_transform_steps → filter + sort + aggregate components wired after dest
-- dbt → build_transform_steps mode=dbt → post_transform SQL CTAS chain + sql transform node on canvas
+- build_transform_steps (mode=dbt default) → warehouse filter + sort + aggregate components after dest
+
+Example — "one ingested table, build medallion layers":
+- build_lake_pipeline starter_id=single_lake_medallion source_table=staging.events
 
 ## NL → canvas components
 When the user mentions monitors, sensors, quality checks, freshness, or data validation:
@@ -76,7 +86,7 @@ When the user mentions monitors, sensors, quality checks, freshness, or data val
 2. **New pipeline**: pass \`components\` on **generate_pipeline** — each item needs \`component_id\` and sensible \`config\` (e.g. dq_check: table + not_null columns; s3_monitor: prefix/bucket defaults).
 3. **Existing pipeline** (pipeline context below): call **add_pipeline_components** with the same \`components\` array — nodes land on the visual canvas and sync to v2 YAML on apply.
 4. **Wire the graph** (connect/disconnect steps, add dbt transform after load): call **edit_pipeline_canvas** with \`actions[]\` — use node labels or ids like "source", "dest", "join", "filter".
-5. **Playbooks** — call **list_pipeline_playbooks** for curated recipes; apply with add_pipeline_components + edit_pipeline_canvas in one turn when the user describes a pattern (clean data, join enrich, S3 sensor, DQ).
+5. **Playbooks** — call **list_pipeline_playbooks** or **build_lake_pipeline** for curated recipes; apply with add_pipeline_components + edit_pipeline_canvas in one turn.
 6. Prefer **native** component ids (filter_rows, join_tables, lookup, group_aggregate, data_cleansing, datetime_parser, pivot, anti_join, dq_check) — they compile and run inline on the canvas.
 
 ## Curated playbooks (use list_pipeline_playbooks)
@@ -459,6 +469,31 @@ const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "build_lake_pipeline",
+    description:
+      "Build a curated single-lake (or light multi-source) transform chain after ingest. Agnostic — works for any entity/industry. Use for medallion, source→mart, enrich+DQ, union, or entity 360 patterns.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        starter_id: {
+          type: "string",
+          enum: LAKE_PIPELINE_STARTERS.map((s) => s.id),
+          description: "Lake pipeline starter recipe id",
+        },
+        source_table: {
+          type: "string",
+          description: "Primary loaded table, e.g. staging.events",
+        },
+        second_table: { type: "string", description: "Second source for union starters" },
+        dimension_table: { type: "string", description: "Dimension table for enrich / entity 360 starters" },
+        layer_prefix: { type: "string", description: "Output schema prefix, default marts" },
+        join_key: { type: "string", description: "Join key column, default entity_id" },
+        id_column: { type: "string", description: "Primary key for dedupe/DQ, default id" },
+      },
+      required: ["starter_id", "source_table"],
+    },
+  },
+  {
     name: "list_pipeline_playbooks",
     description:
       "List curated high-value pipeline recipes (ingest+DQ, join enrich, clean+parse, S3 sensor, dbt after load). Use when user describes a pattern without naming specific component ids.",
@@ -522,8 +557,8 @@ function toolBuildTransformSteps(params: {
   return {
     ...built,
     next_action:
-      built.mode === "dataframe" && built.components.length
-        ? "Pass components[] to generate_pipeline or add_pipeline_components; optional graph_edits via edit_pipeline_canvas."
+      built.components.length
+        ? "Pass components[] to generate_pipeline or add_pipeline_components; wire graph_edits via edit_pipeline_canvas."
         : "Pass post_transform_type + post_transform_code to generate_pipeline; wire graph_edits via edit_pipeline_canvas.",
     generate_pipeline_fields: {
       components: built.components.length ? built.components : undefined,
@@ -539,7 +574,7 @@ function toolBuildTransformSteps(params: {
 
 function toolListPipelinePlaybooks(query?: string) {
   const q = query?.trim().toLowerCase();
-  const matched = q ? matchPlaybook(q) : null;
+  const matched = q ? matchPlaybook(q) ?? matchLakeStarter(q) : null;
   const playbooks = q
     ? AI_PIPELINE_PLAYBOOKS.filter(
         (p) =>
@@ -548,6 +583,15 @@ function toolListPipelinePlaybooks(query?: string) {
           p.triggers.some((t) => t.includes(q) || q.includes(t))
       )
     : AI_PIPELINE_PLAYBOOKS;
+  const lakeStarters = q
+    ? LAKE_PIPELINE_STARTERS.filter(
+        (s) =>
+          s.id.includes(q) ||
+          s.title.toLowerCase().includes(q) ||
+          s.triggers.some((t) => t.includes(q) || q.includes(t))
+      )
+    : LAKE_PIPELINE_STARTERS;
+  const lakeMatch = q ? matchLakeStarter(q) : null;
   return {
     playbooks: playbooks.map((p) => ({
       id: p.id,
@@ -556,10 +600,56 @@ function toolListPipelinePlaybooks(query?: string) {
       components: p.components,
       graph_edits: p.graphEdits,
     })),
+    lake_starters: lakeStarters.map((s) => ({
+      id: s.id,
+      title: s.title,
+      description: s.description,
+      source_count: s.sourceCount,
+      tool: "build_lake_pipeline",
+    })),
     best_match: matched
-      ? { id: matched.id, title: matched.title, components: matched.components, graph_edits: matched.graphEdits }
-      : null,
-    hint: "Apply with add_pipeline_components (components[]) then edit_pipeline_canvas (graph_edits) on existing pipelines, or components[] on generate_pipeline for new ones.",
+      ? "components" in matched
+        ? {
+            id: matched.id,
+            title: matched.title,
+            components: matched.components,
+            graph_edits: matched.graphEdits,
+          }
+        : {
+            id: matched.id,
+            title: matched.title,
+            tool: "build_lake_pipeline",
+          }
+      : lakeMatch
+        ? { id: lakeMatch.id, title: lakeMatch.title, tool: "build_lake_pipeline" }
+        : null,
+    hint: "Apply playbooks with add_pipeline_components (components[]) then edit_pipeline_canvas (graph_edits). Lake starters via build_lake_pipeline.",
+  };
+}
+
+function toolBuildLakePipeline(params: {
+  starter_id?: string;
+  source_table?: string;
+  second_table?: string;
+  dimension_table?: string;
+  layer_prefix?: string;
+  join_key?: string;
+  id_column?: string;
+}) {
+  const built = buildLakePipeline({
+    starter_id: String(params.starter_id ?? "").trim(),
+    source_table: String(params.source_table ?? "").trim(),
+    second_table: params.second_table,
+    dimension_table: params.dimension_table,
+    layer_prefix: params.layer_prefix,
+    join_key: params.join_key,
+    id_column: params.id_column,
+  });
+  return {
+    ...built,
+    next_action:
+      "Pass components[] to generate_pipeline or add_pipeline_components; wire graph_edits via edit_pipeline_canvas.",
+    generate_pipeline_fields: { components: built.components },
   };
 }
 
@@ -1458,6 +1548,16 @@ When they describe a brand-new pipeline instead, use **generate_pipeline** witho
             dbt_package_path: typeof inp.dbt_package_path === "string" ? inp.dbt_package_path : undefined,
             dbt_target_schema: typeof inp.dbt_target_schema === "string" ? inp.dbt_target_schema : undefined,
             user_query: messages[messages.length - 1]?.content ?? "",
+          });
+        } else if (name === "build_lake_pipeline") {
+          result = toolBuildLakePipeline({
+            starter_id: typeof inp.starter_id === "string" ? inp.starter_id : undefined,
+            source_table: typeof inp.source_table === "string" ? inp.source_table : undefined,
+            second_table: typeof inp.second_table === "string" ? inp.second_table : undefined,
+            dimension_table: typeof inp.dimension_table === "string" ? inp.dimension_table : undefined,
+            layer_prefix: typeof inp.layer_prefix === "string" ? inp.layer_prefix : undefined,
+            join_key: typeof inp.join_key === "string" ? inp.join_key : undefined,
+            id_column: typeof inp.id_column === "string" ? inp.id_column : undefined,
           });
         } else if (name === "list_pipeline_playbooks") {
           result = toolListPipelinePlaybooks(typeof inp.query === "string" ? inp.query : undefined);

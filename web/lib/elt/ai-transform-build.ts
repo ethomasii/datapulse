@@ -104,13 +104,15 @@ function quoteIdent(id: string): string {
   return `"${safe}"`;
 }
 
-function buildDataframeComponents(
+function buildStepComponents(
   sourceTable: string,
-  steps: TransformBuildStep[]
+  steps: TransformBuildStep[],
+  execution: "warehouse" | "dataframe"
 ): AiPipelineComponentInput[] {
   const src = splitTableRef(sourceTable);
   const components: AiPipelineComponentInput[] = [];
   let currentTable = src.qualified;
+  const execConfig = execution === "dataframe" ? { execution: "dataframe" } : { execution: "warehouse" };
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i]!;
@@ -123,7 +125,7 @@ function buildDataframeComponents(
       components.push({
         component_id: "filter_rows",
         label: `Filter ${label}`,
-        config: { table: currentTable, condition, output_table: out },
+        config: { table: currentTable, condition, output_table: out, ...execConfig },
       });
       currentTable = out;
       continue;
@@ -141,7 +143,7 @@ function buildDataframeComponents(
       components.push({
         component_id: "sort_rows",
         label: `Sort ${label}`,
-        config: { table: currentTable, columns, ascending: asc, output_table: out },
+        config: { table: currentTable, columns, ascending: asc, output_table: out, ...execConfig },
       });
       currentTable = out;
       continue;
@@ -159,6 +161,7 @@ function buildDataframeComponents(
           group_by: groupBy,
           aggregations: JSON.stringify(aggs),
           output_table: out,
+          ...execConfig,
         },
       });
       currentTable = out;
@@ -171,7 +174,7 @@ function buildDataframeComponents(
       components.push({
         component_id: "select_columns",
         label: `Select ${label}`,
-        config: { table: currentTable, columns, output_table: out },
+        config: { table: currentTable, columns, output_table: out, ...execConfig },
       });
       currentTable = out;
       continue;
@@ -185,6 +188,7 @@ function buildDataframeComponents(
           table: currentTable,
           subset: step.columns ?? [],
           output_table: out,
+          ...execConfig,
         },
       });
       currentTable = out;
@@ -196,13 +200,27 @@ function buildDataframeComponents(
       components.push({
         component_id: "limit_rows",
         label: `Limit ${label}`,
-        config: { table: currentTable, n, output_table: out },
+        config: { table: currentTable, limit: n, output_table: out, ...execConfig },
       });
       currentTable = out;
     }
   }
 
   return components;
+}
+
+function buildDataframeComponents(
+  sourceTable: string,
+  steps: TransformBuildStep[]
+): AiPipelineComponentInput[] {
+  return buildStepComponents(sourceTable, steps, "dataframe");
+}
+
+function buildWarehouseComponents(
+  sourceTable: string,
+  steps: TransformBuildStep[]
+): AiPipelineComponentInput[] {
+  return buildStepComponents(sourceTable, steps, "warehouse");
 }
 
 function buildDbtSqlChain(sourceTable: string, steps: TransformBuildStep[]): string {
@@ -329,15 +347,18 @@ export function buildTransformPipeline(input: TransformBuildInput): TransformBui
   }
 
   const packagePath = String(input.dbt_package_path ?? "").trim();
+  const warehouseComponents = buildWarehouseComponents(sourceTable, steps);
+
   if (packagePath) {
     const selector = String(input.dbt_selector ?? "").trim() || "tag:eltpulse_ai";
     messages.push(
-      `dbt push-down: warehouse SQL models run via linked dbt project. Inline SQL also available as post_transform backup.`
+      `dbt push-down: linked transform project + ${warehouseComponents.length} warehouse component step(s) on canvas.`
     );
     return {
       mode,
-      components: [],
+      components: warehouseComponents,
       graph_edits: [
+        ...graphEditsForComponents(warehouseComponents),
         {
           op: "add_transform",
           tool: "dbt",
@@ -353,6 +374,18 @@ export function buildTransformPipeline(input: TransformBuildInput): TransformBui
       dbt_target_schema: input.dbt_target_schema,
       dbt_selector: selector,
       dbt_run_scope: "selection",
+      messages,
+    };
+  }
+
+  if (warehouseComponents.length) {
+    messages.push(
+      `Warehouse path: ${warehouseComponents.length} native transform step(s) — SQL push-down after load (no data movement off the lake).`
+    );
+    return {
+      mode,
+      components: warehouseComponents,
+      graph_edits: graphEditsForComponents(warehouseComponents),
       messages,
     };
   }
@@ -378,13 +411,18 @@ export function buildTransformPipeline(input: TransformBuildInput): TransformBui
   };
 }
 
-/** Infer transform mode from user text — default dataframe for quick ops, dbt for warehouse/scale language. */
+/** Infer transform mode — warehouse default for lake/single-source; dataframe for quick worker ops. */
 export function inferTransformMode(query: string): TransformBuildMode {
   const q = query.toLowerCase();
+  if (/\b(dataframe|pandas|in.?memory|worker)\b/.test(q)) {
+    return "dataframe";
+  }
   if (
-    /\b(dbt|push.?down|warehouse|sql model|materialized|snowflake|bigquery|redshift|databricks)\b/.test(q)
+    /\b(dbt|push.?down|warehouse|sql model|materialized|snowflake|bigquery|redshift|databricks|lake|medallion|single source|one source|mart|cdp)\b/.test(
+      q
+    )
   ) {
     return "dbt";
   }
-  return "dataframe";
+  return "dbt";
 }

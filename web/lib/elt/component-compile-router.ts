@@ -55,7 +55,7 @@ export const TOP_COMPONENT_ROUTES: Record<string, ComponentRoute> = {
   lookup: { target: "python", badge: "native", hint: "Left join lookup against reference table" },
   pivot: { target: "python", badge: "native", hint: "Pivot long → wide with pandas" },
   cross_join: { target: "python", badge: "native", hint: "Cartesian product of two tables" },
-  anti_join: { target: "python", badge: "native", hint: "Rows in left not in right" },
+  anti_join: { target: "dbt", badge: "native", hint: "Warehouse SQL anti-join — dataframe optional" },
   data_cleansing: { target: "python", badge: "native", hint: "Trim, lowercase, drop null rows" },
   datetime_parser: { target: "python", badge: "native", hint: "Parse string columns to datetime" },
   unpivot: { target: "python", badge: "native", hint: "Unpivot wide → long (melt)" },

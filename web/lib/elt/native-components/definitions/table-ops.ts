@@ -5,6 +5,7 @@ import { pandasReadTable, pandasWriteTable, strList } from "./_pandas-helpers";
 import {
   sqlAggExpr,
   sqlCreateTableAs,
+  sqlQuotedColumns,
   sqlQualifiedTable,
   useDataframeExecution,
 } from "./_sql-helpers";
@@ -98,8 +99,8 @@ export const sortRowsComponent: NativeComponentDefinition = {
   aliases: ["sort", "arrange"],
   name: "Sort rows",
   category: "transformation",
-  description: "Sort a table by one or more columns.",
-  compileTarget: "python",
+  description: "Sort a table by columns via warehouse SQL (default) or dataframe.",
+  compileTarget: "dbt",
   fields: [
     { key: "table", label: "Table", type: "string", required: true },
     { key: "columns", label: "Sort columns", type: "string_list", required: true },
@@ -111,6 +112,13 @@ export const sortRowsComponent: NativeComponentDefinition = {
       default: "true",
     },
     { key: "output_table", label: "Output table", type: "string" },
+    {
+      key: "execution",
+      label: "Execution",
+      type: "select",
+      options: ["warehouse", "dataframe"],
+      default: "warehouse",
+    },
   ],
   compile(config) {
     const table = String(config.table ?? "").trim();
@@ -127,20 +135,38 @@ export const sortRowsComponent: NativeComponentDefinition = {
           ? "True"
           : "False";
     if (!table || !columns.length) {
-      return { warnings: ["sort_rows: table and columns required"], python: [] };
+      return { warnings: ["sort_rows: table and columns required"], sql: [], python: [] };
     }
-    const colsPy = `[${columns.map((c) => JSON.stringify(c)).join(", ")}]`;
-    const python = [
-      `# ── sort_rows: ${table} ──`,
-      "try:",
-      ...pandasReadTable(table).map((l) => (l.startsWith("import") ? l : `    ${l}`)),
-      `    _df = _df.sort_values(by=${colsPy}, ascending=${ascPy})`,
-      ...pandasWriteTable(output, "sort_rows"),
-      "except Exception as _sort_err:",
-      '    print(f"[sort_rows] failed: {_sort_err}")',
-      "    raise",
+
+    if (useDataframeExecution(config)) {
+      const colsPy = `[${columns.map((c) => JSON.stringify(c)).join(", ")}]`;
+      const python = [
+        `# ── sort_rows (dataframe): ${table} ──`,
+        "try:",
+        ...pandasReadTable(table).map((l) => (l.startsWith("import") ? l : `    ${l}`)),
+        `    _df = _df.sort_values(by=${colsPy}, ascending=${ascPy})`,
+        ...pandasWriteTable(output, "sort_rows"),
+        "except Exception as _sort_err:",
+        '    print(f"[sort_rows] failed: {_sort_err}")',
+        "    raise",
+      ];
+      return { python };
+    }
+
+    const ascList =
+      columns.length > 1 && ascRaw.includes(",")
+        ? ascRaw.split(",").map((s) => s.trim().toLowerCase() !== "false")
+        : columns.map(() => ascRaw.toLowerCase() !== "false");
+    const orderBy = columns
+      .map((c, i) => `${sqlQuotedColumns([c])} ${ascList[i] ? "ASC" : "DESC"}`)
+      .join(", ");
+    const sql = [
+      sqlCreateTableAs(
+        output,
+        `SELECT *\nFROM ${sqlQualifiedTable(table)}\nORDER BY ${orderBy}`
+      ),
     ];
-    return { python };
+    return { sql };
   },
 };
 
@@ -149,29 +175,47 @@ export const limitRowsComponent: NativeComponentDefinition = {
   aliases: ["head_rows", "take_rows"],
   name: "Limit rows",
   category: "transformation",
-  description: "Keep first N rows of a table (head).",
-  compileTarget: "python",
+  description: "Keep first N rows via warehouse SQL LIMIT (default) or dataframe head.",
+  compileTarget: "dbt",
   fields: [
     { key: "table", label: "Table", type: "string", required: true },
     { key: "limit", label: "Row limit", type: "number", default: 1000, required: true },
     { key: "output_table", label: "Output table", type: "string" },
+    {
+      key: "execution",
+      label: "Execution",
+      type: "select",
+      options: ["warehouse", "dataframe"],
+      default: "warehouse",
+    },
   ],
   compile(config) {
     const table = String(config.table ?? "").trim();
     const output = String(config.output_table ?? table).trim();
     const limit = Math.max(1, Math.floor(Number(config.limit ?? config.n ?? 1000)));
-    if (!table) return { warnings: ["limit_rows: table required"], python: [] };
-    const python = [
-      `# ── limit_rows: ${table} (n=${limit}) ──`,
-      "try:",
-      ...pandasReadTable(table).map((l) => (l.startsWith("import") ? l : `    ${l}`)),
-      `    _df = _df.head(${limit})`,
-      ...pandasWriteTable(output, "limit_rows"),
-      "except Exception as _lim_err:",
-      '    print(f"[limit_rows] failed: {_lim_err}")',
-      "    raise",
+    if (!table) return { warnings: ["limit_rows: table required"], sql: [], python: [] };
+
+    if (useDataframeExecution(config)) {
+      const python = [
+        `# ── limit_rows (dataframe): ${table} (n=${limit}) ──`,
+        "try:",
+        ...pandasReadTable(table).map((l) => (l.startsWith("import") ? l : `    ${l}`)),
+        `    _df = _df.head(${limit})`,
+        ...pandasWriteTable(output, "limit_rows"),
+        "except Exception as _lim_err:",
+        '    print(f"[limit_rows] failed: {_lim_err}")',
+        "    raise",
+      ];
+      return { python };
+    }
+
+    const sql = [
+      sqlCreateTableAs(
+        output,
+        `SELECT *\nFROM ${sqlQualifiedTable(table)}\nLIMIT ${limit}`
+      ),
     ];
-    return { python };
+    return { sql };
   },
 };
 

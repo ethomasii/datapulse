@@ -1,6 +1,12 @@
 import { escapePyString } from "@/lib/elt/escape-py";
 import type { NativeComponentDefinition } from "../types";
 import { pandasReadTable, pandasWriteTable, strList } from "./_pandas-helpers";
+import {
+  sqlCreateTableAs,
+  sqlJoinOnClause,
+  sqlQualifiedTable,
+  useDataframeExecution,
+} from "./_sql-helpers";
 
 function outputParts(output: string) {
   const outSchema = output.includes(".") ? output.split(".")[0]! : "public";
@@ -94,16 +100,23 @@ export const crossJoinComponent: NativeComponentDefinition = {
 
 export const antiJoinComponent: NativeComponentDefinition = {
   id: "anti_join",
-  aliases: ["except_join", "left_anti_join"],
+  aliases: ["except_join", "left_anti_join", "orphan_rows"],
   name: "Anti join",
   category: "transformation",
-  description: "Rows in left table not present in right (left anti join).",
-  compileTarget: "python",
+  description: "Rows in left table not in right — warehouse SQL anti-join (default) or dataframe.",
+  compileTarget: "dbt",
   fields: [
     { key: "left_table", label: "Left table", type: "string", required: true },
     { key: "right_table", label: "Right table", type: "string", required: true },
     { key: "on", label: "Join key(s)", type: "string_list", required: true },
     { key: "output_table", label: "Output table", type: "string", required: true },
+    {
+      key: "execution",
+      label: "Execution",
+      type: "select",
+      options: ["warehouse", "dataframe"],
+      default: "warehouse",
+    },
   ],
   compile(config) {
     const left = String(config.left_table ?? "").trim();
@@ -111,27 +124,42 @@ export const antiJoinComponent: NativeComponentDefinition = {
     const output = String(config.output_table ?? "").trim();
     const on = strList(config.on ?? config.join_keys);
     if (!left || !right || !output || !on.length) {
-      return { warnings: ["anti_join: left_table, right_table, on, output_table required"], python: [] };
+      return { warnings: ["anti_join: left_table, right_table, on, output_table required"], sql: [], python: [] };
     }
-    const { outSchema, outName } = outputParts(output);
-    const onPy = `[${on.map((c) => JSON.stringify(c)).join(", ")}]`;
-    const python = [
-      `# ── anti_join: ${left} − ${right} ──`,
-      "import pandas as pd",
-      "try:",
-      "    _dest_client = pipeline._get_destination_clients(pipeline.state)[0]",
-      "    _sql = _dest_client.sql_client()",
-      `    _left = pd.read_sql('SELECT * FROM ${escapePyString(left)}', _sql._engine)`,
-      `    _right = pd.read_sql('SELECT * FROM ${escapePyString(right)}', _sql._engine)`,
-      `    _df = _left.merge(_right[${onPy}], on=${onPy}, how='left', indicator=True)`,
-      "    _df = _df[_df['_merge'] == 'left_only'].drop(columns=['_merge'])",
-      `    _df.to_sql("${escapePyString(outName)}", _sql._engine, schema="${escapePyString(outSchema)}", if_exists="replace", index=False)`,
-      `    print(f"[anti_join] wrote {len(_df)} rows to ${escapePyString(output)}")`,
-      "except Exception as _e:",
-      '    print(f"[anti_join] failed: {_e}")',
-      "    raise",
+
+    if (useDataframeExecution(config)) {
+      const { outSchema, outName } = outputParts(output);
+      const onPy = `[${on.map((c) => JSON.stringify(c)).join(", ")}]`;
+      const python = [
+        `# ── anti_join (dataframe): ${left} − ${right} ──`,
+        "import pandas as pd",
+        "try:",
+        "    _dest_client = pipeline._get_destination_clients(pipeline.state)[0]",
+        "    _sql = _dest_client.sql_client()",
+        `    _left = pd.read_sql('SELECT * FROM ${escapePyString(left)}', _sql._engine)`,
+        `    _right = pd.read_sql('SELECT * FROM ${escapePyString(right)}', _sql._engine)`,
+        `    _df = _left.merge(_right[${onPy}], on=${onPy}, how='left', indicator=True)`,
+        "    _df = _df[_df['_merge'] == 'left_only'].drop(columns=['_merge'])",
+        `    _df.to_sql("${escapePyString(outName)}", _sql._engine, schema="${escapePyString(outSchema)}", if_exists="replace", index=False)`,
+        `    print(f"[anti_join] wrote {len(_df)} rows to ${escapePyString(output)}")`,
+        "except Exception as _e:",
+        '    print(f"[anti_join] failed: {_e}")',
+        "    raise",
+      ];
+      return { python };
+    }
+
+    const leftQ = sqlQualifiedTable(left);
+    const rightQ = sqlQualifiedTable(right);
+    const onClause = sqlJoinOnClause(on, [], []);
+    const nullCheck = on.map((c) => `r."${c.replace(/"/g, '""')}" IS NULL`).join(" AND ");
+    const sql = [
+      sqlCreateTableAs(
+        output,
+        `SELECT l.*\nFROM ${leftQ} AS l\nLEFT JOIN ${rightQ} AS r\n  ON ${onClause}\nWHERE ${nullCheck}`
+      ),
     ];
-    return { python };
+    return { sql };
   },
 };
 

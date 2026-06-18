@@ -47,6 +47,54 @@ export function sqlJoinKeyword(how: string): string {
   }
 }
 
+export function sqlJoinOnClause(
+  on: string[],
+  leftOn: string[],
+  rightOn: string[],
+  leftAlias = "l",
+  rightAlias = "r"
+): string {
+  if (on.length) {
+    return on
+      .map(
+        (c) =>
+          `${leftAlias}."${c.replace(/"/g, '""')}" = ${rightAlias}."${c.replace(/"/g, '""')}"`
+      )
+      .join(" AND ");
+  }
+  if (leftOn.length && rightOn.length) {
+    const pairs = Math.min(leftOn.length, rightOn.length);
+    const clauses: string[] = [];
+    for (let i = 0; i < pairs; i++) {
+      const lo = leftOn[i]!;
+      const ro = rightOn[i]!;
+      clauses.push(
+        `${leftAlias}."${lo.replace(/"/g, '""')}" = ${rightAlias}."${ro.replace(/"/g, '""')}"`
+      );
+    }
+    return clauses.join(" AND ");
+  }
+  return "1 = 1";
+}
+
+export function sqlDedupeSelect(
+  table: string,
+  subset: string[],
+  keep: string
+): string {
+  const src = sqlQualifiedTable(table);
+  if (!subset.length) {
+    return `SELECT DISTINCT *\nFROM ${src}`;
+  }
+  const part = subset.map((c) => `"${c.replace(/"/g, '""')}"`).join(", ");
+  const order = keep.toLowerCase() === "last" ? "DESC" : "ASC";
+  return `SELECT *\nFROM (\n  SELECT *, ROW_NUMBER() OVER (PARTITION BY ${part} ORDER BY 1 ${order}) AS _elt_rn\n  FROM ${src}\n) AS _elt_dedup\nWHERE _elt_rn = 1`;
+}
+
+export function sqlQuotedColumns(columns: string[]): string {
+  return columns.map((c) => `"${c.replace(/"/g, '""')}"`).join(", ");
+}
+
 export function sqlAggExpr(column: string, fn: string): string {
   const col = `"${column.replace(/"/g, '""')}"`;
   switch (fn.toLowerCase()) {
