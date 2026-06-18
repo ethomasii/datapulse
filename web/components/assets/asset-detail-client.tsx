@@ -14,6 +14,8 @@ import {
 import { AssetCatalogMetaEditor } from "@/components/assets/asset-catalog-meta-editor";
 import { AssetCatalogAiPanel } from "@/components/assets/asset-catalog-ai-panel";
 import { AssetColumnsTable } from "@/components/assets/asset-columns-table";
+import { AssetConversationPanel } from "@/components/assets/asset-conversation-panel";
+import { AssetContractPanel } from "@/components/assets/asset-contract-panel";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 import {
   AssetFreshnessBadge,
@@ -298,6 +300,9 @@ export function AssetDetailClient({ assetKey }: { assetKey: string }) {
               <p className="mt-3 text-xs text-slate-500">No runs yet</p>
             )}
           </section>
+
+          <AssetContractPanel assetKey={asset.id} />
+          <AssetConversationPanel assetKey={asset.id} assetLabel={asset.catalogDisplayName ?? asset.displayName} />
 
           {siblings.length > 0 ? (
             <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">

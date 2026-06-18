@@ -78,6 +78,17 @@ export const patchRunBodySchema = z.object({
             name: z.string().max(256),
             status: z.enum(["success", "skipped", "error"]),
             executionTimeMs: z.number().finite().nonnegative().optional(),
+            description: z.string().max(4000).optional(),
+            columns: z
+              .array(
+                z.object({
+                  name: z.string().max(256),
+                  type: z.string().max(128).optional(),
+                  description: z.string().max(2000).optional(),
+                })
+              )
+              .max(500)
+              .optional(),
           })
         )
         .max(500)
@@ -98,6 +109,10 @@ export const patchRunBodySchema = z.object({
       source: z.enum(["config", "runner"]).optional(),
     })
     .optional(),
+  /** Raw dbt run_results.json — parsed server-side into telemetry.dbt. */
+  dbtRunResults: z.unknown().optional(),
+  /** Raw dbt manifest.json artifact — enriches models with columns/descriptions. */
+  dbtArtifactManifest: z.unknown().optional(),
 });
 
 export type LogEntry = z.infer<typeof logEntrySchema>;

@@ -2,6 +2,8 @@ import type { Prisma } from "@prisma/client";
 import { sanitizeForRunStorage } from "@/lib/elt/run-log-sanitize";
 import { mergeRunTelemetry, runTelemetryToJson } from "@/lib/elt/run-telemetry";
 import type { LogEntry, PatchRunBody } from "@/lib/elt/run-types";
+import { parseDbtRunArtifacts } from "@/lib/elt/dbt-artifact-manifest";
+import { sanitizeDbtRunManifest } from "@/lib/elt/dbt-run-manifest";
 
 type RunPatchExisting = {
   status: string;
@@ -69,7 +71,18 @@ export function applyPatchRunBody(
     body.telemetrySummary !== undefined ||
     body.appendTelemetrySample !== undefined ||
     body.telemetrySamples !== undefined ||
-    body.dbtManifest !== undefined;
+    body.dbtManifest !== undefined ||
+    body.dbtRunResults !== undefined ||
+    body.dbtArtifactManifest !== undefined;
+
+  let resolvedDbtManifest = body.dbtManifest;
+  if (body.dbtRunResults !== undefined || body.dbtArtifactManifest !== undefined) {
+    const fromArtifacts = parseDbtRunArtifacts(body.dbtRunResults, body.dbtArtifactManifest);
+    if (fromArtifacts) resolvedDbtManifest = fromArtifacts;
+  } else if (body.dbtManifest !== undefined) {
+    const sanitized = sanitizeDbtRunManifest(body.dbtManifest);
+    if (sanitized) resolvedDbtManifest = sanitized;
+  }
 
   const telemetryJson = telemetryTouched
     ? (runTelemetryToJson(
@@ -77,7 +90,7 @@ export function applyPatchRunBody(
           telemetrySummary: body.telemetrySummary,
           appendTelemetrySample: body.appendTelemetrySample,
           telemetrySamples: body.telemetrySamples,
-          dbtManifest: body.dbtManifest,
+          dbtManifest: resolvedDbtManifest,
         })
       ) as Prisma.InputJsonValue)
     : undefined;

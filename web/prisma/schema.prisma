@@ -94,6 +94,8 @@ model User {
   catalogAssetViews CatalogAssetView[]
   catalogCollections CatalogCollection[]
   glossaryTerms GlossaryTerm[]
+  dataContracts DataContract[]
+  catalogComments CatalogAssetComment[]
   dbtProjects DbtProject[]
 
   /// Membership in a shared org (not the owner row — use `ownedOrganization`).
@@ -280,21 +282,31 @@ model CatalogAssetView {
   @@map("CatalogAssetView")
 }
 
-/// Curated data product / collection of catalog assets.
+/// Curated data product — a governed bundle of catalog assets (DataHub-style data product).
 model CatalogCollection {
-  id          String   @id @default(cuid())
-  userId      String   @map("user_id")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  slug        String
-  name        String
-  description String?  @db.Text
-  featured    Boolean  @default(false)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  items       CatalogCollectionItem[]
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug          String
+  name          String
+  description   String?  @db.Text
+  /// Product owner display name (team or person).
+  ownerName     String?  @map("owner_name")
+  /// Domain tag, e.g. finance, marketing, product.
+  domain        String?
+  /// Intended consumer teams or personas.
+  consumerTags  Json     @default("[]") @map("consumer_tags")
+  /// Optional linked data contract for SLA / schema guarantees.
+  contractId    String?  @map("contract_id")
+  contract      DataContract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  featured      Boolean  @default(false)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  items         CatalogCollectionItem[]
 
   @@unique([userId, slug])
   @@index([userId])
+  @@index([contractId])
   @@map("CatalogCollection")
 }
 
@@ -338,6 +350,63 @@ model GlossaryTermLink {
   @@index([termId])
   @@index([assetKey])
   @@map("GlossaryTermLink")
+}
+
+/// Data contract — schema, freshness SLA, and ownership promises for catalog assets.
+model DataContract {
+  id                String   @id @default(cuid())
+  userId            String   @map("user_id")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug              String
+  name              String
+  description       String?  @db.Text
+  ownerName         String?  @map("owner_name")
+  ownerEmail        String?  @map("owner_email")
+  status            String   @default("draft")
+  /// Max hours since last successful pipeline run before contract is "stale".
+  freshnessSlaHours Int?     @map("freshness_sla_hours")
+  /// Expected columns: [{ name, type?, required?, description? }]
+  schemaSpec        Json     @default("[]") @map("schema_spec")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  assets            DataContractAsset[]
+  products          CatalogCollection[]
+
+  @@unique([userId, slug])
+  @@index([userId])
+  @@map("DataContract")
+}
+
+model DataContractAsset {
+  id         String   @id @default(cuid())
+  contractId String   @map("contract_id")
+  contract   DataContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  assetKey   String   @map("asset_key")
+
+  @@unique([contractId, assetKey])
+  @@index([contractId])
+  @@index([assetKey])
+  @@map("DataContractAsset")
+}
+
+/// Threaded discussion on a catalog asset (in-app; Slack mirror optional later).
+model CatalogAssetComment {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assetKey    String   @map("asset_key")
+  body        String   @db.Text
+  authorName  String?  @map("author_name")
+  authorEmail String?  @map("author_email")
+  parentId    String?  @map("parent_id")
+  parent      CatalogAssetComment? @relation("CommentThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     CatalogAssetComment[] @relation("CommentThread")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([assetKey, createdAt(sort: Desc)])
+  @@index([userId])
+  @@map("CatalogAssetComment")
 }
 
 /// First-class dbt project — standalone or linked to one or more pipelines (Snowflake dbt Projects / dbt Cloud style).

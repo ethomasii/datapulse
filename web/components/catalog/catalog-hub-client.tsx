@@ -10,6 +10,7 @@ import {
   Loader2,
   Route,
   Search,
+  Shield,
   Table2,
   Workflow,
 } from "lucide-react";
@@ -34,6 +35,8 @@ type Overview = {
 
 const CARDS = [
   { href: "/assets", label: "Assets", icon: Table2, desc: "Tables, objects, and dbt models across pipelines" },
+  { href: "/catalog/products", label: "Data products", icon: Database, desc: "Curated governed asset bundles" },
+  { href: "/catalog/contracts", label: "Data contracts", icon: Shield, desc: "Schema and freshness SLAs" },
   { href: "/catalog/connectors", label: "Connectors", icon: LayoutGrid, desc: "What your workspace uses + full registry" },
   { href: "/catalog/scenarios", label: "Scenarios", icon: Route, desc: "Starter recipes you can deploy" },
   { href: "/catalog/dbt", label: "dbt projects", icon: GitBranch, desc: "Projects, models, runs — Snowflake-style hub" },
@@ -226,7 +229,12 @@ export function CatalogHubClient() {
 
       {collections.length > 0 ? (
         <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Collections</h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Data products</h2>
+            <Link href="/catalog/products" className="text-xs font-medium text-sky-600 hover:underline dark:text-sky-400">
+              View all
+            </Link>
+          </div>
           <ul className="mt-3 grid gap-3 sm:grid-cols-2">
             {collections.filter((c) => c.featured).slice(0, 4).map((c) => (
               <li key={c.id} className="rounded-lg border border-slate-100 p-3 dark:border-slate-800">

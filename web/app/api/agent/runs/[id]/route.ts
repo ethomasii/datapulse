@@ -12,7 +12,9 @@ import { db } from "@/lib/db/client";
 import { getAgentAuthContext } from "@/lib/agent/auth";
 import { agentCanMutateRun } from "@/lib/agent/gateway-routing";
 import { applyPatchRunBody } from "@/lib/elt/apply-run-patch";
+import { syncCatalogFromDbtManifest } from "@/lib/elt/catalog-sync-from-run";
 import { maybeDispatchRunWebhook } from "@/lib/elt/maybe-dispatch-run-webhook";
+import { parseRunTelemetry } from "@/lib/elt/run-telemetry";
 import { patchRunBodySchema } from "@/lib/elt/run-types";
 
 type Params = { params: Promise<{ id: string }> };
@@ -130,6 +132,12 @@ export async function PATCH(req: Request, { params }: Params) {
 
   if (patch.willBeTerminal && !patch.wasTerminal) {
     await maybeDispatchRunWebhook(run.id, user.id);
+    if (patch.nextStatus === "succeeded" && existing.pipelineId && patch.telemetryJson) {
+      const tel = parseRunTelemetry(patch.telemetryJson);
+      if (tel.dbt) {
+        void syncCatalogFromDbtManifest(user.id, existing.pipelineId, tel.dbt).catch(() => undefined);
+      }
+    }
   }
 
   return NextResponse.json({ run, cancel: false });

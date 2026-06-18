@@ -25,16 +25,23 @@ export async function GET(req: Request) {
   const collections = await db.catalogCollection.findMany({
     where: { userId: { in: ownerIds } },
     orderBy: [{ featured: "desc" }, { updatedAt: "desc" }],
-    include: { items: { orderBy: { sortOrder: "asc" } } },
+    include: {
+      items: { orderBy: { sortOrder: "asc" } },
+      contract: { select: { id: true, slug: true, name: true, status: true } },
+    },
   });
 
-  return NextResponse.json({ collections, canEditCatalog: perms.canEditCatalog });
+  return NextResponse.json({ products: collections, collections, canEditCatalog: perms.canEditCatalog });
 }
 
 const upsertSchema = z.object({
   slug: z.string().min(1).max(64).regex(/^[a-z0-9-]+$/),
   name: z.string().min(1).max(128),
   description: z.string().max(4000).nullable().optional(),
+  ownerName: z.string().max(128).nullable().optional(),
+  domain: z.string().max(64).nullable().optional(),
+  consumerTags: z.array(z.string().max(64)).max(16).optional(),
+  contractId: z.string().nullable().optional(),
   featured: z.boolean().optional(),
   assetKeys: z.array(z.string().max(512)).max(200).optional(),
 });
@@ -63,11 +70,19 @@ export async function PUT(req: Request) {
       slug: body.slug,
       name: body.name,
       description: body.description ?? null,
+      ownerName: body.ownerName ?? null,
+      domain: body.domain ?? null,
+      consumerTags: body.consumerTags ?? [],
+      contractId: body.contractId ?? null,
       featured: body.featured ?? false,
     },
     update: {
       name: body.name,
       ...(body.description !== undefined ? { description: body.description } : {}),
+      ...(body.ownerName !== undefined ? { ownerName: body.ownerName } : {}),
+      ...(body.domain !== undefined ? { domain: body.domain } : {}),
+      ...(body.consumerTags !== undefined ? { consumerTags: body.consumerTags } : {}),
+      ...(body.contractId !== undefined ? { contractId: body.contractId } : {}),
       ...(body.featured !== undefined ? { featured: body.featured } : {}),
     },
   });
