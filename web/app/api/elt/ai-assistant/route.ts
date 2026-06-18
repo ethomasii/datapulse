@@ -18,6 +18,7 @@ import {
   applyCanvasComponentsToSourceConfig,
   type AiPipelineComponentInput,
 } from "@/lib/elt/ai-pipeline-canvas-build";
+import { applyCanvasGraphEdits, type CanvasGraphEditAction } from "@/lib/elt/canvas-graph-edit";
 import { extractComponentsFromCanvas } from "@/lib/elt/canvas-component-sync";
 import { getCanvasFromSourceConfig } from "@/lib/elt/canvas-source-config";
 import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-graph";
@@ -49,6 +50,7 @@ When the user mentions monitors, sensors, quality checks, freshness, or data val
 1. Call **search_components** then **get_component_details** (include_schema=true when config fields matter).
 2. **New pipeline**: pass \`components\` on **generate_pipeline** — each item needs \`component_id\` and sensible \`config\` (e.g. dq_check: table + not_null columns; s3_monitor: prefix/bucket defaults).
 3. **Existing pipeline** (pipeline context below): call **add_pipeline_components** with the same \`components\` array — nodes land on the visual canvas and sync to v2 YAML on apply.
+4. **Wire the graph** (connect/disconnect steps, add dbt transform after load): call **edit_pipeline_canvas** with \`actions[]\` — use node labels or ids like "source", "dest", "join", "filter".
 4. Prefer native compile targets (quality, monitor, dlt) over dagster badge items.
 
 Component config defaults:
@@ -314,6 +316,45 @@ const TOOLS: Anthropic.Tool[] = [
         include_schema: { type: "boolean", description: "Fetch remote schema.json for config field hints" },
       },
       required: ["component_id"],
+    },
+  },
+  {
+    name: "edit_pipeline_canvas",
+    description:
+      "Edit the visual pipeline graph: connect/disconnect nodes, add transform steps (dbt/python/sql), or add components with wiring. Requires pipeline context (canvas AI) or pipeline_id.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        pipeline_id: {
+          type: "string",
+          description: "Pipeline UUID — omit when editing from canvas (uses open pipeline).",
+        },
+        actions: {
+          type: "array",
+          description: "Graph edit operations applied in order.",
+          items: {
+            type: "object",
+            properties: {
+              op: {
+                type: "string",
+                enum: ["connect", "disconnect", "add_component", "add_transform"],
+              },
+              source: { type: "string", description: "connect/disconnect: source node label or id" },
+              target: { type: "string", description: "connect/disconnect: target node label or id" },
+              component_id: { type: "string", description: "add_component: component id from search_components" },
+              label: { type: "string" },
+              config: { type: "object" },
+              after: { type: "string", description: "Wire new node after this node (label/id)" },
+              tool: { type: "string", enum: ["dbt", "python", "sql", "other"], description: "add_transform" },
+              package_path: { type: "string" },
+              selector: { type: "string" },
+              code: { type: "string" },
+            },
+            required: ["op"],
+          },
+        },
+      },
+      required: ["actions"],
     },
   },
 ];
@@ -681,6 +722,72 @@ function normalizeAiComponents(raw: unknown): AiPipelineComponentInput[] {
     .filter((x): x is AiPipelineComponentInput => x !== null);
 }
 
+async function toolEditPipelineCanvas(
+  userId: string,
+  contextPipelineId: string | undefined,
+  params: { pipeline_id?: string; actions?: unknown }
+) {
+  const pipelineId = String(params.pipeline_id ?? contextPipelineId ?? "").trim();
+  const actions = Array.isArray(params.actions)
+    ? (params.actions as CanvasGraphEditAction[])
+    : [];
+  if (!pipelineId) {
+    return {
+      success: false,
+      error: "No pipeline_id — open the AI assistant from the canvas with a pipeline selected.",
+    };
+  }
+  if (actions.length === 0) {
+    return { success: false, error: "actions array is required with at least one op." };
+  }
+
+  const ownerIds = await getAccessibleResourceOwnerIds(userId);
+  const pipeline = await db.eltPipeline.findFirst({
+    where: { id: pipelineId, userId: { in: ownerIds } },
+  });
+  if (!pipeline) {
+    return { success: false, error: "Pipeline not found or access denied." };
+  }
+
+  const base = { ...(pipeline.sourceConfiguration as Record<string, unknown>) };
+  const edited = applyCanvasGraphEdits(base, actions, {
+    sourceType: pipeline.sourceType,
+    destinationType: pipeline.destinationType,
+    pipelineName: pipeline.name,
+  });
+
+  if (edited.errors.length && !edited.messages.length) {
+    return { success: false, errors: edited.errors };
+  }
+
+  const validation = validatePipelineCanvasGraph(
+    edited.canvas.nodes as Node[],
+    edited.canvas.edges as Edge[],
+    {
+      requireConnectorTypes: true,
+      pipelineSourceType: pipeline.sourceType,
+      pipelineDestinationType: pipeline.destinationType,
+    }
+  );
+  if (!validation.ok) {
+    return {
+      success: false,
+      error: "Canvas validation failed",
+      errors: [...edited.errors, ...validation.errors],
+      messages: edited.messages,
+    };
+  }
+
+  return {
+    success: true,
+    next_action: "patch_pipeline",
+    pipeline_id: pipelineId,
+    patch_payload: { canvas: edited.canvas } satisfies PatchPipelinePayload,
+    messages: edited.messages,
+    graph_errors: edited.errors.length ? edited.errors : undefined,
+  };
+}
+
 async function toolAddPipelineComponents(
   userId: string,
   contextPipelineId: string | undefined,
@@ -955,6 +1062,7 @@ export async function POST(request: Request) {
 - Sensor monitors on canvas: ${onCanvas.sensorMonitors.map((s) => s.label).join(", ") || "none"}
 
 When the user asks to add checks, sensors, or transforms, call **add_pipeline_components** (omit pipeline_id — context is set).
+When they ask to connect steps, wire join→filter, or add dbt after load, call **edit_pipeline_canvas** with actions[].
 When they describe a brand-new pipeline instead, use **generate_pipeline** without pipeline_id.`;
     }
     if (!runErrorContext) {
@@ -1102,6 +1210,11 @@ When they describe a brand-new pipeline instead, use **generate_pipeline** witho
           result = await toolAddPipelineComponents(user.id, pipelineId, {
             pipeline_id: typeof inp.pipeline_id === "string" ? inp.pipeline_id : undefined,
             components: inp.components,
+          });
+        } else if (name === "edit_pipeline_canvas") {
+          result = await toolEditPipelineCanvas(user.id, pipelineId, {
+            pipeline_id: typeof inp.pipeline_id === "string" ? inp.pipeline_id : undefined,
+            actions: inp.actions,
           });
         } else if (name === "list_dbt_projects") {
           result = await toolListDbtProjects(

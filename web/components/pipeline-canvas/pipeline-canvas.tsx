@@ -28,6 +28,7 @@ import { Download, Loader2, Plus, RotateCcw, Save, Trash2, Upload } from "lucide
 import { CanvasBindingsProvider, type CanvasBindingsContextValue } from "./canvas-bindings-context";
 import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-graph";
 import { isValidPipelineCanvasEdge } from "@/lib/elt/canvas-component-sync";
+import { findNearestEdge, insertNodeOnEdge } from "@/lib/elt/canvas-edge-insert";
 import { dashedAnimatedEdgeStyle, resolveCanvasEdges } from "./canvas-edge-defaults";
 import { pipelineNodeTypes } from "./custom-nodes";
 
@@ -313,12 +314,47 @@ function FlowCanvas({
       try {
         const component = JSON.parse(raw) as Parameters<PipelineCanvasControl["addComponentNode"]>[0];
         const position = rfRef.current.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-        addComponentNode(component, position);
+        idCounter += 1;
+        const id = `n-${idCounter}`;
+        const newNode: Node = {
+          id,
+          type: "componentNode",
+          position,
+          data: {
+            componentId: component.id,
+            label: component.name,
+            category: component.category,
+            compileTarget: component.compileTarget,
+            compileBadge: component.compileBadge ?? component.compileTarget,
+            compileHint: component.compileHint,
+            canvasPorts: component.canvasPorts,
+            config: {},
+          },
+        };
+
+        const edge = findNearestEdge(nodes, edges, position);
+        if (edge) {
+          const src = nodes.find((n) => n.id === edge.source);
+          const tgt = nodes.find((n) => n.id === edge.target);
+          if (
+            src &&
+            tgt &&
+            isValidPipelineCanvasEdge(src, newNode) &&
+            isValidPipelineCanvasEdge(newNode, tgt)
+          ) {
+            const result = insertNodeOnEdge(nodes, edges, edge, newNode);
+            setNodes(result.nodes);
+            setEdges(resolveCanvasEdges(result.nodes, result.edges));
+            return;
+          }
+        }
+
+        setNodes((nds) => [...nds, newNode]);
       } catch {
         /* ignore malformed drag payload */
       }
     },
-    [addComponentNode]
+    [nodes, edges, setNodes, setEdges]
   );
 
   const resetGraph = useCallback(() => {

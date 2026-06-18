@@ -26,6 +26,14 @@ type Props = {
   className?: string;
 };
 
+const PALETTE_TABS = [
+  { id: "", label: "All" },
+  { id: "ingestion", label: "Ingest" },
+  { id: "transformation", label: "Transform" },
+  { id: "check", label: "Check" },
+  { id: "sensor", label: "Sensor" },
+] as const;
+
 /** Searchable palette fed by GET /api/elt/components — builder + canvas. */
 export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter, className }: Props) {
   const [q, setQ] = useState("");
@@ -91,18 +99,27 @@ export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter
             className="w-full rounded-md border border-slate-200 py-1.5 pl-8 pr-2 text-sm dark:border-slate-600 dark:bg-slate-950"
           />
         </div>
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="mt-2 w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-950"
-        >
-          <option value="">All categories</option>
-          {categories.map((c) => (
-            <option key={c.category} value={c.category}>
-              {c.category} ({c.count})
-            </option>
+        <div className="mt-2 flex flex-wrap gap-1">
+          {PALETTE_TABS.map((tab) => (
+            <button
+              key={tab.id || "all"}
+              type="button"
+              onClick={() => setCategory(tab.id)}
+              className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+                category === tab.id
+                  ? "bg-sky-600 text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              }`}
+            >
+              {tab.label}
+            </button>
           ))}
-        </select>
+        </div>
+        {categories.length > 0 && category === "" ? (
+          <p className="mt-1.5 text-[10px] text-slate-400">
+            {categories.map((c) => `${c.category} (${c.count})`).join(" · ")}
+          </p>
+        ) : null}
       </div>
       <ul className="flex-1 overflow-y-auto p-2">
         {loading ? (

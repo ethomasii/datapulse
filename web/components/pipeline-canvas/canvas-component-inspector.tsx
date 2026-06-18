@@ -143,6 +143,7 @@ export function CanvasComponentInspector({
             fields={formFields}
             values={config}
             readOnly={readOnly}
+            pipelineId={pipelineId}
             onChange={setConfig}
           />
           {!readOnly ? (

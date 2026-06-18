@@ -1,12 +1,16 @@
 "use client";
 
 import type { NativeComponentField } from "@/lib/elt/native-components";
+import { isTableAssetField } from "@/lib/elt/table-asset-fields";
+import { PipelineTableAssetPicker } from "@/components/elt/pipeline-table-asset-picker";
 
 type Props = {
   fields: NativeComponentField[];
   values: Record<string, unknown>;
   readOnly?: boolean;
   onChange: (next: Record<string, unknown>) => void;
+  /** When set, table fields show warehouse asset picker scoped to this pipeline. */
+  pipelineId?: string;
 };
 
 function fieldValue(values: Record<string, unknown>, key: string, defaultVal?: unknown): string {
@@ -31,7 +35,7 @@ function parseFieldValue(field: NativeComponentField, raw: string): unknown {
   return raw;
 }
 
-export function ComponentSchemaForm({ fields, values, readOnly = false, onChange }: Props) {
+export function ComponentSchemaForm({ fields, values, readOnly = false, onChange, pipelineId }: Props) {
   if (!fields.length) return null;
 
   return (
@@ -87,6 +91,33 @@ export function ComponentSchemaForm({ fields, values, readOnly = false, onChange
                   onChange({ ...values, [field.key]: parseFieldValue(field, e.target.value) })
                 }
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 font-mono text-xs dark:border-slate-600 dark:bg-slate-950"
+              />
+            </label>
+          );
+        }
+
+        if (isTableAssetField(field.key) && pipelineId) {
+          return (
+            <label key={field.key} className="block text-sm">
+              <span className="font-medium text-slate-700 dark:text-slate-300">
+                {field.label}
+                {field.required ? " *" : ""}
+              </span>
+              {field.description ? (
+                <span className="mt-0.5 block text-[11px] text-slate-500">{field.description}</span>
+              ) : null}
+              <PipelineTableAssetPicker
+                pipelineId={pipelineId}
+                value={val}
+                readOnly={readOnly}
+                placeholder={field.placeholder ?? "schema.table"}
+                onChange={(tableRef) => {
+                  const next = { ...values, [field.key]: tableRef };
+                  if (field.key === "table" || field.key === "output_table" || field.key === "table_name") {
+                    next.asset_key = tableRef;
+                  }
+                  onChange(next);
+                }}
               />
             </label>
           );

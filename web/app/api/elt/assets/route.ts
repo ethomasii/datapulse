@@ -71,6 +71,15 @@ export async function GET(req: Request) {
 
   let payload = buildWorkspaceAssets(rows, latestRunsByPipelineId);
 
+  const pipelineIdFilter = new URL(req.url).searchParams.get("pipelineId")?.trim();
+  if (pipelineIdFilter) {
+    payload = {
+      ...payload,
+      assets: payload.assets.filter((a) => a.pipelineId === pipelineIdFilter),
+      pipelines: payload.pipelines.filter((b) => b.pipelineId === pipelineIdFilter),
+    };
+  }
+
   const catalogRows = await db.catalogEntry.findMany({
     where: { userId: { in: ownerIds } },
   });
