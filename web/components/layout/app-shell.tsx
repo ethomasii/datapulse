@@ -28,6 +28,7 @@ import {
   Users,
   Waypoints,
   Webhook,
+  Workflow,
   Zap,
 } from "lucide-react";
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
@@ -58,9 +59,10 @@ const CORE_NAV: NavItem[] = [
 const CATALOG_NAV: NavItem[] = [
   { href: "/catalog", label: "Overview", icon: LayoutGrid },
   { href: "/assets", label: "Assets", icon: Table2 },
+  { href: "/catalog/transform-hub", label: "Transform hub", icon: Workflow },
+  { href: "/catalog/dbt", label: "My dbt projects", icon: GitBranch },
   { href: "/catalog/connectors", label: "Connectors", icon: Plug },
   { href: "/catalog/scenarios", label: "Scenarios", icon: Route },
-  { href: "/catalog/dbt", label: "dbt projects", icon: GitBranch },
 ];
 
 const ADVANCED_NAV: NavItem[] = [

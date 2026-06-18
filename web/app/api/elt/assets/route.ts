@@ -111,5 +111,18 @@ export async function GET(req: Request) {
     );
   }
 
+  const assetKeyParam = new URL(req.url).searchParams.get("assetKey")?.trim();
+  if (assetKeyParam) {
+    const asset = payload.assets.find((a) => a.id === assetKeyParam);
+    if (!asset) {
+      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    }
+    const bundle = payload.pipelines.find((b) => b.pipelineId === asset.pipelineId);
+    if (!bundle) {
+      return NextResponse.json({ error: "Pipeline not found" }, { status: 404 });
+    }
+    return NextResponse.json({ asset, bundle });
+  }
+
   return NextResponse.json(payload);
 }

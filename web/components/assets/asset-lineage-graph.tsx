@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import type { AssetLineageGraph } from "@/lib/elt/asset-lineage";
+import { assetDetailHref } from "@/lib/elt/asset-path";
 
 const KIND_COLOR: Record<string, string> = {
   source: "border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100",
@@ -10,7 +12,17 @@ const KIND_COLOR: Record<string, string> = {
   object: "border-cyan-300 bg-cyan-50 text-cyan-900 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-100",
 };
 
-export function AssetLineageGraph({ graph }: { graph: AssetLineageGraph }) {
+const HIGHLIGHT_RING = "ring-2 ring-sky-500 ring-offset-2 dark:ring-offset-slate-900";
+
+export function AssetLineageGraph({
+  graph,
+  highlightAssetId,
+  linkNodes = false,
+}: {
+  graph: AssetLineageGraph;
+  highlightAssetId?: string;
+  linkNodes?: boolean;
+}) {
   if (graph.nodes.length === 0) return null;
 
   const byId = Object.fromEntries(graph.nodes.map((n) => [n.id, n]));
@@ -27,17 +39,27 @@ export function AssetLineageGraph({ graph }: { graph: AssetLineageGraph }) {
     const node = byId[id];
     if (!node) return null;
     const kids = children.get(id) ?? [];
+    const highlighted = highlightAssetId === id;
+    const cardClass = `mb-2 inline-flex max-w-full flex-col rounded-lg border px-3 py-2 transition ${KIND_COLOR[node.kind] ?? KIND_COLOR.raw} ${highlighted ? HIGHLIGHT_RING : ""} ${linkNodes ? "hover:opacity-90" : ""}`;
+
+    const inner = (
+      <>
+        <span className="text-xs font-semibold">{node.label}</span>
+        {node.sublabel ? (
+          <span className="mt-0.5 truncate font-mono text-[10px] opacity-80">{node.sublabel}</span>
+        ) : null}
+      </>
+    );
 
     return (
       <div className={depth > 0 ? "ml-4 border-l border-slate-200 pl-4 dark:border-slate-700" : ""}>
-        <div
-          className={`mb-2 inline-flex max-w-full flex-col rounded-lg border px-3 py-2 ${KIND_COLOR[node.kind] ?? KIND_COLOR.raw}`}
-        >
-          <span className="text-xs font-semibold">{node.label}</span>
-          {node.sublabel ? (
-            <span className="mt-0.5 truncate font-mono text-[10px] opacity-80">{node.sublabel}</span>
-          ) : null}
-        </div>
+        {linkNodes && !highlighted ? (
+          <Link href={assetDetailHref(id)} className={cardClass}>
+            {inner}
+          </Link>
+        ) : (
+          <div className={cardClass}>{inner}</div>
+        )}
         {kids.length > 0 ? (
           <div className="space-y-2 pb-2">
             {kids.map((kid) => (

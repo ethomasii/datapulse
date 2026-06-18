@@ -164,6 +164,26 @@ export function BuilderClient({
     if (wantDbt) setPostTransformType("dbt");
   }, [searchParams]);
 
+  const wantDbtSetup = searchParams.get("dbt") === "1";
+
+  useEffect(() => {
+    if (!wantDbtSetup) return;
+    if (!effectiveOpenPipelineId) {
+      setShowCreateForm(true);
+      setCreateMode("manual");
+    }
+  }, [wantDbtSetup, effectiveOpenPipelineId]);
+
+  useEffect(() => {
+    if (!wantDbtSetup || !(showCreateForm || editingId)) return;
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById("acc-transform");
+      if (el instanceof HTMLDetailsElement) el.open = true;
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [wantDbtSetup, showCreateForm, editingId]);
+
   function patchConnection(key: string, value: string) {
     setConnectionValues((prev) => ({ ...prev, [key]: value }));
   }
@@ -768,6 +788,22 @@ export function BuilderClient({
                 </button>
               </div>
             )}
+            {wantDbtSetup && (editingId || createMode === "manual") ? (
+              <div className="mb-4 w-full rounded-lg border border-violet-200 bg-violet-50 px-4 py-3 text-sm dark:border-violet-900 dark:bg-violet-950/40">
+                <p className="font-medium text-violet-900 dark:text-violet-100">Enable dbt on this pipeline</p>
+                <p className="mt-1 text-violet-800 dark:text-violet-200">
+                  Scroll to <strong>Post-load transform</strong>, choose <strong>dbt</strong>, pick a package (browse the{" "}
+                  <Link href="/catalog/transform-hub" className="font-semibold underline">
+                    Transform hub
+                  </Link>
+                  ), then save. The project shows under{" "}
+                  <Link href="/catalog/dbt" className="font-semibold underline">
+                    My dbt projects
+                  </Link>
+                  .
+                </p>
+              </div>
+            ) : null}
             {/* Guided/JSON/Canvas tabs — shown for editing, or when in manual create mode */}
             {(editingId || createMode === "manual") && (
             <div className="flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 p-0.5 text-sm dark:border-slate-600">
@@ -1047,7 +1083,9 @@ export function BuilderClient({
                 <FormAccordion
                   id="acc-transform"
                   title="Post-load transform"
-                  subtitle="Optional Python script or SQL statements to run after ingest"
+                  subtitle="Optional dbt, Python, or SQL to run after ingest"
+                  defaultOpen={wantDbtSetup}
+                  badge={wantDbtSetup ? "dbt setup" : undefined}
                 >
                   <div className="space-y-3">
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">

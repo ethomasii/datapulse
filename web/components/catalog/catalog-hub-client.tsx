@@ -11,8 +11,10 @@ import {
   Route,
   Search,
   Table2,
+  Workflow,
 } from "lucide-react";
 import { RelatedLinks } from "@/components/ui/related-links";
+import { assetDetailHref } from "@/lib/elt/asset-path";
 
 type Overview = {
   summary: {
@@ -30,6 +32,7 @@ const CARDS = [
   { href: "/catalog/connectors", label: "Connectors", icon: LayoutGrid, desc: "What your workspace uses + full registry" },
   { href: "/catalog/scenarios", label: "Scenarios", icon: Route, desc: "Starter recipes you can deploy" },
   { href: "/catalog/dbt", label: "dbt projects", icon: GitBranch, desc: "Projects, models, runs — Snowflake-style hub" },
+  { href: "/catalog/transform-hub", label: "Transform hub", icon: Workflow, desc: "Browse dbt staging packages by connector" },
 ] as const;
 
 type SearchHit = {
@@ -123,11 +126,7 @@ export function CatalogHubClient() {
                 {searchHits.map((hit) => (
                   <li key={hit.assetKey} className="py-2">
                     <Link
-                      href={
-                        hit.pipelineId
-                          ? `/assets?pipeline=${encodeURIComponent(hit.pipelineId)}`
-                          : "/assets"
-                      }
+                      href={assetDetailHref(hit.assetKey)}
                       className="font-medium text-sky-600 hover:underline dark:text-sky-400"
                     >
                       {hit.displayName}

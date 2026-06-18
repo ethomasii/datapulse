@@ -28,7 +28,7 @@ const V2_ROADMAP = [
   { id: "replication-dbt", label: "Post-replication dbt job type", done: true },
 ] as const;
 
-export function DbtHubPageClient() {
+export function DbtHubPageClient({ variant = "marketing" }: { variant?: "marketing" | "app" }) {
   const [packages, setPackages] = useState<DbtHubPackage[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -61,40 +61,48 @@ export function DbtHubPageClient() {
 
   return (
     <>
-      <div className="mt-8 flex flex-wrap gap-3">
-        <SignedIn>
+      {variant === "marketing" ? (
+        <div className="mt-8 flex flex-wrap gap-3">
+          <SignedIn>
+            <Link
+              href="/builder?dbt=1"
+              className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-500"
+            >
+              Create pipeline with dbt
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/catalog/transform-hub"
+              className="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-900"
+            >
+              Transform hub (app)
+            </Link>
+            <Link
+              href="/runs"
+              className="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-900"
+            >
+              View runs
+            </Link>
+          </SignedIn>
+          <SignedOut>
+            <Link
+              href="/sign-up"
+              className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-500"
+            >
+              Start free
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </SignedOut>
           <Link
-            href="/builder"
-            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-500"
-          >
-            Open builder
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-          <Link
-            href="/runs"
+            href="/docs/dbt"
             className="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-900"
           >
-            View runs
+            Technical docs
           </Link>
-        </SignedIn>
-        <SignedOut>
-          <Link
-            href="/sign-up"
-            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-500"
-          >
-            Start free
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </SignedOut>
-        <Link
-          href="/docs/dbt"
-          className="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-900"
-        >
-          Technical docs
-        </Link>
-      </div>
+        </div>
+      ) : null}
 
-      <section className="mt-16 grid gap-6 lg:grid-cols-2">
+      <section className={variant === "marketing" ? "mt-16 grid gap-6 lg:grid-cols-2" : "grid gap-6 lg:grid-cols-2"}>
         <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
           <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-white">
             <Workflow className="h-5 w-5 text-sky-600" />
@@ -154,10 +162,11 @@ export function DbtHubPageClient() {
         </div>
       </section>
 
-      <section className="mt-16">
+      <section className={variant === "marketing" ? "mt-16" : "mt-8"}>
         <h2 className="text-xl font-bold text-slate-900 dark:text-white">Staging packages by connector</h2>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-          Curated dbt Hub packages that match eltPulse connectors — pick one in the builder or scaffold straight to Git.
+          Curated dbt Hub packages that match eltPulse connectors — pick one below, then enable dbt in the pipeline
+          builder&apos;s <strong>Post-load transform</strong> section.
         </p>
         <div className="relative mt-4 max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -204,9 +213,10 @@ export function DbtHubPageClient() {
                   <SignedIn>
                     <Link
                       href={`/builder?source=${encodeURIComponent(pkg.sourceSlugs[0])}&dbt=1`}
-                      className="text-xs font-semibold text-sky-600 hover:underline dark:text-sky-400"
+                      className="inline-flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-sky-500"
                     >
-                      Enable in builder →
+                      Create pipeline with package
+                      <ArrowRight className="h-3 w-3" />
                     </Link>
                   </SignedIn>
                 </div>

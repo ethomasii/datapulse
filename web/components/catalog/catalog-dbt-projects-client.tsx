@@ -123,13 +123,67 @@ export function CatalogDbtProjectsClient() {
       {loading ? (
         <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
       ) : projects.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
-          <GitBranch className="mx-auto h-8 w-8 text-slate-400" />
-          <p className="mt-3 font-medium text-slate-900 dark:text-white">No dbt projects yet</p>
-          <p className="mt-1 text-sm text-slate-500">Enable dbt on a pipeline in the builder or open the dbt hub.</p>
-          <Link href="/builder?dbt=1" className="mt-4 inline-flex text-sm font-semibold text-sky-600 dark:text-sky-400">
-            Open builder with dbt →
-          </Link>
+        <div className="space-y-6">
+          <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
+            <GitBranch className="mx-auto h-8 w-8 text-slate-400" />
+            <p className="mt-3 font-medium text-slate-900 dark:text-white">No dbt projects yet</p>
+            <p className="mx-auto mt-2 max-w-lg text-sm text-slate-500">
+              A dbt project is a pipeline with dbt enabled under <strong>Post-load transform</strong> in the builder.
+              You don&apos;t create dbt projects separately — attach a package to a pipeline first.
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Link
+              href="/catalog/transform-hub"
+              className="rounded-xl border border-violet-200 bg-violet-50/60 p-5 transition hover:border-violet-300 dark:border-violet-900 dark:bg-violet-950/30"
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
+                Step 1
+              </p>
+              <p className="mt-2 font-semibold text-slate-900 dark:text-white">Browse Transform hub</p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                Pick a staging package for your connector (Stripe, GitHub, Postgres, …).
+              </p>
+              <span className="mt-3 inline-flex text-sm font-semibold text-sky-600 dark:text-sky-400">
+                Open Transform hub →
+              </span>
+            </Link>
+            <Link
+              href="/builder?dbt=1"
+              className="rounded-xl border border-sky-200 bg-sky-50/60 p-5 transition hover:border-sky-300 dark:border-sky-900 dark:bg-sky-950/30"
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Step 2</p>
+              <p className="mt-2 font-semibold text-slate-900 dark:text-white">Enable dbt on a pipeline</p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                Create or edit a pipeline — open <strong>Post-load transform</strong>, choose dbt, save.
+              </p>
+              <span className="mt-3 inline-flex text-sm font-semibold text-sky-600 dark:text-sky-400">
+                Open builder with dbt →
+              </span>
+            </Link>
+            <Link
+              href="/runs"
+              className="rounded-xl border border-slate-200 bg-white p-5 transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 3</p>
+              <p className="mt-2 font-semibold text-slate-900 dark:text-white">Run the pipeline</p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                After a successful run, the project shows here with models, schedules, and compile/run actions.
+              </p>
+              <span className="mt-3 inline-flex text-sm font-semibold text-sky-600 dark:text-sky-400">
+                View runs →
+              </span>
+            </Link>
+          </div>
+
+          <p className="text-center text-xs text-slate-500">
+            Already have pipelines?{" "}
+            <Link href="/builder" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+              Edit a pipeline
+            </Link>{" "}
+            and add dbt under Post-load transform.
+          </p>
         </div>
       ) : (
         <ul className="space-y-4">

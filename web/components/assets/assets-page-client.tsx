@@ -4,35 +4,36 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  ArrowRight,
-  CheckCircle2,
+  ChevronRight,
   Database,
   GitBranch,
-  HelpCircle,
   Layers,
   Loader2,
   PlayCircle,
   RefreshCw,
   Search,
   Table2,
-  XCircle,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RelatedLinks } from "@/components/ui/related-links";
-import { AssetCatalogMetaEditor } from "@/components/assets/asset-catalog-meta-editor";
+import {
+  AssetFreshnessBadge,
+  AssetKindBadge,
+  AssetCatalogPreview,
+  WarehouseStatusBadge,
+} from "@/components/assets/asset-display";
 import { AssetLineageGraph } from "@/components/assets/asset-lineage-graph";
 import { buildAssetLineageGraph } from "@/lib/elt/asset-lineage";
 import { computePipelineFreshness } from "@/lib/elt/asset-freshness";
+import { assetDetailHref } from "@/lib/elt/asset-path";
 import { syncModeLabel } from "@/lib/elt/pipeline-tool-labels";
 import type { WarehouseVerificationSummary } from "@/lib/elt/asset-warehouse-reconcile";
 import type {
   PipelineAssetBundle,
-  WarehouseAssetStatus,
   WorkspaceAsset,
   WorkspaceAssetKind,
   WorkspaceAssetsResponse,
 } from "@/lib/elt/pipeline-assets";
-import type { AssetFreshnessMeta } from "@/lib/elt/asset-freshness";
 
 type AssetsPageData = WorkspaceAssetsResponse & {
   warehouseVerification?: WarehouseVerificationSummary;
@@ -40,32 +41,6 @@ type AssetsPageData = WorkspaceAssetsResponse & {
 
 type ViewMode = "pipelines" | "flat";
 type KindFilter = "all" | WorkspaceAssetKind;
-
-const KIND_META: Record<
-  WorkspaceAssetKind,
-  { label: string; badge: string }
-> = {
-  source: {
-    label: "Source",
-    badge: "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200",
-  },
-  raw: {
-    label: "Raw",
-    badge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200",
-  },
-  transform: {
-    label: "dbt model",
-    badge: "bg-violet-100 text-violet-800 dark:bg-violet-950/50 dark:text-violet-200",
-  },
-  post_transform: {
-    label: "Post-transform",
-    badge: "bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200",
-  },
-  object: {
-    label: "Object",
-    badge: "bg-cyan-100 text-cyan-900 dark:bg-cyan-950/50 dark:text-cyan-200",
-  },
-};
 
 function formatRelative(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -77,8 +52,7 @@ function formatRelative(iso: string | null | undefined): string {
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
   if (hours < 48) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }
 
 function matchesQuery(text: string, q: string): boolean {
@@ -94,7 +68,9 @@ function assetMatches(asset: WorkspaceAsset, q: string): boolean {
     matchesQuery(asset.destinationType, q) ||
     matchesQuery(asset.landingQualified ?? "", q) ||
     matchesQuery(asset.landingDataset ?? "", q) ||
-    matchesQuery(asset.dbtPackage ?? "", q)
+    matchesQuery(asset.dbtPackage ?? "", q) ||
+    matchesQuery(asset.catalogDescription ?? "", q) ||
+    (asset.catalogTags ?? []).some((t) => matchesQuery(t, q))
   );
 }
 
@@ -118,74 +94,33 @@ function SummaryCard({
   );
 }
 
-function AssetKindBadge({ kind }: { kind: WorkspaceAssetKind }) {
-  const meta = KIND_META[kind];
+function AssetListRow({ asset }: { asset: WorkspaceAsset }) {
   return (
-    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${meta.badge}`}>
-      {meta.label}
-    </span>
-  );
-}
-
-const WAREHOUSE_STATUS_META: Record<
-  WarehouseAssetStatus,
-  { label: string; badge: string; icon: React.ComponentType<{ className?: string }> }
-> = {
-  verified: {
-    label: "In warehouse",
-    badge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200",
-    icon: CheckCircle2,
-  },
-  missing: {
-    label: "Missing",
-    badge: "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200",
-    icon: XCircle,
-  },
-  unknown: {
-    label: "Unknown",
-    badge: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
-    icon: HelpCircle,
-  },
-  not_checked: {
-    label: "Not checked",
-    badge: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
-    icon: HelpCircle,
-  },
-};
-
-function WarehouseStatusBadge({ status, runObserved }: { status?: WarehouseAssetStatus; runObserved?: boolean }) {
-  if (!status && !runObserved) return null;
-  if (runObserved && status !== "missing") {
-    return (
-      <span
-        className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[9px] font-medium text-violet-800 dark:bg-violet-950/50 dark:text-violet-200"
-        title="Observed on last dbt run"
-      >
-        <CheckCircle2 className="h-3 w-3" aria-hidden />
-        Last run
-      </span>
-    );
-  }
-  if (!status || status === "not_checked") return null;
-  const meta = WAREHOUSE_STATUS_META[status];
-  const Icon = meta.icon;
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${meta.badge}`}>
-      <Icon className="h-3 w-3" aria-hidden />
-      {meta.label}
-    </span>
-  );
-}
-
-function AssetFreshnessBadge({ meta }: { meta?: AssetFreshnessMeta }) {
-  if (!meta || meta.freshness === "never_run") return null;
-  return (
-    <span
-      className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${meta.badgeClass}`}
-      title={meta.detail}
+    <Link
+      href={assetDetailHref(asset.id)}
+      className="group flex flex-wrap items-center justify-between gap-3 rounded-lg border border-transparent px-3 py-2.5 transition hover:border-slate-200 hover:bg-slate-50 dark:hover:border-slate-700 dark:hover:bg-slate-950/50"
     >
-      {meta.label}
-    </span>
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <AssetKindBadge kind={asset.kind} />
+          <span className="text-sm font-medium text-slate-900 group-hover:text-sky-700 dark:text-white dark:group-hover:text-sky-300">
+            {asset.displayName}
+          </span>
+          {asset.transformScope === "post_replication" ? (
+            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-900 dark:bg-amber-950/50">
+              Post-replication
+            </span>
+          ) : null}
+          <WarehouseStatusBadge status={asset.warehouseStatus} runObserved={asset.runObserved} />
+          <AssetFreshnessBadge meta={asset.assetFreshness} />
+        </div>
+        {asset.landingQualified ? (
+          <code className="block truncate font-mono text-[11px] text-slate-500">{asset.landingQualified}</code>
+        ) : null}
+        <AssetCatalogPreview description={asset.catalogDescription} tags={asset.catalogTags} />
+      </div>
+      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 group-hover:text-sky-500 dark:text-slate-600" aria-hidden />
+    </Link>
   );
 }
 
@@ -233,9 +168,7 @@ function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBund
             <span className="font-mono text-xs text-slate-500">{bundle.landingDataset}</span>
           </p>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
-            {bundle.rawAssets.length} raw
-            {bundle.transforms.length ? ` · ${bundle.transforms.length} dbt` : ""}
-            {bundle.postTransforms.length ? ` · ${bundle.postTransforms.length} post-transform` : ""}
+            {allAssets.length} asset{allAssets.length === 1 ? "" : "s"}
             {bundle.lastRun ? (
               <>
                 {" "}
@@ -256,9 +189,6 @@ function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBund
             ) : (
               " · no runs yet"
             )}
-            {bundle.lastRun?.rowsLoaded !== undefined ? (
-              <> · {new Intl.NumberFormat().format(bundle.lastRun.rowsLoaded)} rows</>
-            ) : null}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -278,33 +208,14 @@ function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBund
           >
             Pipeline
           </Link>
-          <Link
-            href={`/runs?pipeline=${bundle.pipelineId}`}
-            onClick={(e) => e.stopPropagation()}
-            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:border-sky-300 hover:text-sky-700 dark:border-slate-700 dark:text-slate-300"
-          >
-            Runs
-          </Link>
         </div>
       </button>
 
       {open ? (
         <div className="space-y-4 border-t border-slate-100 px-5 py-4 dark:border-slate-800">
-          <AssetLineageGraph graph={lineage} />
-          {bundle.lastRun?.dbtManifest && bundle.lastRun.dbtManifest.models.length > 0 ? (
-            <p className="text-xs text-slate-600 dark:text-slate-400">
-              Last run dbt:{" "}
-              <span className="font-medium text-violet-700 dark:text-violet-300">
-                {bundle.lastRun.dbtManifest.models.filter((m) => m.status === "success").length}/
-                {bundle.lastRun.dbtManifest.models.length} models succeeded
-              </span>
-              {bundle.lastRun.dbtManifest.source === "runner" ? " (runner-reported)" : " (from config)"}
-            </p>
-          ) : null}
+          <AssetLineageGraph graph={lineage} linkNodes />
           {bundle.dbtDiff &&
-          (bundle.dbtDiff.missingFromRun.length > 0 ||
-            bundle.dbtDiff.extraOnRun.length > 0 ||
-            bundle.dbtDiff.failedModels.length > 0) ? (
+          (bundle.dbtDiff.missingFromRun.length > 0 || bundle.dbtDiff.failedModels.length > 0) ? (
             <div className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2 text-xs dark:border-violet-900 dark:bg-violet-950/30">
               <p className="font-medium text-violet-900 dark:text-violet-100">dbt config vs last run</p>
               {bundle.dbtDiff.missingFromRun.length > 0 ? (
@@ -312,56 +223,17 @@ function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBund
                   Missing on run: {bundle.dbtDiff.missingFromRun.join(", ")}
                 </p>
               ) : null}
-              {bundle.dbtDiff.extraOnRun.length > 0 ? (
-                <p className="mt-1 text-violet-800 dark:text-violet-200">
-                  Extra on run: {bundle.dbtDiff.extraOnRun.join(", ")}
-                </p>
-              ) : null}
               {bundle.dbtDiff.failedModels.length > 0 ? (
                 <p className="mt-1 text-red-700 dark:text-red-300">
-                  Failed: {bundle.dbtDiff.failedModels.join(", ")}
+                  Failed: {bundle.dbtDiff.failedModels.length} model(s)
                 </p>
               ) : null}
             </div>
           ) : null}
-          {bundle.warehouseMessage ? (
-            <p className="text-xs text-slate-500 dark:text-slate-400">{bundle.warehouseMessage}</p>
-          ) : null}
-          <ul className="space-y-2">
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {allAssets.map((asset) => (
-              <li key={asset.id} className="list-none space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-950/50">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <AssetKindBadge kind={asset.kind} />
-                    <span className="text-sm font-medium text-slate-900 dark:text-white">{asset.displayName}</span>
-                    {asset.transformScope === "post_replication" ? (
-                      <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-900 dark:bg-amber-950/50">
-                        Post-replication
-                      </span>
-                    ) : null}
-                    {asset.landingQualified ? (
-                      <code className="truncate font-mono text-[11px] text-slate-500">{asset.landingQualified}</code>
-                    ) : null}
-                    <WarehouseStatusBadge status={asset.warehouseStatus} runObserved={asset.runObserved} />
-                    <AssetFreshnessBadge meta={asset.assetFreshness} />
-                  </div>
-                  {asset.dbtPackage ? (
-                    <span className="text-[11px] text-slate-500">{asset.dbtPackage.replace(/^dlt-hub\//, "")}</span>
-                  ) : null}
-                </div>
-                {asset.catalogDescription || asset.catalogTags?.length ? (
-                  <p className="px-3 text-[11px] text-slate-500">
-                    {asset.catalogDescription}
-                    {asset.catalogTags?.length ? ` · ${asset.catalogTags.join(", ")}` : ""}
-                  </p>
-                ) : null}
-                <AssetCatalogMetaEditor
-                  assetKey={asset.id}
-                  kind={asset.kind}
-                  pipelineId={asset.pipelineId}
-                  initialDescription={asset.catalogDescription ?? ""}
-                  initialTags={asset.catalogTags ?? []}
-                />
+              <li key={asset.id} className="list-none">
+                <AssetListRow asset={asset} />
               </li>
             ))}
           </ul>
@@ -380,7 +252,7 @@ export function AssetsPageClient() {
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<ViewMode>("pipelines");
+  const [view, setView] = useState<ViewMode>("flat");
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
 
   const load = useCallback(async (verifyWarehouse = false) => {
@@ -460,9 +332,8 @@ export function AssetsPageClient() {
         </div>
         <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Workspace assets</h1>
         <p className="mt-3 max-w-3xl text-slate-600 dark:text-slate-300">
-          A config-derived inventory of what your pipelines ingest, where raw data lands, and which dbt models transform
-          it. Verify against your warehouse to see which tables are present — Postgres, Snowflake, BigQuery,
-          DuckDB, MotherDuck, Databricks, ClickHouse, MySQL, Trino, Redshift, and SQLite are supported.
+          Browse tables, objects, and dbt models across your pipelines. Open any asset for catalog metadata,
+          lineage, and warehouse status — Postgres, Snowflake, BigQuery, DuckDB, S3, GCS, Azure Blob, and more.
         </p>
       </div>
 
@@ -505,16 +376,7 @@ export function AssetsPageClient() {
               <p className="font-medium text-slate-900 dark:text-white">Warehouse verification</p>
               <p className="mt-1 text-slate-600 dark:text-slate-400">
                 {data.warehouseVerification.verifiedAssets} verified · {data.warehouseVerification.missingAssets} missing
-                · {data.warehouseVerification.destinationsIntrospected} destination
-                {data.warehouseVerification.destinationsIntrospected === 1 ? "" : "s"} introspected
               </p>
-              {data.warehouseVerification.messages.length > 0 ? (
-                <ul className="mt-2 list-inside list-disc text-xs text-amber-800 dark:text-amber-200">
-                  {data.warehouseVerification.messages.slice(0, 5).map((m) => (
-                    <li key={m}>{m}</li>
-                  ))}
-                </ul>
-              ) : null}
             </div>
           ) : null}
 
@@ -525,7 +387,7 @@ export function AssetsPageClient() {
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search pipelines, tables, models…"
+                placeholder="Search assets, tags, pipelines…"
                 className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm dark:border-slate-700 dark:bg-slate-900"
               />
             </div>
@@ -543,13 +405,13 @@ export function AssetsPageClient() {
                 type="button"
                 onClick={() => void load(true)}
                 disabled={verifying}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-sky-300 hover:text-sky-700 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-sky-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
               >
                 {verifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                 Verify in warehouse
               </button>
               <div className="flex rounded-lg border border-slate-200 p-0.5 dark:border-slate-700">
-                {(["pipelines", "flat"] as const).map((mode) => (
+                {(["flat", "pipelines"] as const).map((mode) => (
                   <button
                     key={mode}
                     type="button"
@@ -560,7 +422,7 @@ export function AssetsPageClient() {
                         : "rounded-md px-3 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400"
                     }
                   >
-                    {mode === "pipelines" ? "By pipeline" : "All assets"}
+                    {mode === "flat" ? "All assets" : "By pipeline"}
                   </button>
                 ))}
               </div>
@@ -573,6 +435,7 @@ export function AssetsPageClient() {
                   <option value="all">All kinds</option>
                   <option value="source">Sources</option>
                   <option value="raw">Raw</option>
+                  <option value="object">Objects</option>
                   <option value="transform">dbt models</option>
                   <option value="post_transform">Post-transforms</option>
                 </select>
@@ -586,51 +449,21 @@ export function AssetsPageClient() {
                 <p className="text-sm text-slate-500">No pipelines match your search.</p>
               ) : (
                 filteredPipelines.map((bundle, i) => (
-                  <PipelineBundleCard key={bundle.pipelineId} bundle={bundle} defaultOpen={i === 0} />
+                  <PipelineBundleCard key={bundle.pipelineId} bundle={bundle} defaultOpen={i === 0 && Boolean(pipelineFilter)} />
                 ))
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900">
-                  <tr>
-                    <th className="px-4 py-2 font-medium">Asset</th>
-                    <th className="px-4 py-2 font-medium">Kind</th>
-                    <th className="px-4 py-2 font-medium">Landing</th>
-                    <th className="px-4 py-2 font-medium">Warehouse</th>
-                    <th className="px-4 py-2 font-medium">Pipeline</th>
-                    <th className="px-4 py-2 font-medium" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredAssets.map((asset) => (
-                    <tr key={asset.id} className="border-b border-slate-100 dark:border-slate-800/80">
-                      <td className="px-4 py-2.5 font-medium text-slate-900 dark:text-white">{asset.displayName}</td>
-                      <td className="px-4 py-2.5">
-                        <AssetKindBadge kind={asset.kind} />
-                      </td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-slate-500">
-                        {asset.landingQualified ?? asset.landingDataset ?? "—"}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <WarehouseStatusBadge status={asset.warehouseStatus} runObserved={asset.runObserved} />
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-600 dark:text-slate-400">{asset.pipelineName}</td>
-                      <td className="px-4 py-2.5 text-right">
-                        <Link
-                          href={`/builder?pipeline=${asset.pipelineId}`}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-sky-600 hover:underline dark:text-sky-400"
-                        >
-                          Open <ArrowRight className="h-3 w-3" />
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
+              <ul className="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-900">
+                {filteredAssets.map((asset) => (
+                  <li key={asset.id}>
+                    <AssetListRow asset={asset} />
+                  </li>
+                ))}
+              </ul>
               {filteredAssets.length === 0 ? (
-                <p className="px-4 py-6 text-sm text-slate-500">No assets match your filters.</p>
+                <p className="px-4 py-8 text-center text-sm text-slate-500">No assets match your filters.</p>
               ) : null}
             </div>
           )}
@@ -639,8 +472,8 @@ export function AssetsPageClient() {
 
       <RelatedLinks
         links={[
+          { href: "/catalog", icon: Database, label: "Catalog", desc: "Search and browse workspace metadata" },
           { href: "/builder", icon: Layers, label: "Pipelines", desc: "Edit sync and transform configuration" },
-          { href: "/dbt", icon: GitBranch, label: "dbt transforms", desc: "Staging packages and scaffold to Git" },
           { href: "/runs", icon: PlayCircle, label: "Runs", desc: "Execution history and telemetry" },
         ]}
       />
