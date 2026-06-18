@@ -396,6 +396,35 @@ const STORAGE_CONNECTORS: ConnectorDef[] = [
       { key: "AZURE_STORAGE_ACCOUNT_KEY", label: "Storage Account Key", type: "password", required: true },
     ],
   },
+  {
+    slug: "iceberg",
+    label: "Apache Iceberg (S3 / object store)",
+    connectionTypes: ["source", "destination"],
+    category: "Cloud Storage",
+    configFields: [
+      { key: "warehouse", label: "Warehouse URI", type: "text", placeholder: "s3://my-lake/warehouse/", help: "Iceberg warehouse path (typically S3/GCS/ADLS)" },
+      { key: "catalog", label: "Catalog", type: "select", default: "rest", options: [
+        { value: "rest", label: "REST catalog" },
+        { value: "glue", label: "AWS Glue" },
+        { value: "hive", label: "Hive Metastore" },
+        { value: "nessie", label: "Project Nessie" },
+      ]},
+      { key: "namespace", label: "Default namespace / schema", type: "text", placeholder: "analytics" },
+      { key: "table_format", label: "Table format", type: "text", default: "iceberg", help: "Always iceberg — stored for dlt/Sling destination hints" },
+    ],
+    credentialFields: [
+      { key: "AWS_ACCESS_KEY_ID", label: "AWS Access Key ID", type: "text", required: false, help: "For S3-backed warehouses" },
+      { key: "AWS_SECRET_ACCESS_KEY", label: "AWS Secret Access Key", type: "password", required: false },
+      { key: "AWS_REGION", label: "AWS Region", type: "text", required: false, placeholder: "us-east-1" },
+      { key: "ICEBERG_REST_URI", label: "REST catalog URI", type: "text", required: false, placeholder: "https://catalog.example.com/api", show_if: { catalog: "rest" } },
+    ],
+    sourceConfigFields: [
+      { key: "warehouse", label: "Warehouse URI", type: "text", required: true, placeholder: "s3://my-lake/warehouse/" },
+      { key: "namespace", label: "Namespace", type: "text", required: false },
+      { key: "table", label: "Table name", type: "text", required: false, help: "Optional — omit to sync all tables in namespace" },
+      { key: "table_format", label: "Table format", type: "text", default: "iceberg" },
+    ],
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

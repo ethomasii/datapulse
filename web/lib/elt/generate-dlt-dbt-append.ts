@@ -1,5 +1,6 @@
 import type { PipelineRequest } from "./types";
 import { escapePyString } from "./escape-py";
+import { eltpulseDbtArtifactUploadPython } from "./generate-eltpulse-run-reporting";
 import { readDbtTransformConfig } from "./dbt-run-phases";
 import { partitionColumnFromSourceConfiguration } from "./run-partition-resolution";
 
@@ -102,5 +103,6 @@ ${partitionColumnLine}    if partition_key:
         _elt_dbt_vars["${escapePyString(valueKey)}"] = partition_key
     _dbt_run_params = ${runParamsExpr}
     _dbt_runner.run_all(_dbt_run_params, additional_vars=(_elt_dbt_vars if _elt_dbt_vars else None))
+${eltpulseDbtArtifactUploadPython(`r"${escapePyString(packagePath)}"`)}
 `;
 }

@@ -73,7 +73,8 @@ export function applyPatchRunBody(
     body.telemetrySamples !== undefined ||
     body.dbtManifest !== undefined ||
     body.dbtRunResults !== undefined ||
-    body.dbtArtifactManifest !== undefined;
+    body.dbtArtifactManifest !== undefined ||
+    body.telemetryResources !== undefined;
 
   let resolvedDbtManifest = body.dbtManifest;
   if (body.dbtRunResults !== undefined || body.dbtArtifactManifest !== undefined) {
@@ -91,6 +92,7 @@ export function applyPatchRunBody(
           appendTelemetrySample: body.appendTelemetrySample,
           telemetrySamples: body.telemetrySamples,
           dbtManifest: resolvedDbtManifest,
+          resources: body.telemetryResources,
         })
       ) as Prisma.InputJsonValue)
     : undefined;

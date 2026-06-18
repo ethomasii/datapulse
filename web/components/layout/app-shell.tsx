@@ -54,6 +54,7 @@ const CORE_NAV: NavItem[] = [
   { href: "/builder", label: "Pipelines", icon: Layers },
   { href: "/connections", label: "Connections", icon: Cable },
   { href: "/runs", label: "Runs", icon: PlayCircle },
+  { href: "/observability", label: "Observability", icon: Activity },
 ];
 
 const CATALOG_NAV: NavItem[] = [

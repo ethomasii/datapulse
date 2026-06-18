@@ -3,7 +3,7 @@ const UA = "eltPulse-Runs/1";
 export type RunWebhookPayload = {
   /** Lets multi-product receivers (e.g. ServicePulse) identify the emitter. */
   source?: "eltpulse";
-  event: "run.succeeded" | "run.failed" | "run.cancelled";
+  event: "run.succeeded" | "run.failed" | "run.cancelled" | "catalog.contract_violated";
   correlationId: string;
   pipelineId?: string | null;
   dbtProjectId?: string | null;
@@ -21,6 +21,13 @@ export type RunWebhookPayload = {
   dbtManifest?: Record<string, unknown>;
   /** Failed dbt tests only — convenient for alerting rules. */
   dbtTestFailures?: Array<{ name: string; status: string; message?: string }>;
+  /** Active data contracts violated after a successful run. */
+  catalogContractViolations?: Array<{
+    contractSlug: string;
+    contractName: string;
+    assetKey: string;
+    issues: string[];
+  }>;
 };
 
 export async function deliverRunWebhook(url: string, payload: RunWebhookPayload): Promise<{ ok: boolean; httpStatus?: number }> {

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { PipelineHealthSummary } from "@/lib/elt/pipeline-health";
 import { formatHealthRows } from "@/lib/elt/pipeline-health";
+import { formatDurationMs } from "@/lib/elt/run-telemetry";
 
 const STATUS_STYLES: Record<PipelineHealthSummary["status"], string> = {
   healthy: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
@@ -21,12 +22,18 @@ export function PipelineHealthPanel({ health }: { health: PipelineHealthSummary[
     <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Pipeline health (7d)</h2>
-        <p className="text-xs text-slate-500">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <Link href="/observability" className="text-sky-600 hover:underline dark:text-sky-400">
+            Full metrics →
+          </Link>
+          <span className="text-slate-400">·</span>
+          <p className="text-slate-500">
           {failing > 0 ? `${failing} failing` : null}
           {failing > 0 && degraded > 0 ? " · " : null}
           {degraded > 0 ? `${degraded} degraded` : null}
           {failing === 0 && degraded === 0 ? "All monitored pipelines OK" : null}
-        </p>
+          </p>
+        </div>
       </div>
       <ul className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
         {health.slice(0, 8).map((h) => (
@@ -48,6 +55,15 @@ export function PipelineHealthPanel({ health }: { health: PipelineHealthSummary[
               {h.lastRowsLoaded !== null ? (
                 <span className="text-slate-500">{formatHealthRows(h.lastRowsLoaded)} rows</span>
               ) : null}
+              {h.lastDurationMs !== null ? (
+                <span className="text-slate-500">{formatDurationMs(h.lastDurationMs)}</span>
+              ) : null}
+              {h.avgRowsLoaded !== null && h.runs7d >= 2 ? (
+                <span className="text-slate-500">avg {formatHealthRows(h.avgRowsLoaded)}</span>
+              ) : null}
+              <Link href={`/observability?pipeline=${encodeURIComponent(h.pipelineId)}`} className="text-sky-600 hover:underline dark:text-sky-400">
+                Metrics
+              </Link>
               <Link href={`/runs?pipeline=${encodeURIComponent(h.pipelineId)}`} className="text-sky-600 hover:underline dark:text-sky-400">
                 Runs
               </Link>

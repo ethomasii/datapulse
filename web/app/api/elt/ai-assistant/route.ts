@@ -11,6 +11,8 @@ import { toDbtProjectSummary } from "@/lib/elt/dbt-projects";
 import { generatePipelineArtifacts } from "@/lib/elt/generate-artifacts";
 import { setDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
 import { supportsInPipelineDbt } from "@/lib/elt/pipeline-tool-labels";
+import { listComponents, getComponentById, fetchComponentSchema } from "@/lib/elt/component-registry";
+import { routeComponent, type ComponentCompileTarget } from "@/lib/elt/component-compile-router";
 import type { CreatePipelineBody } from "@/lib/elt/types";
 
 const MODEL = "claude-sonnet-4-6";
@@ -47,6 +49,11 @@ After generating, give ONE short sentence: "Pipeline ready — click Save, then 
 - For REST APIs with no URL at all: ask for the base URL only.
 - Never ask about credentials, env vars, or optional config — use defaults.
 - If the user cannot write pipelines (see workspace permissions), explain their role and suggest asking an admin — do NOT call generate_pipeline.
+
+## Component catalog (dagster-component-templates)
+- 864+ reusable pipeline components compile to dlt/Sling/dbt/monitors/Python — use **search_components** when the user asks for checks, sensors, transforms, or ingestion patterns by name.
+- **get_component_details** returns compile target (dlt, quality, monitor, dbt, python, dagster) and monitor↔ingestion pairs.
+- Prefer native compile targets (dlt, sling, quality, monitor, dbt) over dagster badge items unless user explicitly needs Dagster.
 
 ## Format
 - Be extremely brief. 1-3 sentences max after a generation.
@@ -210,6 +217,39 @@ const TOOLS: Anthropic.Tool[] = [
         },
       },
       required: [],
+    },
+  },
+  {
+    name: "search_components",
+    description:
+      "Search the dagster-component-templates catalog (864+ components). Use for quality checks, sensors, ingestion templates, transforms. Returns compile target (dlt/sling/quality/monitor/dbt/python/dagster).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Search term — e.g. 's3 monitor', 'great expectations', 'kafka ingest'" },
+        category: {
+          type: "string",
+          description: "Optional category: ingestion, check, sensor, dbt, transformation, analytics, ai",
+        },
+        compile_target: {
+          type: "string",
+          description: "Optional filter: dlt, sling, quality, monitor, dbt, python, dagster",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "get_component_details",
+    description:
+      "Get a component template by id: description, compile route, canvas ports, monitor↔ingestion pair, optional schema.json fields.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        component_id: { type: "string", description: "Component id from search_components, e.g. s3_monitor" },
+        include_schema: { type: "boolean", description: "Fetch remote schema.json for config field hints" },
+      },
+      required: ["component_id"],
     },
   },
 ];
@@ -444,6 +484,67 @@ const DEST_INLINE_FIELDS: Record<string, InlineField[]> = {
 
 function getInlineFields(sourceType: string): InlineField[] {
   return SOURCE_INLINE_FIELDS[sourceType.toLowerCase()] ?? [];
+}
+
+function toolSearchComponents(query: string, category?: string, compileTarget?: string) {
+  const { items, total } = listComponents({
+    q: query,
+    category,
+    compileTarget: compileTarget as ComponentCompileTarget | undefined,
+    limit: 15,
+  });
+  return {
+    total,
+    components: items.map((c) => ({
+      id: c.id,
+      name: c.name,
+      category: c.category,
+      description: c.description,
+      compile_target: c.compileTarget,
+      compile_hint: c.compileHint,
+      monitor_pair: c.monitorPair ?? null,
+    })),
+    hint:
+      items.length > 0
+        ? `Best match: ${items[0].name} (${items[0].id}) → compiles to ${items[0].compileTarget}. Use get_component_details for schema fields.`
+        : "No components matched — try search_sources for connector slugs or generate_pipeline directly.",
+  };
+}
+
+async function toolGetComponentDetails(componentId: string, includeSchema?: boolean) {
+  const c = getComponentById(componentId);
+  if (!c) {
+    return { error: `Unknown component '${componentId}'. Use search_components first.` };
+  }
+  const route = routeComponent(c.id, c.category);
+  let schema: unknown = null;
+  if (includeSchema && c.schema_url) {
+    schema = await fetchComponentSchema(c.schema_url);
+  }
+  return {
+    id: c.id,
+    name: c.name,
+    category: c.category,
+    description: c.description,
+    compile_target: c.compileTarget,
+    compile_badge: c.compileBadge,
+    compile_hint: c.compileHint,
+    canvas_ports: c.canvasPorts,
+    monitor_pair: c.monitorPair ?? null,
+    route,
+    schema_url: c.schema_url,
+    ...(schema ? { schema } : {}),
+    next_steps:
+      route.target === "dlt" || route.target === "sling"
+        ? "Call generate_pipeline with matching source_type/destination_type — component is config UX only."
+        : route.target === "quality"
+          ? "Add quality block to declarative spec v2 or elt_tests in sourceConfiguration."
+          : route.target === "monitor"
+            ? "Create EltMonitor linked to pipeline — pair with ingestion via monitor_pair."
+            : route.target === "dbt"
+              ? "Use list_dbt_projects + post_transform_type=dbt on generate_pipeline."
+              : "May need Python post-transform or Dagster — explain compile_badge to user.",
+  };
 }
 
 async function toolListDbtProjects(userId: string, sourceSlug?: string) {
@@ -777,6 +878,17 @@ export async function POST(request: Request) {
           result = await toolListDbtProjects(
             user.id,
             typeof inp.source_slug === "string" ? inp.source_slug : undefined
+          );
+        } else if (name === "search_components") {
+          result = toolSearchComponents(
+            String(inp.query ?? ""),
+            typeof inp.category === "string" ? inp.category : undefined,
+            typeof inp.compile_target === "string" ? inp.compile_target : undefined
+          );
+        } else if (name === "get_component_details") {
+          result = await toolGetComponentDetails(
+            String(inp.component_id ?? ""),
+            inp.include_schema === true
           );
         } else {
           result = { error: `Unknown tool: ${name}` };

@@ -1,4 +1,7 @@
-# eltPulse managed worker — run real pipelines (no Vercel Services required)
+# eltPulse managed worker (legacy — eltPulse SaaS only)
+
+> **Customer agents:** use [`../worker/`](../worker/) + [`../gateway/`](../gateway/) instead.  
+> This folder is for **eltPulse-managed** runs via internal APIs (`/api/internal/managed-runs*`), not customer Bearer tokens.
 
 Managed runs use internal APIs (`/api/internal/managed-runs*`). **Default behavior:** if you set **GitHub dispatch** env vars on Vercel, the app **auto-selects `gha`** so real dlt/Sling runs on **GitHub Actions** — you do **not** need Vercel “Services”.
 

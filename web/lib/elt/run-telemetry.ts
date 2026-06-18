@@ -8,6 +8,13 @@ import { sanitizeDbtRunManifest } from "@/lib/elt/dbt-run-manifest";
 
 export const TELEMETRY_SAMPLES_MAX = 2000;
 
+export type TelemetrySystemMetrics = {
+  cpuPercent?: number;
+  memoryMb?: number;
+  networkBytesIn?: number;
+  networkBytesOut?: number;
+};
+
 export type TelemetrySummary = {
   rowsLoaded?: number;
   bytesLoaded?: number;
@@ -16,6 +23,8 @@ export type TelemetrySummary = {
   currentResource?: string;
   /** ISO timestamp of last summary update */
   updatedAt?: string;
+  /** Worker process metrics when reported */
+  system?: TelemetrySystemMetrics;
 };
 
 export type TelemetrySample = {
@@ -28,11 +37,20 @@ export type TelemetrySample = {
   progress?: number;
   phase?: string;
   resource?: string;
+  system?: TelemetrySystemMetrics;
+};
+
+export type ResourceRollup = {
+  resource: string;
+  rows?: number;
+  bytes?: number;
 };
 
 export type RunTelemetry = {
   summary: TelemetrySummary;
   samples: TelemetrySample[];
+  /** Per-resource rollup from samples (optional, set on terminal PATCH). */
+  resources?: ResourceRollup[];
   /** dbt model/test results from the transform phase (v2). */
   dbt?: DbtRunManifest;
   /** Numeric rollup was inferred from structured log lines (no telemetry summary on the run). */
@@ -56,11 +74,29 @@ function str(n: unknown, max: number): string | undefined {
   return t.length > max ? t.slice(0, max) : t;
 }
 
+function sanitizeSystem(raw: unknown): TelemetrySystemMetrics | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const o = raw as Record<string, unknown>;
+  const cpuPercent = finiteNonNeg(o.cpuPercent);
+  let cpu = cpuPercent;
+  if (cpu !== undefined && cpu > 100) cpu = 100;
+  const memoryMb = finiteNonNeg(o.memoryMb);
+  const networkBytesIn = finiteNonNeg(o.networkBytesIn);
+  const networkBytesOut = finiteNonNeg(o.networkBytesOut);
+  const out: TelemetrySystemMetrics = {};
+  if (cpu !== undefined) out.cpuPercent = cpu;
+  if (memoryMb !== undefined) out.memoryMb = memoryMb;
+  if (networkBytesIn !== undefined) out.networkBytesIn = networkBytesIn;
+  if (networkBytesOut !== undefined) out.networkBytesOut = networkBytesOut;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 function sanitizeSummary(raw: Record<string, unknown>): TelemetrySummary {
   const rowsLoaded = finiteNonNeg(raw.rowsLoaded);
   const bytesLoaded = finiteNonNeg(raw.bytesLoaded);
   let progress = finiteNonNeg(raw.progress);
   if (progress !== undefined && progress > 100) progress = 100;
+  const system = sanitizeSystem(raw.system);
   return {
     ...(rowsLoaded !== undefined ? { rowsLoaded } : {}),
     ...(bytesLoaded !== undefined ? { bytesLoaded } : {}),
@@ -68,6 +104,7 @@ function sanitizeSummary(raw: Record<string, unknown>): TelemetrySummary {
     ...(str(raw.currentPhase, 256) !== undefined ? { currentPhase: str(raw.currentPhase, 256) } : {}),
     ...(str(raw.currentResource, 512) !== undefined ? { currentResource: str(raw.currentResource, 512) } : {}),
     ...(str(raw.updatedAt, 64) !== undefined ? { updatedAt: str(raw.updatedAt, 64) } : {}),
+    ...(system ? { system } : {}),
   };
 }
 
@@ -81,6 +118,7 @@ function sanitizeSample(raw: Record<string, unknown>, defaultAt: string): Teleme
   if (progress !== undefined && progress > 100) progress = 100;
   const phase = str(raw.phase, 128);
   const resource = str(raw.resource, 512);
+  const system = sanitizeSystem(raw.system);
   const out: TelemetrySample = { at };
   if (rows !== undefined) out.rows = rows;
   if (bytes !== undefined) out.bytes = bytes;
@@ -89,6 +127,7 @@ function sanitizeSample(raw: Record<string, unknown>, defaultAt: string): Teleme
   if (progress !== undefined) out.progress = progress;
   if (phase) out.phase = phase;
   if (resource) out.resource = resource;
+  if (system) out.system = system;
   return out;
 }
 
@@ -181,7 +220,26 @@ export function parseRunTelemetry(raw: unknown): RunTelemetry {
     }
   }
   const dbt = sanitizeDbtRunManifest(o.dbt) ?? undefined;
-  return { summary, samples: samples.slice(-TELEMETRY_SAMPLES_MAX), ...(dbt ? { dbt } : {}) };
+  const resourcesRaw = o.resources;
+  let resources: ResourceRollup[] | undefined;
+  if (Array.isArray(resourcesRaw)) {
+    resources = resourcesRaw
+      .filter((r) => r && typeof r === "object" && typeof (r as ResourceRollup).resource === "string")
+      .map((r) => {
+        const row = r as ResourceRollup;
+        return {
+          resource: row.resource.slice(0, 512),
+          ...(finiteNonNeg(row.rows) !== undefined ? { rows: finiteNonNeg(row.rows) } : {}),
+          ...(finiteNonNeg(row.bytes) !== undefined ? { bytes: finiteNonNeg(row.bytes) } : {}),
+        };
+      });
+  }
+  return {
+    summary,
+    samples: samples.slice(-TELEMETRY_SAMPLES_MAX),
+    ...(resources?.length ? { resources } : {}),
+    ...(dbt ? { dbt } : {}),
+  };
 }
 
 function inferSummaryFromSamples(samples: TelemetrySample[]): TelemetrySummary | null {
@@ -219,6 +277,7 @@ export type TelemetryPatchInput = {
   appendTelemetrySample?: Partial<TelemetrySample>;
   telemetrySamples?: TelemetrySample[];
   dbtManifest?: DbtRunManifest;
+  resources?: ResourceRollup[];
 };
 
 export function mergeRunTelemetry(existingRaw: unknown, patch: TelemetryPatchInput): RunTelemetry {
@@ -260,16 +319,56 @@ export function mergeRunTelemetry(existingRaw: unknown, patch: TelemetryPatchInp
     if (sanitized) dbt = sanitized;
   }
 
-  return { summary, samples, ...(dbt ? { dbt } : {}) };
+  let resources = base.resources;
+  if (patch.resources !== undefined) {
+    resources = patch.resources.slice(0, 500);
+  }
+
+  return { summary, samples, ...(resources?.length ? { resources } : {}), ...(dbt ? { dbt } : {}) };
 }
 
 export function runTelemetryToJson(t: RunTelemetry): Record<string, unknown> {
   return {
     summary: t.summary,
     samples: t.samples,
+    ...(t.resources?.length ? { resources: t.resources } : {}),
     ...(t.dbt ? { dbt: t.dbt } : {}),
     ...(t.derivedFromLogs ? { derivedFromLogs: true } : {}),
   };
+}
+
+export type PhaseTimelineEntry = {
+  phase: string;
+  startedAt: string;
+  endedAt?: string;
+  durationMs?: number;
+};
+
+/** Derive phase durations from telemetry samples. */
+export function phaseTimeline(samples: TelemetrySample[]): PhaseTimelineEntry[] {
+  const entries: PhaseTimelineEntry[] = [];
+  for (const s of samples) {
+    if (!s.phase || !s.at) continue;
+    const last = entries[entries.length - 1];
+    if (last && last.phase === s.phase && !last.endedAt) continue;
+    if (last && !last.endedAt) {
+      last.endedAt = s.at;
+      last.durationMs = Date.parse(s.at) - Date.parse(last.startedAt);
+    }
+    entries.push({ phase: s.phase, startedAt: s.at });
+  }
+  return entries;
+}
+
+export function formatDurationMs(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined || !Number.isFinite(ms)) return "—";
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  const mins = Math.floor(ms / 60_000);
+  const secs = Math.round((ms % 60_000) / 1000);
+  if (mins < 60) return `${mins}m ${secs}s`;
+  const hours = Math.floor(mins / 60);
+  return `${hours}h ${mins % 60}m`;
 }
 
 export function formatBytes(n: number): string {

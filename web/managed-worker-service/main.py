@@ -47,6 +47,12 @@ app = FastAPI(title="eltPulse managed worker", version="0.1.0")
 _MAX_WALL_MS = 900_000
 _LOG_CHUNK = 3400
 _PHASE_MARKER = re.compile(r"\[eltpulse\]\s+phase:(\w+)", re.IGNORECASE)
+_RESOURCE_MARKER = re.compile(
+    r"\[eltpulse\]\s+resource:([^\s]+)\s+rows:(\d+)(?:\s+bytes:(\d+))?", re.IGNORECASE
+)
+_ROWS_LOADED = re.compile(r"\b([\d,]+)\s*rows\s+loaded\b", re.IGNORECASE)
+_ROWS_SO_FAR = re.compile(r"rows\s+processed\s+so\s+far:\s*([\d,]+)", re.IGNORECASE)
+_BYTES_LOADED = re.compile(r"\b([\d,]+)\s*bytes\s+loaded\b", re.IGNORECASE)
 _PHASE_PROGRESS = {"extract": 15, "load": 70, "dbt": 90, "done": 100, "failed": 100}
 
 
@@ -155,12 +161,45 @@ async def _append_log(
     msg = _sanitize(f"[{stream}] {line}", 4000)
     level = "warn" if stream == "stderr" else "info"
     body: dict[str, Any] = {"status": "running", "appendLog": {"level": level, "message": msg}}
+
     phase_match = _PHASE_MARKER.search(line)
     if phase_match:
         phase = phase_match.group(1).lower()
         progress = _PHASE_PROGRESS.get(phase, 50)
         body["telemetrySummary"] = {"currentPhase": phase, "progress": progress}
         body["appendTelemetrySample"] = {"phase": phase, "progress": progress}
+    else:
+        resource_match = _RESOURCE_MARKER.search(line)
+        if resource_match:
+            resource = resource_match.group(1)
+            rows = int(resource_match.group(2).replace(",", ""))
+            bytes_val = int(resource_match.group(3).replace(",", "")) if resource_match.group(3) else None
+            summary: dict[str, Any] = {"currentResource": resource, "rowsLoaded": rows}
+            sample: dict[str, Any] = {"resource": resource, "rows": rows}
+            if bytes_val is not None:
+                summary["bytesLoaded"] = bytes_val
+                sample["bytes"] = bytes_val
+            body["telemetrySummary"] = summary
+            body["appendTelemetrySample"] = sample
+        else:
+            rows_loaded = _ROWS_LOADED.search(line)
+            if rows_loaded:
+                rows = int(rows_loaded.group(1).replace(",", ""))
+                body["telemetrySummary"] = {"rowsLoaded": rows}
+                body["appendTelemetrySample"] = {"rows": rows}
+            else:
+                rows_so_far = _ROWS_SO_FAR.search(line)
+                if rows_so_far:
+                    rows = int(rows_so_far.group(1).replace(",", ""))
+                    body["telemetrySummary"] = {"rowsLoaded": rows}
+                    body["appendTelemetrySample"] = {"rows": rows}
+                else:
+                    bytes_loaded = _BYTES_LOADED.search(line)
+                    if bytes_loaded:
+                        nbytes = int(bytes_loaded.group(1).replace(",", ""))
+                        body["telemetrySummary"] = {"bytesLoaded": nbytes}
+                        body["appendTelemetrySample"] = {"bytes": nbytes}
+
     await _patch(client, base, internal, run_id, body)
 
 
@@ -203,7 +242,7 @@ async def _pump_stream(
         await _append_log(client, base, internal, run_id, label, buf.strip())
 
 
-async def _execute_one_run(
+from agent_system_metrics import sample_system_metrics_loop
     client: httpx.AsyncClient,
     base: str,
     internal: str,
@@ -297,6 +336,10 @@ async def _execute_one_run(
             secrets_s if isinstance(secrets_s, dict) else None,
             secrets_d if isinstance(secrets_d, dict) else None,
         )
+        child_env["ELTPULSE_RUN_ID"] = run_id
+        child_env["ELTPULSE_CONTROL_PLANE_URL"] = base
+        if internal:
+            child_env["ELTPULSE_INTERNAL_API_SECRET"] = internal
 
         if tool == "sling":
             sling_bin = os.environ.get("ELTPULSE_MANAGED_SLING_BIN", "sling").strip() or "sling"
@@ -322,6 +365,14 @@ async def _execute_one_run(
                 proc.kill()
 
         killer = asyncio.create_task(kill_after_delay())
+        metrics_stop = asyncio.Event()
+
+        async def _metrics_patch(body: dict[str, Any]) -> None:
+            await _patch(client, base, internal, run_id, body)
+
+        metrics_task = asyncio.create_task(
+            sample_system_metrics_loop(_metrics_patch, metrics_stop, pid=proc.pid)
+        )
         assert proc.stdout and proc.stderr
         try:
             await asyncio.wait_for(
@@ -333,6 +384,8 @@ async def _execute_one_run(
                 timeout=max(1.0, run_timeout_ms / 1000.0) + 30.0,
             )
         except asyncio.TimeoutError:
+            metrics_stop.set()
+            metrics_task.cancel()
             if proc.returncode is None:
                 proc.kill()
             await _patch(
@@ -348,6 +401,10 @@ async def _execute_one_run(
             )
             return "ran"
         finally:
+            metrics_stop.set()
+            metrics_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await metrics_task
             killer.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await killer

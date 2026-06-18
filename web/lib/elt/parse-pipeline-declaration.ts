@@ -1,24 +1,47 @@
 import YAML from "yaml";
 import { createPipelineBodySchema, type CreatePipelineBody } from "@/lib/elt/types";
+import {
+  DECLARATIVE_PIPELINE_SPEC_VERSION,
+  declarativePipelineSpecSchema,
+} from "@/lib/elt/declarative-pipeline-spec";
+import { compileDeclarativePipelineSpec } from "@/lib/elt/compile-declarative-pipeline";
 
-const DECLARATION_KEY = "eltpulse_pipeline_declaration";
+const DECLARATION_V1_KEY = "eltpulse_pipeline_declaration";
+const SPEC_V2_KEY = "eltpulse_pipeline";
 const UPSERT_KEY = "upsert";
 const PIPELINE_KEY = "pipeline";
 
 export type ParsedPipelineDeclaration = {
   body: CreatePipelineBody;
-  /** When true, create or update by `name` + resolved tool (same as `POST .../declaration?mode=upsert`). */
+  /** When true, create or update by `name` + resolved tool. */
   upsert: boolean;
+  specVersion: 1 | 2;
+  /** Original YAML for v2 round-trip when applying declarative specs. */
+  declarativeSpecYaml?: string;
 };
 
-function flattenDeclarationDoc(raw: unknown): { json: Record<string, unknown>; upsert: boolean } {
+function readUpsert(merged: Record<string, unknown>): boolean {
+  const upsertRaw = merged[UPSERT_KEY];
+  delete merged[UPSERT_KEY];
+  return upsertRaw === true || upsertRaw === "true" || upsertRaw === 1;
+}
+
+function flattenDoc(raw: unknown): { merged: Record<string, unknown>; upsert: boolean; version: 1 | 2 } {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     throw new Error("Declaration must be a YAML mapping");
   }
   const root = raw as Record<string, unknown>;
-  const ver = root[DECLARATION_KEY];
-  if (ver !== 1 && ver !== "1") {
-    throw new Error(`${DECLARATION_KEY} must be 1`);
+
+  const v2 = root[SPEC_V2_KEY];
+  const v1 = root[DECLARATION_V1_KEY];
+
+  let version: 1 | 2;
+  if (v2 === 2 || v2 === "2") {
+    version = 2;
+  } else if (v1 === 1 || v1 === "1") {
+    version = 1;
+  } else {
+    throw new Error(`${SPEC_V2_KEY}: 2 or ${DECLARATION_V1_KEY}: 1 required`);
   }
 
   let merged: Record<string, unknown> = { ...root };
@@ -26,21 +49,17 @@ function flattenDeclarationDoc(raw: unknown): { json: Record<string, unknown>; u
   if (nested && typeof nested === "object" && !Array.isArray(nested)) {
     merged = { ...merged, ...(nested as Record<string, unknown>) };
   }
-  delete merged[DECLARATION_KEY];
+  delete merged[SPEC_V2_KEY];
+  delete merged[DECLARATION_V1_KEY];
   delete merged[PIPELINE_KEY];
 
-  const upsertRaw = merged[UPSERT_KEY];
-  delete merged[UPSERT_KEY];
-  const upsert = upsertRaw === true || upsertRaw === "true" || upsertRaw === 1;
-
-  return { json: merged, upsert };
+  const upsert = readUpsert(merged);
+  return { merged, upsert, version };
 }
 
 /**
- * Parse eltPulse pipeline declaration YAML (v1) into the same shape as `POST /api/elt/pipelines` JSON.
- *
- * Supports either flat keys or a nested `pipeline:` mapping. Optional `upsert: true` merges with
- * {@link ParsedPipelineDeclaration.upsert}.
+ * Parse eltPulse pipeline declaration YAML v1 (legacy flat keys).
+ * For v2 declarative specs use {@link parseAndCompileDeclarativeYaml}.
  */
 export function parsePipelineDeclarationYaml(yamlText: string): ParsedPipelineDeclaration {
   let doc: unknown;
@@ -51,13 +70,60 @@ export function parsePipelineDeclarationYaml(yamlText: string): ParsedPipelineDe
     throw new Error(`Invalid YAML: ${msg}`);
   }
 
-  const { json: flat, upsert } = flattenDeclarationDoc(doc);
+  const { merged, upsert, version } = flattenDoc(doc);
 
-  const parsed = createPipelineBodySchema.safeParse(flat);
-  if (!parsed.success) {
-    const err = parsed.error.flatten();
-    throw new Error(`Invalid pipeline declaration: ${JSON.stringify(err.fieldErrors)}`);
+  if (version === DECLARATIVE_PIPELINE_SPEC_VERSION) {
+    throw new Error("Declarative pipeline spec v2 requires compile — use parseAndCompileDeclarativeYaml");
   }
 
-  return { body: parsed.data, upsert };
+  const parsed = createPipelineBodySchema.safeParse(merged);
+  if (!parsed.success) {
+    throw new Error(`Invalid pipeline declaration: ${JSON.stringify(parsed.error.flatten().fieldErrors)}`);
+  }
+
+  return { body: parsed.data, upsert, specVersion: 1 };
+}
+
+/** Parse v1 or v2 YAML; v2 compiles to CreatePipelineBody and resolves `@workspace`. */
+export async function parseAndCompileDeclarativeYaml(
+  userId: string,
+  yamlText: string
+): Promise<ParsedPipelineDeclaration> {
+  let doc: unknown;
+  try {
+    doc = YAML.parse(yamlText);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`Invalid YAML: ${msg}`);
+  }
+
+  const { merged, upsert, version } = flattenDoc(doc);
+
+  if (version === DECLARATIVE_PIPELINE_SPEC_VERSION) {
+    const specParsed = declarativePipelineSpecSchema.safeParse(merged);
+    if (!specParsed.success) {
+      throw new Error(
+        `Invalid declarative pipeline spec: ${JSON.stringify(specParsed.error.flatten().fieldErrors)}`
+      );
+    }
+
+    const compiled = await compileDeclarativePipelineSpec(userId, specParsed.data);
+    if (!compiled.ok) {
+      throw new Error(compiled.error);
+    }
+
+    return {
+      body: compiled.body,
+      upsert,
+      specVersion: 2,
+      declarativeSpecYaml: yamlText.trimEnd() + "\n",
+    };
+  }
+
+  const parsed = createPipelineBodySchema.safeParse(merged);
+  if (!parsed.success) {
+    throw new Error(`Invalid pipeline declaration: ${JSON.stringify(parsed.error.flatten().fieldErrors)}`);
+  }
+
+  return { body: parsed.data, upsert, specVersion: 1 };
 }

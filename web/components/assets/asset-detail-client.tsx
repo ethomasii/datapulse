@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
+  Calendar,
   GitBranch,
   Layers,
   Loader2,
@@ -16,6 +17,8 @@ import { AssetCatalogAiPanel } from "@/components/assets/asset-catalog-ai-panel"
 import { AssetColumnsTable } from "@/components/assets/asset-columns-table";
 import { AssetConversationPanel } from "@/components/assets/asset-conversation-panel";
 import { AssetContractPanel } from "@/components/assets/asset-contract-panel";
+import { AssetHistoryPanel } from "@/components/assets/asset-history-panel";
+import { AssetSlicePanel } from "@/components/assets/asset-slice-panel";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 import {
   AssetFreshnessBadge,
@@ -172,6 +175,18 @@ export function AssetDetailClient({ assetKey }: { assetKey: string }) {
               <Layers className="h-4 w-4" /> Pipeline
             </Link>
             <Link
+              href={`/run-slices?pipeline=${asset.pipelineId}`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-sky-300 dark:border-slate-700 dark:text-slate-200"
+            >
+              <Calendar className="h-4 w-4" /> Slices
+            </Link>
+            <Link
+              href={`/observability?pipeline=${asset.pipelineId}`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-sky-300 dark:border-slate-700 dark:text-slate-200"
+            >
+              Metrics
+            </Link>
+            <Link
               href={`/runs?pipeline=${asset.pipelineId}`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-sky-300 dark:border-slate-700 dark:text-slate-200"
             >
@@ -258,6 +273,10 @@ export function AssetDetailClient({ assetKey }: { assetKey: string }) {
           </section>
 
           <AssetLineageGraph graph={lineage} highlightAssetId={asset.id} linkNodes />
+
+          <AssetHistoryPanel assetKey={asset.id} />
+
+          <AssetSlicePanel assetKey={asset.id} pipelineId={asset.pipelineId} />
         </div>
 
         <aside className="space-y-6">

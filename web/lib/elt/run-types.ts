@@ -10,6 +10,15 @@ const logEntrySchema = z.object({
 });
 
 /** Partial rollup for list views + live progress (merge into existing summary on PATCH). */
+const telemetrySystemSchema = z
+  .object({
+    cpuPercent: z.number().finite().min(0).max(100).optional(),
+    memoryMb: z.number().finite().nonnegative().optional(),
+    networkBytesIn: z.number().finite().nonnegative().optional(),
+    networkBytesOut: z.number().finite().nonnegative().optional(),
+  })
+  .strict();
+
 export const telemetrySummaryPatchSchema = z
   .object({
     rowsLoaded: z.number().finite().nonnegative().optional(),
@@ -18,6 +27,7 @@ export const telemetrySummaryPatchSchema = z
     currentPhase: z.string().max(256).optional(),
     currentResource: z.string().max(512).optional(),
     updatedAt: z.string().max(64).optional(),
+    system: telemetrySystemSchema.optional(),
   })
   .strict();
 
@@ -32,6 +42,15 @@ export const telemetrySampleSchema = z
     progress: z.number().finite().min(0).max(100).optional(),
     phase: z.string().max(128).optional(),
     resource: z.string().max(512).optional(),
+    system: telemetrySystemSchema.optional(),
+  })
+  .strict();
+
+const resourceRollupSchema = z
+  .object({
+    resource: z.string().max(512),
+    rows: z.number().finite().nonnegative().optional(),
+    bytes: z.number().finite().nonnegative().optional(),
   })
   .strict();
 
@@ -113,6 +132,8 @@ export const patchRunBodySchema = z.object({
   dbtRunResults: z.unknown().optional(),
   /** Raw dbt manifest.json artifact — enriches models with columns/descriptions. */
   dbtArtifactManifest: z.unknown().optional(),
+  /** Per-resource rollup (table/model stats) — stored under telemetry.resources. */
+  telemetryResources: z.array(resourceRollupSchema).max(500).optional(),
 });
 
 export type LogEntry = z.infer<typeof logEntrySchema>;

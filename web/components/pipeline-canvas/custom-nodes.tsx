@@ -241,8 +241,41 @@ export function DestinationNode({ id, data }: NodeProps) {
   );
 }
 
+export function ComponentNode({ id, data }: NodeProps) {
+  const update = useNodeDataUpdater(id);
+  const d = data as Record<string, unknown>;
+  const title = String(d.label ?? d.componentId ?? "Component");
+  const target = String(d.compileTarget ?? "");
+  const badge = String(d.compileBadge ?? target);
+  const ports = d.canvasPorts as { left?: boolean; right?: boolean } | undefined;
+
+  return (
+    <div className="min-w-[180px] rounded-lg border-2 border-violet-400 bg-white px-3 py-2 shadow-sm dark:border-violet-600 dark:bg-slate-900">
+      {ports?.left !== false ? (
+        <Handle type="target" position={Position.Left} className={handleClass("sky")} />
+      ) : null}
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-600 dark:text-violet-300">
+        {badge}
+      </p>
+      <NodeTitleField
+        value={title}
+        onChange={(v) => update({ label: v })}
+        accent="sky"
+        placeholder="Component"
+      />
+      {typeof d.compileHint === "string" && d.compileHint ? (
+        <p className="mt-1 line-clamp-2 text-[10px] text-slate-500">{d.compileHint}</p>
+      ) : null}
+      {ports?.right !== false ? (
+        <Handle type="source" position={Position.Right} className={handleClass("sky")} />
+      ) : null}
+    </div>
+  );
+}
+
 export const pipelineNodeTypes = {
   sourceNode: SourceNode,
   transformNode: TransformNode,
   destNode: DestinationNode,
+  componentNode: ComponentNode,
 };

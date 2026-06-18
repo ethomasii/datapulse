@@ -106,12 +106,18 @@ model User {
   /// When set, unrouted runs (no pipeline default, no per-run override) pin to this named gateway. Distinct from legacy `agentToken`.
   defaultAgentTokenId String?     @unique @map("default_agent_token_id")
   defaultAgentToken    AgentToken? @relation("UserAccountDefaultGateway", fields: [defaultAgentTokenId], references: [id], onDelete: SetNull)
+  /// Default landing warehouse / lake for declarative `destination: @workspace` pipelines.
+  defaultDestinationConnectionId String? @map("default_destination_connection_id")
+  defaultDestinationConnection   Connection? @relation("UserDefaultDestination", fields: [defaultDestinationConnectionId], references: [id], onDelete: SetNull)
 
   @@index([organizationId])
   @@index([defaultAgentTokenId])
+  @@index([defaultDestinationConnectionId])
   /// Named agent connectors (AWS, GCP, on-prem, etc.) — each has its own Bearer token and heartbeat.
   agentTokens AgentToken[]
   workspaceApiKeys WorkspaceApiKey[]
+  observabilityAlertRules ObservabilityAlertRule[]
+  eltWorkflows EltWorkflow[]
 }
 
 /// Per-user agent API token (multiple connectors: one per cloud, on-prem, etc.).
@@ -161,6 +167,9 @@ model Organization {
   /// Named gateway default for unrouted runs when working in this org (Clerk org session).
   defaultAgentTokenId String?     @unique @map("default_agent_token_id")
   defaultAgentToken    AgentToken? @relation("OrganizationDefaultGateway", fields: [defaultAgentTokenId], references: [id], onDelete: SetNull)
+  /// Org-wide default destination for declarative pipelines (`destination: @workspace`).
+  defaultDestinationConnectionId String? @map("default_destination_connection_id")
+  defaultDestinationConnection   Connection? @relation("OrganizationDefaultDestination", fields: [defaultDestinationConnectionId], references: [id], onDelete: SetNull)
   /// Optional floor for sensor checks (seconds). If set, overrides plan-tier default for this org (e.g. enterprise contract).
   sensorPollIntervalSecondsOverride Int? @map("sensor_poll_interval_seconds_override")
   createdAt   DateTime @default(now())
@@ -172,6 +181,7 @@ model Organization {
 
   @@index([ownerUserId])
   @@index([defaultAgentTokenId])
+  @@index([defaultDestinationConnectionId])
   @@map("Organization")
 }
 
@@ -217,6 +227,8 @@ model Connection {
   pipelinesAsSource      EltPipeline[] @relation("PipelineSourceConnection")
   pipelinesAsDestination EltPipeline[] @relation("PipelineDestinationConnection")
   dbtProjectsAsDestination DbtProject[] @relation("DbtProjectDestination")
+  usersAsDefaultDestination User[] @relation("UserDefaultDestination")
+  organizationsAsDefaultDestination Organization[] @relation("OrganizationDefaultDestination")
 }
 
 /// eltPulse monitor — evaluated on the control plane and/or your gateway depending on `executionHost` + account plane.
@@ -401,6 +413,9 @@ model CatalogAssetComment {
   parentId    String?  @map("parent_id")
   parent      CatalogAssetComment? @relation("CommentThread", fields: [parentId], references: [id], onDelete: Cascade)
   replies     CatalogAssetComment[] @relation("CommentThread")
+  /// Slack thread anchor for two-way sync
+  slackChannel String? @map("slack_channel")
+  slackTs      String? @map("slack_ts")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -478,6 +493,8 @@ model EltPipeline {
   /// Optional link to a workspace dbt project (config synced into sourceConfiguration.dbt).
   dbtProjectId            String? @map("dbt_project_id")
   dbtProject              DbtProject? @relation(fields: [dbtProjectId], references: [id], onDelete: SetNull)
+  /// Authoritative declarative pipeline YAML (v2) when applied via GitOps or spec editor.
+  declarativeSpecYaml     String? @map("declarative_spec_yaml") @db.Text
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -569,6 +586,49 @@ model WorkspaceApiKey {
 
   @@index([userId])
   @@map("workspace_api_key")
+}
+
+/// Observability alert rule — success rate, freshness, row-drop thresholds.
+model ObservabilityAlertRule {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  enabled     Boolean  @default(true)
+  /// success_rate | freshness_hours | row_drop_pct | failed_runs
+  metric      String
+  /// lt | gt | lte | gte
+  operator    String   @default("lt")
+  threshold   Float
+  windowDays  Int      @default(7) @map("window_days")
+  pipelineId  String?  @map("pipeline_id")
+  /// POST account runsWebhookUrl or per-pipeline override when triggered
+  notifyWebhook Boolean @default(true) @map("notify_webhook")
+  lastTriggeredAt DateTime? @map("last_triggered_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([pipelineId])
+  @@map("ObservabilityAlertRule")
+}
+
+/// Lightweight workflow DAG — pipeline chains after success (Lakeflow Jobs lite).
+model EltWorkflow {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  enabled     Boolean  @default(true)
+  description String?  @db.Text
+  /// { nodes: [{ id, type: pipeline|monitor|webhook, pipelineId?, monitorId? }], edges: [{ from, to, on: success|failure|always }] }
+  definition  Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("EltWorkflow")
 }
 
 /// Pending email invites to join an organization workspace.

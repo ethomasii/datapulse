@@ -10,6 +10,8 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { sanitizeForRunStorage } from "@/lib/elt/run-log-sanitize";
+import { startSystemMetricsSampler } from "@/lib/elt/agent-system-metrics";
+import { parseLogLineForTelemetry } from "@/lib/elt/telemetry-log-parser";
 import { pipelineToolLabel } from "@/lib/elt/pipeline-tool-labels";
 import {
   fetchPendingManagedRunIds,
@@ -67,20 +69,24 @@ async function appendLogLine(
   line: string
 ) {
   const message = sanitizeForRunStorage(`[${stream}] ${line}`, 4000);
+  const parsed = parseLogLineForTelemetry(line);
   await patchOrThrow(baseUrl, secret, runId, {
     status: "running",
     appendLog: { level: stream === "stderr" ? "warn" : "info", message },
+    ...(parsed?.patch ?? {}),
   });
 }
 
 function mergeEnv(
   base: NodeJS.ProcessEnv,
   a: Record<string, string> | null | undefined,
-  b: Record<string, string> | null | undefined
+  b: Record<string, string> | null | undefined,
+  c?: Record<string, string> | null | undefined
 ): NodeJS.ProcessEnv {
   const out: NodeJS.ProcessEnv = { ...base };
   if (a) for (const [k, v] of Object.entries(a)) if (v) out[k] = v;
   if (b) for (const [k, v] of Object.entries(b)) if (v) out[k] = v;
+  if (c) for (const [k, v] of Object.entries(c)) if (v) out[k] = v;
   return out;
 }
 
@@ -222,7 +228,12 @@ export async function executeManagedRunLocalProcess(options: {
     const childEnv = mergeEnv(
       process.env,
       ctx.connections.source?.secrets,
-      ctx.connections.destination?.secrets
+      ctx.connections.destination?.secrets,
+      {
+        ELTPULSE_RUN_ID: runId,
+        ELTPULSE_CONTROL_PLANE_URL: baseUrl,
+        ...(secret ? { ELTPULSE_INTERNAL_API_SECRET: secret } : {}),
+      }
     );
 
     const timeoutMs = Math.max(
@@ -231,6 +242,9 @@ export async function executeManagedRunLocalProcess(options: {
     );
 
     let exitCode: number | null = 1;
+    const metricsSampler = startSystemMetricsSampler(async (body) => {
+      await patchOrThrow(baseUrl, secret, runId, body as PatchRunBody);
+    });
     try {
       const child = spawnPipelineChild(dir, tool, ctx.run.partitionValue, childEnv, timeoutMs);
       let settledCode = 1;
@@ -255,6 +269,8 @@ export async function executeManagedRunLocalProcess(options: {
         telemetrySummary: { currentPhase: "failed", progress: 100 },
       });
       return "ran";
+    } finally {
+      metricsSampler.stop();
     }
 
     if (exitCode === 0) {

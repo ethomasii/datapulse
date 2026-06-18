@@ -16,6 +16,9 @@ import { computePipelineFreshness } from "@/lib/elt/asset-freshness";
 import { enrichBundleAssetFreshness, resourcesTouchedFromTelemetry } from "@/lib/elt/asset-level-freshness";
 import { computeDbtAssetDiff, type DbtAssetDiff } from "@/lib/elt/asset-dbt-diff";
 import { enrichBundleFromDbtManifest } from "@/lib/elt/asset-dbt-enrich";
+import { readMedallionHints } from "@/lib/elt/compile-declarative-pipeline";
+import { inferMedallionLayer } from "@/lib/elt/medallion-layer";
+import type { MedallionLayer } from "@/lib/elt/declarative-pipeline-spec";
 
 export type PipelineSyncMode = "connector_sync" | "database_replication";
 
@@ -56,6 +59,8 @@ export type WorkspaceAsset = {
   catalogDisplayName?: string;
   /** Column count from catalog metadata when known. */
   catalogColumnCount?: number;
+  /** Medallion architecture layer when inferable (bronze / silver / gold). */
+  medallionLayer?: MedallionLayer;
   enabled: boolean;
 };
 
@@ -466,6 +471,12 @@ export function derivePipelineAssets(pipeline: PipelineAssetInput): PipelineAsse
   const transforms = resolveTransformAssets(pipeline, config, syncMode, landingDataset);
   const postTransforms = resolvePostTransformAssets(pipeline, config, syncMode);
 
+  const medallionHints = readMedallionHints(config);
+  const withMedallion = (asset: WorkspaceAsset): WorkspaceAsset => {
+    const layer = inferMedallionLayer(asset.kind, medallionHints);
+    return layer ? { ...asset, medallionLayer: layer } : asset;
+  };
+
   const bundle: PipelineAssetBundle = {
     pipelineId: pipeline.id,
     pipelineName: pipeline.name,
@@ -477,9 +488,9 @@ export function derivePipelineAssets(pipeline: PipelineAssetInput): PipelineAsse
     freshness: "never_run",
     freshnessLabel: "Never run",
     source: sourceAsset,
-    rawAssets,
-    transforms,
-    postTransforms,
+    rawAssets: rawAssets.map(withMedallion),
+    transforms: transforms.map(withMedallion),
+    postTransforms: postTransforms.map(withMedallion),
     updatedAt:
       pipeline.updatedAt instanceof Date ? pipeline.updatedAt.toISOString() : String(pipeline.updatedAt),
   };

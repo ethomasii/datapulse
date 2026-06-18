@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { prismaSchemaDriftResponse } from "@/lib/db/prisma-schema-drift-response";
-import { parsePipelineDeclarationYaml } from "@/lib/elt/parse-pipeline-declaration";
+import { parseAndCompileDeclarativeYaml } from "@/lib/elt/parse-pipeline-declaration";
 import { createPipelineDefinition, upsertPipelineDefinition } from "@/lib/elt/persist-pipeline";
 
 /**
  * POST /api/elt/pipelines/declaration
  *
- * Apply a pipeline from **declarative YAML** (GitOps-friendly). Same fields as `POST /api/elt/pipelines` JSON.
+ * Apply a pipeline from **declarative YAML** (GitOps-friendly). Supports v1 flat keys and **v2 declarative spec** (`eltpulse_pipeline: 2`).
  *
  * - Body: raw YAML with `Content-Type: application/yaml` or `text/yaml`, **or** JSON `{ "declaration": "<yaml string>" }`.
  * - Query: `mode=upsert` forces create-or-replace by `name` + resolved tool. Otherwise use `upsert: true` in YAML.
@@ -60,9 +60,9 @@ export async function POST(req: Request) {
     }
   }
 
-  let parsed: ReturnType<typeof parsePipelineDeclarationYaml>;
+  let parsed: Awaited<ReturnType<typeof parseAndCompileDeclarativeYaml>>;
   try {
-    parsed = parsePipelineDeclarationYaml(yamlText);
+    parsed = await parseAndCompileDeclarativeYaml(user.id, yamlText);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: msg }, { status: 400 });
@@ -70,10 +70,15 @@ export async function POST(req: Request) {
 
   const wantUpsert = modeParam === "upsert" || parsed.upsert;
 
+  const persistOpts =
+    parsed.declarativeSpecYaml !== undefined
+      ? { declarativeSpecYaml: parsed.declarativeSpecYaml }
+      : undefined;
+
   try {
     const result = wantUpsert
-      ? await upsertPipelineDefinition(user.id, parsed.body)
-      : await createPipelineDefinition(user.id, parsed.body);
+      ? await upsertPipelineDefinition(user.id, parsed.body, persistOpts)
+      : await createPipelineDefinition(user.id, parsed.body, persistOpts);
 
     if (!result.ok) {
       return NextResponse.json({ error: result.message }, { status: result.status });

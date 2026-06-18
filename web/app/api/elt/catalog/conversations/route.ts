@@ -8,26 +8,67 @@ import {
 import { hasCatalogReadScope, hasCatalogWriteScope } from "@/lib/auth/workspace-auth-helpers";
 import { db } from "@/lib/db/client";
 import { assetDetailHref } from "@/lib/elt/asset-path";
+import {
+  postSlackCatalogMessage,
+  postSlackCatalogWebhook,
+  slackCatalogConfig,
+} from "@/lib/elt/slack-catalog";
 
-async function maybeNotifySlack(input: {
+async function notifySlackNewThread(input: {
+  commentId: string;
   assetKey: string;
   authorName: string;
   body: string;
   assetLabel?: string;
 }) {
-  const webhook = process.env.SLACK_CATALOG_WEBHOOK_URL?.trim();
-  if (!webhook) return;
-
+  const cfg = slackCatalogConfig();
   const origin = process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://app.eltpulse.com";
   const link = `${origin}${assetDetailHref(input.assetKey)}`;
+  const label = input.assetLabel ?? input.assetKey.split(":").pop() ?? input.assetKey;
+  const text = `💬 *${input.authorName}* on *${label}*:\n${input.body.slice(0, 500)}\n<${link}|Open in catalog>`;
 
-  await fetch(webhook, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      text: `💬 *${input.authorName}* on *${input.assetLabel ?? input.assetKey}*:\n${input.body.slice(0, 500)}\n<${link}|Open in catalog>`,
-    }),
-  }).catch(() => undefined);
+  if (cfg.botEnabled) {
+    const posted = await postSlackCatalogMessage({ text });
+    if (posted.ok && posted.channel && posted.ts) {
+      await db.catalogAssetComment.update({
+        where: { id: input.commentId },
+        data: { slackChannel: posted.channel, slackTs: posted.ts },
+      });
+    }
+    return;
+  }
+
+  if (cfg.webhookEnabled) {
+    await postSlackCatalogWebhook(text);
+  }
+}
+
+async function notifySlackReply(input: {
+  parentId: string;
+  authorName: string;
+  body: string;
+}) {
+  const cfg = slackCatalogConfig();
+  if (!cfg.botEnabled) return;
+
+  const parent = await db.catalogAssetComment.findUnique({ where: { id: input.parentId } });
+  if (!parent) return;
+
+  let threadTs = parent.slackTs;
+  let assetKey = parent.assetKey;
+  if (!threadTs && parent.parentId) {
+    const root = await db.catalogAssetComment.findUnique({ where: { id: parent.parentId } });
+    threadTs = root?.slackTs ?? null;
+    assetKey = root?.assetKey ?? parent.assetKey;
+  }
+  if (!threadTs) return;
+
+  const origin = process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://app.eltpulse.com";
+  const link = `${origin}${assetDetailHref(assetKey)}`;
+  await postSlackCatalogMessage({
+    text: `↩️ *${input.authorName}* replied:\n${input.body.slice(0, 500)}\n<${link}|Open in catalog>`,
+    threadTs,
+  });
 }
 
 export async function GET(req: Request) {
@@ -49,7 +90,13 @@ export async function GET(req: Request) {
     },
   });
 
-  return NextResponse.json({ assetKey, comments, slackEnabled: Boolean(process.env.SLACK_CATALOG_WEBHOOK_URL) });
+  const slack = slackCatalogConfig();
+  return NextResponse.json({
+    assetKey,
+    comments,
+    slackEnabled: slack.webhookEnabled || slack.botEnabled,
+    slackTwoWay: slack.twoWayEnabled,
+  });
 }
 
 const postSchema = z.object({
@@ -86,8 +133,15 @@ export async function POST(req: Request) {
   });
 
   if (!body.parentId) {
-    void maybeNotifySlack({
+    void notifySlackNewThread({
+      commentId: comment.id,
       assetKey: body.assetKey,
+      authorName,
+      body: body.body.trim(),
+    });
+  } else {
+    void notifySlackReply({
+      parentId: body.parentId,
       authorName,
       body: body.body.trim(),
     });

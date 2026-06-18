@@ -102,10 +102,27 @@ export default function GatewayDocsPage() {
         monitor polling, spawn commands for isolated workers, etc. Read{" "}
         <code>integrations/gateway/README.md</code> in the source tree for the full list.
       </p>
+      <p>
+        <strong>System metrics</strong> (CPU / RAM on the worker process) are sampled by default and PATCHed on each run
+        via <code>telemetrySummary.system</code> and <code>appendTelemetrySample.system</code> (<code>cpuPercent</code>,{" "}
+        <code>memoryMb</code>). Disable with <code>ELTPULSE_SYSTEM_METRICS=0</code>; interval with{" "}
+        <code>ELTPULSE_SYSTEM_METRICS_INTERVAL_MS</code> (default 20000). The Node reference gateway uses built-in{" "}
+        <code>process.cpuUsage()</code> / <code>process.memoryUsage()</code>; Python executors can{" "}
+        <code>pip install psutil</code> and reuse the same PATCH shape.
+      </p>
 
       <h2>Reference gateway (this repository)</h2>
       <p>
-        A minimal Node implementation lives at <code>integrations/gateway/</code> in the{" "}
+        Customer-facing source lives in{" "}
+        <a href="https://github.com/eltpulsehq/integrations" target="_blank" rel="noreferrer">
+          eltpulsehq/integrations
+        </a>
+        : a lightweight <strong>gateway</strong> (poll + claim + launch) and a <strong>worker</strong> image per run (
+        <code>ghcr.io/eltpulsehq/gateway-worker</code>) that executes dlt/Sling and PATCHes logs/telemetry directly to the
+        control plane. The monorepo mirrors the same layout under <code>integrations/</code>.
+      </p>
+      <p>
+        A minimal Node implementation also lives at <code>integrations/gateway/</code> in the{" "}
         <a href="https://github.com/eltpulsehq/integrations" target="_blank" rel="noreferrer">
           eltpulsehq/integrations
         </a>{" "}

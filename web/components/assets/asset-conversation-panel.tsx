@@ -21,6 +21,7 @@ export function AssetConversationPanel({ assetKey, assetLabel }: { assetKey: str
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
   const [slackEnabled, setSlackEnabled] = useState(false);
+  const [slackTwoWay, setSlackTwoWay] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -28,9 +29,10 @@ export function AssetConversationPanel({ assetKey, assetLabel }: { assetKey: str
     try {
       const res = await fetch(`/api/elt/catalog/conversations?assetKey=${encodeURIComponent(assetKey)}`);
       if (res.ok) {
-        const data = (await res.json()) as { comments: Comment[]; slackEnabled?: boolean };
+        const data = (await res.json()) as { comments: Comment[]; slackEnabled?: boolean; slackTwoWay?: boolean };
         setComments(data.comments ?? []);
         setSlackEnabled(Boolean(data.slackEnabled));
+        setSlackTwoWay(Boolean(data.slackTwoWay));
       }
     } finally {
       setLoading(false);
@@ -76,7 +78,11 @@ export function AssetConversationPanel({ assetKey, assetLabel }: { assetKey: str
       <p className="mt-1 text-xs text-slate-500">
         Ask questions, leave notes for consumers, or flag data quality issues on{" "}
         {assetLabel ?? "this asset"}.
-        {slackEnabled ? " New threads also post to Slack." : null}
+        {slackEnabled
+          ? slackTwoWay
+            ? " New threads post to Slack and replies sync both ways."
+            : " New threads also post to Slack."
+          : null}
       </p>
 
       {loading ? (

@@ -1,6 +1,7 @@
 import type { PipelineRequest } from "./types";
 import { escapePyString } from "./escape-py";
 import { dltDbtRunnerBeforeReturn } from "./generate-dlt-dbt-append";
+import { eltpulseReportLoadInfoPython } from "./generate-eltpulse-run-reporting";
 import { postTransformBeforeReturn } from "./generate-post-transform";
 import { generateRestApiAdvanced, generateRestApiPipeline } from "./generate-dlt-rest";
 import { generatePostgresDltPipeline, generateStripePipeline } from "./generate-dlt-golden";
@@ -108,7 +109,7 @@ def run(partition_key: str = None):
         loader_file_format="${escapePyString(request.fileFormat ?? "parquet")}"
     )
 
-    print(f"Pipeline completed: {info}")${dltDbtRunnerBeforeReturn(request)}${postTransformBeforeReturn(request)}
+    print(f"Pipeline completed: {info}")${eltpulseReportLoadInfoPython("info")}${dltDbtRunnerBeforeReturn(request)}${postTransformBeforeReturn(request)}
     return info
 
 if __name__ == "__main__":
@@ -157,6 +158,8 @@ def run(partition_key: str = None):
     # Example placeholder
     data = [{"id": 1, "partition": partition_key, "source": "${escapePyString(request.sourceType)}"}]
 
+    print("[eltpulse] phase:extract", flush=True)
+    print("[eltpulse] phase:load", flush=True)
     info = pipeline.run(
         data,
         table_name="${escapePyString(request.sourceType)}_data",
@@ -164,7 +167,7 @@ def run(partition_key: str = None):
         loader_file_format="${escapePyString(request.fileFormat ?? "parquet")}"  # File format for file-based destinations
     )
 
-    print(f"Pipeline completed: {info}")${dltDbtRunnerBeforeReturn(request)}${postTransformBeforeReturn(request)}
+    print(f"Pipeline completed: {info}")${eltpulseReportLoadInfoPython("info")}${dltDbtRunnerBeforeReturn(request)}${postTransformBeforeReturn(request)}
     return info
 
 if __name__ == "__main__":

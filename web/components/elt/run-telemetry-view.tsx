@@ -2,7 +2,14 @@
 
 import type { RunTelemetry, TelemetrySample } from "@/lib/elt/run-telemetry";
 import { formatRunPhaseLabel } from "@/lib/elt/dbt-run-phases";
-import { effectiveRunTelemetry, formatBytes, formatRows } from "@/lib/elt/run-telemetry";
+import {
+  effectiveRunTelemetry,
+  formatBytes,
+  formatDurationMs,
+  formatRows,
+  phaseTimeline,
+} from "@/lib/elt/run-telemetry";
+import { resourceSyncStats } from "@/lib/elt/pipeline-health";
 
 function pickSeries(samples: TelemetrySample[]): { values: number[]; label: string; formatter: (n: number) => string } {
   const hasRows = samples.some((s) => typeof s.rows === "number");
@@ -238,6 +245,15 @@ export function RunTelemetrySummaryCards({ telemetry }: { telemetry: RunTelemetr
           ) : null}
         </div>
       )}
+      {s.system ? (
+        <div className="col-span-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-xs sm:col-span-4 dark:border-slate-700 dark:bg-slate-900/60">
+          <span className="font-semibold text-slate-600 dark:text-slate-400">Worker: </span>
+          {s.system.cpuPercent !== undefined ? `${Math.round(s.system.cpuPercent)}% CPU` : null}
+          {s.system.memoryMb !== undefined ? ` · ${Math.round(s.system.memoryMb)} MB RAM` : null}
+          {s.system.networkBytesIn !== undefined ? ` · ↓${formatBytes(s.system.networkBytesIn)}` : null}
+          {s.system.networkBytesOut !== undefined ? ` · ↑${formatBytes(s.system.networkBytesOut)}` : null}
+        </div>
+      ) : null}
     </div>
     </div>
   );
@@ -252,6 +268,11 @@ export function RunTelemetryView({
   logEntriesRaw?: unknown;
 }) {
   const telemetry = effectiveRunTelemetry(telemetryRaw, logEntriesRaw);
+  const phases = phaseTimeline(telemetry.samples);
+  const resources: { resource: string; rows?: number; bytes?: number }[] =
+    telemetry.resources?.length
+      ? telemetry.resources
+      : resourceSyncStats(telemetryRaw).map((r) => ({ resource: r.resource, rows: r.rows }));
 
   return (
     <div className="space-y-3">
@@ -259,12 +280,52 @@ export function RunTelemetryView({
         <span className="text-xs font-medium uppercase text-slate-500">Telemetry</span>
         <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
           Live samples via <code className="text-[11px]">PATCH</code> (<code className="text-[11px]">appendTelemetrySample</code> /{" "}
-          <code className="text-[11px]">telemetrySummary</code>). Same fields on{" "}
-          <code className="text-[11px]">/api/elt/runs/:id</code> and <code className="text-[11px]">/api/agent/runs/:id</code>.
+          <code className="text-[11px]">telemetrySummary</code>). Runners emit{" "}
+          <code className="text-[11px]">[eltpulse] phase:</code> and{" "}
+          <code className="text-[11px]">[eltpulse] resource:</code> markers for automatic parsing.
         </p>
       </div>
       <RunTelemetrySummaryCards telemetry={telemetry} />
       <TelemetryChart samples={telemetry.samples} />
+      {phases.length > 0 ? (
+        <div>
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Phase timeline</div>
+          <ul className="space-y-1 rounded-lg border border-slate-200 p-2 text-xs dark:border-slate-700">
+            {phases.map((p) => (
+              <li key={`${p.phase}-${p.startedAt}`} className="flex flex-wrap items-center gap-2">
+                <span className="font-medium text-slate-800 dark:text-slate-200">{formatRunPhaseLabel(p.phase)}</span>
+                <span className="text-slate-500">{new Date(p.startedAt).toLocaleTimeString()}</span>
+                {p.durationMs !== undefined ? (
+                  <span className="text-slate-400">({formatDurationMs(p.durationMs)})</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {resources.length > 0 ? (
+        <div>
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Per-resource stats</div>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-slate-500">
+                <th className="py-1 pr-2">Resource</th>
+                <th className="py-1 pr-2">Rows</th>
+                <th className="py-1">Bytes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {resources.map((r) => (
+                <tr key={r.resource} className="border-t border-slate-100 dark:border-slate-800">
+                  <td className="py-1 pr-2 font-mono">{r.resource}</td>
+                  <td className="py-1 pr-2 font-mono">{r.rows !== undefined ? formatRows(r.rows) : "—"}</td>
+                  <td className="py-1 font-mono">{r.bytes !== undefined ? formatBytes(r.bytes) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
       <p className="text-[10px] text-slate-400 dark:text-slate-500">{telemetry.samples.length} sample(s) stored (cap 2 000)</p>
     </div>
   );

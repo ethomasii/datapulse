@@ -19,6 +19,11 @@ export type PersistPipelineSuccess = {
   created: boolean;
 };
 
+export type PersistPipelineOptions = {
+  /** Store authoritative v2 declarative YAML on the pipeline row. */
+  declarativeSpecYaml?: string | null;
+};
+
 type PreparedPipelineWrite = {
   bodyMerged: CreatePipelineBody;
   bodyForArtifacts: CreatePipelineBody;
@@ -95,7 +100,8 @@ function isGatewayFailure(
  */
 export async function upsertPipelineDefinition(
   userId: string,
-  body: CreatePipelineBody
+  body: CreatePipelineBody,
+  options?: PersistPipelineOptions
 ): Promise<PersistPipelineSuccess | PersistPipelineFailure> {
   const prep = await prepareWrite(userId, body);
   if (isPersistFailure(prep)) return prep;
@@ -138,6 +144,9 @@ export async function upsertPipelineDefinition(
     runsWebhookUrl,
     ...(gw.defaultTargetAgentTokenId !== undefined ? { defaultTargetAgentTokenId: gw.defaultTargetAgentTokenId } : {}),
     ...(body.executionHost !== undefined ? { executionHost: body.executionHost } : {}),
+    ...(options?.declarativeSpecYaml !== undefined
+      ? { declarativeSpecYaml: options.declarativeSpecYaml }
+      : {}),
   };
 
   if (existing) {
@@ -162,7 +171,8 @@ export async function upsertPipelineDefinition(
 /** Create only — fails with 409 if the same name+tool already exists. */
 export async function createPipelineDefinition(
   userId: string,
-  body: CreatePipelineBody
+  body: CreatePipelineBody,
+  options?: PersistPipelineOptions
 ): Promise<PersistPipelineSuccess | PersistPipelineFailure> {
   const perms = await getWorkspacePermissions(userId);
   if (!perms.canWrite) {
@@ -227,6 +237,9 @@ export async function createPipelineDefinition(
       runsWebhookUrl,
       ...(gw.defaultTargetAgentTokenId !== undefined ? { defaultTargetAgentTokenId: gw.defaultTargetAgentTokenId } : {}),
       ...(body.executionHost !== undefined ? { executionHost: body.executionHost } : {}),
+      ...(options?.declarativeSpecYaml !== undefined
+        ? { declarativeSpecYaml: options.declarativeSpecYaml }
+        : {}),
     },
   });
 

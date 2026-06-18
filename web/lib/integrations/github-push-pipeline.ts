@@ -1,7 +1,7 @@
 import { db } from "@/lib/db/client";
 import { getGithubConnectionForUser } from "@/lib/db/github-connection-query";
 import { ELTPULSE_REPO } from "@/lib/elt/eltpulse-repo-layout";
-import { eltPipelineToDeclarationYamlString } from "@/lib/elt/pipeline-to-declaration-yaml";
+import { eltPipelineToDeclarativeYamlString } from "@/lib/elt/pipeline-spec-export";
 import { getGithubAccessTokenForUser } from "@/lib/integrations/github-access-token";
 import { githubJson, githubRepoContentsApiPath } from "@/lib/integrations/github-rest";
 import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
@@ -53,7 +53,7 @@ export async function pushPipelineToGithub(
     return { ok: false, error: "Pipeline not found" };
   }
 
-  const yamlText = eltPipelineToDeclarationYamlString(row);
+  const yamlText = await eltPipelineToDeclarativeYamlString(row);
   const relPath = `${ELTPULSE_REPO.pipelinesDir}/${row.name}.yaml`;
   const fileUrlPath = githubRepoContentsApiPath(ctx.owner, ctx.name, relPath);
   const fileUrlWithRef = `${fileUrlPath}?ref=${encodeURIComponent(ctx.branch)}`;

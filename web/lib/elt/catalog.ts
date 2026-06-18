@@ -28,7 +28,7 @@ function buildSourceGroups(): Record<string, readonly string[]> {
   // Also include storage / file / database types not in the registry
   // (used by Sling replication pipelines)
   const extras: Record<string, string[]> = {
-    "Cloud Storage": ["s3", "gcs", "azure_blob"],
+    "Cloud Storage": ["s3", "gcs", "azure_blob", "iceberg"],
     Databases: ["postgres", "mysql", "mongodb", "mssql", "oracle", "duckdb", "sqlite"],
     Files: ["csv", "json", "parquet"],
   };
@@ -62,7 +62,7 @@ export const SOURCE_GROUPS: Record<string, readonly string[]> = buildSourceGroup
 export const DESTINATION_GROUPS: Record<string, readonly string[]> = {
   "Cloud Warehouses": ["snowflake", "bigquery", "redshift", "databricks"],
   Databases: ["postgres", "mysql", "duckdb", "motherduck", "clickhouse", "mssql", "sqlite"],
-  "Cloud Storage": ["s3", "gcs", "azure_blob"],
+  "Cloud Storage": ["s3", "gcs", "azure_blob", "iceberg"],
 };
 
 export const SOURCE_TYPES = Array.from(new Set(Object.values(SOURCE_GROUPS).flat())) as string[];

@@ -1,13 +1,17 @@
-# eltPulse gateway — published as ghcr.io/eltpulsehq/gateway:latest from this repo.
-FROM node:22-alpine
+# eltPulse gateway — published as ghcr.io/eltpulsehq/gateway:latest
+#
+# Lightweight polling process only — no pipeline runtimes needed here.
+# Pipeline code runs in ghcr.io/eltpulsehq/gateway-worker containers/jobs
+# launched by the docker / kubernetes / ecs executors.
+
+FROM node:20-slim
 
 WORKDIR /app
+COPY lib ./lib
+COPY gateway/package.json ./gateway/package.json
+COPY gateway/src ./gateway/src
 
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
-
-COPY src ./src
-
+WORKDIR /app/gateway
 ENV NODE_ENV=production
 
 USER node

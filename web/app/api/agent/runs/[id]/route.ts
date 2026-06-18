@@ -13,6 +13,7 @@ import { getAgentAuthContext } from "@/lib/agent/auth";
 import { agentCanMutateRun } from "@/lib/agent/gateway-routing";
 import { applyPatchRunBody } from "@/lib/elt/apply-run-patch";
 import { syncCatalogFromDbtManifest } from "@/lib/elt/catalog-sync-from-run";
+import { maybeDispatchContractAlerts } from "@/lib/elt/maybe-dispatch-contract-alerts";
 import { maybeDispatchRunWebhook } from "@/lib/elt/maybe-dispatch-run-webhook";
 import { parseRunTelemetry } from "@/lib/elt/run-telemetry";
 import { patchRunBodySchema } from "@/lib/elt/run-types";
@@ -137,6 +138,7 @@ export async function PATCH(req: Request, { params }: Params) {
       if (tel.dbt) {
         void syncCatalogFromDbtManifest(user.id, existing.pipelineId, tel.dbt).catch(() => undefined);
       }
+      void maybeDispatchContractAlerts(run.id, user.id).catch(() => undefined);
     }
   }
 

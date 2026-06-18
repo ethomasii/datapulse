@@ -1,0 +1,60 @@
+# Declarative pipeline spec v2 — vendor-agnostic (Snowflake, Postgres, DuckDB, S3/Iceberg, …)
+#
+# curl -H "Authorization: Bearer <session>" -H "Content-Type: application/yaml" \
+#   --data-binary @examples/eltpulse-pipeline.declarative.v2.example.yaml \
+#   "https://app.example.com/api/elt/pipelines/declaration?mode=upsert"
+#
+# Set a workspace default destination under Connections, then use destination: "@workspace".
+
+eltpulse_pipeline: 2
+upsert: true
+
+name: stripe_revenue_to_lake
+source: stripe
+destination: "@workspace"
+tool: auto
+
+description: "Incremental Stripe billing data with post-load dbt transforms."
+
+tables:
+  - customers
+  - charges
+  - subscriptions
+
+sync:
+  mode: incremental
+  cursor: created
+
+slices:
+  column: created
+  granularity: day
+  note: "Daily backfill slices; gateway passes partition_value from run.partitionValue."
+
+transform:
+  dbt:
+    enabled: true
+    package_path: https://github.com/yourorg/dbt-analytics.git
+    select: tag:revenue
+
+# Dagster-components-style extensible steps (quality, dbt, sql, python)
+components:
+  - id: quality_charges
+    type: quality
+    config:
+      table: charges
+      not_null: [id, amount]
+
+quality:
+  - table: customers
+    not_null: [id]
+
+medallion:
+  landing: bronze
+  transform: gold
+
+schedule:
+  enabled: true
+  cron: "0 6 * * *"
+  timezone: America/New_York
+
+executionHost: inherit

@@ -42,6 +42,7 @@ import { attachCanvasToSourceConfiguration } from "@/lib/elt/merge-canvas-into-s
 import { minimalSourceConfigurationForNewPipeline } from "@/lib/elt/minimal-source-configuration";
 import { ensureGithubReposForForm } from "@/lib/elt/normalize-source-configuration";
 import clsx from "clsx";
+import { ComponentPalette } from "@/components/elt/component-palette";
 
 type PipelineRow = { id: string; name: string };
 
@@ -1027,6 +1028,12 @@ export function CanvasPageClient() {
                 )}
                 aria-label="Pipeline settings"
               >
+                {inspectorFocus.kind === "none" ? (
+                  <ComponentPalette
+                    className="mb-4 h-[280px] lg:h-[320px]"
+                    onSelect={(c) => canvasControlRef.current?.addComponentNode(c)}
+                  />
+                ) : null}
                 {renderCanvasInspectorPanel(inspectorFocus)}
               </aside>
             </>

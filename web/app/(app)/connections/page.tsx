@@ -171,10 +171,14 @@ function ConnectionRow({
   conn,
   usedBy,
   onDelete,
+  isWorkspaceDefault,
+  onSetAsDefault,
 }: {
   conn: Connection;
   usedBy: PipelineUsage[];
   onDelete: (id: string) => void;
+  isWorkspaceDefault?: boolean;
+  onSetAsDefault?: (id: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -269,6 +273,11 @@ function ConnectionRow({
             {conn.connectionType}
           </span>
           <span className="text-sm text-slate-500 dark:text-slate-400">{connectorLabel(conn.connector)}</span>
+          {isWorkspaceDefault && conn.connectionType === "destination" ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+              Default lake
+            </span>
+          ) : null}
           {usedBy.length > 0 ? (
             <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300">
               {usedBy.length} pipeline{usedBy.length !== 1 ? "s" : ""}
@@ -302,6 +311,24 @@ function ConnectionRow({
 
       {open && (
         <div className="border-t border-slate-100 px-4 pb-4 pt-4 dark:border-slate-800">
+          {conn.connectionType === "destination" && onSetAsDefault ? (
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onSetAsDefault(isWorkspaceDefault ? null : conn.id)}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+                  isWorkspaceDefault
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+                    : "border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                }`}
+              >
+                {isWorkspaceDefault ? "Clear workspace default" : "Set as workspace default lake"}
+              </button>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                Used when declarative pipelines specify <code className="font-mono">destination: &quot;@workspace&quot;</code>
+              </span>
+            </div>
+          ) : null}
           {usedBy.length > 0 && (
             <div className="mb-4 rounded-lg border border-sky-100 bg-sky-50/60 px-3 py-2.5 dark:border-sky-900 dark:bg-sky-900/10">
               <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">Used by {usedBy.length} pipeline{usedBy.length !== 1 ? "s" : ""}</p>
@@ -564,14 +591,17 @@ export default function ConnectionsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [migrationPending, setMigrationPending] = useState(false);
   const [filter, setFilter] = useState<"all" | ConnectionType>("all");
+  const [defaultDestinationConnectionId, setDefaultDestinationConnectionId] = useState<string | null>(null);
+  const [defaultDestinationName, setDefaultDestinationName] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const [connRes, pipRes] = await Promise.all([
+      const [connRes, pipRes, defaultsRes] = await Promise.all([
         apiFetch("/api/elt/connections"),
         apiFetch("/api/elt/pipelines"),
+        apiFetch("/api/elt/workspace-defaults"),
       ]);
       if (connRes.status === 401) {
         setConnections([]);
@@ -615,6 +645,18 @@ export default function ConnectionsPage() {
           /* usage map is optional context */
         }
       }
+      if (defaultsRes.ok) {
+        try {
+          const d = (await defaultsRes.json()) as {
+            defaultDestinationConnectionId?: string | null;
+            defaultDestinationName?: string | null;
+          };
+          setDefaultDestinationConnectionId(d.defaultDestinationConnectionId ?? null);
+          setDefaultDestinationName(d.defaultDestinationName ?? null);
+        } catch {
+          /* optional */
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -632,6 +674,21 @@ export default function ConnectionsPage() {
 
   function onCreated(c: Connection) {
     setConnections((prev) => [c, ...prev]);
+  }
+
+  async function setWorkspaceDefaultDestination(id: string | null) {
+    const res = await apiFetch("/api/elt/workspace-defaults", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ defaultDestinationConnectionId: id }),
+    });
+    if (!res.ok) return;
+    const d = (await res.json()) as {
+      defaultDestinationConnectionId?: string | null;
+      defaultDestinationName?: string | null;
+    };
+    setDefaultDestinationConnectionId(d.defaultDestinationConnectionId ?? null);
+    setDefaultDestinationName(d.defaultDestinationName ?? null);
   }
 
   const visible = connections.filter((c) => filter === "all" || c.connectionType === filter);
@@ -660,6 +717,25 @@ export default function ConnectionsPage() {
         </div>
         <CreateConnectionForm onCreated={onCreated} />
       </div>
+
+      {defaultDestinationName ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+          <p className="text-sm font-semibold text-emerald-950 dark:text-emerald-100">
+            Workspace default lake: {defaultDestinationName}
+          </p>
+          <p className="mt-1 text-xs text-emerald-900/90 dark:text-emerald-100/90">
+            Declarative pipelines can use <code className="font-mono">destination: &quot;@workspace&quot;</code> to land
+            data here — Snowflake, Postgres, DuckDB, MotherDuck, S3/Parquet, or any saved destination profile.
+          </p>
+        </div>
+      ) : destCount > 0 ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+          <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">No workspace default lake yet</p>
+          <p className="mt-1 text-xs text-amber-900/90 dark:text-amber-100/90">
+            Expand a destination connection and set it as the workspace default to streamline declarative pipelines.
+          </p>
+        </div>
+      ) : null}
 
       <div className="rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 dark:border-sky-900/50 dark:bg-sky-950/25">
         <div className="flex flex-wrap items-start gap-2">
@@ -758,7 +834,14 @@ export default function ConnectionsPage() {
       ) : (
         <ul className="space-y-2">
           {visible.map((conn) => (
-            <ConnectionRow key={conn.id} conn={conn} usedBy={pipelineUsage[conn.id] ?? []} onDelete={remove} />
+            <ConnectionRow
+              key={conn.id}
+              conn={conn}
+              usedBy={pipelineUsage[conn.id] ?? []}
+              onDelete={remove}
+              isWorkspaceDefault={conn.id === defaultDestinationConnectionId}
+              onSetAsDefault={setWorkspaceDefaultDestination}
+            />
           ))}
         </ul>
       )}

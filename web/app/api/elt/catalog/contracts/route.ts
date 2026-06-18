@@ -34,7 +34,8 @@ export async function GET(req: Request) {
   });
 
   if (!assetKey) {
-    return NextResponse.json({ contracts });
+    const perms = await getWorkspacePermissions(auth.user.id);
+    return NextResponse.json({ contracts, canEditCatalog: perms.canEditCatalog });
   }
 
   const linked = contracts.filter((c) => c.assets.some((a) => a.assetKey === assetKey));

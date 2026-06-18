@@ -76,7 +76,23 @@ type PipelineRow = {
   executionHost: PipelineExecutionHost;
 };
 
-type FormMode = "structured" | "json";
+type FormMode = "structured" | "json" | "spec";
+
+const DEFAULT_SPEC_YAML = `# Declarative pipeline spec v2
+eltpulse_pipeline: 2
+upsert: true
+
+name: my_pipeline
+source: github
+destination: "@workspace"
+tool: auto
+
+tables:
+  - issues
+
+sync:
+  mode: incremental
+`;
 
 export function BuilderClient({
   initialEditPipelineId = null,
@@ -114,6 +130,7 @@ export function BuilderClient({
   const [destinationType, setDestinationType] = useState("duckdb");
   const [description, setDescription] = useState("");
   const [formMode, setFormMode] = useState<FormMode>("structured");
+  const [specYaml, setSpecYaml] = useState(DEFAULT_SPEC_YAML);
   const [sourceJson, setSourceJson] = useState("{}");
   /** Full `sourceConfiguration` for guided mode (SOURCE_CONFIGURATIONS + extras). */
   const [sourceCfg, setSourceCfg] = useState<Record<string, unknown>>(() =>
@@ -358,7 +375,39 @@ export function BuilderClient({
     }
   }
 
+  async function saveSpecYaml(e: React.FormEvent) {
+    e.preventDefault();
+    setCreating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/elt/pipelines/declaration?mode=upsert", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ declaration: specYaml }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(typeof err.error === "string" ? err.error : JSON.stringify(err));
+      }
+      const data = (await res.json()) as { pipeline?: { id: string } };
+      await load();
+      if (data.pipeline?.id) {
+        setEditingId(data.pipeline.id);
+        setShowCreateForm(false);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Spec save failed");
+    } finally {
+      setCreating(false);
+    }
+  }
+
   async function createPipeline(e: React.FormEvent) {
+    if (formMode === "spec") {
+      await saveSpecYaml(e);
+      return;
+    }
     e.preventDefault();
     setCreating(true);
     setError(null);
@@ -516,6 +565,7 @@ export function BuilderClient({
       sourceConnectionId?: string | null;
       destinationConnectionId?: string | null;
       dbtProjectId?: string | null;
+      declarativeSpecYaml?: string | null;
     };
     setEditingId(id);
     setName(p.name);
@@ -526,6 +576,13 @@ export function BuilderClient({
     const cfg = p.sourceConfiguration ?? {};
     const { core, connection } = extractConnectionValues(cfg, p.sourceType, p.destinationType);
     setFormMode("structured");
+    if (p.declarativeSpecYaml?.trim()) {
+      setSpecYaml(p.declarativeSpecYaml);
+    } else {
+      setSpecYaml(
+        `# Declarative pipeline spec v2\neltpulse_pipeline: 2\nupsert: true\n\nname: ${p.name}\nsource: ${p.sourceType}\ndestination: "@workspace"\ntool: auto\n`
+      );
+    }
     setSourceCfg(ensureGithubReposForForm(core));
     setConnectionValues({
       ...emptyConnectionValuesForTypes(p.sourceType, p.destinationType),
@@ -912,6 +969,13 @@ export function BuilderClient({
               >
                 JSON
               </button>
+              <button
+                type="button"
+                onClick={() => setFormMode("spec")}
+                className={`rounded-md px-3 py-1 ${formMode === "spec" ? "bg-sky-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"}`}
+              >
+                Spec YAML
+              </button>
               <Link
                 href={
                   editingId
@@ -1261,6 +1325,26 @@ export function BuilderClient({
                   value={sourceJson}
                   onChange={(e) => setSourceJson(e.target.value)}
                   rows={14}
+                  spellCheck={false}
+                  className="mt-2 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                />
+              </label>
+            )}
+
+            {formMode === "spec" && (
+              <label className="block rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Declarative pipeline spec (YAML v2)
+                </span>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Lakeflow-style spec — <code className="font-mono">destination: &quot;@workspace&quot;</code>, tables,
+                  sync, slices, transform, quality, components. Applied via{" "}
+                  <code className="font-mono">POST /api/elt/pipelines/declaration</code>.
+                </p>
+                <textarea
+                  value={specYaml}
+                  onChange={(e) => setSpecYaml(e.target.value)}
+                  rows={22}
                   spellCheck={false}
                   className="mt-2 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
                 />

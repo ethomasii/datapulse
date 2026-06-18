@@ -77,6 +77,14 @@ export type CanvasInspectorFocus =
 
 export type PipelineCanvasControl = {
   patchNodeData: (nodeId: string, patch: Record<string, unknown>) => void;
+  addComponentNode: (component: {
+    id: string;
+    name: string;
+    compileTarget: string;
+    compileBadge?: string;
+    compileHint: string;
+    canvasPorts: { left: boolean; right: boolean };
+  }) => void;
 };
 
 export type PipelineCanvasProps = {
@@ -227,10 +235,10 @@ function FlowCanvas({
   }, []);
 
   const addNode = useCallback(
-    (type: "sourceNode" | "transformNode" | "destNode") => {
+    (type: "sourceNode" | "transformNode" | "destNode" | "componentNode", data?: Record<string, unknown>) => {
       idCounter += 1;
       const id = `n-${idCounter}`;
-      const labels = {
+      const labels: Record<string, Record<string, unknown>> = {
         sourceNode: { hint: "" },
         transformNode: {
           label: "New transform",
@@ -238,6 +246,7 @@ function FlowCanvas({
           transformTool: "other",
         },
         destNode: { hint: "" },
+        componentNode: { label: "Component", hint: "", ...data },
       };
       setNodes((nds) => [
         ...nds,
@@ -250,6 +259,27 @@ function FlowCanvas({
       ]);
     },
     [setNodes]
+  );
+
+  const addComponentNode = useCallback(
+    (component: {
+      id: string;
+      name: string;
+      compileTarget: string;
+      compileBadge?: string;
+      compileHint: string;
+      canvasPorts: { left: boolean; right: boolean };
+    }) => {
+      addNode("componentNode", {
+        componentId: component.id,
+        label: component.name,
+        compileTarget: component.compileTarget,
+        compileBadge: component.compileBadge ?? component.compileTarget,
+        compileHint: component.compileHint,
+        canvasPorts: component.canvasPorts,
+      });
+    },
+    [addNode]
   );
 
   const resetGraph = useCallback(() => {
@@ -324,11 +354,12 @@ function FlowCanvas({
           nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, ...patch } } : n))
         );
       },
+      addComponentNode,
     };
     return () => {
       canvasControlRef.current = null;
     };
-  }, [canvasControlRef, setNodes]);
+  }, [canvasControlRef, setNodes, addComponentNode]);
 
   const onSelectionChange = useCallback(
     ({ nodes: selectedNodes }: { nodes: Node[] }) => {

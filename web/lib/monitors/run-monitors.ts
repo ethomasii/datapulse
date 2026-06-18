@@ -494,6 +494,15 @@ export type MonitorForEnqueue = {
   config: unknown;
 };
 
+async function afterMonitorTriggeredRun(userId: string, monitorId: string, pipelineId: string): Promise<void> {
+  try {
+    const { triggerWorkflowsForMonitor } = await import("@/lib/elt/elt-workflow-runner");
+    await triggerWorkflowsForMonitor(userId, monitorId, pipelineId);
+  } catch {
+    /* workflow fan-out is best-effort */
+  }
+}
+
 export async function enqueuePipelineRunForMonitor(
   userId: string,
   monitor: MonitorForEnqueue
@@ -658,6 +667,7 @@ export async function runMonitorChecksForUser(
             metadata: { ...result.metadata, run_ids: q.runIds },
             timestamp: now.toISOString(),
           });
+          await afterMonitorTriggeredRun(m.userId, m.id, m.pipelineId);
         } else {
           errors.push(`${m.name}: triggered but run not queued — ${q.reason}`);
         }
@@ -760,6 +770,7 @@ export async function runMonitorChecksForAllUsers(options?: CronMonitorScaleOpti
             metadata: { ...result.metadata, run_ids: q.runIds },
             timestamp: now.toISOString(),
           });
+          await afterMonitorTriggeredRun(m.userId, m.id, m.pipelineId);
         } else {
           errors.push(`${m.userId}/${m.name}: ${q.reason}`);
         }

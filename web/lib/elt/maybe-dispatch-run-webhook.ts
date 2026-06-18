@@ -19,6 +19,19 @@ export async function maybeDispatchRunWebhook(runId: string, userId: string): Pr
     },
   });
 
+  if (run?.pipelineId && (run.status === "succeeded" || run.status === "failed")) {
+    try {
+      const { triggerWorkflowsForPipelineRun } = await import("@/lib/elt/elt-workflow-runner");
+      await triggerWorkflowsForPipelineRun(
+        userId,
+        run.pipelineId,
+        run.status === "succeeded" ? "success" : "failure"
+      );
+    } catch {
+      /* workflow fan-out is best-effort */
+    }
+  }
+
   const webhookUrl = run?.pipeline?.runsWebhookUrl ?? run?.user.runsWebhookUrl;
   if (!run || !webhookUrl) return;
   if (!["succeeded", "failed", "cancelled"].includes(run.status)) return;

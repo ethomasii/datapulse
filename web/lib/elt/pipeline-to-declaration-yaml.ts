@@ -106,3 +106,6 @@ export function eltPipelineToDeclarationYamlString(row: EltPipeline): string {
   };
   return YAML.stringify(doc, { lineWidth: 0 }).trimEnd() + "\n";
 }
+
+/** Prefer v2 declarative export when available (async — resolves connection names). */
+export { eltPipelineToDeclarativeYamlString } from "@/lib/elt/pipeline-spec-export";

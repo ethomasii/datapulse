@@ -11,6 +11,7 @@ import { db } from "@/lib/db/client";
 import { maybeDispatchRunWebhook } from "@/lib/elt/maybe-dispatch-run-webhook";
 import { applyPatchRunBody } from "@/lib/elt/apply-run-patch";
 import { syncCatalogFromDbtManifest } from "@/lib/elt/catalog-sync-from-run";
+import { maybeDispatchContractAlerts } from "@/lib/elt/maybe-dispatch-contract-alerts";
 import { parseRunTelemetry } from "@/lib/elt/run-telemetry";
 import { patchRunBodySchema } from "@/lib/elt/run-types";
 
@@ -104,6 +105,7 @@ export async function PATCH(req: Request, context: RouteContext) {
       if (tel.dbt) {
         void syncCatalogFromDbtManifest(user.id, existing.pipelineId, tel.dbt).catch(() => undefined);
       }
+      void maybeDispatchContractAlerts(run.id, user.id).catch(() => undefined);
     }
   }
 

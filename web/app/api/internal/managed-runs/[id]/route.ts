@@ -11,7 +11,10 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
 import { applyPatchRunBody } from "@/lib/elt/apply-run-patch";
 import { reportRowsSyncedUsage } from "@/lib/billing/report-usage";
+import { maybeDispatchContractAlerts } from "@/lib/elt/maybe-dispatch-contract-alerts";
 import { maybeDispatchRunWebhook } from "@/lib/elt/maybe-dispatch-run-webhook";
+import { parseRunTelemetry } from "@/lib/elt/run-telemetry";
+import { syncCatalogFromDbtManifest } from "@/lib/elt/catalog-sync-from-run";
 import { patchRunBodySchema } from "@/lib/elt/run-types";
 import { resolveRouteParamId } from "@/lib/server/route-params";
 
@@ -134,6 +137,13 @@ export async function PATCH(req: Request, ctx: Ctx) {
       const rows = telemetry?.summary?.rowsLoaded;
       if (typeof rows === "number") {
         void reportRowsSyncedUsage(existing.userId, rows);
+      }
+      if (existing.pipelineId && patch.telemetryJson) {
+        const tel = parseRunTelemetry(patch.telemetryJson);
+        if (tel.dbt) {
+          void syncCatalogFromDbtManifest(existing.userId, existing.pipelineId, tel.dbt).catch(() => undefined);
+        }
+        void maybeDispatchContractAlerts(run.id, existing.userId).catch(() => undefined);
       }
     }
   }
