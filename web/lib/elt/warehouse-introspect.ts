@@ -9,6 +9,9 @@ import {
   introspectClickhouse,
   introspectDatabricks,
   introspectDuckdb,
+  introspectGcs,
+  introspectFilesystem,
+  introspectS3,
   introspectMotherduck,
   introspectMysql,
   introspectPostgresFamily,
@@ -51,6 +54,9 @@ export const WAREHOUSE_INTROSPECTION_CONNECTORS = [
   "mysql",
   "trino",
   "sqlite",
+  "s3",
+  "gcs",
+  "filesystem",
 ] as const;
 
 export function normalizeQualifiedTable(schema: string, table: string): string {
@@ -61,6 +67,10 @@ export function normalizeQualifiedTable(schema: string, table: string): string {
 export function parseLandingQualified(qualified: string | undefined): { full: string | null; table: string | null } {
   if (!qualified?.trim()) return { full: null, table: null };
   const q = qualified.trim();
+  const uri = q.match(/^(s3|gs|azure):\/\/.+/i);
+  if (uri) {
+    return { full: q.toLowerCase(), table: q.split("/").pop()?.toLowerCase() ?? null };
+  }
   const parts = q.split(".").filter(Boolean);
   if (parts.length >= 2) {
     const table = parts[parts.length - 1]!;
@@ -75,6 +85,7 @@ export function tableSetFromIntrospection(tables: WarehouseTableRef[]): Set<stri
   for (const t of tables) {
     set.add(normalizeQualifiedTable(t.schema, t.table));
     set.add(t.table.toLowerCase());
+    if (t.qualified) set.add(t.qualified.toLowerCase());
   }
   return set;
 }
@@ -88,6 +99,8 @@ export function isTablePresentInWarehouse(
   const { full, table } = parseLandingQualified(landingQualified);
   if (full && warehouseTables.has(full)) return true;
   if (table && warehouseTables.has(table)) return true;
+  const lower = landingQualified.trim().toLowerCase();
+  if (warehouseTables.has(lower)) return true;
   return false;
 }
 
@@ -126,11 +139,17 @@ export async function introspectDestinationConnection(
       return introspectTrino(secrets, config);
     case "sqlite":
       return introspectSqlite(secrets, config);
+    case "s3":
+      return introspectS3(secrets, config);
+    case "gcs":
+      return introspectGcs(secrets, config);
+    case "filesystem":
+      return introspectFilesystem(secrets, config);
     default:
       return {
         ok: false,
         connector,
-        message: `Warehouse verification is not available for ${connector} yet. Supported: Postgres, Redshift, Snowflake, BigQuery, DuckDB, MotherDuck, Databricks, ClickHouse, MySQL, Trino, SQLite.`,
+        message: `Warehouse verification is not available for ${connector} yet. Supported: SQL warehouses, DuckDB, MotherDuck, S3, GCS, filesystem, and more.`,
         tables: [],
       };
   }

@@ -14,6 +14,15 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    version: "0.9.5",
+    date: "2026-06-17",
+    highlights: [
+      "Catalog hub — in-app /catalog with connectors, scenarios, and dbt projects (no more marketing-page sidebar links).",
+      "Catalog metadata — import from pipelines, edit descriptions/tags per asset; CatalogEntry stored in workspace DB.",
+      "Object store inventory — S3, GCS, and filesystem verification; object landing paths on assets map.",
+    ],
+  },
+  {
     version: "0.9.4",
     date: "2026-06-17",
     highlights: [

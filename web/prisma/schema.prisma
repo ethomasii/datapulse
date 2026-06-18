@@ -90,6 +90,7 @@ model User {
   eltPipelineRuns EltPipelineRun[]
   connections Connection[]
   eltMonitors EltMonitor[]
+  catalogEntries CatalogEntry[]
 
   /// Membership in a shared org (not the owner row — use `ownedOrganization`).
   organizationId String?       @map("organization_id")
@@ -236,7 +237,30 @@ model EltMonitor {
   @@map("EltMonitor")
 }
 
-/// Generated ELT pipeline definitions stored in Neon. Execution is customer-operated (optional agent / API) or eltPulse-managed when enabled.
+/// User-editable catalog metadata for assets, connectors, and dbt projects.
+model CatalogEntry {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Stable key, e.g. pipeline:p1:raw:customers or dbt_project:p1
+  assetKey    String   @map("asset_key")
+  kind        String
+  displayName String?  @map("display_name")
+  description String?  @db.Text
+  tags        Json     @default("[]")
+  metadata    Json     @default("{}")
+  pipelineId  String?  @map("pipeline_id")
+  importedAt  DateTime? @map("imported_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, assetKey])
+  @@index([userId])
+  @@index([pipelineId])
+  @@map("CatalogEntry")
+}
+
+/// Generated ELT pipeline definitions stored in Neon.
 model EltPipeline {
   id                  String   @id @default(cuid())
   userId              String

@@ -56,10 +56,11 @@ const CORE_NAV: NavItem[] = [
 ];
 
 const CATALOG_NAV: NavItem[] = [
+  { href: "/catalog", label: "Overview", icon: LayoutGrid },
   { href: "/assets", label: "Assets", icon: Table2 },
-  { href: "/connectors", label: "Connectors", icon: LayoutGrid },
-  { href: "/scenarios", label: "Scenarios", icon: Route },
-  { href: "/dbt", label: "dbt transforms", icon: GitBranch },
+  { href: "/catalog/connectors", label: "Connectors", icon: Plug },
+  { href: "/catalog/scenarios", label: "Scenarios", icon: Route },
+  { href: "/catalog/dbt", label: "dbt projects", icon: GitBranch },
 ];
 
 const ADVANCED_NAV: NavItem[] = [
@@ -223,7 +224,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const mobileAll: NavItem[] = [
     ...CORE_NAV,
     { href: "/assets", label: "Assets", icon: Table2 },
-    { href: "/connectors", label: "Catalog", icon: LayoutGrid },
+    { href: "/catalog", label: "Catalog", icon: LayoutGrid },
     ...ADVANCED_NAV.slice(0, 2),
     ...ACCOUNT_NAV,
   ];

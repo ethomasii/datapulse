@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RelatedLinks } from "@/components/ui/related-links";
+import { AssetCatalogMetaEditor } from "@/components/assets/asset-catalog-meta-editor";
 import { AssetLineageGraph } from "@/components/assets/asset-lineage-graph";
 import { buildAssetLineageGraph } from "@/lib/elt/asset-lineage";
 import { computePipelineFreshness } from "@/lib/elt/asset-freshness";
@@ -59,6 +60,10 @@ const KIND_META: Record<
   post_transform: {
     label: "Post-transform",
     badge: "bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200",
+  },
+  object: {
+    label: "Object",
+    badge: "bg-cyan-100 text-cyan-900 dark:bg-cyan-950/50 dark:text-cyan-200",
   },
 };
 
@@ -324,27 +329,39 @@ function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBund
           ) : null}
           <ul className="space-y-2">
             {allAssets.map((asset) => (
-              <li
-                key={asset.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-950/50"
-              >
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <AssetKindBadge kind={asset.kind} />
-                  <span className="text-sm font-medium text-slate-900 dark:text-white">{asset.displayName}</span>
-                  {asset.transformScope === "post_replication" ? (
-                    <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-900 dark:bg-amber-950/50">
-                      Post-replication
-                    </span>
+              <li key={asset.id} className="list-none space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-950/50">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <AssetKindBadge kind={asset.kind} />
+                    <span className="text-sm font-medium text-slate-900 dark:text-white">{asset.displayName}</span>
+                    {asset.transformScope === "post_replication" ? (
+                      <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-900 dark:bg-amber-950/50">
+                        Post-replication
+                      </span>
+                    ) : null}
+                    {asset.landingQualified ? (
+                      <code className="truncate font-mono text-[11px] text-slate-500">{asset.landingQualified}</code>
+                    ) : null}
+                    <WarehouseStatusBadge status={asset.warehouseStatus} runObserved={asset.runObserved} />
+                    <AssetFreshnessBadge meta={asset.assetFreshness} />
+                  </div>
+                  {asset.dbtPackage ? (
+                    <span className="text-[11px] text-slate-500">{asset.dbtPackage.replace(/^dlt-hub\//, "")}</span>
                   ) : null}
-                  {asset.landingQualified ? (
-                    <code className="truncate font-mono text-[11px] text-slate-500">{asset.landingQualified}</code>
-                  ) : null}
-                  <WarehouseStatusBadge status={asset.warehouseStatus} runObserved={asset.runObserved} />
-                  <AssetFreshnessBadge meta={asset.assetFreshness} />
                 </div>
-                {asset.dbtPackage ? (
-                  <span className="text-[11px] text-slate-500">{asset.dbtPackage.replace(/^dlt-hub\//, "")}</span>
+                {asset.catalogDescription || asset.catalogTags?.length ? (
+                  <p className="px-3 text-[11px] text-slate-500">
+                    {asset.catalogDescription}
+                    {asset.catalogTags?.length ? ` · ${asset.catalogTags.join(", ")}` : ""}
+                  </p>
                 ) : null}
+                <AssetCatalogMetaEditor
+                  assetKey={asset.id}
+                  kind={asset.kind}
+                  pipelineId={asset.pipelineId}
+                  initialDescription={asset.catalogDescription ?? ""}
+                  initialTags={asset.catalogTags ?? []}
+                />
               </li>
             ))}
           </ul>
@@ -359,6 +376,7 @@ export function AssetsPageClient() {
   const pipelineFilter = searchParams.get("pipeline")?.trim() ?? "";
   const [data, setData] = useState<AssetsPageData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [importingMeta, setImportingMeta] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -381,6 +399,19 @@ export function AssetsPageClient() {
       else setLoading(false);
     }
   }, []);
+
+  const importMetadata = useCallback(async () => {
+    setImportingMeta(true);
+    try {
+      const res = await fetch("/api/elt/catalog/entries?action=import", { method: "POST" });
+      if (!res.ok) throw new Error("Import failed");
+      await load(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Import failed");
+    } finally {
+      setImportingMeta(false);
+    }
+  }, [load]);
 
   useEffect(() => {
     void load();
@@ -499,6 +530,15 @@ export function AssetsPageClient() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void importMetadata()}
+                disabled={importingMeta}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-sky-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              >
+                {importingMeta ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Import from pipelines
+              </button>
               <button
                 type="button"
                 onClick={() => void load(true)}

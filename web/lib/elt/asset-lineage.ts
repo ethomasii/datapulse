@@ -1,6 +1,6 @@
 import type { PipelineAssetBundle, WorkspaceAsset } from "@/lib/elt/pipeline-assets";
 
-export type LineageNodeKind = "source" | "raw" | "transform" | "post_transform";
+export type LineageNodeKind = "source" | "raw" | "transform" | "post_transform" | "object";
 
 export type AssetLineageNode = {
   id: string;

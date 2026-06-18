@@ -706,3 +706,138 @@ export async function introspectSqlite(
   const dbPath = secret(secrets, "DEST_SQLITE_PATH") || configString(config, "path");
   return introspectDuckdbFile("sqlite", dbPath);
 }
+
+// ─── Object stores (S3, GCS) ─────────────────────────────────────────────────
+
+export async function introspectS3(
+  secrets: Record<string, string>,
+  config: Record<string, unknown>
+): Promise<WarehouseIntrospectionResult> {
+  const accessKey = secret(secrets, "AWS_ACCESS_KEY_ID");
+  const secretKey = secret(secrets, "AWS_SECRET_ACCESS_KEY");
+  const region = secret(secrets, "AWS_REGION") || configString(config, "region") || "us-east-1";
+  const bucket = configString(config, "bucket", "target_bucket");
+  const prefix = configString(config, "prefix", "path");
+
+  if (!accessKey || !secretKey || !bucket) {
+    return fail("s3", "S3 destination needs AWS credentials and bucket in connection config.");
+  }
+
+  try {
+    const { S3Client, ListObjectsV2Command } = await import("@aws-sdk/client-s3");
+    const client = new S3Client({
+      region,
+      credentials: { accessKeyId: accessKey, secretAccessKey: secretKey },
+    });
+    const tables: WarehouseTableRef[] = [];
+    let token: string | undefined;
+    do {
+      const res = await client.send(
+        new ListObjectsV2Command({
+          Bucket: bucket,
+          Prefix: prefix || undefined,
+          MaxKeys: 1000,
+          ContinuationToken: token,
+        })
+      );
+      for (const obj of res.Contents ?? []) {
+        const key = obj.Key ?? "";
+        if (!key || key.endsWith("/")) continue;
+        tables.push({
+          schema: bucket,
+          table: key,
+          qualified: `s3://${bucket}/${key}`,
+        });
+        if (tables.length >= TABLE_LIMIT) break;
+      }
+      token = res.NextContinuationToken;
+    } while (token && tables.length < TABLE_LIMIT);
+
+    return ok("s3", `Found ${tables.length} object(s) in s3://${bucket}${prefix ? `/${prefix}` : ""}.`, tables);
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return fail("s3", `Could not list S3 objects: ${detail.slice(0, 180)}`);
+  }
+}
+
+export async function introspectGcs(
+  secrets: Record<string, string>,
+  config: Record<string, unknown>
+): Promise<WarehouseIntrospectionResult> {
+  const credentials =
+    secret(secrets, "GCS_CREDENTIALS", "GOOGLE_APPLICATION_CREDENTIALS") || configString(config, "credentials");
+  const bucket = configString(config, "bucket");
+  const prefix = configString(config, "prefix", "path");
+
+  if (!credentials || !bucket) {
+    return fail("gcs", "GCS destination needs service account JSON and bucket.");
+  }
+
+  try {
+    const token = await fetchGcpAccessToken(credentials, "https://www.googleapis.com/auth/devstorage.read_only");
+    const tables: WarehouseTableRef[] = [];
+    let pageToken: string | undefined;
+    do {
+      const url = new URL(`https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(bucket)}/o`);
+      if (prefix) url.searchParams.set("prefix", prefix);
+      url.searchParams.set("maxResults", "1000");
+      if (pageToken) url.searchParams.set("pageToken", pageToken);
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (!res.ok) return fail("gcs", `GCS list API returned ${res.status}.`);
+      const body = (await res.json()) as { items?: { name: string }[]; nextPageToken?: string };
+      for (const item of body.items ?? []) {
+        if (!item.name || item.name.endsWith("/")) continue;
+        tables.push({
+          schema: bucket,
+          table: item.name,
+          qualified: `gs://${bucket}/${item.name}`,
+        });
+        if (tables.length >= TABLE_LIMIT) break;
+      }
+      pageToken = body.nextPageToken;
+    } while (pageToken && tables.length < TABLE_LIMIT);
+
+    return ok("gcs", `Found ${tables.length} object(s) in gs://${bucket}${prefix ? `/${prefix}` : ""}.`, tables);
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return fail("gcs", `Could not list GCS objects: ${detail.slice(0, 180)}`);
+  }
+}
+
+export async function introspectFilesystem(
+  secrets: Record<string, string>,
+  config: Record<string, unknown>
+): Promise<WarehouseIntrospectionResult> {
+  const basePath =
+    secret(secrets, "DEST_FILESYSTEM_PATH") || configString(config, "path", "output_directory");
+  if (!basePath.trim()) {
+    return fail("filesystem", "Set output directory path to verify filesystem objects.");
+  }
+
+  try {
+    const fs = await import("fs/promises");
+    const path = await import("path");
+    const entries = await fs.readdir(basePath, { withFileTypes: true });
+    const tables: WarehouseTableRef[] = [];
+    for (const ent of entries) {
+      if (!ent.isFile()) continue;
+      const full = path.join(basePath, ent.name);
+      tables.push({
+        schema: basePath,
+        table: ent.name,
+        qualified: full,
+      });
+      if (tables.length >= TABLE_LIMIT) break;
+    }
+    return ok("filesystem", `Found ${tables.length} file(s) in ${basePath}.`, tables);
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return fail(
+      "filesystem",
+      `Could not list filesystem path (must exist on the app host): ${detail.slice(0, 160)}`
+    );
+  }
+}

@@ -19,7 +19,7 @@ import { enrichBundleFromDbtManifest } from "@/lib/elt/asset-dbt-enrich";
 
 export type PipelineSyncMode = "connector_sync" | "database_replication";
 
-export type WorkspaceAssetKind = "source" | "raw" | "transform" | "post_transform";
+export type WorkspaceAssetKind = "source" | "raw" | "transform" | "post_transform" | "object";
 
 export type WarehouseAssetStatus = "verified" | "missing" | "unknown" | "not_checked";
 
@@ -50,6 +50,10 @@ export type WorkspaceAsset = {
   runObserved?: boolean;
   /** Per-asset freshness from last run telemetry or dbt manifest. */
   assetFreshness?: AssetFreshnessMeta;
+  /** User-editable catalog metadata (merged from CatalogEntry). */
+  catalogDescription?: string;
+  catalogTags?: string[];
+  catalogDisplayName?: string;
   enabled: boolean;
 };
 
@@ -300,6 +304,64 @@ function resolveTransformAssets(
   }));
 }
 
+function resolveObjectStoreTargets(
+  pipeline: PipelineAssetInput,
+  config: Record<string, unknown>,
+  syncMode: PipelineSyncMode,
+  sourceId: string
+): WorkspaceAsset[] {
+  const dest = pipeline.destinationType.toLowerCase().trim();
+  if (!["s3", "gcs", "azure_blob", "filesystem"].includes(dest)) return [];
+
+  let qualified = "";
+  let name = "";
+  if (dest === "s3") {
+    const bucket = String(config.bucket ?? config.target_bucket ?? "").trim();
+    const prefix = String(config.prefix ?? config.path ?? "").trim();
+    if (!bucket) return [];
+    qualified = prefix ? `s3://${bucket}/${prefix.replace(/\/$/, "")}` : `s3://${bucket}`;
+    name = prefix || bucket;
+  } else if (dest === "gcs") {
+    const bucket = String(config.bucket ?? "").trim();
+    const prefix = String(config.prefix ?? config.path ?? "").trim();
+    if (!bucket) return [];
+    qualified = prefix ? `gs://${bucket}/${prefix.replace(/\/$/, "")}` : `gs://${bucket}`;
+    name = prefix || bucket;
+  } else if (dest === "azure_blob") {
+    const account = String(config.account_name ?? config.account ?? "").trim();
+    const container = String(config.container ?? "").trim();
+    const prefix = String(config.prefix ?? config.path ?? "").trim();
+    if (!account || !container) return [];
+    qualified = prefix
+      ? `azure://${account}/${container}/${prefix.replace(/\/$/, "")}`
+      : `azure://${account}/${container}`;
+    name = prefix || container;
+  } else {
+    const path = String(config.path ?? config.DEST_FILESYSTEM_PATH ?? "").trim();
+    if (!path) return [];
+    qualified = path;
+    name = path.split("/").pop() || path;
+  }
+
+  return [
+    {
+      id: `${pipeline.id}:object:${sanitizeIdPart(qualified)}`,
+      kind: "object",
+      name,
+      displayName: qualified,
+      pipelineId: pipeline.id,
+      pipelineName: pipeline.name,
+      syncMode,
+      sourceType: pipeline.sourceType,
+      destinationType: pipeline.destinationType,
+      landingQualified: qualified,
+      parentId: sourceId,
+      description: "Object store landing path",
+      enabled: pipeline.enabled,
+    },
+  ];
+}
+
 function resolvePostTransformAssets(
   pipeline: PipelineAssetInput,
   config: Record<string, unknown>,
@@ -396,6 +458,8 @@ export function derivePipelineAssets(pipeline: PipelineAssetInput): PipelineAsse
       };
     });
   }
+
+  rawAssets = [...rawAssets, ...resolveObjectStoreTargets(pipeline, config, syncMode, sourceAsset.id)];
 
   const transforms = resolveTransformAssets(pipeline, config, syncMode, landingDataset);
   const postTransforms = resolvePostTransformAssets(pipeline, config, syncMode);

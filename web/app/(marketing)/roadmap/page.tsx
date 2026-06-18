@@ -82,6 +82,11 @@ const ITEMS: {
   },
   {
     status: "shipped",
+    title: "Catalog hub — in-app connectors, scenarios, dbt projects",
+    desc: "/catalog workspace pages replace marketing sidebar links; metadata import/edit on assets; S3/GCS object inventory.",
+  },
+  {
+    status: "shipped",
     title: "Assets v4 — per-asset freshness & canvas lineage",
     desc: "Asset-level loaded/built badges from run telemetry; dbt config vs manifest diff; lineage panel on canvas builder.",
   },

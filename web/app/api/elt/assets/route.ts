@@ -10,6 +10,7 @@ import { connectionOwnerWhere, getAccessibleResourceOwnerIds, pipelineOwnerWhere
 import { db } from "@/lib/db/client";
 import { applyWarehouseVerificationToAssets } from "@/lib/elt/asset-warehouse-reconcile";
 import { buildWorkspaceAssets, type PipelineRunAssetInput } from "@/lib/elt/pipeline-assets";
+import { mergeCatalogIntoAssetsPayload } from "@/lib/elt/catalog-entries";
 import { introspectDestinationConnection } from "@/lib/elt/warehouse-introspect";
 
 export async function GET(req: Request) {
@@ -61,6 +62,12 @@ export async function GET(req: Request) {
   }
 
   let payload = buildWorkspaceAssets(rows, latestRunsByPipelineId);
+
+  const catalogRows = await db.catalogEntry.findMany({
+    where: { userId: { in: ownerIds } },
+  });
+  const entriesByKey = new Map(catalogRows.map((r) => [r.assetKey, r]));
+  payload = mergeCatalogIntoAssetsPayload(payload, entriesByKey);
 
   if (verifyWarehouse) {
     const pipelineDestinationConnectionId = new Map(
