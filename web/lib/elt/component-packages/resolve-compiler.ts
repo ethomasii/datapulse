@@ -1,5 +1,6 @@
 import { getNativeComponent } from "@/lib/elt/native-components/registry";
 import type { NativeComponentCompileResult } from "@/lib/elt/native-components/types";
+import { resolveGenericCompiler } from "@/lib/elt/generic-catalog-compiler";
 import { resolvePackageComponent } from "./registry";
 
 export type ResolvedComponentCompiler = {
@@ -46,6 +47,15 @@ export async function resolveComponentCompiler(
       id: builtin.id,
       source: "builtin",
       compile: async (config) => builtin.compile(config),
+    };
+  }
+
+  const generic = resolveGenericCompiler(id);
+  if (generic) {
+    return {
+      id: generic.id,
+      source: "builtin",
+      compile: generic.compile,
     };
   }
 

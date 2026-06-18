@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { ComponentCatalogAssetPanel } from "@/components/elt/component-catalog-asset-panel";
 import { ComponentSchemaForm } from "@/components/elt/component-schema-form";
 import { ComponentDataPreview } from "@/components/elt/component-data-preview";
+import { RunStepPanel } from "@/components/elt/run-step-panel";
 import type { NativeComponentField } from "@/lib/elt/native-components";
 
 type ComponentDetail = {
@@ -101,7 +102,7 @@ export function CanvasComponentInspector({
           {detail?.compileTarget ?? "component"}
           {detail?.hasCompiler ? (
             <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-              {detail?.isPackage ? "PACKAGE" : "NATIVE"}
+              {detail?.isPackage ? "PACKAGE" : detail?.isNative ? "NATIVE" : "GENERIC"}
             </span>
           ) : (
             <span className="ml-2 rounded bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
@@ -118,24 +119,42 @@ export function CanvasComponentInspector({
       {detail?.hasCompiler ? (
         <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
           {detail?.isPackage
-            ? `Package compiler from ${detail.packageCatalogId ?? "catalog"} — compiles into runner code on save.`
-            : "Compiles into pipeline runner code (Python/SQL post-transform or quality tests) on save."}
+            ? `Package compiler from ${detail.packageCatalogId ?? "catalog"}.`
+            : detail?.isNative
+              ? "Native compiler — materializes on save and full pipeline run."
+              : "Generic category compiler — run step compiles + previews; Python writes on full run."}
         </p>
-      ) : (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-          Catalog template only — stored in declarative spec; no native compiler yet.
-        </p>
-      )}
+      ) : null}
 
       {detail?.monitorPair ? (
         <p className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-800 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200">
-          Sensor pair: saves as monitor and triggers{" "}
+          Sensor pair: triggers{" "}
           <code className="font-mono">{detail.monitorPair.pipelineComponentId}</code> when linked.
         </p>
       ) : null}
 
       {detail?.hasCompiler ? (
-        <ComponentDataPreview pipelineId={pipelineId} config={config} readOnly={readOnly} />
+        <>
+          <RunStepPanel
+            pipelineId={pipelineId}
+            nodeId={nodeId}
+            componentId={componentId}
+            config={config}
+            readOnly={readOnly}
+          />
+          <ComponentDataPreview
+            pipelineId={pipelineId}
+            config={config}
+            readOnly={readOnly}
+            autoLoad
+          />
+        </>
+      ) : null}
+
+      {!detail?.hasCompiler ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          Catalog template only — stored in declarative spec; no compiler yet.
+        </p>
       ) : null}
 
       <ComponentCatalogAssetPanel

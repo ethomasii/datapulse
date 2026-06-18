@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react";
 import { ArrowRightLeft, Database, Target } from "lucide-react";
+import { ComponentIcon } from "@/components/elt/component-icon";
 import { DESTINATION_OPTIONS, SOURCE_OPTIONS } from "@/lib/elt/catalog";
 import { ConnectorCombobox } from "@/components/elt/connector-combobox";
 import { cn } from "@/lib/utils";
@@ -247,6 +248,9 @@ export function ComponentNode({ id, data }: NodeProps) {
   const title = String(d.label ?? d.componentId ?? "Component");
   const target = String(d.compileTarget ?? "");
   const badge = String(d.compileBadge ?? target);
+  const category = String(d.category ?? "");
+  const componentId = String(d.componentId ?? "");
+  const manifestIcon = typeof d.icon === "string" ? d.icon : undefined;
   const ports = d.canvasPorts as { left?: boolean; right?: boolean } | undefined;
 
   return (
@@ -254,9 +258,19 @@ export function ComponentNode({ id, data }: NodeProps) {
       {ports?.left !== false ? (
         <Handle type="target" position={Position.Left} className={handleClass("sky")} />
       ) : null}
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-600 dark:text-violet-300">
-        {badge}
-      </p>
+      <div className="flex items-center gap-1.5">
+        <ComponentIcon
+          componentId={componentId}
+          category={category}
+          manifestIcon={manifestIcon}
+          compileTarget={target}
+          size="sm"
+          className="text-violet-600 dark:text-violet-300"
+        />
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-600 dark:text-violet-300">
+          {badge}
+        </p>
+      </div>
       <NodeTitleField
         value={title}
         onChange={(v) => update({ label: v })}

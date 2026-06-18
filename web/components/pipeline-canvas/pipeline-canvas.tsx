@@ -29,6 +29,7 @@ import { CanvasBindingsProvider, type CanvasBindingsContextValue } from "./canva
 import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-graph";
 import { isValidPipelineCanvasEdge } from "@/lib/elt/canvas-component-sync";
 import { findNearestEdge, insertNodeOnEdge } from "@/lib/elt/canvas-edge-insert";
+import { wireInputFromUpstreamEdge } from "@/lib/elt/canvas-wire-input";
 import { dashedAnimatedEdgeStyle, resolveCanvasEdges } from "./canvas-edge-defaults";
 import { pipelineNodeTypes } from "./custom-nodes";
 
@@ -89,6 +90,7 @@ export type PipelineCanvasControl = {
       compileBadge?: string;
       compileHint: string;
       canvasPorts: { left: boolean; right: boolean };
+      icon?: string;
     },
     position?: { x: number; y: number }
   ) => void;
@@ -217,18 +219,37 @@ function FlowCanvas({
   }, []);
 
   const onConnect = useCallback(
-    (params: Connection) =>
-      setEdges((eds) =>
-        addEdge(
+    (params: Connection) => {
+      setEdges((eds) => {
+        const nextEdges = addEdge(
           {
             ...params,
             animated: true,
             style: { ...dashedAnimatedEdgeStyle },
           },
           eds
-        )
-      ),
-    [setEdges]
+        );
+        if (params.target) {
+          setNodes((nds) => {
+            const wired = wireInputFromUpstreamEdge(nds, nextEdges, params.target!);
+            if (!wired) return nds;
+            return nds.map((n) =>
+              n.id === wired.nodeId
+                ? {
+                    ...n,
+                    data: {
+                      ...n.data,
+                      config: wired.configPatch,
+                    },
+                  }
+                : n
+            );
+          });
+        }
+        return nextEdges;
+      });
+    },
+    [setEdges, setNodes]
   );
 
   const removeSelectedNodes = useCallback(() => {
@@ -285,6 +306,7 @@ function FlowCanvas({
         compileBadge?: string;
         compileHint: string;
         canvasPorts: { left: boolean; right: boolean };
+        icon?: string;
       },
       position?: { x: number; y: number }
     ) => {
@@ -298,6 +320,7 @@ function FlowCanvas({
           compileBadge: component.compileBadge ?? component.compileTarget,
           compileHint: component.compileHint,
           canvasPorts: component.canvasPorts,
+          icon: component.icon,
           config: {},
         },
         position
@@ -328,6 +351,7 @@ function FlowCanvas({
             compileBadge: component.compileBadge ?? component.compileTarget,
             compileHint: component.compileHint,
             canvasPorts: component.canvasPorts,
+            icon: component.icon,
             config: {},
           },
         };
@@ -343,8 +367,16 @@ function FlowCanvas({
             isValidPipelineCanvasEdge(newNode, tgt)
           ) {
             const result = insertNodeOnEdge(nodes, edges, edge, newNode);
-            setNodes(result.nodes);
-            setEdges(resolveCanvasEdges(result.nodes, result.edges));
+            const wired = wireInputFromUpstreamEdge(result.nodes, result.edges, newNode.id);
+            const finalNodes = wired
+              ? result.nodes.map((n) =>
+                  n.id === wired.nodeId
+                    ? { ...n, data: { ...n.data, config: wired.configPatch } }
+                    : n
+                )
+              : result.nodes;
+            setNodes(finalNodes);
+            setEdges(resolveCanvasEdges(finalNodes, result.edges));
             return;
           }
         }

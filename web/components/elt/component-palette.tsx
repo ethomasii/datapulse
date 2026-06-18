@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import { ELTPULSE_COMPONENT_DRAG_MIME } from "@/lib/elt/canvas-drag";
+import { ComponentIcon } from "@/components/elt/component-icon";
 
 export type ComponentListItem = {
   id: string;
@@ -16,6 +17,7 @@ export type ComponentListItem = {
   isNative?: boolean;
   isPackage?: boolean;
   hasCompiler?: boolean;
+  icon?: string;
   monitorPair?: { monitorId: string; pipelineComponentId: string; label: string } | null;
 };
 
@@ -46,7 +48,7 @@ export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ limit: "40", includePackages: "1" });
+      const params = new URLSearchParams({ limit: "60", includePackages: "1" });
       if (q.trim()) params.set("q", q.trim());
       if (category) params.set("category", category);
       if (compileTargetFilter) params.set("compileTarget", compileTargetFilter);
@@ -141,12 +143,22 @@ export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter
                 onClick={() => onSelect(c)}
                 className="mb-1 w-full cursor-grab rounded-md px-2 py-2 text-left hover:bg-slate-50 active:cursor-grabbing dark:hover:bg-slate-800"
               >
+                <div className="flex items-start gap-2">
+                  <ComponentIcon
+                    componentId={c.id}
+                    category={c.category}
+                    manifestIcon={c.icon}
+                    compileTarget={c.compileTarget}
+                    size="sm"
+                    className="mt-0.5 text-slate-500"
+                  />
+                  <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-sm font-medium text-slate-900 dark:text-white">{c.name}</span>
                   <div className="flex shrink-0 flex-col items-end gap-0.5">
-                    {(c.isPackage || c.hasCompiler) ? (
+                    {(c.isPackage || c.hasCompiler || c.isNative) ? (
                       <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-                        {c.isPackage ? "package" : "native"}
+                        {c.isPackage ? "package" : c.isNative ? "native" : "generic"}
                       </span>
                     ) : null}
                     <span
@@ -160,6 +172,8 @@ export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter
                 {c.monitorPair ? (
                   <p className="mt-1 text-[10px] text-violet-600 dark:text-violet-300">↔ {c.monitorPair.label}</p>
                 ) : null}
+                  </div>
+                </div>
               </button>
             </li>
           ))

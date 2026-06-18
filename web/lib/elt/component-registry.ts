@@ -6,6 +6,7 @@
 import manifestIndex from "@/lib/elt/data/component-manifest-index.json";
 import { canvasPortsForCategory, normalizeComponentCategory } from "@/lib/elt/component-canvas-io";
 import { routeComponent, suggestMonitorPipelinePair, TOP_COMPONENT_ROUTES, type ComponentCompileTarget, type ComponentRoute } from "@/lib/elt/component-compile-router";
+import { canCompileGenerically } from "@/lib/elt/generic-catalog-compiler";
 import { isNativeComponent } from "@/lib/elt/native-components";
 
 export type ComponentManifestEntry = {
@@ -28,6 +29,8 @@ export type ComponentListItem = ComponentManifestEntry & {
   monitorPair?: ReturnType<typeof suggestMonitorPipelinePair>;
   /** Has an eltPulse native compiler (executable on worker). */
   isNative?: boolean;
+  /** Compiles via native, package, or generic category compiler. */
+  hasCompiler?: boolean;
 };
 
 type ManifestIndex = {
@@ -138,13 +141,15 @@ function enrichComponent(row: ComponentManifestEntry): ComponentListItem {
   const ports = canvasPortsForCategory(row.category);
   const pair =
     route.target === "monitor" || route.target === "dlt" ? suggestMonitorPipelinePair(row.id) : null;
+  const native = isNativeComponent(row.id);
   return {
     ...row,
     compileTarget: route.target,
     compileBadge: route.badge,
     compileHint: route.hint,
     canvasPorts: { left: ports.left, right: ports.right },
-    isNative: isNativeComponent(row.id),
+    isNative: native,
+    hasCompiler: native || canCompileGenerically(route),
     ...(pair ? { monitorPair: pair } : {}),
   };
 }

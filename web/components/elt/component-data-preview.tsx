@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { Eye, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Eye, Loader2, Zap } from "lucide-react";
 import { previewTableFromConfig } from "@/lib/elt/pipeline-asset-keys";
 
 type PreviewResult = {
@@ -19,14 +19,23 @@ type Props = {
   pipelineId: string;
   config: Record<string, unknown>;
   readOnly?: boolean;
+  /** Auto-fetch preview when table or _preview_nonce changes (wire connect). */
+  autoLoad?: boolean;
 };
 
-export function ComponentDataPreview({ pipelineId, config, readOnly = false }: Props) {
+export function ComponentDataPreview({
+  pipelineId,
+  config,
+  readOnly = false,
+  autoLoad = false,
+}: Props) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PreviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [autoTriggered, setAutoTriggered] = useState(false);
 
   const table = previewTableFromConfig(config);
+  const previewNonce = config._preview_nonce;
 
   const load = useCallback(async () => {
     if (!table) {
@@ -53,10 +62,19 @@ export function ComponentDataPreview({ pipelineId, config, readOnly = false }: P
     }
   }, [pipelineId, config, table]);
 
+  useEffect(() => {
+    if (!autoLoad || readOnly || !table) return;
+    const t = setTimeout(() => {
+      setAutoTriggered(true);
+      void load();
+    }, 400);
+    return () => clearTimeout(t);
+  }, [autoLoad, readOnly, table, previewNonce, load]);
+
   if (!table && !readOnly) {
     return (
       <p className="text-xs text-slate-500">
-        Configure a table name to enable data preview (Alteryx-style sample rows).
+        Wire an upstream step or set a table to enable auto-preview (Alteryx-style).
       </p>
     );
   }
@@ -64,7 +82,12 @@ export function ComponentDataPreview({ pipelineId, config, readOnly = false }: P
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/50">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">Data preview</p>
+        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+          Data preview
+          {autoTriggered && loading ? (
+            <span className="ml-1 font-normal text-sky-600 dark:text-sky-400">· auto</span>
+          ) : null}
+        </p>
         <button
           type="button"
           onClick={() => void load()}
@@ -110,6 +133,10 @@ export function ComponentDataPreview({ pipelineId, config, readOnly = false }: P
         </div>
       ) : result && !error ? (
         <p className="mt-2 text-xs text-slate-500">{result.message ?? "No rows returned."}</p>
+      ) : loading ? (
+        <p className="mt-2 flex items-center gap-1 text-xs text-slate-500">
+          <Zap className="h-3 w-3" /> Loading preview…
+        </p>
       ) : null}
     </div>
   );
