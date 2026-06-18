@@ -1,5 +1,5 @@
 import type { Edge, Node } from "@xyflow/react";
-import { filterEdgesToPipelineRules } from "@/components/pipeline-canvas/canvas-edge-defaults";
+import { filterCanvasEdges } from "@/lib/elt/canvas-component-sync";
 
 export type ValidatePipelineCanvasOptions = {
   /** When true, source/destination catalog types must be set (saved pipeline + inspector). */
@@ -26,6 +26,7 @@ export function validatePipelineCanvasGraph(
   const sources = nodes.filter((n) => n.type === "sourceNode");
   const dests = nodes.filter((n) => n.type === "destNode");
   const transforms = nodes.filter((n) => n.type === "transformNode");
+  const components = nodes.filter((n) => n.type === "componentNode");
 
   if (sources.length === 0) {
     errors.push("Add a source node (extract).");
@@ -52,17 +53,17 @@ export function validatePipelineCanvasGraph(
     }
   }
 
-  const filtered = filterEdgesToPipelineRules(nodes, edges);
+  const filtered = filterCanvasEdges(nodes, edges);
   if (edges.length > 0 && filtered.length < edges.length) {
     errors.push(
-      "Remove invalid edges. Allowed wiring: extract → load, load → transform, transform → transform only."
+      "Remove invalid edges. Allowed: source → load, load → transform, transform → transform, and component template ports (see component catalog)."
     );
   }
 
   if (sources.length > 0 && dests.length > 0) {
-    if (filtered.length === 0) {
-      errors.push("Connect source to destination (and any transform steps).");
-    } else {
+    if (filtered.length === 0 && components.length === 0) {
+      errors.push("Connect source to destination (and any transform or component steps).");
+    } else if (filtered.length > 0) {
       const adj = new Map<string, string[]>();
       for (const e of filtered) {
         if (!adj.has(e.source)) adj.set(e.source, []);

@@ -73,13 +73,15 @@ export type CanvasInspectorFocus =
   | { kind: "none" }
   | { kind: "source"; nodeId: string }
   | { kind: "destination"; nodeId: string }
-  | { kind: "transform"; nodeId: string; data: Record<string, unknown> };
+  | { kind: "transform"; nodeId: string; data: Record<string, unknown> }
+  | { kind: "component"; nodeId: string; data: Record<string, unknown> };
 
 export type PipelineCanvasControl = {
   patchNodeData: (nodeId: string, patch: Record<string, unknown>) => void;
   addComponentNode: (component: {
     id: string;
     name: string;
+    category: string;
     compileTarget: string;
     compileBadge?: string;
     compileHint: string;
@@ -265,6 +267,7 @@ function FlowCanvas({
     (component: {
       id: string;
       name: string;
+      category: string;
       compileTarget: string;
       compileBadge?: string;
       compileHint: string;
@@ -273,10 +276,12 @@ function FlowCanvas({
       addNode("componentNode", {
         componentId: component.id,
         label: component.name,
+        category: component.category,
         compileTarget: component.compileTarget,
         compileBadge: component.compileBadge ?? component.compileTarget,
         compileHint: component.compileHint,
         canvasPorts: component.canvasPorts,
+        config: {},
       });
     },
     [addNode]
@@ -381,6 +386,14 @@ function FlowCanvas({
       if (n.type === "transformNode") {
         onInspectorFocusChange({
           kind: "transform",
+          nodeId: n.id,
+          data: { ...(n.data as Record<string, unknown>) },
+        });
+        return;
+      }
+      if (n.type === "componentNode") {
+        onInspectorFocusChange({
+          kind: "component",
           nodeId: n.id,
           data: { ...(n.data as Record<string, unknown>) },
         });

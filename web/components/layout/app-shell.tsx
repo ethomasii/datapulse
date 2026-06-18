@@ -30,6 +30,7 @@ import {
   Webhook,
   Workflow,
   Zap,
+  Sparkles,
 } from "lucide-react";
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
 import clsx from "clsx";
@@ -60,6 +61,7 @@ const CORE_NAV: NavItem[] = [
 const CATALOG_NAV: NavItem[] = [
   { href: "/catalog", label: "Overview", icon: LayoutGrid },
   { href: "/assets", label: "Assets", icon: Table2 },
+  { href: "/catalog/components", label: "Components", icon: Sparkles },
   { href: "/catalog/transform-hub", label: "Transform hub", icon: Workflow },
   { href: "/catalog/dbt", label: "My dbt projects", icon: GitBranch },
   { href: "/catalog/connectors", label: "Connectors", icon: Plug },
@@ -67,6 +69,7 @@ const CATALOG_NAV: NavItem[] = [
 ];
 
 const ADVANCED_NAV: NavItem[] = [
+  { href: "/workflows", label: "Workflows", icon: Workflow },
   { href: "/sources", label: "Source Registry", icon: BookOpen },
   { href: "/orchestration", label: "Monitors", icon: Split },
   { href: "/schedule", label: "Schedules", icon: CalendarClock },

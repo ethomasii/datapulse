@@ -1,9 +1,8 @@
 import type { Edge, Node } from "@xyflow/react";
+import { isValidPipelineCanvasEdge } from "@/lib/elt/canvas-component-sync";
 
 /**
- * Valid pipeline wiring: extract → load → zero or more transforms.
- * Downstream of a transform may only be another transform (not load or extract).
- * Into a transform: from destination (load) or another transform only — not directly from source.
+ * Valid pipeline wiring: extract → load → transforms, plus component template ports.
  */
 export function filterEdgesToPipelineRules(nodes: Node[], edges: Edge[]): Edge[] {
   const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -11,13 +10,7 @@ export function filterEdgesToPipelineRules(nodes: Node[], edges: Edge[]): Edge[]
     const s = byId.get(e.source);
     const t = byId.get(e.target);
     if (!s?.type || !t?.type) return false;
-    if (s.type === "transformNode") {
-      return t.type === "transformNode";
-    }
-    if (t.type === "transformNode") {
-      return s.type === "destNode" || s.type === "transformNode";
-    }
-    return true;
+    return isValidPipelineCanvasEdge(s, t);
   });
 }
 

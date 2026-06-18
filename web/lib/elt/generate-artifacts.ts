@@ -1,6 +1,7 @@
 import YAML from "yaml";
 import { stripCanvasFromSourceConfig } from "./canvas-source-config";
 import { chooseTool } from "./choose-tool";
+import { applyDestinationCodegenHints } from "./destination-codegen-hints";
 import { generateDltPipeline } from "./generate-dlt";
 import { generateSlingReplication, slingReplicationToYaml } from "./generate-sling";
 import { generateEltpulseWorkspaceYaml } from "./generate-eltpulse-workspace";
@@ -20,20 +21,21 @@ function bodyToRequest(body: CreatePipelineBody): PipelineRequest {
   const c = body.sourceConfiguration ?? {};
   const stripped = stripCanvasFromSourceConfig(c as Record<string, unknown>);
   const cCodegen = normalizeSourceConfigurationForCodegen(body.sourceType, stripped);
-  const tests = parseEltLines(cCodegen, "elt_tests");
-  const sensors = parseEltLines(cCodegen, "elt_sensors");
-  const cronScheduleRaw = cCodegen.cron_schedule ?? cCodegen["cronSchedule"];
+  const destResolved = applyDestinationCodegenHints(body.destinationType, cCodegen);
+  const tests = parseEltLines(destResolved.config, "elt_tests");
+  const sensors = parseEltLines(destResolved.config, "elt_sensors");
+  const cronScheduleRaw = destResolved.config.cron_schedule ?? destResolved.config["cronSchedule"];
   const cron = typeof cronScheduleRaw === "string" ? cronScheduleRaw : null;
-  const tzRaw = cCodegen.schedule_timezone ?? cCodegen.timezone;
+  const tzRaw = destResolved.config.schedule_timezone ?? destResolved.config.timezone;
   const tz = typeof tzRaw === "string" ? tzRaw : "UTC";
-  const partitionsRaw = cCodegen["elt_partitions_note"];
-  const otherRaw = cCodegen["elt_other_notes"];
+  const partitionsRaw = destResolved.config["elt_partitions_note"];
+  const otherRaw = destResolved.config["elt_other_notes"];
 
   return {
     name: body.name,
     sourceType: body.sourceType,
-    destinationType: body.destinationType,
-    sourceConfiguration: cCodegen,
+    destinationType: destResolved.destinationType,
+    sourceConfiguration: destResolved.config,
     description: body.description ?? null,
     groupName: body.groupName ?? null,
     writeDisposition: "append",
@@ -41,12 +43,18 @@ function bodyToRequest(body: CreatePipelineBody): PipelineRequest {
     timezone: tz,
     retries: 2,
     retryDelay: 30,
-    schemaOverride: typeof cCodegen.schema_override === "string" ? cCodegen.schema_override : null,
-    destinationInstance: typeof cCodegen.destination_instance === "string" ? cCodegen.destination_instance : null,
-    incrementalEnabled: Boolean(cCodegen.incremental_enabled),
-    cursorField: typeof cCodegen.cursor_field === "string" ? cCodegen.cursor_field : undefined,
-    cursorInitialValue: typeof cCodegen.cursor_initial_value === "string" ? cCodegen.cursor_initial_value : undefined,
-    scheduleEnabled: Boolean(cCodegen.schedule_enabled ?? cCodegen["scheduleEnabled"]),
+    schemaOverride: typeof destResolved.config.schema_override === "string" ? destResolved.config.schema_override : null,
+    destinationInstance:
+      typeof destResolved.config.destination_instance === "string"
+        ? destResolved.config.destination_instance
+        : null,
+    incrementalEnabled: Boolean(destResolved.config.incremental_enabled),
+    cursorField: typeof destResolved.config.cursor_field === "string" ? destResolved.config.cursor_field : undefined,
+    cursorInitialValue:
+      typeof destResolved.config.cursor_initial_value === "string"
+        ? destResolved.config.cursor_initial_value
+        : undefined,
+    scheduleEnabled: Boolean(destResolved.config.schedule_enabled ?? destResolved.config["scheduleEnabled"]),
     cronSchedule: cron,
     tests: tests.length ? tests : undefined,
     sensors: sensors.length ? sensors : undefined,

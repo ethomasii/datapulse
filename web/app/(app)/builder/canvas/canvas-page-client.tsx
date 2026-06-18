@@ -11,6 +11,7 @@ import { FormAccordion } from "@/components/elt/form-accordion";
 import { GuidedDestinationBlock } from "@/components/elt/guided-destination-block";
 import { GuidedSourceBlock } from "@/components/elt/guided-source-block";
 import { CanvasTransformInspector } from "@/components/pipeline-canvas/canvas-transform-inspector";
+import { CanvasComponentInspector } from "@/components/pipeline-canvas/canvas-component-inspector";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 import type { DbtTransformNodeData } from "@/lib/elt/dbt-canvas";
 import { CanvasAssetLineagePanel } from "@/components/pipeline-canvas/canvas-asset-lineage-panel";
@@ -544,7 +545,14 @@ export function CanvasPageClient() {
       }
       const data = (await res.json().catch(() => ({}))) as {
         pipeline?: { sourceConfiguration?: Record<string, unknown> };
+        monitorApply?: { created: string[]; skipped: string[]; errors: string[] };
       };
+      if (data.monitorApply?.created.length) {
+        setSaveError(null);
+      }
+      if (data.monitorApply?.errors.length) {
+        setSaveError(`Monitors: ${data.monitorApply.errors.join("; ")}`);
+      }
       if (data.pipeline?.sourceConfiguration) {
         const full = data.pipeline.sourceConfiguration;
         lastFullSourceConfigRef.current = { ...full };
@@ -668,6 +676,27 @@ export function CanvasPageClient() {
             sourceSlug={pipelineSourceType}
             linkedDbtProjectId={linkedDbtProjectId}
             onLinkedDbtProjectChange={setLinkedDbtProjectId}
+            readOnly={!canWrite}
+            onPatch={(p) => canvasControlRef.current?.patchNodeData(focus.nodeId, p)}
+          />
+        </div>
+      );
+    }
+
+    if (focus.kind === "component") {
+      return (
+        <div className="space-y-4">
+          <div className={stickyHeaderClass}>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Component template</h2>
+            <p className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-400">
+              Lakeflow-style step — compiles to dlt/Sling/dbt/monitor/quality on save.
+            </p>
+          </div>
+          <CanvasComponentInspector
+            key={focus.nodeId}
+            nodeId={focus.nodeId}
+            initialData={focus.data}
+            pipelineId={selectedId}
             readOnly={!canWrite}
             onPatch={(p) => canvasControlRef.current?.patchNodeData(focus.nodeId, p)}
           />

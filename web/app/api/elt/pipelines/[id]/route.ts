@@ -21,6 +21,11 @@ import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-
 import { normalizeRunWebhookUrl } from "@/lib/elt/validate-run-webhook-url";
 import { mergeSourceConfigurationForSourceTypeChange } from "@/lib/elt/merge-source-config-on-type-change";
 import { syncDltDbtWithCanvas } from "@/lib/elt/dbt-canvas";
+import {
+  extractComponentsFromCanvas,
+  syncCanvasToPipelineSpec,
+} from "@/lib/elt/canvas-component-sync";
+import { applyCanvasSensorMonitors } from "@/lib/elt/apply-canvas-component-monitors";
 import { linkDbtProjectToPipeline, unlinkDbtProjectFromPipeline } from "@/lib/elt/dbt-projects";
 import { resolveRouteParamId } from "@/lib/server/route-params";
 import { assertUserOwnsGatewayToken } from "@/lib/agent/gateway-routing";
@@ -465,6 +470,28 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
     syncDltDbtWithCanvas(base);
 
+    let declarativeSpecYaml: string | undefined;
+    let monitorApply: Awaited<ReturnType<typeof applyCanvasSensorMonitors>> | undefined;
+
+    if (p.canvas !== undefined && p.canvas !== null) {
+      const synced = await syncCanvasToPipelineSpec(existing, base);
+      base = synced.sourceConfiguration;
+      declarativeSpecYaml = synced.declarativeSpecYaml;
+
+      const extracted = extractComponentsFromCanvas(
+        p.canvas.nodes as Node[],
+        p.canvas.edges as Edge[]
+      );
+      if (extracted.sensorMonitors.length) {
+        monitorApply = await applyCanvasSensorMonitors(
+          user.id,
+          existing.id,
+          nextSourceConnectionId,
+          extracted.sensorMonitors
+        );
+      }
+    }
+
     const tool: CreatePipelineBody["tool"] =
       existing.tool === "dlt" || existing.tool === "sling" ? existing.tool : "auto";
     const syntheticBody: CreatePipelineBody = {
@@ -497,6 +524,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
         pipelineCode,
         configYaml,
         workspaceYaml,
+        ...(declarativeSpecYaml ? { declarativeSpecYaml } : {}),
         ...(nextDefaultGateway !== undefined ? { defaultTargetAgentTokenId: nextDefaultGateway } : {}),
         ...(p.executionHost !== undefined ? { executionHost: p.executionHost } : {}),
       },
@@ -511,7 +539,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
     }
 
     const refreshed = await db.eltPipeline.findUnique({ where: { id: row.id } });
-    return NextResponse.json({ pipeline: refreshed ?? row });
+    return NextResponse.json({
+      pipeline: refreshed ?? row,
+      ...(monitorApply ? { monitorApply } : {}),
+    });
   } catch (e) {
     const drift = prismaSchemaDriftResponse(e);
     if (drift) return drift;
