@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { fetchComponentSchema, getComponentById } from "@/lib/elt/component-registry";
+import {
+  dagsterAttributesToFields,
+  getNativeComponent,
+  isNativeComponent,
+} from "@/lib/elt/native-components";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -24,5 +29,23 @@ export async function GET(req: Request, ctx: Ctx) {
     schema = await fetchComponentSchema(component.schema_url);
   }
 
-  return NextResponse.json({ component, schema });
+  const native = getNativeComponent(id);
+  const nativeFields = native?.fields ?? null;
+  let formFields = nativeFields;
+  if (!formFields && schema && typeof schema === "object") {
+    const attrs = (schema as Record<string, unknown>).attributes;
+    if (attrs && typeof attrs === "object") {
+      formFields = dagsterAttributesToFields(
+        attrs as Record<string, Record<string, unknown>>,
+        native?.dagsterOnlyFields
+      );
+    }
+  }
+
+  return NextResponse.json({
+    component: { ...component, isNative: isNativeComponent(id) },
+    schema,
+    nativeFields: formFields,
+    nativeCompilerId: native?.id ?? null,
+  });
 }

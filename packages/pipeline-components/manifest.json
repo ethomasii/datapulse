@@ -1,0 +1,22 @@
+{
+  "version": "1",
+  "repository": "eltpulsehq/pipeline-components",
+  "description": "Native executable pipeline components for eltPulse declarative v2",
+  "sourcePath": "web/lib/elt/native-components/definitions",
+  "components": [
+    "join_tables",
+    "filter_rows",
+    "sql_transform",
+    "select_columns",
+    "drop_duplicates",
+    "union_tables",
+    "dq_check",
+    "freshness_check",
+    "unique_check",
+    "s3_monitor",
+    "sqs_monitor",
+    "gcs_monitor",
+    "s3_to_database_asset",
+    "sql_to_database_asset"
+  ]
+}

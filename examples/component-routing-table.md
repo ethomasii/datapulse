@@ -1,6 +1,6 @@
 # Component → compiler routing (top templates)
 
-Templates from [dagster-component-templates](https://github.com/eric-thomas-dagster/dagster-component-templates) are **discovery + config UX only**. eltPulse compiles them to engines we already run — not a second Dagster runtime.
+Templates from [dagster-component-templates](https://github.com/eric-thomas-dagster/dagster-component-templates) are **discovery + config UX** by default. **Native** components (see `examples/native-pipeline-components.md`) compile to executable Python/SQL on the managed worker.
 
 ## Category defaults
 

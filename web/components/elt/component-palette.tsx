@@ -12,6 +12,7 @@ export type ComponentListItem = {
   compileBadge?: string;
   compileHint: string;
   canvasPorts: { left: boolean; right: boolean };
+  isNative?: boolean;
   monitorPair?: { monitorId: string; pipelineComponentId: string; label: string } | null;
 };
 
@@ -117,11 +118,18 @@ export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter
               >
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-sm font-medium text-slate-900 dark:text-white">{c.name}</span>
-                  <span
-                    className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${badgeColor[c.compileTarget] ?? "bg-slate-100 text-slate-600"}`}
-                  >
-                    {c.compileTarget}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-0.5">
+                    {c.isNative ? (
+                      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                        native
+                      </span>
+                    ) : null}
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${badgeColor[c.compileTarget] ?? "bg-slate-100 text-slate-600"}`}
+                    >
+                      {c.compileTarget}
+                    </span>
+                  </div>
                 </div>
                 <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{c.description || c.compileHint}</p>
                 {c.monitorPair ? (

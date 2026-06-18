@@ -6,6 +6,7 @@
 import manifestIndex from "@/lib/elt/data/component-manifest-index.json";
 import { canvasPortsForCategory, normalizeComponentCategory } from "@/lib/elt/component-canvas-io";
 import { routeComponent, suggestMonitorPipelinePair, TOP_COMPONENT_ROUTES, type ComponentCompileTarget, type ComponentRoute } from "@/lib/elt/component-compile-router";
+import { isNativeComponent } from "@/lib/elt/native-components";
 
 export type ComponentManifestEntry = {
   id: string;
@@ -25,6 +26,8 @@ export type ComponentListItem = ComponentManifestEntry & {
   compileHint: string;
   canvasPorts: { left: boolean; right: boolean };
   monitorPair?: ReturnType<typeof suggestMonitorPipelinePair>;
+  /** Has an eltPulse native compiler (executable on worker). */
+  isNative?: boolean;
 };
 
 type ManifestIndex = {
@@ -114,6 +117,7 @@ export function getComponentById(id: string): ComponentListItem | null {
     compileBadge: curated.badge,
     compileHint: curated.hint,
     canvasPorts: { left: ports.left, right: ports.right },
+    isNative: isNativeComponent(id),
     ...(pair ? { monitorPair: pair } : {}),
   };
 }
@@ -140,6 +144,7 @@ function enrichComponent(row: ComponentManifestEntry): ComponentListItem {
     compileBadge: route.badge,
     compileHint: route.hint,
     canvasPorts: { left: ports.left, right: ports.right },
+    isNative: isNativeComponent(row.id),
     ...(pair ? { monitorPair: pair } : {}),
   };
 }

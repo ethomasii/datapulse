@@ -2,6 +2,7 @@ import YAML from "yaml";
 import { stripCanvasFromSourceConfig } from "./canvas-source-config";
 import { chooseTool } from "./choose-tool";
 import { applyDestinationCodegenHints } from "./destination-codegen-hints";
+import { compileNativePipelineComponents } from "./native-components";
 import { generateDltPipeline } from "./generate-dlt";
 import { generateSlingReplication, slingReplicationToYaml } from "./generate-sling";
 import { generateEltpulseWorkspaceYaml } from "./generate-eltpulse-workspace";
@@ -19,7 +20,8 @@ function parseEltLines(c: Record<string, unknown>, key: string): string[] {
 
 function bodyToRequest(body: CreatePipelineBody): PipelineRequest {
   const c = body.sourceConfiguration ?? {};
-  const stripped = stripCanvasFromSourceConfig(c as Record<string, unknown>);
+  const { config: compiledConfig } = compileNativePipelineComponents(c as Record<string, unknown>);
+  const stripped = stripCanvasFromSourceConfig(compiledConfig);
   const cCodegen = normalizeSourceConfigurationForCodegen(body.sourceType, stripped);
   const destResolved = applyDestinationCodegenHints(body.destinationType, cCodegen);
   const tests = parseEltLines(destResolved.config, "elt_tests");
