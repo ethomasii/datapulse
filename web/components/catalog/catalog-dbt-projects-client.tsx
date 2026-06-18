@@ -11,9 +11,11 @@ import {
   Layers,
   Loader2,
   PlayCircle,
+  Plus,
 } from "lucide-react";
+import type { DbtProjectSummary } from "@/lib/elt/dbt-projects";
 
-type DbtProject = {
+type LegacyDbtProject = {
   pipelineId: string;
   pipelineName: string;
   sourceType: string;
@@ -23,34 +25,25 @@ type DbtProject = {
   packagePath?: string;
   transformScope?: string;
   freshnessLabel: string;
-  lastRun?: { id: string; status: string; dbtManifest?: { models: { name: string; status: string }[] } };
-  dbtDiff?: { missingFromRun: string[]; failedModels: string[] };
 };
 
-const V3_ROADMAP = [
-  { id: "projects", label: "dbt Projects workspace (this page)", done: true },
-  { id: "git", label: "Git-backed project browser + scaffold", done: true },
-  { id: "manifest", label: "Manifest on runs + config diff", done: true },
-  { id: "schedule", label: "Scheduled dbt via pipeline tasks", done: true },
-  { id: "compile", label: "dbt compile/run from UI (native executor)", done: true },
-  { id: "tracing", label: "OpenTelemetry-style run tracing", done: false },
-] as const;
-
 export function CatalogDbtProjectsClient() {
-  const [projects, setProjects] = useState<DbtProject[]>([]);
+  const [projects, setProjects] = useState<DbtProjectSummary[]>([]);
+  const [legacy, setLegacy] = useState<LegacyDbtProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
 
-  async function triggerDbt(pipelineId: string, action: "run" | "compile" | "test") {
-    setRunning(`${pipelineId}:${action}`);
+  async function triggerDbt(opts: { dbtProjectId?: string; pipelineId?: string }, action: "run" | "compile" | "test") {
+    const key = opts.dbtProjectId ?? opts.pipelineId ?? "";
+    setRunning(`${key}:${action}`);
     setRunError(null);
     try {
       const res = await fetch("/api/elt/dbt/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ pipelineId, action }),
+        body: JSON.stringify({ ...opts, action }),
       });
       const data = (await res.json()) as { error?: unknown; run?: { id: string } };
       if (!res.ok) {
@@ -70,10 +63,20 @@ export function CatalogDbtProjectsClient() {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch("/api/elt/catalog/overview");
-        if (res.ok) {
-          const data = (await res.json()) as { dbtProjects: DbtProject[] };
-          setProjects(data.dbtProjects ?? []);
+        const [projRes, overviewRes] = await Promise.all([
+          fetch("/api/elt/dbt/projects", { credentials: "same-origin" }),
+          fetch("/api/elt/catalog/overview", { credentials: "same-origin" }),
+        ]);
+        let registered: DbtProjectSummary[] = [];
+        if (projRes.ok) {
+          const data = (await projRes.json()) as { projects?: DbtProjectSummary[] };
+          registered = data.projects ?? [];
+          setProjects(registered);
+        }
+        if (overviewRes.ok) {
+          const data = (await overviewRes.json()) as { dbtProjects?: LegacyDbtProject[] };
+          const registeredIds = new Set(registered.flatMap((p) => p.linkedPipelineIds));
+          setLegacy((data.dbtProjects ?? []).filter((p) => !registeredIds.has(p.pipelineId)));
         }
       } finally {
         setLoading(false);
@@ -81,37 +84,36 @@ export function CatalogDbtProjectsClient() {
     })();
   }, []);
 
+  const hasAny = projects.length > 0 || legacy.length > 0;
+
   return (
     <div className="mx-auto w-full min-w-0 max-w-6xl space-y-8">
-      <div>
-        <Link href="/catalog" className="text-sm font-medium text-sky-600 hover:underline dark:text-sky-400">
-          ← Catalog
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <Link href="/catalog" className="text-sm font-medium text-sky-600 hover:underline dark:text-sky-400">
+            ← Catalog
+          </Link>
+          <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">dbt projects</h1>
+          <p className="mt-2 max-w-3xl text-slate-600 dark:text-slate-300">
+            First-class dbt projects in your workspace — like{" "}
+            <a
+              href="https://www.snowflake.com/en/developers/guides/dbt-projects-on-snowflake/"
+              className="font-medium text-sky-600 hover:underline dark:text-sky-400"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              dbt Projects on Snowflake
+            </a>{" "}
+            or dbt Cloud. Register Git-backed projects, run transforms standalone, or wire them into EL pipelines for
+            orchestrated EL+T.
+          </p>
+        </div>
+        <Link
+          href="/catalog/dbt/new"
+          className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+        >
+          <Plus className="h-4 w-4" /> New project
         </Link>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">dbt projects</h1>
-        <p className="mt-2 max-w-3xl text-slate-600 dark:text-slate-300">
-          Workspace view of dbt transforms attached to pipelines — inspired by{" "}
-          <a
-            href="https://www.snowflake.com/en/developers/guides/dbt-projects-on-snowflake/"
-            className="font-medium text-sky-600 hover:underline dark:text-sky-400"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            dbt Projects on Snowflake
-          </a>
-          . Each project maps to a pipeline with dbt enabled; runs, schedules, and Git scaffold link from here.
-        </p>
-      </div>
-
-      <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900 dark:bg-violet-950/30">
-        <h2 className="text-sm font-semibold text-violet-900 dark:text-violet-100">dbt v3 roadmap</h2>
-        <ul className="mt-2 grid gap-1 sm:grid-cols-2">
-          {V3_ROADMAP.map((item) => (
-            <li key={item.id} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
-              <span className={item.done ? "text-emerald-600" : "text-slate-400"}>{item.done ? "✓" : "○"}</span>
-              {item.label}
-            </li>
-          ))}
-        </ul>
       </div>
 
       {runError ? (
@@ -122,15 +124,21 @@ export function CatalogDbtProjectsClient() {
 
       {loading ? (
         <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-      ) : projects.length === 0 ? (
+      ) : !hasAny ? (
         <div className="space-y-6">
           <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
             <GitBranch className="mx-auto h-8 w-8 text-slate-400" />
             <p className="mt-3 font-medium text-slate-900 dark:text-white">No dbt projects yet</p>
             <p className="mx-auto mt-2 max-w-lg text-sm text-slate-500">
-              A dbt project is a pipeline with dbt enabled under <strong>Post-load transform</strong> in the builder.
-              You don&apos;t create dbt projects separately — attach a package to a pipeline first.
+              Create a standalone dbt project from Git or scaffold from the Transform hub — then optionally link it to a
+              pipeline for post-load transforms.
             </p>
+            <Link
+              href="/catalog/dbt/new"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+            >
+              <Plus className="h-4 w-4" /> Create dbt project
+            </Link>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
@@ -145,132 +153,74 @@ export function CatalogDbtProjectsClient() {
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                 Pick a staging package for your connector (Stripe, GitHub, Postgres, …).
               </p>
-              <span className="mt-3 inline-flex text-sm font-semibold text-sky-600 dark:text-sky-400">
-                Open Transform hub →
-              </span>
             </Link>
             <Link
-              href="/builder?dbt=1"
+              href="/catalog/dbt/new"
               className="rounded-xl border border-sky-200 bg-sky-50/60 p-5 transition hover:border-sky-300 dark:border-sky-900 dark:bg-sky-950/30"
             >
               <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Step 2</p>
-              <p className="mt-2 font-semibold text-slate-900 dark:text-white">Enable dbt on a pipeline</p>
+              <p className="mt-2 font-semibold text-slate-900 dark:text-white">Register your project</p>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                Create or edit a pipeline — open <strong>Post-load transform</strong>, choose dbt, save.
+                Point at a Git repo or local path, set target schema, and choose a warehouse connection.
               </p>
-              <span className="mt-3 inline-flex text-sm font-semibold text-sky-600 dark:text-sky-400">
-                Open builder with dbt →
-              </span>
             </Link>
             <Link
-              href="/runs"
+              href="/builder?dbt=1"
               className="rounded-xl border border-slate-200 bg-white p-5 transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900"
             >
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 3</p>
-              <p className="mt-2 font-semibold text-slate-900 dark:text-white">Run the pipeline</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 3 (optional)</p>
+              <p className="mt-2 font-semibold text-slate-900 dark:text-white">Link to a pipeline</p>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                After a successful run, the project shows here with models, schedules, and compile/run actions.
+                Wire the project into an EL pipeline for sync → load → dbt in one run.
               </p>
-              <span className="mt-3 inline-flex text-sm font-semibold text-sky-600 dark:text-sky-400">
-                View runs →
-              </span>
             </Link>
           </div>
-
-          <p className="text-center text-xs text-slate-500">
-            Already have pipelines?{" "}
-            <Link href="/builder" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-              Edit a pipeline
-            </Link>{" "}
-            and add dbt under Post-load transform.
-          </p>
         </div>
       ) : (
         <ul className="space-y-4">
           {projects.map((p) => (
             <li
-              key={p.pipelineId}
+              key={p.id}
               className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h2 className="font-semibold text-slate-900 dark:text-white">{p.pipelineName}</h2>
+                  <Link href={`/catalog/dbt/${p.id}`} className="font-semibold text-slate-900 hover:text-sky-600 dark:text-white dark:hover:text-sky-400">
+                    {p.name}
+                  </Link>
                   <p className="mt-1 text-sm text-slate-500">
-                    {p.sourceType} → {p.destinationType} · {p.modelCount} model{p.modelCount === 1 ? "" : "s"}
+                    {p.gitUrl ? "Git-backed" : "Local path"}
                     {p.packagePath ? ` · ${p.packagePath.replace(/^dlt-hub\//, "")}` : ""}
+                    {p.targetSchema ? ` · schema ${p.targetSchema}` : ""}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    {p.transformScope === "post_replication" ? "Post-replication dbt" : "In-pipeline dbt"} ·{" "}
-                    {p.freshnessLabel}
+                    {p.linkedPipelines.length > 0
+                      ? `Linked to ${p.linkedPipelines.length} pipeline${p.linkedPipelines.length === 1 ? "" : "s"}`
+                      : "Standalone"}
+                    {p.scheduleEnabled && p.cronSchedule ? ` · scheduled ${p.cronSchedule}` : ""}
                   </p>
                 </div>
-                {!p.enabled ? (
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
-                    Disabled
-                  </span>
-                ) : null}
               </div>
-
-              {p.lastRun?.dbtManifest ? (
-                <p className="mt-3 text-xs text-violet-700 dark:text-violet-300">
-                  Last run:{" "}
-                  {p.lastRun.dbtManifest.models.filter((m) => m.status === "success").length}/
-                  {p.lastRun.dbtManifest.models.length} models succeeded
-                </p>
-              ) : null}
-              {p.dbtDiff && (p.dbtDiff.missingFromRun.length > 0 || p.dbtDiff.failedModels.length > 0) ? (
-                <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                  {p.dbtDiff.missingFromRun.length > 0
-                    ? `Missing on run: ${p.dbtDiff.missingFromRun.join(", ")}`
-                    : ""}
-                  {p.dbtDiff.failedModels.length > 0 ? ` · Failed: ${p.dbtDiff.failedModels.join(", ")}` : ""}
-                </p>
-              ) : null}
 
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={!p.enabled || running !== null}
-                  onClick={() => void triggerDbt(p.pipelineId, "run")}
+                  disabled={running !== null}
+                  onClick={() => void triggerDbt({ dbtProjectId: p.id }, "run")}
                   className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800 hover:border-violet-300 disabled:opacity-50 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200"
                 >
-                  {running === `${p.pipelineId}:run` ? (
+                  {running === `${p.id}:run` ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
                     <PlayCircle className="h-3.5 w-3.5" />
                   )}{" "}
                   Run dbt
                 </button>
-                <button
-                  type="button"
-                  disabled={!p.enabled || running !== null}
-                  onClick={() => void triggerDbt(p.pipelineId, "compile")}
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-sky-300 dark:border-slate-700 dark:text-slate-200"
-                >
-                  {running === `${p.pipelineId}:compile` ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <GitBranch className="h-3.5 w-3.5" />
-                  )}{" "}
-                  Compile
-                </button>
                 <Link
-                  href={`/builder?pipeline=${p.pipelineId}&dbt=1`}
+                  href={`/catalog/dbt/${p.id}`}
                   className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-sky-300 dark:border-slate-700 dark:text-slate-200"
                 >
-                  <Layers className="h-3.5 w-3.5" /> Edit project
-                </Link>
-                <Link
-                  href={`/runs?pipeline=${p.pipelineId}`}
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-sky-300 dark:border-slate-700 dark:text-slate-200"
-                >
-                  <PlayCircle className="h-3.5 w-3.5" /> Runs
-                </Link>
-                <Link
-                  href={`/assets?pipeline=${p.pipelineId}`}
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-sky-300 dark:border-slate-700 dark:text-slate-200"
-                >
-                  <Activity className="h-3.5 w-3.5" /> Lineage
+                  <Layers className="h-3.5 w-3.5" /> Open project
                 </Link>
                 <Link
                   href="/schedule"
@@ -287,6 +237,52 @@ export function CatalogDbtProjectsClient() {
               </div>
             </li>
           ))}
+
+          {legacy.length > 0 ? (
+            <>
+              <li className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Legacy inline dbt (not yet registered as projects)
+              </li>
+              {legacy.map((p) => (
+                <li
+                  key={p.pipelineId}
+                  className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-5 dark:border-slate-800 dark:bg-slate-900/50"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h2 className="font-semibold text-slate-900 dark:text-white">{p.pipelineName}</h2>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {p.sourceType} → {p.destinationType} · {p.modelCount} model{p.modelCount === 1 ? "" : "s"}
+                        {p.freshnessLabel ? ` · ${p.freshnessLabel}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={!p.enabled || running !== null}
+                      onClick={() => void triggerDbt({ pipelineId: p.pipelineId }, "run")}
+                      className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800 disabled:opacity-50 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200"
+                    >
+                      Run dbt
+                    </button>
+                    <Link
+                      href={`/builder?pipeline=${p.pipelineId}&dbt=1`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                    >
+                      Edit in builder
+                    </Link>
+                    <Link
+                      href={`/assets?pipeline=${p.pipelineId}`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                    >
+                      <Activity className="h-3.5 w-3.5" /> Lineage
+                    </Link>
+                  </div>
+                </li>
+              ))}
+            </>
+          ) : null}
         </ul>
       )}
 

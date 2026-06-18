@@ -10,6 +10,7 @@ import { RunIngestionExecutor } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
 import { parseStoredConnectionSecrets } from "@/lib/elt/connection-secrets-store";
+import { sourceConfigurationFromDbtProject } from "@/lib/elt/dbt-projects";
 import { resolveRouteParamId } from "@/lib/server/route-params";
 
 export const dynamic = "force-dynamic";
@@ -69,10 +70,31 @@ export async function GET(req: Request, ctx: Ctx) {
           destinationConnectionId: true,
         },
       },
+      dbtProject: {
+        select: {
+          id: true,
+          name: true,
+          packagePath: true,
+          gitUrl: true,
+          gitBranch: true,
+          gitSubpath: true,
+          targetSchema: true,
+          runScope: true,
+          selector: true,
+          scheduleEnabled: true,
+          cronSchedule: true,
+          scheduleTimezone: true,
+          hubPackageKey: true,
+          destinationConnectionId: true,
+        },
+      },
     },
   });
 
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!run.pipeline && !run.dbtProject) {
+    return NextResponse.json({ error: "Run has no pipeline or dbt project" }, { status: 409 });
+  }
   if (!MANAGED.includes(run.ingestionExecutor)) {
     return NextResponse.json({ error: "Run is not managed-ingestion" }, { status: 403 });
   }
@@ -84,10 +106,26 @@ export async function GET(req: Request, ctx: Ctx) {
   }
 
   const userId = run.userId;
+  const destinationConnectionId =
+    run.pipeline?.destinationConnectionId ?? run.dbtProject?.destinationConnectionId ?? null;
   const [source, destination] = await Promise.all([
-    loadConnection(userId, run.pipeline.sourceConnectionId),
-    loadConnection(userId, run.pipeline.destinationConnectionId),
+    loadConnection(userId, run.pipeline?.sourceConnectionId ?? null),
+    loadConnection(userId, destinationConnectionId),
   ]);
+
+  const pipelinePayload = run.pipeline ?? {
+    id: run.dbtProject!.id,
+    name: run.dbtProject!.name,
+    tool: "dbt",
+    sourceType: "dbt",
+    destinationType: destination?.connector ?? "warehouse",
+    sourceConfiguration: sourceConfigurationFromDbtProject(run.dbtProject!),
+    pipelineCode: null,
+    configYaml: null,
+    workspaceYaml: null,
+    sourceConnectionId: null,
+    destinationConnectionId,
+  };
 
   return NextResponse.json({
     run: {
@@ -97,7 +135,7 @@ export async function GET(req: Request, ctx: Ctx) {
       partitionColumn: run.partitionColumn,
       correlationId: run.correlationId,
     },
-    pipeline: run.pipeline,
+    pipeline: pipelinePayload,
     connections: { source, destination },
   });
 }

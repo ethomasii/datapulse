@@ -55,8 +55,10 @@ export async function GET(req: Request) {
       },
     });
     for (const run of runs) {
-      if (!latestRunsByPipelineId.has(run.pipelineId)) {
-        latestRunsByPipelineId.set(run.pipelineId, run);
+      const pid = run.pipelineId;
+      if (!pid) continue;
+      if (!latestRunsByPipelineId.has(pid)) {
+        latestRunsByPipelineId.set(pid, { ...run, pipelineId: pid });
       }
     }
   }

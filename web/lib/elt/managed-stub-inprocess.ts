@@ -8,6 +8,11 @@ import {
   resolveRunPhasesForTrigger,
 } from "@/lib/elt/dbt-run-phases";
 import { buildStubDbtRunManifest } from "@/lib/elt/dbt-run-manifest";
+import {
+  loadDbtProjectForPipeline,
+  resolveEffectiveSourceConfiguration,
+  sourceConfigurationFromDbtProject,
+} from "@/lib/elt/dbt-projects";
 import { maybeDispatchRunWebhook } from "@/lib/elt/maybe-dispatch-run-webhook";
 import type { PatchRunBody } from "@/lib/elt/run-types";
 import type { ManagedWorkerBatchResult } from "@/lib/elt/managed-worker-stub-http";
@@ -69,12 +74,22 @@ export async function stubCompleteManagedRunInProcess(runId: string): Promise<vo
     where: { id: runId },
     select: {
       triggeredBy: true,
-      pipeline: { select: { sourceType: true, sourceConfiguration: true } },
+      dbtProjectId: true,
+      pipeline: { select: { sourceType: true, sourceConfiguration: true, dbtProjectId: true } },
+      dbtProject: true,
     },
   });
-  const sourceConfiguration = run?.pipeline?.sourceConfiguration;
+
+  let sourceConfiguration: unknown = run?.pipeline?.sourceConfiguration;
+  if (run?.dbtProject) {
+    sourceConfiguration = sourceConfigurationFromDbtProject(run.dbtProject);
+  } else if (run?.pipeline) {
+    const linked = await loadDbtProjectForPipeline(run.pipeline);
+    sourceConfiguration = resolveEffectiveSourceConfiguration(run.pipeline, linked);
+  }
+
   const hasDbt = pipelineHasDbtEnabled(sourceConfiguration);
-  const sourceType = run?.pipeline?.sourceType ?? "";
+  const sourceType = run?.pipeline?.sourceType ?? run?.dbtProject?.sourceSlug ?? "";
   const triggeredBy = run?.triggeredBy ?? null;
   const phases = resolveRunPhasesForTrigger(sourceConfiguration, triggeredBy);
   const dbtOnly = isDbtOnlyTriggeredBy(triggeredBy);
@@ -133,8 +148,8 @@ export async function stubCompleteManagedRunInProcess(runId: string): Promise<vo
     appendLog: { level: "info", message: successMessage },
     telemetrySummary: { currentPhase: "done", progress: 100, rowsLoaded: 100, bytesLoaded: 50_000 },
     appendTelemetrySample: { progress: 100, rows: 100, bytes: 50_000, phase: "done" },
-    ...(hasDbt && run?.pipeline && dbtAction !== "compile"
-      ? { dbtManifest: buildStubDbtRunManifest(sourceType, run.pipeline.sourceConfiguration) }
+    ...(hasDbt && (run?.pipeline || run?.dbtProject) && dbtAction !== "compile"
+      ? { dbtManifest: buildStubDbtRunManifest(sourceType, sourceConfiguration) }
       : {}),
   });
 }

@@ -23,6 +23,7 @@ type Props = {
   sourceSlug?: string;
   pipelineTool?: string;
   pipelineId?: string | null;
+  dbtProjectId?: string | null;
   fieldClass?: string;
   compact?: boolean;
 };
@@ -36,6 +37,7 @@ export function DbtConfigFields({
   sourceSlug,
   pipelineTool,
   pipelineId,
+  dbtProjectId,
   fieldClass = defaultFieldClass,
   compact = false,
 }: Props) {
@@ -43,8 +45,8 @@ export function DbtConfigFields({
   const [scaffoldMsg, setScaffoldMsg] = useState<string | null>(null);
 
   async function scaffoldToGit() {
-    if (!pipelineId) {
-      setScaffoldMsg("Save the pipeline first, then scaffold dbt to Git.");
+    if (!pipelineId && !dbtProjectId) {
+      setScaffoldMsg("Save the project first, then scaffold dbt to Git.");
       return;
     }
     setScaffolding(true);
@@ -54,7 +56,12 @@ export function DbtConfigFields({
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pipelineId, sourceSlug, pushToGit: true }),
+        body: JSON.stringify({
+          pipelineId: pipelineId ?? undefined,
+          dbtProjectId: dbtProjectId ?? undefined,
+          sourceSlug,
+          pushToGit: true,
+        }),
       });
       const data = (await res.json()) as {
         ok?: boolean;
@@ -102,7 +109,7 @@ export function DbtConfigFields({
 
       <DbtPackagePicker sourceSlug={sourceSlug} onSelect={applyHubPackage} />
 
-      {pipelineId ? (
+      {pipelineId || dbtProjectId ? (
         <button
           type="button"
           disabled={scaffolding || !sourceSlug}

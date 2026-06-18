@@ -5,6 +5,7 @@ import { getMonthlyRowsSynced } from "@/lib/billing/report-usage";
 import { pipelineOwnerWhere } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
 import { effectiveRunTelemetry, formatBytes, formatRows } from "@/lib/elt/run-telemetry";
+import { runSubjectLabel } from "@/lib/elt/run-display";
 import { ONBOARDING_STEPS } from "@/lib/onboarding/config";
 import { OnboardingChecklist } from "@/components/onboarding/checklist";
 import { BarChart } from "@/components/ui/bar-chart";
@@ -30,6 +31,7 @@ const DASHBOARD_RUN_LIST = {
   telemetry: true,
   logEntries: true,
   pipeline: { select: { name: true } },
+  dbtProject: { select: { name: true } },
 } as const;
 
 export default async function DashboardPage() {
@@ -197,7 +199,7 @@ export default async function DashboardPage() {
                         href={`/runs?run=${encodeURIComponent(r.id)}`}
                         className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2 text-sm hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/60"
                       >
-                        <span className="font-medium text-slate-900 dark:text-white">{r.pipeline.name}</span>
+                        <span className="font-medium text-slate-900 dark:text-white">{runSubjectLabel(r)}</span>
                         <span className="capitalize text-slate-600 dark:text-slate-400">{r.status}</span>
                         <span className="w-full font-mono text-xs text-slate-500 dark:text-slate-400">
                           {s.progress !== undefined ? `${Math.round(s.progress)}%` : "—"} ·{" "}
@@ -226,7 +228,7 @@ export default async function DashboardPage() {
                         href={`/runs?run=${encodeURIComponent(r.id)}`}
                         className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2 text-sm hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/60"
                       >
-                        <span className="font-medium text-slate-900 dark:text-white">{r.pipeline.name}</span>
+                        <span className="font-medium text-slate-900 dark:text-white">{runSubjectLabel(r)}</span>
                         <span className="capitalize text-slate-600 dark:text-slate-400">{r.status}</span>
                         <span className="w-full font-mono text-xs text-slate-500 dark:text-slate-400">
                           {s.rowsLoaded !== undefined ? `${formatRows(s.rowsLoaded)} rows` : "—"} ·{" "}

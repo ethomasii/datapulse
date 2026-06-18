@@ -3,7 +3,8 @@ import { db } from "@/lib/db/client";
 
 export type CreatePendingEltRunInput = {
   userId: string;
-  pipelineId: string;
+  pipelineId?: string | null;
+  dbtProjectId?: string | null;
   environment: string;
   triggeredBy: string | null;
   partitionColumn: string | null;
@@ -15,6 +16,9 @@ export type CreatePendingEltRunInput = {
 };
 
 export async function createPendingEltRun(input: CreatePendingEltRunInput): Promise<{ id: string }> {
+  if (!input.pipelineId && !input.dbtProjectId) {
+    throw new Error("pipelineId or dbtProjectId is required");
+  }
   const correlationId =
     typeof input.correlationId === "string" && input.correlationId.trim()
       ? input.correlationId.trim()
@@ -22,7 +26,8 @@ export async function createPendingEltRun(input: CreatePendingEltRunInput): Prom
   const run = await db.eltPipelineRun.create({
     data: {
       userId: input.userId,
-      pipelineId: input.pipelineId,
+      pipelineId: input.pipelineId ?? null,
+      dbtProjectId: input.dbtProjectId ?? null,
       status: "pending",
       environment: input.environment,
       correlationId,

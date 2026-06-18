@@ -47,6 +47,7 @@ export async function GET(req: Request) {
     take: limit,
     include: {
       pipeline: { select: { id: true, name: true } },
+      dbtProject: { select: { id: true, name: true } },
       targetAgentToken: { select: { id: true, name: true } },
     },
   });

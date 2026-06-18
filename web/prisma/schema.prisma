@@ -91,6 +91,7 @@ model User {
   connections Connection[]
   eltMonitors EltMonitor[]
   catalogEntries CatalogEntry[]
+  dbtProjects DbtProject[]
 
   /// Membership in a shared org (not the owner row — use `ownedOrganization`).
   organizationId String?       @map("organization_id")
@@ -210,6 +211,7 @@ model Connection {
   eltMonitors EltMonitor[]
   pipelinesAsSource      EltPipeline[] @relation("PipelineSourceConnection")
   pipelinesAsDestination EltPipeline[] @relation("PipelineDestinationConnection")
+  dbtProjectsAsDestination DbtProject[] @relation("DbtProjectDestination")
 }
 
 /// eltPulse monitor — evaluated on the control plane and/or your gateway depending on `executionHost` + account plane.
@@ -260,6 +262,42 @@ model CatalogEntry {
   @@map("CatalogEntry")
 }
 
+/// First-class dbt project — standalone or linked to one or more pipelines (Snowflake dbt Projects / dbt Cloud style).
+model DbtProject {
+  id                      String   @id @default(cuid())
+  userId                  String   @map("user_id")
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                    String
+  description             String?  @db.Text
+  /// Local path or subdirectory within a Git repo, e.g. ./eltpulse/dbt/analytics
+  packagePath             String   @map("package_path")
+  /// Full Git remote when project lives in a repo (optional if packagePath is sufficient)
+  gitUrl                  String?  @map("git_url") @db.Text
+  gitBranch               String?  @default("main") @map("git_branch")
+  gitSubpath              String?  @map("git_subpath")
+  targetSchema            String?  @map("target_schema")
+  sourceSlug              String?  @map("source_slug")
+  hubPackageKey           String?  @map("hub_package_key")
+  runScope                String   @default("all") @map("run_scope")
+  selector                String?
+  scheduleEnabled         Boolean  @default(false) @map("schedule_enabled")
+  cronSchedule            String?  @map("cron_schedule")
+  scheduleTimezone        String   @default("UTC") @map("schedule_timezone")
+  /// Warehouse for standalone dbt-only runs when no pipeline is linked
+  destinationConnectionId String?  @map("destination_connection_id")
+  destinationConnection   Connection? @relation("DbtProjectDestination", fields: [destinationConnectionId], references: [id], onDelete: SetNull)
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  pipelines EltPipeline[]
+  runs      EltPipelineRun[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([destinationConnectionId])
+  @@map("DbtProject")
+}
+
 /// Generated ELT pipeline definitions stored in Neon.
 model EltPipeline {
   id                  String   @id @default(cuid())
@@ -290,6 +328,9 @@ model EltPipeline {
   /// Saved destination Connection row.
   destinationConnectionId String? @map("destination_connection_id")
   destinationConnection   Connection? @relation("PipelineDestinationConnection", fields: [destinationConnectionId], references: [id], onDelete: SetNull)
+  /// Optional link to a workspace dbt project (config synced into sourceConfiguration.dbt).
+  dbtProjectId            String? @map("dbt_project_id")
+  dbtProject              DbtProject? @relation(fields: [dbtProjectId], references: [id], onDelete: SetNull)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -297,6 +338,7 @@ model EltPipeline {
   @@index([userId])
   @@index([sourceConnectionId])
   @@index([destinationConnectionId])
+  @@index([dbtProjectId])
   runs EltPipelineRun[]
   eltMonitors EltMonitor[]
 }
@@ -314,8 +356,10 @@ model EltPipelineRun {
   id            String    @id @default(cuid())
   userId        String
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  pipelineId    String
-  pipeline      EltPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  pipelineId    String?
+  pipeline      EltPipeline? @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  dbtProjectId  String?   @map("dbt_project_id")
+  dbtProject    DbtProject? @relation(fields: [dbtProjectId], references: [id], onDelete: SetNull)
   /// Whether ingestion ran on the customer agent, managed eltPulse worker, or was reported via the control-plane API.
   ingestionExecutor RunIngestionExecutor @default(unspecified) @map("ingestion_executor")
   status        RunStatus @default(pending)
@@ -344,6 +388,7 @@ model EltPipelineRun {
 
   @@index([userId, startedAt(sort: Desc)])
   @@index([pipelineId, startedAt(sort: Desc)])
+  @@index([dbtProjectId, startedAt(sort: Desc)])
   @@index([userId, status])
   @@index([userId, environment])
   @@index([userId, status, targetAgentTokenId])

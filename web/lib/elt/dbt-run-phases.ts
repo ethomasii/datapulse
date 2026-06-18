@@ -35,7 +35,9 @@ export function formatRunPhaseLabel(phase: string | undefined | null): string {
 export function pipelineHasDbtEnabled(sourceConfiguration: unknown): boolean {
   const dbt = readDbtTransformConfig(sourceConfiguration);
   if (!dbt) return false;
-  return Boolean(dbt.enabled) && String(dbt.package_path ?? "").trim().length > 0;
+  const hasPath = String(dbt.package_path ?? "").trim().length > 0;
+  const hasGit = String(dbt.git_url ?? "").trim().length > 0;
+  return Boolean(dbt.enabled) && (hasPath || hasGit);
 }
 
 export function dbtPackagePathFromConfig(sourceConfiguration: unknown): string | null {

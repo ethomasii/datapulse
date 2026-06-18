@@ -2,6 +2,7 @@ import { db } from "@/lib/db/client";
 import { parseRunTelemetry } from "@/lib/elt/run-telemetry";
 import { dbtFailedTests } from "@/lib/elt/dbt-run-manifest";
 import { deliverRunWebhook, type RunWebhookPayload } from "@/lib/elt/run-webhook";
+import { runSubjectLabel } from "@/lib/elt/run-display";
 
 function appBaseUrl(): string {
   return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -13,11 +14,12 @@ export async function maybeDispatchRunWebhook(runId: string, userId: string): Pr
     where: { id: runId, userId },
     include: {
       pipeline: { select: { name: true, runsWebhookUrl: true } },
+      dbtProject: { select: { name: true } },
       user: { select: { runsWebhookUrl: true } },
     },
   });
 
-  const webhookUrl = run?.pipeline.runsWebhookUrl ?? run?.user.runsWebhookUrl;
+  const webhookUrl = run?.pipeline?.runsWebhookUrl ?? run?.user.runsWebhookUrl;
   if (!run || !webhookUrl) return;
   if (!["succeeded", "failed", "cancelled"].includes(run.status)) return;
 
@@ -33,7 +35,8 @@ export async function maybeDispatchRunWebhook(runId: string, userId: string): Pr
     event,
     correlationId: run.correlationId,
     pipelineId: run.pipelineId,
-    pipelineName: run.pipeline.name,
+    dbtProjectId: run.dbtProjectId,
+    pipelineName: runSubjectLabel(run),
     environment: run.environment,
     status: run.status,
     errorSummary: run.errorSummary,

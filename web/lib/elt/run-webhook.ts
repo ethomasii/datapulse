@@ -5,7 +5,8 @@ export type RunWebhookPayload = {
   source?: "eltpulse";
   event: "run.succeeded" | "run.failed" | "run.cancelled";
   correlationId: string;
-  pipelineId: string;
+  pipelineId?: string | null;
+  dbtProjectId?: string | null;
   pipelineName: string;
   environment: string;
   status: string;

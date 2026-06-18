@@ -27,6 +27,7 @@ import { RelatedLinks } from "@/components/ui/related-links";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BarChart } from "@/components/ui/bar-chart";
 import { parseSliceFromTriggeredBy } from "@/lib/elt/slice-trigger";
+import { runSubjectLabel } from "@/lib/elt/run-display";
 
 type PipelineOpt = { id: string; name: string; partitionColumn: string | null };
 
@@ -44,7 +45,8 @@ type RunRow = {
   errorSummary: string | null;
   webhookStatus: string | null;
   telemetry?: unknown;
-  pipeline: { id: string; name: string; sourceType?: string; sourceConfiguration?: unknown };
+  pipeline: { id: string; name: string; sourceType?: string; sourceConfiguration?: unknown } | null;
+  dbtProject?: { id: string; name: string } | null;
   targetAgentToken?: { id: string; name: string } | null;
 };
 
@@ -333,7 +335,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
           cmp = new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime();
           break;
         case "pipeline":
-          cmp = a.pipeline.name.localeCompare(b.pipeline.name);
+          cmp = runSubjectLabel(a).localeCompare(runSubjectLabel(b));
           break;
         case "status":
           cmp = a.status.localeCompare(b.status);
@@ -961,7 +963,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                                 className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 dark:border-slate-600"
                                 checked={selectedIds.has(r.id)}
                                 onChange={() => toggleRowSelect(r.id)}
-                                aria-label={`Select run ${r.pipeline.name}`}
+                                aria-label={`Select run ${runSubjectLabel(r)}`}
                               />
                             ) : null}
                           </div>
@@ -995,8 +997,8 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                       <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-400">
                         {new Date(r.startedAt).toLocaleString()}
                       </td>
-                      <td className="max-w-[min(200px,28vw)] truncate px-3 py-2 font-medium text-slate-900 dark:text-white" title={r.pipeline.name}>
-                        {r.pipeline.name}
+                      <td className="max-w-[min(200px,28vw)] truncate px-3 py-2 font-medium text-slate-900 dark:text-white" title={runSubjectLabel(r)}>
+                        {runSubjectLabel(r)}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">{r.environment}</td>
                       <td className="whitespace-nowrap px-3 py-2">

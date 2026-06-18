@@ -38,6 +38,7 @@ export async function GET(req: Request) {
   });
 
   const catalogEntries = await db.catalogEntry.count({ where: { userId: { in: ownerIds } } });
+  const registeredDbtProjects = await db.dbtProject.count({ where: { userId: { in: ownerIds } } });
 
   const assetsPayload = buildWorkspaceAssets(pipelines);
   const sourceUsage = new Map<string, number>();
@@ -52,6 +53,7 @@ export async function GET(req: Request) {
       pipelines: pipelines.length,
       connections: connections.length,
       catalogEntries,
+      dbtProjects: registeredDbtProjects,
       assets: assetsPayload.summary,
     },
     connectorUsage: {

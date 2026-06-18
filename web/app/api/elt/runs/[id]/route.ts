@@ -24,6 +24,7 @@ export async function GET(req: Request, context: RouteContext) {
     where: { id, userId: auth.user.id },
     include: {
       pipeline: { select: { id: true, name: true, tool: true, sourceType: true, sourceConfiguration: true } },
+      dbtProject: { select: { id: true, name: true } },
       targetAgentToken: { select: { id: true, name: true } },
     },
   });
@@ -88,7 +89,10 @@ export async function PATCH(req: Request, context: RouteContext) {
   const run = await db.eltPipelineRun.update({
     where: { id },
     data,
-    include: { pipeline: { select: { id: true, name: true } } },
+    include: {
+      pipeline: { select: { id: true, name: true } },
+      dbtProject: { select: { id: true, name: true } },
+    },
   });
 
   if (patch.willBeTerminal && !patch.wasTerminal) {
