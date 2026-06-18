@@ -2,7 +2,7 @@ import YAML from "yaml";
 import { stripCanvasFromSourceConfig } from "./canvas-source-config";
 import { chooseTool } from "./choose-tool";
 import { applyDestinationCodegenHints } from "./destination-codegen-hints";
-import { compileNativePipelineComponents } from "./native-components";
+import { compilePipelineComponentsAsync } from "./native-components/compile-pipeline-components";
 import { generateDltPipeline } from "./generate-dlt";
 import { generateSlingReplication, slingReplicationToYaml } from "./generate-sling";
 import { generateEltpulseWorkspaceYaml } from "./generate-eltpulse-workspace";
@@ -18,9 +18,14 @@ function parseEltLines(c: Record<string, unknown>, key: string): string[] {
   return [];
 }
 
-function bodyToRequest(body: CreatePipelineBody): PipelineRequest {
+async function bodyToRequest(
+  body: CreatePipelineBody,
+  options?: { workspaceCatalogUrls?: string[] | null }
+): Promise<PipelineRequest> {
   const c = body.sourceConfiguration ?? {};
-  const { config: compiledConfig } = compileNativePipelineComponents(c as Record<string, unknown>);
+  const { config: compiledConfig } = await compilePipelineComponentsAsync(c as Record<string, unknown>, {
+    workspaceCatalogUrls: options?.workspaceCatalogUrls,
+  });
   const stripped = stripCanvasFromSourceConfig(compiledConfig);
   const cCodegen = normalizeSourceConfigurationForCodegen(body.sourceType, stripped);
   const destResolved = applyDestinationCodegenHints(body.destinationType, cCodegen);
@@ -71,9 +76,12 @@ export function resolveTool(body: CreatePipelineBody): "dlt" | "sling" {
   return chooseTool(body.sourceType, body.destinationType);
 }
 
-export function generatePipelineArtifacts(body: CreatePipelineBody) {
+export async function generatePipelineArtifacts(
+  body: CreatePipelineBody,
+  options?: { workspaceCatalogUrls?: string[] | null }
+) {
   const tool = resolveTool(body);
-  const req = bodyToRequest(body);
+  const req = await bodyToRequest(body, options);
 
   if (tool === "dlt") {
     const pipelineCode = generateDltPipeline(req);

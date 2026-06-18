@@ -1,4 +1,5 @@
 import type { PipelineComponentSpec } from "@/lib/elt/declarative-pipeline-spec";
+import { resolveComponentCompiler } from "@/lib/elt/component-packages";
 import { getNativeComponent, resolveNativeComponentId } from "./registry";
 import type { CompiledPipelineComponents } from "./types";
 
@@ -70,9 +71,15 @@ function mergeConfigPatch(
 
 /**
  * Compile elt_components[] into executable post-transform Python/SQL and quality tests.
- * Mutates a copy of sourceConfiguration — call before pipeline artifact codegen.
+ * Sync path: built-in TS compilers only (tests / legacy).
  */
 export function compileNativePipelineComponents(
+  sourceConfiguration: Record<string, unknown>
+): { config: Record<string, unknown>; result: CompiledPipelineComponents } {
+  return compilePipelineComponentsSync(sourceConfiguration);
+}
+
+function compilePipelineComponentsSync(
   sourceConfiguration: Record<string, unknown>
 ): { config: Record<string, unknown>; result: CompiledPipelineComponents } {
   const config = { ...sourceConfiguration };
@@ -95,16 +102,112 @@ export function compileNativePipelineComponents(
     }
 
     const out = native.compile(cfg);
+    applyCompileOutput(config, out, { pythonBlocks, sqlStatements, testLines, quality, warnings });
     compiled = true;
-    if (out.python?.length) pythonBlocks.push(...out.python);
-    if (out.sql?.length) sqlStatements.push(...out.sql);
-    if (out.tests?.length) testLines.push(...out.tests);
-    if (out.quality?.length) quality.push(...out.quality);
-    if (out.configPatch && Object.keys(out.configPatch).length) {
-      mergeConfigPatch(config, out.configPatch);
-    }
-    if (out.warnings?.length) warnings.push(...out.warnings);
   }
+
+  finalizeCompiledConfig(config, { pythonBlocks, sqlStatements, testLines, quality, compiled });
+  return {
+    config,
+    result: { pythonBlocks, sqlStatements, testLines, quality, warnings, compiled },
+  };
+}
+
+/**
+ * Async compile: remote package compile.mjs first, then built-in TS fallback.
+ */
+export async function compilePipelineComponentsAsync(
+  sourceConfiguration: Record<string, unknown>,
+  options?: { workspaceCatalogUrls?: string[] | null }
+): Promise<{ config: Record<string, unknown>; result: CompiledPipelineComponents }> {
+  const config = { ...sourceConfiguration };
+  const components = topoOrder(parseEltComponents(config.elt_components));
+
+  const pythonBlocks: string[] = [];
+  const sqlStatements: string[] = [];
+  const testLines: string[] = [];
+  const quality: CompiledPipelineComponents["quality"] = [];
+  const warnings: string[] = [];
+  let compiled = false;
+
+  for (const comp of components) {
+    const cfg = { ...(comp.config ?? {}), template_id: comp.config?.template_id ?? comp.id };
+    const nativeId = resolveNativeComponentId(cfg) ?? comp.id;
+    const compiler = await resolveComponentCompiler(nativeId, {
+      sourceConfiguration: config,
+      workspaceCatalogUrls: options?.workspaceCatalogUrls,
+    });
+    if (!compiler) {
+      warnings.push(`No compiler for component '${nativeId}' — stored in spec only`);
+      continue;
+    }
+
+    try {
+      const out = await compiler.compile(cfg);
+      applyCompileOutput(config, out, { pythonBlocks, sqlStatements, testLines, quality, warnings });
+      compiled = true;
+      if (compiler.source === "package") {
+        config.elt_components_package_sources = {
+          ...(typeof config.elt_components_package_sources === "object" &&
+          config.elt_components_package_sources
+            ? (config.elt_components_package_sources as Record<string, string>)
+            : {}),
+          [nativeId]: compiler.catalogId ?? "package",
+        };
+      }
+    } catch (err) {
+      warnings.push(
+        `Compile failed for '${nativeId}': ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  finalizeCompiledConfig(config, { pythonBlocks, sqlStatements, testLines, quality, compiled });
+  return {
+    config,
+    result: { pythonBlocks, sqlStatements, testLines, quality, warnings, compiled },
+  };
+}
+
+function applyCompileOutput(
+  config: Record<string, unknown>,
+  out: {
+    python?: string[];
+    sql?: string[];
+    tests?: string[];
+    quality?: CompiledPipelineComponents["quality"];
+    configPatch?: Record<string, unknown>;
+    warnings?: string[];
+  },
+  acc: {
+    pythonBlocks: string[];
+    sqlStatements: string[];
+    testLines: string[];
+    quality: CompiledPipelineComponents["quality"];
+    warnings: string[];
+  }
+): void {
+  if (out.python?.length) acc.pythonBlocks.push(...out.python);
+  if (out.sql?.length) acc.sqlStatements.push(...out.sql);
+  if (out.tests?.length) acc.testLines.push(...out.tests);
+  if (out.quality?.length) acc.quality.push(...out.quality);
+  if (out.configPatch && Object.keys(out.configPatch).length) {
+    mergeConfigPatch(config, out.configPatch);
+  }
+  if (out.warnings?.length) acc.warnings.push(...out.warnings);
+}
+
+function finalizeCompiledConfig(
+  config: Record<string, unknown>,
+  state: {
+    pythonBlocks: string[];
+    sqlStatements: string[];
+    testLines: string[];
+    quality: CompiledPipelineComponents["quality"];
+    compiled: boolean;
+  }
+): void {
+  const { pythonBlocks, sqlStatements, testLines, quality, compiled } = state;
 
   if (pythonBlocks.length || sqlStatements.length) {
     const existing = config.post_transform;
@@ -167,9 +270,4 @@ export function compileNativePipelineComponents(
     config.elt_components_compiled = true;
     config.elt_components_compiled_at = new Date().toISOString();
   }
-
-  return {
-    config,
-    result: { pythonBlocks, sqlStatements, testLines, quality, warnings, compiled },
-  };
 }

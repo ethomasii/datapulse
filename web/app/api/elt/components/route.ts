@@ -5,6 +5,8 @@ import {
   listComponentCategories,
   listComponents,
 } from "@/lib/elt/component-registry";
+import { listPackageCatalogComponents } from "@/lib/elt/component-packages";
+import { defaultCatalogSources } from "@/lib/elt/component-packages/catalog-sources";
 import type { ComponentCompileTarget } from "@/lib/elt/component-compile-router";
 
 /**
@@ -19,6 +21,7 @@ export async function GET(req: Request) {
   const q = url.searchParams.get("q") ?? undefined;
   const category = url.searchParams.get("category") ?? undefined;
   const compileTarget = url.searchParams.get("compileTarget") as ComponentCompileTarget | null;
+  const includePackages = url.searchParams.get("includePackages") === "1";
   const limit = Number(url.searchParams.get("limit") ?? "50");
   const offset = Number(url.searchParams.get("offset") ?? "0");
 
@@ -30,10 +33,44 @@ export async function GET(req: Request) {
     offset: Number.isFinite(offset) ? offset : 0,
   });
 
+  let packageItems: Awaited<ReturnType<typeof listPackageCatalogComponents>> = [];
+  if (includePackages) {
+    packageItems = await listPackageCatalogComponents();
+    if (q?.trim()) {
+      const ql = q.trim().toLowerCase();
+      packageItems = packageItems.filter(
+        (p) =>
+          p.id.toLowerCase().includes(ql) ||
+          p.name.toLowerCase().includes(ql) ||
+          p.description.toLowerCase().includes(ql)
+      );
+    }
+    if (category) {
+      packageItems = packageItems.filter((p) => p.category === category);
+    }
+  }
+
+  const packageAsList = packageItems.map((p) => ({
+    id: p.id,
+    name: p.name,
+    category: p.category,
+    description: p.description,
+    compileTarget: p.compileTarget,
+    compileBadge: "package" as const,
+    compileHint: `Package compiler (${p.catalogId})`,
+    canvasPorts: { left: true, right: true },
+    isNative: false,
+    isPackage: true,
+    hasCompiler: true,
+  }));
+
+  const merged = [...packageAsList, ...items.filter((i) => !packageAsList.some((p) => p.id === i.id))];
+
   return NextResponse.json({
     meta: COMPONENT_MANIFEST_META,
+    catalogs: defaultCatalogSources().map((c) => c.id),
     categories: listComponentCategories(),
-    total,
-    components: items,
+    total: total + packageAsList.length,
+    components: merged.slice(0, Number.isFinite(limit) ? limit : 50),
   });
 }

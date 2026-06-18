@@ -859,7 +859,7 @@ function toolGeneratePipeline(params: GeneratePipelineParams) {
   const requiredFields = getInlineFields(params.source_type);
 
   try {
-    const artifacts = generatePipelineArtifacts(body);
+    const artifacts = await generatePipelineArtifacts(body);
     const preview = artifacts.pipelineCode.slice(0, 800) + (artifacts.pipelineCode.length > 800 ? "\n# ... (truncated)" : "");
     return {
       success: true,

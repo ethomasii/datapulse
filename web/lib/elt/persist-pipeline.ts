@@ -51,7 +51,7 @@ async function prepareWrite(
   }
   const bodyForArtifacts = prepared.artifactBody;
   const resolvedTool = resolveTool(bodyForArtifacts);
-  const { pipelineCode, configYaml, workspaceYaml } = generatePipelineArtifacts(bodyForArtifacts);
+  const { pipelineCode, configYaml, workspaceYaml } = await generatePipelineArtifacts(bodyForArtifacts);
   return {
     bodyMerged,
     bodyForArtifacts,

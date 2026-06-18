@@ -173,7 +173,7 @@ export async function PUT(req: Request, ctx: Ctx) {
       }
     }
 
-    const { pipelineCode, configYaml, workspaceYaml } = generatePipelineArtifacts(bodyForArtifacts);
+    const { pipelineCode, configYaml, workspaceYaml } = await generatePipelineArtifacts(bodyForArtifacts);
 
     let runsWebhookUrl: string | null | undefined;
     if (body.runsWebhookUrl !== undefined) {
@@ -510,7 +510,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       return NextResponse.json({ error: preparedPatch.message }, { status: 400 });
     }
 
-    const { pipelineCode, configYaml, workspaceYaml } = generatePipelineArtifacts(preparedPatch.artifactBody);
+    const { pipelineCode, configYaml, workspaceYaml } = await generatePipelineArtifacts(preparedPatch.artifactBody);
 
     const row = await db.eltPipeline.update({
       where: { id: existing.id },

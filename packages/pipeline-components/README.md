@@ -1,12 +1,22 @@
 # Native pipeline components for eltPulse
 
-Executable pipeline component definitions for [eltPulse](https://github.com/eltpulsehq/datapulse) declarative v2 pipelines.
+Executable **component packages** for [eltPulse](https://github.com/ethomasii/datapulse) declarative v2 pipelines.
 
-**Canonical implementation** (TypeScript `compile()` functions) lives in the datapulse monorepo:
+## Package = schema + implementation
 
-`web/lib/elt/native-components/definitions/`
+Each component is a folder with **both** files:
 
-This repository publishes **metadata + form schemas** (`components/*/component.json`) synced from datapulse for discovery, docs, and external tooling.
+```
+components/my_component/
+  component.json   # form fields, compileTarget, metadata
+  compile.mjs      # export function compile(config) → { python, sql, tests, ... }
+```
+
+eltPulse fetches `compile.mjs` from this repo at pipeline save time (sandboxed) and merges output into generated `pipeline.py`. **No datapulse PR required** to add new components.
+
+See [examples/component-packages.md](https://github.com/ethomasii/datapulse/blob/main/examples/component-packages.md) in the monorepo.
+
+Built-in TS compilers in datapulse are a fallback when no `compile.mjs` exists in the catalog.
 
 ## Sync from datapulse
 

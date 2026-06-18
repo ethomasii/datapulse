@@ -103,7 +103,7 @@ run(`git branch -M ${branch}`);
 
 if (repoExists) {
   run(`git remote add origin ${sshRemote}`);
-  run(`git push -u origin ${branch}`);
+  run(`git push --force -u origin ${branch}`);
   console.log(`Published https://github.com/${repo}`);
   process.exit(0);
 }

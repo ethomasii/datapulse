@@ -14,6 +14,9 @@ type ComponentDetail = {
   compileTarget: string;
   compileHint: string;
   isNative?: boolean;
+  isPackage?: boolean;
+  hasCompiler?: boolean;
+  packageCatalogId?: string | null;
   monitorPair?: { monitorId: string; pipelineComponentId: string; label: string } | null;
 };
 
@@ -94,9 +97,9 @@ export function CanvasComponentInspector({
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-600">
           {detail?.compileTarget ?? "component"}
-          {detail?.isNative ? (
+          {detail?.hasCompiler ? (
             <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-              NATIVE
+              {detail?.isPackage ? "PACKAGE" : "NATIVE"}
             </span>
           ) : (
             <span className="ml-2 rounded bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
@@ -110,9 +113,11 @@ export function CanvasComponentInspector({
         <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">{detail?.compileHint}</p>
       </div>
 
-      {detail?.isNative ? (
+      {detail?.hasCompiler ? (
         <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
-          Compiles into pipeline runner code (Python/SQL post-transform or quality tests) on save.
+          {detail?.isPackage
+            ? `Package compiler from ${detail.packageCatalogId ?? "catalog"} — compiles into runner code on save.`
+            : "Compiles into pipeline runner code (Python/SQL post-transform or quality tests) on save."}
         </p>
       ) : (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">

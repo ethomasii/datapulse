@@ -13,6 +13,8 @@ export type ComponentListItem = {
   compileHint: string;
   canvasPorts: { left: boolean; right: boolean };
   isNative?: boolean;
+  isPackage?: boolean;
+  hasCompiler?: boolean;
   monitorPair?: { monitorId: string; pipelineComponentId: string; label: string } | null;
 };
 
@@ -35,7 +37,7 @@ export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ limit: "40" });
+      const params = new URLSearchParams({ limit: "40", includePackages: "1" });
       if (q.trim()) params.set("q", q.trim());
       if (category) params.set("category", category);
       if (compileTargetFilter) params.set("compileTarget", compileTargetFilter);
@@ -119,9 +121,9 @@ export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-sm font-medium text-slate-900 dark:text-white">{c.name}</span>
                   <div className="flex shrink-0 flex-col items-end gap-0.5">
-                    {c.isNative ? (
+                    {(c.isPackage || c.hasCompiler) ? (
                       <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-                        native
+                        {c.isPackage ? "package" : "native"}
                       </span>
                     ) : null}
                     <span
