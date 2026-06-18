@@ -1,0 +1,19 @@
+{
+  "id": "sql_to_database_asset",
+  "name": "SQL database replicate",
+  "category": "ingestion",
+  "description": "Merge Sling/database replication table hints into source configuration.",
+  "compileTarget": "sling",
+  "fields": [
+    {
+      "key": "tables",
+      "label": "Tables",
+      "description": "schema.table list",
+      "type": "string_list",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "compileNote": "Executable compile() lives in datapulse web/lib/elt/native-components/definitions/"
+}

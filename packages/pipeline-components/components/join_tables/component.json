@@ -1,0 +1,93 @@
+{
+  "id": "join_tables",
+  "aliases": [
+    "dataframe_join"
+  ],
+  "name": "Join tables",
+  "category": "transformation",
+  "description": "Join two loaded warehouse tables after sync (pandas via destination SQL client).",
+  "compileTarget": "python",
+  "dagsterOnlyFields": [
+    "asset_name",
+    "left_asset_key",
+    "right_asset_key",
+    "group_name",
+    "partition_type",
+    "partition_start",
+    "partition_date_column",
+    "partition_values",
+    "partition_static_dim",
+    "partition_static_column",
+    "owners",
+    "asset_tags",
+    "kinds",
+    "freshness_max_lag_minutes",
+    "freshness_cron",
+    "column_lineage",
+    "include_preview_metadata",
+    "preview_rows",
+    "deps",
+    "retry_policy_max_retries",
+    "retry_policy_delay_seconds",
+    "retry_policy_backoff",
+    "dynamic_partition_name",
+    "partition_dimensions"
+  ],
+  "fields": [
+    {
+      "key": "left_table",
+      "label": "Left table",
+      "description": "Fully-qualified table name (schema.table)",
+      "type": "string",
+      "required": true,
+      "placeholder": "staging.orders"
+    },
+    {
+      "key": "right_table",
+      "label": "Right table",
+      "type": "string",
+      "required": true,
+      "placeholder": "staging.customers"
+    },
+    {
+      "key": "how",
+      "label": "Join type",
+      "type": "select",
+      "options": [
+        "inner",
+        "left",
+        "right",
+        "outer"
+      ],
+      "default": "inner"
+    },
+    {
+      "key": "on",
+      "label": "Join columns",
+      "description": "Same column name(s) on both tables",
+      "type": "string_list",
+      "placeholder": "customer_id"
+    },
+    {
+      "key": "left_on",
+      "label": "Left join columns",
+      "type": "string_list"
+    },
+    {
+      "key": "right_on",
+      "label": "Right join columns",
+      "type": "string_list"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "description": "Where to write the joined result",
+      "type": "string",
+      "required": true,
+      "placeholder": "staging.orders_enriched"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "compileNote": "Executable compile() lives in datapulse web/lib/elt/native-components/definitions/"
+}

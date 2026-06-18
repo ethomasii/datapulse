@@ -11,8 +11,11 @@ import {
   s3MonitorComponent,
   sqsMonitorComponent,
   gcsMonitorComponent,
+  kafkaMonitorComponent,
+  sqlMonitorComponent,
 } from "./definitions/sensor-monitors";
-import { s3IngestComponent, sqlToDatabaseComponent } from "./definitions/ingestion-hints";
+import { s3IngestComponent, sqsIngestComponent, kafkaIngestComponent, restApiIngestComponent, sqlToDatabaseComponent } from "./definitions/ingestion-hints";
+import { renameColumnsComponent, castColumnsComponent } from "./definitions/column-ops";
 import type { NativeComponentDefinition } from "./types";
 
 const ALL_NATIVE: NativeComponentDefinition[] = [
@@ -25,10 +28,17 @@ const ALL_NATIVE: NativeComponentDefinition[] = [
   dropDuplicatesComponent,
   unionTablesComponent,
   uniqueCheckComponent,
+  renameColumnsComponent,
+  castColumnsComponent,
   s3MonitorComponent,
   sqsMonitorComponent,
   gcsMonitorComponent,
+  kafkaMonitorComponent,
+  sqlMonitorComponent,
   s3IngestComponent,
+  sqsIngestComponent,
+  kafkaIngestComponent,
+  restApiIngestComponent,
   sqlToDatabaseComponent,
 ];
 

@@ -1,0 +1,27 @@
+name: validate-manifest
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate manifest matches components
+        run: |
+          node -e "
+          const fs = require('fs');
+          const path = require('path');
+          const m = JSON.parse(fs.readFileSync('manifest.json','utf8'));
+          const dirs = fs.readdirSync('components').filter(d => fs.existsSync(path.join('components',d,'component.json')));
+          const missing = m.components.filter(id => !dirs.includes(id));
+          const extra = dirs.filter(id => !m.components.includes(id));
+          if (missing.length || extra.length) {
+            console.error('Manifest mismatch', { missing, extra });
+            process.exit(1);
+          }
+          console.log('OK:', m.components.length, 'components');
+          "

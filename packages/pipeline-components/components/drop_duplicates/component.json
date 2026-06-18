@@ -1,0 +1,44 @@
+{
+  "id": "drop_duplicates",
+  "aliases": [
+    "unique_dedup",
+    "warehouse_dedup"
+  ],
+  "name": "Drop duplicates",
+  "category": "transformation",
+  "description": "Deduplicate rows by key columns after load.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "subset",
+      "label": "Key columns",
+      "description": "Columns defining uniqueness (empty = all columns)",
+      "type": "string_list"
+    },
+    {
+      "key": "keep",
+      "label": "Keep",
+      "type": "select",
+      "options": [
+        "first",
+        "last",
+        "false"
+      ],
+      "default": "first"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "compileNote": "Executable compile() lives in datapulse web/lib/elt/native-components/definitions/"
+}

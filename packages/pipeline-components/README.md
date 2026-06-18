@@ -1,57 +1,48 @@
-# eltPulse pipeline components (native repo)
+# Native pipeline components for eltPulse
 
-Future home for **executable** pipeline component definitions, split from the Dagster discovery catalog.
+Executable pipeline component definitions for [eltPulse](https://github.com/eltpulsehq/datapulse) declarative v2 pipelines.
+
+**Canonical implementation** (TypeScript `compile()` functions) lives in the datapulse monorepo:
+
+`web/lib/elt/native-components/definitions/`
+
+This repository publishes **metadata + form schemas** (`components/*/component.json`) synced from datapulse for discovery, docs, and external tooling.
+
+## Sync from datapulse
+
+```bash
+# In datapulse repo root:
+node scripts/export-pipeline-components-catalog.mjs
+node scripts/publish-pipeline-components.mjs
+```
 
 ## Layout
 
 ```
 components/
-  join_tables/
-    component.json     # id, aliases, fields, compileTarget
-    compile.ts         # compile(config) → python | sql | configPatch
-  sql_transform/
-    ...
-manifest.json          # index for sync into datapulse
+  join_tables/component.json    # id, fields, compileTarget, aliases
+  sql_transform/component.json
+  ...
+manifest.json                 # component index
 ```
 
-## Today
+## Native components
 
-Source of truth lives in the monorepo at:
+See [manifest.json](./manifest.json) for the current list. Each component compiles to:
 
-`web/lib/elt/native-components/definitions/`
+| compileTarget | Runtime |
+|---------------|---------|
+| `python` | Post-load Python in generated `pipeline.py` |
+| `quality` | `elt_tests` + SQL validation |
+| `monitor` | `elt_canvas_sensors` → EltMonitor |
+| `dlt` | Source configuration hints for dlt |
+| `sling` | Source configuration hints for Sling |
 
-Sync script (bundles into web app):
+## Migration from Dagster templates
 
-```bash
-node scripts/sync-native-components.mjs
-```
+We reuse [dagster-component-templates](https://github.com/eric-thomas-dagster/dagster-component-templates) **schema.json** for forms and reimplement `component.py` behavior in eltPulse — no Dagster runtime.
 
-## Migration from dagster-component-templates
+## Related
 
-1. Copy `schema.json` → derive `fields` (or use `dagster-schema.ts` parser at runtime).
-2. Reimplement `component.py` as `compile()` emitting Python/SQL/dlt hints — **do not** import Dagster.
-3. Add `aliases[]` for manifest ids (`dataframe_join` → `join_tables`).
-4. Register in `manifest.json` with `compileTarget`: dlt | sling | python | quality | monitor.
-
-## Native components (v1)
-
-| id | compileTarget |
-|----|---------------|
-| join_tables | python |
-| filter_rows | python |
-| sql_transform | sql |
-| select_columns | python |
-| drop_duplicates | python |
-| union_tables | python |
-| dq_check | quality |
-| freshness_check | quality |
-| unique_check | quality |
-| s3_monitor | monitor |
-| sqs_monitor | monitor |
-| gcs_monitor | monitor |
-| s3_to_database_asset | dlt hints |
-| sql_to_database_asset | sling hints |
-
-## Publishing
-
-CI pushes to `eltpulsehq/pipeline-components` (planned), same pattern as `eltpulsehq/integrations`.
+- [datapulse](https://github.com/eltpulsehq/datapulse) — control plane + compilers
+- [integrations](https://github.com/eltpulsehq/integrations) — gateway/worker execution

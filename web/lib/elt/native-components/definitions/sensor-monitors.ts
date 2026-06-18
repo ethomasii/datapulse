@@ -5,6 +5,8 @@ const MONITOR_TYPES: Record<string, string> = {
   sqs_monitor: "sqs_message_count",
   gcs_monitor: "gcs_file_arrival",
   kafka_monitor: "kafka_message_count",
+  sql_monitor: "sql_watermark",
+  adls_monitor: "adls_file_count",
 };
 
 function buildSensorMonitor(
@@ -66,4 +68,33 @@ export const gcsMonitorComponent: NativeComponentDefinition = {
     { key: "file_pattern", label: "File pattern", type: "string", default: ".*" },
   ],
   compile: (cfg) => buildSensorMonitor("gcs_monitor", "GCS monitor", cfg),
+};
+
+export const kafkaMonitorComponent: NativeComponentDefinition = {
+  id: "kafka_monitor",
+  name: "Kafka lag sensor",
+  category: "sensor",
+  description: "Monitor Kafka consumer lag for a topic.",
+  compileTarget: "monitor",
+  fields: [
+    { key: "bootstrap_servers", label: "Bootstrap servers", type: "string", required: true },
+    { key: "topic", label: "Topic", type: "string", required: true },
+    { key: "group_id", label: "Consumer group", type: "string", required: true },
+    { key: "max_lag", label: "Max lag threshold", type: "number", default: 1000 },
+  ],
+  compile: (cfg) => buildSensorMonitor("kafka_monitor", "Kafka monitor", cfg),
+};
+
+export const sqlMonitorComponent: NativeComponentDefinition = {
+  id: "sql_monitor",
+  name: "SQL watermark sensor",
+  category: "sensor",
+  description: "Monitor SQL table watermark / row count threshold.",
+  compileTarget: "monitor",
+  fields: [
+    { key: "table", label: "Table", type: "string", required: true },
+    { key: "watermark_column", label: "Watermark column", type: "string", required: true },
+    { key: "min_rows", label: "Min rows expected", type: "number", default: 1 },
+  ],
+  compile: (cfg) => buildSensorMonitor("sql_monitor", "SQL monitor", cfg),
 };

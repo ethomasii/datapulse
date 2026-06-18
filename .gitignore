@@ -28,6 +28,9 @@ Thumbs.db
 # Dagster ELT Project (separate repo)
 dagster_elt_project/
 
+# Publish scratch
+.tmp-pipeline-components-push/
+
 # Example pipelines (keep separate)
 elt_pipelines_example/
 
