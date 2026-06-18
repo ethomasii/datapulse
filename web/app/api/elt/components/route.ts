@@ -22,6 +22,7 @@ export async function GET(req: Request) {
   const q = url.searchParams.get("q") ?? undefined;
   const category = url.searchParams.get("category") ?? undefined;
   const compileTarget = url.searchParams.get("compileTarget") as ComponentCompileTarget | null;
+  const executableOnly = url.searchParams.get("executableOnly") === "1";
   const includePackages = url.searchParams.get("includePackages") === "1";
   const limit = Number(url.searchParams.get("limit") ?? "50");
   const offset = Number(url.searchParams.get("offset") ?? "0");
@@ -30,6 +31,7 @@ export async function GET(req: Request) {
     q,
     category,
     compileTarget: compileTarget ?? undefined,
+    executableOnly,
     limit: Number.isFinite(limit) ? limit : 50,
     offset: Number.isFinite(offset) ? offset : 0,
   });
@@ -64,18 +66,30 @@ export async function GET(req: Request) {
     isNative: false,
     isPackage: true,
     hasCompiler: true,
+    compilerTier: "native" as const,
+    isExecutable: true,
+    compilerTierHint: "Executable package compiler from remote catalog.",
   }));
 
-  const merged = [...packageAsList, ...items.filter((i) => !packageAsList.some((p) => p.id === i.id))];
+  let merged = [...packageAsList, ...items.filter((i) => !packageAsList.some((p) => p.id === i.id))];
+  if (executableOnly) {
+    merged = merged.filter((c) => c.isExecutable);
+  }
+
+  const executableCatalogCount = listComponents({ executableOnly: true, limit: 1 }).total;
 
   return NextResponse.json({
-    meta: COMPONENT_MANIFEST_META,
+    meta: {
+      ...COMPONENT_MANIFEST_META,
+      executableCatalogCount,
+      executablePackageCount: packageAsList.length,
+    },
     catalogs: [
       ...defaultCatalogSources().map((c) => c.id),
       ...(await loadWorkspaceCatalogUrls(user.id)),
     ],
     categories: listComponentCategories(),
-    total: total + packageAsList.length,
+    total: executableOnly ? merged.length : total + packageAsList.length,
     components: merged.slice(0, Number.isFinite(limit) ? limit : 50),
   });
 }

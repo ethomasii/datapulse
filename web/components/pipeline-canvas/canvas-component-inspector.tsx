@@ -19,6 +19,9 @@ type ComponentDetail = {
   isNative?: boolean;
   isPackage?: boolean;
   hasCompiler?: boolean;
+  compilerTier?: "native" | "category" | "schema" | "none";
+  isExecutable?: boolean;
+  compilerTierHint?: string;
   packageCatalogId?: string | null;
   monitorPair?: { monitorId: string; pipelineComponentId: string; label: string } | null;
 };
@@ -100,29 +103,48 @@ export function CanvasComponentInspector({
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-600">
           {detail?.compileTarget ?? "component"}
-          {detail?.hasCompiler ? (
+          {detail?.isExecutable ? (
             <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-              {detail?.isPackage ? "PACKAGE" : detail?.isNative ? "NATIVE" : "GENERIC"}
+              {detail?.isPackage ? "PACKAGE" : detail?.isNative ? "NATIVE" : "EXECUTABLE"}
+            </span>
+          ) : detail?.compilerTier === "category" ? (
+            <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+              CATEGORY
+            </span>
+          ) : detail?.compilerTier === "schema" ? (
+            <span className="ml-2 rounded bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+              SCHEMA
             </span>
           ) : (
             <span className="ml-2 rounded bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-              SPEC ONLY
+              UNSUPPORTED
             </span>
           )}
         </p>
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
           {detail?.name ?? componentId}
         </h2>
-        <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">{detail?.compileHint}</p>
+        <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+          {detail?.compilerTierHint ?? detail?.compileHint}
+        </p>
       </div>
 
-      {detail?.hasCompiler ? (
+      {detail?.isExecutable ? (
         <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
           {detail?.isPackage
             ? `Package compiler from ${detail.packageCatalogId ?? "catalog"}.`
-            : detail?.isNative
-              ? "Native compiler — materializes on save and full pipeline run."
-              : "Generic category compiler — run step compiles + previews; Python writes on full run."}
+            : "Native compiler — materializes on save and full pipeline run."}
+        </p>
+      ) : detail?.compilerTier === "category" ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          Category fallback only — emits ingest hints, basic checks, or a table copy. This is not the
+          Dagster template&apos;s real logic. Prefer a native component with the same shape, or add
+          one to eltpulse-pipeline-components.
+        </p>
+      ) : detail?.compilerTier === "schema" ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          Schema template — form fields come from the Dagster catalog. Pipeline save will not run this
+          component&apos;s Python unless you add a native compiler or a custom Python step.
         </p>
       ) : null}
 
@@ -133,7 +155,7 @@ export function CanvasComponentInspector({
         </p>
       ) : null}
 
-      {detail?.hasCompiler ? (
+      {detail?.isExecutable || detail?.compilerTier === "category" ? (
         <>
           <RunStepPanel
             pipelineId={pipelineId}
@@ -151,9 +173,11 @@ export function CanvasComponentInspector({
         </>
       ) : null}
 
-      {!detail?.hasCompiler ? (
+      {!detail?.isExecutable && detail?.compilerTier !== "category" ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-          Catalog template only — stored in declarative spec; no compiler yet.
+          {detail?.compilerTier === "schema"
+            ? "Not executable — discovery and config only. Pick a native component from the executable catalog filter."
+            : "Not supported in eltPulse — use Connections, catalog assets, or a native component."}
         </p>
       ) : null}
 

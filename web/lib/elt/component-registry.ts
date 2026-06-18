@@ -7,6 +7,12 @@ import manifestIndex from "@/lib/elt/data/component-manifest-index.json";
 import { canvasPortsForCategory, normalizeComponentCategory } from "@/lib/elt/component-canvas-io";
 import { routeComponent, suggestMonitorPipelinePair, TOP_COMPONENT_ROUTES, type ComponentCompileTarget, type ComponentRoute } from "@/lib/elt/component-compile-router";
 import { canCompileGenerically } from "@/lib/elt/generic-catalog-compiler";
+import {
+  compilerTierHint,
+  isFaithfulCompiler,
+  resolveCompilerTier,
+  type ComponentCompilerTier,
+} from "@/lib/elt/component-compiler-tier";
 import { isNativeComponent } from "@/lib/elt/native-components";
 
 export type ComponentManifestEntry = {
@@ -31,6 +37,11 @@ export type ComponentListItem = ComponentManifestEntry & {
   isNative?: boolean;
   /** Compiles via native, package, or generic category compiler. */
   hasCompiler?: boolean;
+  /** Honest executability tier (see component-compiler-tier.ts). */
+  compilerTier?: ComponentCompilerTier;
+  /** Native or published package — faithful template behavior. */
+  isExecutable?: boolean;
+  compilerTierHint?: string;
 };
 
 type ManifestIndex = {
@@ -53,6 +64,8 @@ export function listComponents(filters?: {
   q?: string;
   category?: string;
   compileTarget?: ComponentCompileTarget;
+  /** When true, only native catalog ids + caller merges package components separately. */
+  executableOnly?: boolean;
   limit?: number;
   offset?: number;
 }): { items: ComponentListItem[]; total: number } {
@@ -75,6 +88,10 @@ export function listComponents(filters?: {
   }
 
   let items: ComponentListItem[] = rows.map(enrichComponent);
+
+  if (filters?.executableOnly) {
+    items = items.filter((c) => c.isExecutable);
+  }
 
   if (filters?.compileTarget) {
     items = items.filter((c) => c.compileTarget === filters.compileTarget);
@@ -111,6 +128,8 @@ export function getComponentById(id: string): ComponentListItem | null {
       ? suggestMonitorPipelinePair(id)
       : null;
 
+  const native = isNativeComponent(id);
+  const compilerTier = resolveCompilerTier(id, curated);
   return {
     id,
     name: id.replace(/_/g, " "),
@@ -120,7 +139,11 @@ export function getComponentById(id: string): ComponentListItem | null {
     compileBadge: curated.badge,
     compileHint: curated.hint,
     canvasPorts: { left: ports.left, right: ports.right },
-    isNative: isNativeComponent(id),
+    isNative: native,
+    hasCompiler: native || canCompileGenerically(curated),
+    compilerTier,
+    isExecutable: isFaithfulCompiler(compilerTier),
+    compilerTierHint: compilerTierHint(compilerTier),
     ...(pair ? { monitorPair: pair } : {}),
   };
 }
@@ -142,6 +165,8 @@ function enrichComponent(row: ComponentManifestEntry): ComponentListItem {
   const pair =
     route.target === "monitor" || route.target === "dlt" ? suggestMonitorPipelinePair(row.id) : null;
   const native = isNativeComponent(row.id);
+  const compilerTier = resolveCompilerTier(row.id, route);
+  const isExecutable = isFaithfulCompiler(compilerTier);
   return {
     ...row,
     compileTarget: route.target,
@@ -150,6 +175,9 @@ function enrichComponent(row: ComponentManifestEntry): ComponentListItem {
     canvasPorts: { left: ports.left, right: ports.right },
     isNative: native,
     hasCompiler: native || canCompileGenerically(route),
+    compilerTier,
+    isExecutable,
+    compilerTierHint: compilerTierHint(compilerTier),
     ...(pair ? { monitorPair: pair } : {}),
   };
 }

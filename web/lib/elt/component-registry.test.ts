@@ -14,6 +14,7 @@ describe("component-registry", () => {
   it("finds s3 ingest component", () => {
     const c = getComponentById("s3_to_database_asset");
     expect(c?.compileTarget).toBe("dlt");
+    expect(c?.isExecutable).toBe(true);
   });
 
   it("routes quality checks", () => {

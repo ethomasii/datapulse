@@ -17,6 +17,9 @@ export type ComponentListItem = {
   isNative?: boolean;
   isPackage?: boolean;
   hasCompiler?: boolean;
+  compilerTier?: "native" | "category" | "schema" | "none";
+  isExecutable?: boolean;
+  compilerTierHint?: string;
   icon?: string;
   monitorPair?: { monitorId: string; pipelineComponentId: string; label: string } | null;
 };
@@ -40,6 +43,7 @@ const PALETTE_TABS = [
 export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter, className }: Props) {
   const [q, setQ] = useState("");
   const [category, setCategory] = useState(categoryFilter ?? "");
+  const [executableOnly, setExecutableOnly] = useState(true);
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<ComponentListItem[]>([]);
   const [categories, setCategories] = useState<{ category: string; count: number }[]>([]);
@@ -49,6 +53,7 @@ export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter
     setLoading(true);
     try {
       const params = new URLSearchParams({ limit: "60", includePackages: "1" });
+      if (executableOnly) params.set("executableOnly", "1");
       if (q.trim()) params.set("q", q.trim());
       if (category) params.set("category", category);
       if (compileTargetFilter) params.set("compileTarget", compileTargetFilter);
@@ -65,7 +70,7 @@ export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter
     } finally {
       setLoading(false);
     }
-  }, [q, category, compileTargetFilter]);
+  }, [q, category, compileTargetFilter, executableOnly]);
 
   useEffect(() => {
     const t = setTimeout(() => void load(), 200);
@@ -90,7 +95,20 @@ export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter
     <div className={className ?? "flex h-full flex-col rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"}>
       <div className="border-b border-slate-200 p-3 dark:border-slate-700">
         <p className="text-sm font-semibold text-slate-900 dark:text-white">Component catalog</p>
-        <p className="mt-0.5 text-xs text-slate-500">{total} templates — drag onto canvas or click to add</p>
+        <p className="mt-0.5 text-xs text-slate-500">
+          {executableOnly
+            ? `${total} executable components — faithful compilers only`
+            : `${total} templates — drag onto canvas or click to add`}
+        </p>
+        <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+          <input
+            type="checkbox"
+            checked={executableOnly}
+            onChange={(e) => setExecutableOnly(e.target.checked)}
+            className="rounded border-slate-300"
+          />
+          Executable only (hide schema-only templates)
+        </label>
         <div className="relative mt-2">
           <Search className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-slate-400" aria-hidden />
           <input
@@ -156,9 +174,17 @@ export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-sm font-medium text-slate-900 dark:text-white">{c.name}</span>
                   <div className="flex shrink-0 flex-col items-end gap-0.5">
-                    {(c.isPackage || c.hasCompiler || c.isNative) ? (
+                    {c.isExecutable ? (
                       <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-                        {c.isPackage ? "package" : c.isNative ? "native" : "generic"}
+                        {c.isPackage ? "package" : c.isNative ? "native" : "executable"}
+                      </span>
+                    ) : c.compilerTier === "category" ? (
+                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+                        category
+                      </span>
+                    ) : c.compilerTier === "schema" ? (
+                      <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold uppercase text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                        schema
                       </span>
                     ) : null}
                     <span
