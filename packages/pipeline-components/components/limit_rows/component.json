@@ -1,0 +1,35 @@
+{
+  "id": "limit_rows",
+  "aliases": [
+    "head_rows",
+    "take_rows"
+  ],
+  "name": "Limit rows",
+  "category": "transformation",
+  "description": "Keep first N rows of a table (head).",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "limit",
+      "label": "Row limit",
+      "type": "number",
+      "default": 1000,
+      "required": true
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

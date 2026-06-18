@@ -43,8 +43,8 @@ import { attachCanvasToSourceConfiguration } from "@/lib/elt/merge-canvas-into-s
 import { minimalSourceConfigurationForNewPipeline } from "@/lib/elt/minimal-source-configuration";
 import { ensureGithubReposForForm } from "@/lib/elt/normalize-source-configuration";
 import clsx from "clsx";
-import { ComponentPalette } from "@/components/elt/component-palette";
-import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
+import { hydrateCanvasFromSourceConfiguration, extractSpecComponents } from "@/lib/elt/spec-components-to-canvas";
+import { TransformDagPanel } from "@/components/pipeline-canvas/transform-dag-panel";
 
 type PipelineRow = { id: string; name: string };
 
@@ -94,6 +94,7 @@ export function CanvasPageClient() {
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [linkedDbtProjectId, setLinkedDbtProjectId] = useState<string | null>(null);
+  const [canvasView, setCanvasView] = useState<"designer" | "dag">("designer");
 
   const { permissions } = useWorkspacePermissions();
   const canWrite = permissions?.canWrite ?? true;
@@ -288,7 +289,7 @@ export function CanvasPageClient() {
       const st = typeof row.sourceType === "string" ? row.sourceType : "github";
       const dt = typeof row.destinationType === "string" ? row.destinationType : "duckdb";
       hydrateFormFromSourceConfig(cfg, st, dt);
-      const canvas = getCanvasFromSourceConfig(cfg);
+      const canvas = hydrateCanvasFromSourceConfiguration(cfg) ?? getCanvasFromSourceConfig(cfg);
       if (canvas && Array.isArray(canvas.nodes) && Array.isArray(canvas.edges)) {
         const rawDbt = readDbtTransformConfig(cfg);
         const dbtObj =
@@ -1030,6 +1031,38 @@ export function CanvasPageClient() {
             </div>
           ) : (
             <>
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-950">
+                  <button
+                    type="button"
+                    onClick={() => setCanvasView("designer")}
+                    className={clsx(
+                      "rounded-md px-3 py-1.5 text-xs font-medium",
+                      canvasView === "designer"
+                        ? "bg-sky-600 text-white"
+                        : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                    )}
+                  >
+                    Designer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCanvasView("dag")}
+                    className={clsx(
+                      "rounded-md px-3 py-1.5 text-xs font-medium",
+                      canvasView === "dag"
+                        ? "bg-sky-600 text-white"
+                        : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                    )}
+                  >
+                    Transform DAG
+                  </button>
+                </div>
+                <span className="text-xs text-slate-500">
+                  Lakeflow-style DT graph from component edges → <code className="text-[10px]">after[]</code>
+                </span>
+              </div>
+              {canvasView === "designer" ? (
               <div className="min-w-0">
                 <PipelineCanvas
                   key={selectedId}
@@ -1050,6 +1083,15 @@ export function CanvasPageClient() {
                   onInspectorFocusChange={setInspectorFocus}
                 />
               </div>
+              ) : (
+              <div className="min-h-[max(28rem,min(calc(100dvh-8rem),56rem))] rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950">
+                <TransformDagPanel
+                  nodes={loadedGraph?.nodes ?? []}
+                  edges={loadedGraph?.edges ?? []}
+                  specComponents={extractSpecComponents(lastFullSourceConfigRef.current)}
+                />
+              </div>
+              )}
               <aside
                 className={clsx(
                   "mt-4 w-full border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/95",

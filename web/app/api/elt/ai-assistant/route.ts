@@ -9,6 +9,7 @@ import { SOURCE_GROUPS, DESTINATION_GROUPS } from "@/lib/elt/catalog";
 import { chooseTool } from "@/lib/elt/choose-tool";
 import { toDbtProjectSummary } from "@/lib/elt/dbt-projects";
 import { generatePipelineArtifacts } from "@/lib/elt/generate-artifacts";
+import { loadWorkspaceCatalogUrls } from "@/lib/elt/workspace-catalog-sources";
 import { setDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
 import { supportsInPipelineDbt } from "@/lib/elt/pipeline-tool-labels";
 import { listComponents, getComponentById, fetchComponentSchema } from "@/lib/elt/component-registry";
@@ -810,7 +811,7 @@ function applyPostTransformToConfig(
   return { warnings };
 }
 
-function toolGeneratePipeline(params: GeneratePipelineParams) {
+async function toolGeneratePipeline(userId: string, params: GeneratePipelineParams) {
   const name = params.name.replace(/[^a-zA-Z0-9_]/g, "_").replace(/^[^a-zA-Z]/, "p_");
   const tool = chooseTool(params.source_type, params.destination_type);
 
@@ -859,7 +860,8 @@ function toolGeneratePipeline(params: GeneratePipelineParams) {
   const requiredFields = getInlineFields(params.source_type);
 
   try {
-    const artifacts = await generatePipelineArtifacts(body);
+    const workspaceCatalogUrls = await loadWorkspaceCatalogUrls(userId);
+    const artifacts = await generatePipelineArtifacts(body, { workspaceCatalogUrls });
     const preview = artifacts.pipelineCode.slice(0, 800) + (artifacts.pipelineCode.length > 800 ? "\n# ... (truncated)" : "");
     return {
       success: true,
@@ -1095,7 +1097,7 @@ When they describe a brand-new pipeline instead, use **generate_pipeline** witho
             typeof inp.auth_hint === "string" ? inp.auth_hint : undefined,
           );
         } else if (name === "generate_pipeline") {
-          result = toolGeneratePipeline(inp as GeneratePipelineParams);
+          result = await toolGeneratePipeline(user.id, inp as GeneratePipelineParams);
         } else if (name === "add_pipeline_components") {
           result = await toolAddPipelineComponents(user.id, pipelineId, {
             pipeline_id: typeof inp.pipeline_id === "string" ? inp.pipeline_id : undefined,

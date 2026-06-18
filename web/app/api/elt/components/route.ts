@@ -7,6 +7,7 @@ import {
 } from "@/lib/elt/component-registry";
 import { listPackageCatalogComponents } from "@/lib/elt/component-packages";
 import { defaultCatalogSources } from "@/lib/elt/component-packages/catalog-sources";
+import { loadWorkspaceCatalogUrls } from "@/lib/elt/workspace-catalog-sources";
 import type { ComponentCompileTarget } from "@/lib/elt/component-compile-router";
 
 /**
@@ -35,7 +36,8 @@ export async function GET(req: Request) {
 
   let packageItems: Awaited<ReturnType<typeof listPackageCatalogComponents>> = [];
   if (includePackages) {
-    packageItems = await listPackageCatalogComponents();
+    const workspaceCatalogUrls = await loadWorkspaceCatalogUrls(user.id);
+    packageItems = await listPackageCatalogComponents(undefined, workspaceCatalogUrls);
     if (q?.trim()) {
       const ql = q.trim().toLowerCase();
       packageItems = packageItems.filter(
@@ -68,7 +70,10 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     meta: COMPONENT_MANIFEST_META,
-    catalogs: defaultCatalogSources().map((c) => c.id),
+    catalogs: [
+      ...defaultCatalogSources().map((c) => c.id),
+      ...(await loadWorkspaceCatalogUrls(user.id)),
+    ],
     categories: listComponentCategories(),
     total: total + packageAsList.length,
     components: merged.slice(0, Number.isFinite(limit) ? limit : 50),

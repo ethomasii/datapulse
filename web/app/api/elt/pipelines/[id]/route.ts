@@ -12,6 +12,7 @@ import { db } from "@/lib/db/client";
 import { prismaSchemaDriftResponse } from "@/lib/db/prisma-schema-drift-response";
 import { createPipelineBodySchema, type CreatePipelineBody } from "@/lib/elt/types";
 import { generatePipelineArtifacts, resolveTool } from "@/lib/elt/generate-artifacts";
+import { loadWorkspaceCatalogUrls } from "@/lib/elt/workspace-catalog-sources";
 import { mergeEltMetadataIntoSourceConfig } from "@/lib/elt/merge-elt-metadata";
 import {
   preparePipelinePersistenceAndArtifacts,
@@ -173,7 +174,10 @@ export async function PUT(req: Request, ctx: Ctx) {
       }
     }
 
-    const { pipelineCode, configYaml, workspaceYaml } = await generatePipelineArtifacts(bodyForArtifacts);
+    const workspaceCatalogUrls = await loadWorkspaceCatalogUrls(user.id);
+    const { pipelineCode, configYaml, workspaceYaml } = await generatePipelineArtifacts(bodyForArtifacts, {
+      workspaceCatalogUrls,
+    });
 
     let runsWebhookUrl: string | null | undefined;
     if (body.runsWebhookUrl !== undefined) {
@@ -510,7 +514,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
       return NextResponse.json({ error: preparedPatch.message }, { status: 400 });
     }
 
-    const { pipelineCode, configYaml, workspaceYaml } = await generatePipelineArtifacts(preparedPatch.artifactBody);
+    const workspaceCatalogUrls = await loadWorkspaceCatalogUrls(user.id);
+    const { pipelineCode, configYaml, workspaceYaml } = await generatePipelineArtifacts(preparedPatch.artifactBody, {
+      workspaceCatalogUrls,
+    });
 
     const row = await db.eltPipeline.update({
       where: { id: existing.id },

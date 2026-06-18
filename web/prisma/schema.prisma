@@ -109,6 +109,8 @@ model User {
   /// Default landing warehouse / lake for declarative `destination: @workspace` pipelines.
   defaultDestinationConnectionId String? @map("default_destination_connection_id")
   defaultDestinationConnection   Connection? @relation("UserDefaultDestination", fields: [defaultDestinationConnectionId], references: [id], onDelete: SetNull)
+  /// GitHub catalog repos (`owner/repo` or raw URL) merged into component palette + compile resolution.
+  componentCatalogUrls Json @default("[]") @map("component_catalog_urls")
 
   @@index([organizationId])
   @@index([defaultAgentTokenId])
@@ -172,6 +174,8 @@ model Organization {
   defaultDestinationConnection   Connection? @relation("OrganizationDefaultDestination", fields: [defaultDestinationConnectionId], references: [id], onDelete: SetNull)
   /// Optional floor for sensor checks (seconds). If set, overrides plan-tier default for this org (e.g. enterprise contract).
   sensorPollIntervalSecondsOverride Int? @map("sensor_poll_interval_seconds_override")
+  /// Org-wide BYO component catalog repos (`owner/repo` or GitHub raw URL).
+  componentCatalogUrls Json @default("[]") @map("component_catalog_urls")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

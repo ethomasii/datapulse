@@ -36,7 +36,7 @@ var kafkaMonitorComponent = {
   compile: (cfg) => buildSensorMonitor("kafka_monitor", "Kafka monitor", cfg)
 };
 
-// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-rug7fN/kafka_monitor.ts
+// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-ywkMkX/kafka_monitor.ts
 function compile(config) {
   return kafkaMonitorComponent.compile(config);
 }

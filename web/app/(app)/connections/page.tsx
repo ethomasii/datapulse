@@ -17,6 +17,7 @@ import {
   connectorLabel,
 } from "@/lib/elt/connectors-registry";
 import { ConnectorCombobox } from "@/components/elt/connector-combobox";
+import { ComponentCatalogSettings } from "@/components/elt/component-catalog-settings";
 
 function connectorsByCategory(connectionType: "source" | "destination"): { category: string; slugs: string[] }[] {
   const grouped = new Map<string, string[]>();
@@ -736,6 +737,10 @@ export default function ConnectionsPage() {
           </p>
         </div>
       ) : null}
+
+      <div className="rounded-xl border border-violet-200 bg-violet-50/40 px-4 py-4 dark:border-violet-900/40 dark:bg-violet-950/20">
+        <ComponentCatalogSettings />
+      </div>
 
       <div className="rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 dark:border-sky-900/50 dark:bg-sky-950/25">
         <div className="flex flex-wrap items-start gap-2">

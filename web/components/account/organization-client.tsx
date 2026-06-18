@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Building2, Loader2, Mail, UserPlus } from "lucide-react";
 import { BillingUpgradeButton } from "@/components/account/billing-upgrade-button";
+import { ComponentCatalogSettings } from "@/components/elt/component-catalog-settings";
 
 type Org = {
   id: string;
@@ -179,6 +180,10 @@ export function OrganizationClient() {
           </ul>
         ) : null}
       </form>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950">
+        <ComponentCatalogSettings />
+      </div>
 
       {message ? <p className="text-sm text-slate-600">{message}</p> : null}
     </div>
