@@ -5,7 +5,7 @@
 
 import manifestIndex from "@/lib/elt/data/component-manifest-index.json";
 import { canvasPortsForCategory, normalizeComponentCategory } from "@/lib/elt/component-canvas-io";
-import { routeComponent, suggestMonitorPipelinePair, type ComponentCompileTarget, type ComponentRoute } from "@/lib/elt/component-compile-router";
+import { routeComponent, suggestMonitorPipelinePair, TOP_COMPONENT_ROUTES, type ComponentCompileTarget, type ComponentRoute } from "@/lib/elt/component-compile-router";
 
 export type ComponentManifestEntry = {
   id: string;
@@ -84,8 +84,38 @@ export function listComponents(filters?: {
 
 export function getComponentById(id: string): ComponentListItem | null {
   const row = index.components.find((c) => c.id === id);
-  if (!row) return null;
-  return enrichComponent(row);
+  if (row) return enrichComponent(row);
+
+  const curated = TOP_COMPONENT_ROUTES[id];
+  if (!curated || curated.target === "skip") return null;
+
+  const category =
+    curated.target === "quality"
+      ? "check"
+      : curated.target === "monitor"
+        ? "sensor"
+        : curated.target === "dbt"
+          ? "dbt"
+          : curated.target === "dlt" || curated.target === "sling"
+            ? "ingestion"
+            : "transformation";
+  const ports = canvasPortsForCategory(category);
+  const pair =
+    curated.target === "monitor" || curated.target === "dlt"
+      ? suggestMonitorPipelinePair(id)
+      : null;
+
+  return {
+    id,
+    name: id.replace(/_/g, " "),
+    category,
+    description: curated.hint,
+    compileTarget: curated.target,
+    compileBadge: curated.badge,
+    compileHint: curated.hint,
+    canvasPorts: { left: ports.left, right: ports.right },
+    ...(pair ? { monitorPair: pair } : {}),
+  };
 }
 
 export function listComponentCategories(): { category: string; count: number }[] {

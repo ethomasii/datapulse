@@ -13,15 +13,24 @@ import { setDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
 import { supportsInPipelineDbt } from "@/lib/elt/pipeline-tool-labels";
 import { listComponents, getComponentById, fetchComponentSchema } from "@/lib/elt/component-registry";
 import { routeComponent, type ComponentCompileTarget } from "@/lib/elt/component-compile-router";
+import {
+  applyCanvasComponentsToSourceConfig,
+  type AiPipelineComponentInput,
+} from "@/lib/elt/ai-pipeline-canvas-build";
+import { extractComponentsFromCanvas } from "@/lib/elt/canvas-component-sync";
+import { getCanvasFromSourceConfig } from "@/lib/elt/canvas-source-config";
+import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-graph";
+import type { Edge, Node } from "@xyflow/react";
 import type { CreatePipelineBody } from "@/lib/elt/types";
 
 const MODEL = "claude-sonnet-4-6";
 const MAX_TOKENS = 4096;
 
-function buildSystemPrompt(workspaceBlock: string) {
+function buildSystemPrompt(workspaceBlock: string, pipelineContextBlock?: string) {
   return `You are the eltPulse Pipeline Builder AI. Your ONLY job is to generate pipeline configs as fast as possible.
 
 ${workspaceBlock}
+${pipelineContextBlock ? `\n${pipelineContextBlock}\n` : ""}
 
 ## Core rule: Generate immediately, don't interrogate
 
@@ -33,6 +42,18 @@ When a user describes a pipeline (e.g. "Load GitHub issues into Snowflake"), cal
 - EL+T with dbt: set post_transform_type="dbt" and dbt_package_path to a Git URL or ./dbt path; use list_dbt_projects to link an existing workspace project via dbt_project_id when one matches
 
 After generating, give ONE short sentence: "Pipeline ready — click Save, then edit the repo/credentials in the builder or canvas."
+
+## NL → canvas components (Lakeflow loop)
+When the user mentions monitors, sensors, quality checks, freshness, or data validation:
+1. Call **search_components** then **get_component_details** (include_schema=true when config fields matter).
+2. **New pipeline**: pass \`components\` on **generate_pipeline** — each item needs \`component_id\` and sensible \`config\` (e.g. dq_check: table + not_null columns; s3_monitor: prefix/bucket defaults).
+3. **Existing pipeline** (pipeline context below): call **add_pipeline_components** with the same \`components\` array — nodes land on the visual canvas and sync to v2 YAML on apply.
+4. Prefer native compile targets (quality, monitor, dlt) over dagster badge items.
+
+Component config defaults:
+- dq_check / freshness_check: table = main entity table, not_null = ["id"]
+- s3_monitor: prefix = "s3://your-bucket/incoming/"
+- great_expectations_check: table + basic expectations in config when known
 
 ## Post-load transforms (EL+T)
 - **dbt** — connector sync pipelines (dlt) support in-pipeline dbt after load. Set post_transform_type="dbt". Config persists as sourceConfiguration.dbt (enabled, package_path, dataset_name, repository_branch, run_scope, selector).
@@ -53,6 +74,8 @@ After generating, give ONE short sentence: "Pipeline ready — click Save, then 
 ## Component catalog (dagster-component-templates)
 - 864+ reusable pipeline components compile to dlt/Sling/dbt/monitors/Python — use **search_components** when the user asks for checks, sensors, transforms, or ingestion patterns by name.
 - **get_component_details** returns compile target (dlt, quality, monitor, dbt, python, dagster) and monitor↔ingestion pairs.
+- **generate_pipeline** accepts \`components[]\` to place nodes on the canvas for new pipelines.
+- **add_pipeline_components** adds nodes to an open pipeline (canvas edit mode).
 - Prefer native compile targets (dlt, sling, quality, monitor, dbt) over dagster badge items unless user explicitly needs Dagster.
 
 ## Format
@@ -65,6 +88,25 @@ Available destination types: ${Object.values(DESTINATION_GROUPS).flat().join(", 
 
 Verified connectors: ${DLT_HUB_SOURCES.map((s) => `${s.slug} (${s.name})`).join(", ")}`;
 }
+
+const AI_COMPONENT_ITEMS_SCHEMA = {
+  type: "array" as const,
+  items: {
+    type: "object" as const,
+    properties: {
+      component_id: {
+        type: "string",
+        description: "Component id from search_components, e.g. s3_monitor, dq_check, freshness_check",
+      },
+      label: { type: "string", description: "Optional canvas label" },
+      config: {
+        type: "object",
+        description: "Component config — table/not_null for quality, prefix for s3_monitor, etc.",
+      },
+    },
+    required: ["component_id"],
+  },
+};
 
 
 const TOOLS: Anthropic.Tool[] = [
@@ -200,8 +242,29 @@ const TOOLS: Anthropic.Tool[] = [
           type: "string",
           description: "Python or SQL code when post_transform_type is python or sql",
         },
+        components: {
+          ...AI_COMPONENT_ITEMS_SCHEMA,
+          description:
+            "Optional component templates to place on the visual canvas (monitors, quality checks, transforms). Use search_components first.",
+        },
       },
       required: ["name", "source_type", "destination_type"],
+    },
+  },
+  {
+    name: "add_pipeline_components",
+    description:
+      "Add component template nodes to an existing pipeline canvas. Requires pipeline context (canvas AI) or pipeline_id. Syncs to v2 declarative spec when applied.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        pipeline_id: {
+          type: "string",
+          description: "Pipeline UUID — omit when editing from canvas (uses open pipeline).",
+        },
+        components: AI_COMPONENT_ITEMS_SCHEMA,
+      },
+      required: ["components"],
     },
   },
   {
@@ -535,15 +598,13 @@ async function toolGetComponentDetails(componentId: string, includeSchema?: bool
     schema_url: c.schema_url,
     ...(schema ? { schema } : {}),
     next_steps:
-      route.target === "dlt" || route.target === "sling"
-        ? "Call generate_pipeline with matching source_type/destination_type — component is config UX only."
-        : route.target === "quality"
-          ? "Add quality block to declarative spec v2 or elt_tests in sourceConfiguration."
-          : route.target === "monitor"
-            ? "Create EltMonitor linked to pipeline — pair with ingestion via monitor_pair."
-            : route.target === "dbt"
-              ? "Use list_dbt_projects + post_transform_type=dbt on generate_pipeline."
-              : "May need Python post-transform or Dagster — explain compile_badge to user.",
+      route.target === "quality" || route.target === "monitor"
+        ? "Pass in components[] on generate_pipeline (new) or add_pipeline_components (existing pipeline)."
+        : route.target === "dlt" || route.target === "sling"
+          ? "Call generate_pipeline with matching source_type/destination_type — or add as components[] for canvas placement."
+          : route.target === "dbt"
+            ? "Use list_dbt_projects + post_transform_type=dbt on generate_pipeline."
+            : "May need Python post-transform or Dagster — explain compile_badge to user.",
   };
 }
 
@@ -595,7 +656,103 @@ type GeneratePipelineParams = {
   dbt_selector?: string;
   dbt_project_id?: string;
   post_transform_code?: string;
+  components?: AiPipelineComponentInput[];
 };
+
+export type PatchPipelinePayload = {
+  canvas: { nodes: unknown[]; edges: unknown[]; v?: number };
+};
+
+function normalizeAiComponents(raw: unknown): AiPipelineComponentInput[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const o = item as Record<string, unknown>;
+      const component_id = String(o.component_id ?? "").trim();
+      if (!component_id) return null;
+      return {
+        component_id,
+        ...(typeof o.label === "string" && o.label.trim() ? { label: o.label.trim() } : {}),
+        ...(o.config && typeof o.config === "object" ? { config: o.config as Record<string, unknown> } : {}),
+      };
+    })
+    .filter((x): x is AiPipelineComponentInput => x !== null);
+}
+
+async function toolAddPipelineComponents(
+  userId: string,
+  contextPipelineId: string | undefined,
+  params: { pipeline_id?: string; components?: unknown }
+) {
+  const pipelineId = String(params.pipeline_id ?? contextPipelineId ?? "").trim();
+  const components = normalizeAiComponents(params.components);
+  if (!pipelineId) {
+    return {
+      success: false,
+      error: "No pipeline_id — open the AI assistant from the canvas with a pipeline selected.",
+    };
+  }
+  if (components.length === 0) {
+    return { success: false, error: "components array is required and must include at least one component_id." };
+  }
+
+  const ownerIds = await getAccessibleResourceOwnerIds(userId);
+  const pipeline = await db.eltPipeline.findFirst({
+    where: { id: pipelineId, userId: { in: ownerIds } },
+  });
+  if (!pipeline) {
+    return { success: false, error: "Pipeline not found or access denied." };
+  }
+
+  const base = { ...(pipeline.sourceConfiguration as Record<string, unknown>) };
+  const existing = getCanvasFromSourceConfig(base);
+  const applied = applyCanvasComponentsToSourceConfig(base, {
+    sourceType: pipeline.sourceType,
+    destinationType: pipeline.destinationType,
+    components,
+    existingCanvas: existing,
+  });
+
+  const validation = validatePipelineCanvasGraph(
+    applied.canvas.nodes as Node[],
+    applied.canvas.edges as Edge[],
+    {
+      requireConnectorTypes: true,
+      pipelineSourceType: pipeline.sourceType,
+      pipelineDestinationType: pipeline.destinationType,
+    }
+  );
+  if (!validation.ok) {
+    return {
+      success: false,
+      error: "Canvas validation failed",
+      errors: validation.errors,
+      skipped_components: applied.skippedComponents,
+    };
+  }
+
+  const warnings: string[] = [];
+  if (applied.skippedComponents.length) {
+    warnings.push(`Unknown component ids skipped: ${applied.skippedComponents.join(", ")}`);
+  }
+  if (applied.extracted.sensorMonitors.length) {
+    warnings.push(
+      `${applied.extracted.sensorMonitors.length} sensor(s) will create monitors when applied (requires source connection).`
+    );
+  }
+
+  return {
+    success: true,
+    next_action: "patch_pipeline",
+    pipeline_id: pipelineId,
+    patch_payload: { canvas: applied.canvas } satisfies PatchPipelinePayload,
+    components_added: applied.extracted.components.map((c) => c.id),
+    sensor_monitors: applied.extracted.sensorMonitors.map((s) => s.label),
+    skipped_components: applied.skippedComponents,
+    warnings: warnings.length ? warnings : undefined,
+  };
+}
 
 function applyPostTransformToConfig(
   base: Record<string, unknown>,
@@ -674,6 +831,31 @@ function toolGeneratePipeline(params: GeneratePipelineParams) {
   );
   if (dbtProjectId) body.dbtProjectId = dbtProjectId;
 
+  const componentInputs = normalizeAiComponents(params.components);
+  let componentSummary: string[] | undefined;
+  const genWarnings = [...warnings];
+
+  if (componentInputs.length) {
+    const applied = applyCanvasComponentsToSourceConfig(
+      body.sourceConfiguration as Record<string, unknown>,
+      {
+        sourceType: params.source_type,
+        destinationType: params.destination_type,
+        components: componentInputs,
+      }
+    );
+    body.sourceConfiguration = applied.sourceConfiguration;
+    componentSummary = applied.extracted.components.map((c) => c.id);
+    if (applied.skippedComponents.length) {
+      genWarnings.push(`Unknown component ids skipped: ${applied.skippedComponents.join(", ")}`);
+    }
+    if (applied.extracted.sensorMonitors.length) {
+      genWarnings.push(
+        `${applied.extracted.sensorMonitors.length} sensor component(s) on canvas — monitors apply after save when a source connection is linked.`
+      );
+    }
+  }
+
   const requiredFields = getInlineFields(params.source_type);
 
   try {
@@ -685,7 +867,8 @@ function toolGeneratePipeline(params: GeneratePipelineParams) {
       save_payload: body,
       required_fields: requiredFields,
       generated_code_preview: preview,
-      warnings: warnings.length > 0 ? warnings : undefined,
+      components_added: componentSummary,
+      warnings: genWarnings.length > 0 ? genWarnings : undefined,
     };
   } catch (e) {
     return {
@@ -695,7 +878,8 @@ function toolGeneratePipeline(params: GeneratePipelineParams) {
       save_payload: body,
       required_fields: requiredFields,
       generated_code_preview: null,
-      warnings: warnings.length > 0 ? warnings : undefined,
+      components_added: componentSummary,
+      warnings: genWarnings.length > 0 ? genWarnings : undefined,
     };
   }
 }
@@ -749,13 +933,36 @@ export async function POST(request: Request) {
   }
 
   let runErrorContext = lastRunError;
-  if (!runErrorContext && pipelineId) {
-    const lastFail = await db.eltPipelineRun.findFirst({
-      where: { pipelineId, status: "failed" },
-      orderBy: { startedAt: "desc" },
-      select: { errorSummary: true },
+  let pipelineContextBlock = "";
+  if (pipelineId) {
+    const ownerIds = await getAccessibleResourceOwnerIds(user.id);
+    const pipeline = await db.eltPipeline.findFirst({
+      where: { id: pipelineId, userId: { in: ownerIds } },
     });
-    runErrorContext = lastFail?.errorSummary ?? undefined;
+    if (pipeline) {
+      const cfg = (pipeline.sourceConfiguration ?? {}) as Record<string, unknown>;
+      const canvas = getCanvasFromSourceConfig(cfg);
+      const onCanvas = canvas
+        ? extractComponentsFromCanvas(canvas.nodes as Node[], canvas.edges as Edge[])
+        : { components: [], sensorMonitors: [] };
+      pipelineContextBlock = `## Current pipeline (canvas edit mode)
+- Pipeline ID: ${pipeline.id}
+- Name: ${pipeline.name}
+- Source → Destination: ${pipeline.sourceType} → ${pipeline.destinationType}
+- Components on canvas: ${onCanvas.components.map((c) => c.id).join(", ") || "none"}
+- Sensor monitors on canvas: ${onCanvas.sensorMonitors.map((s) => s.label).join(", ") || "none"}
+
+When the user asks to add checks, sensors, or transforms, call **add_pipeline_components** (omit pipeline_id — context is set).
+When they describe a brand-new pipeline instead, use **generate_pipeline** without pipeline_id.`;
+    }
+    if (!runErrorContext) {
+      const lastFail = await db.eltPipelineRun.findFirst({
+        where: { pipelineId, status: "failed" },
+        orderBy: { startedAt: "desc" },
+        select: { errorSummary: true },
+      });
+      runErrorContext = lastFail?.errorSummary ?? undefined;
+    }
   }
 
   const messagesWithContext = runErrorContext
@@ -786,7 +993,7 @@ export async function POST(request: Request) {
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      system: buildSystemPrompt(workspaceBlock),
+      system: buildSystemPrompt(workspaceBlock, pipelineContextBlock),
       tools: TOOLS,
       messages: anthropicMessages,
     });
@@ -805,8 +1012,11 @@ export async function POST(request: Request) {
         .pop();
 
       let savePayload: CreatePipelineBody | undefined;
+      let patchPayload: PatchPipelinePayload | undefined;
+      let patchPipelineId: string | undefined;
       let requiredFields: InlineField[] | undefined;
       let codePreview: string | undefined;
+      let componentSummary: string[] | undefined;
 
       const allToolResults = anthropicMessages
         .filter((m) => m.role === "user")
@@ -823,14 +1033,23 @@ export async function POST(request: Request) {
           if (resultContent) {
             const parsed = JSON.parse(resultContent) as {
               save_payload?: CreatePipelineBody;
+              patch_payload?: PatchPipelinePayload;
+              pipeline_id?: string;
               next_action?: string;
               required_fields?: InlineField[];
               generated_code_preview?: string | null;
+              components_added?: string[];
             };
             if (parsed.next_action === "save_pipeline" && parsed.save_payload) {
               savePayload = parsed.save_payload;
               requiredFields = parsed.required_fields;
               codePreview = parsed.generated_code_preview ?? undefined;
+              if (parsed.components_added?.length) componentSummary = parsed.components_added;
+            }
+            if (parsed.next_action === "patch_pipeline" && parsed.patch_payload) {
+              patchPayload = parsed.patch_payload;
+              patchPipelineId = parsed.pipeline_id;
+              if (parsed.components_added?.length) componentSummary = parsed.components_added;
             }
           }
         } catch {
@@ -841,8 +1060,11 @@ export async function POST(request: Request) {
       return NextResponse.json({
         message: text,
         savePayload,
+        patchPayload,
+        patchPipelineId,
         requiredFields,
         codePreview,
+        componentSummary,
       });
     }
 
@@ -874,6 +1096,11 @@ export async function POST(request: Request) {
           );
         } else if (name === "generate_pipeline") {
           result = toolGeneratePipeline(inp as GeneratePipelineParams);
+        } else if (name === "add_pipeline_components") {
+          result = await toolAddPipelineComponents(user.id, pipelineId, {
+            pipeline_id: typeof inp.pipeline_id === "string" ? inp.pipeline_id : undefined,
+            components: inp.components,
+          });
         } else if (name === "list_dbt_projects") {
           result = await toolListDbtProjects(
             user.id,

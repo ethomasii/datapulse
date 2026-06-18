@@ -2,30 +2,42 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import clsx from 'clsx';
 import {
   Bot, X, Send, Sparkles, Maximize2, Minimize2,
   Zap, CheckCircle, Loader2, ChevronRight, ExternalLink, PenLine, Code2, ChevronDown,
 } from 'lucide-react';
 import type { CreatePipelineBody } from '@/lib/elt/types';
-import type { InlineField } from '@/app/api/elt/ai-assistant/route';
+import type { InlineField, PatchPipelinePayload } from '@/app/api/elt/ai-assistant/route';
 import { useWorkspacePermissions } from '@/lib/hooks/use-workspace-permissions';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   savePayload?: CreatePipelineBody;
+  patchPayload?: PatchPipelinePayload;
+  patchPipelineId?: string;
   requiredFields?: InlineField[];
   codePreview?: string;
+  componentSummary?: string[];
 }
 
 const STARTER_PROMPTS = [
   'Load GitHub issues and PRs into Snowflake',
+  'GitHub → Snowflake with S3 file sensor and not-null checks on issues.id',
   'Sync Stripe payments to BigQuery with dbt staging',
   'Pull HubSpot contacts into Postgres',
   'Connect a REST API to DuckDB',
   'Replicate a Postgres table to Redshift',
   'GitHub → Snowflake EL+T with dbt models after load',
   'What workspace dbt projects do I have?',
+];
+
+const CANVAS_STARTER_PROMPTS = [
+  'Add an S3 file sensor for s3://my-bucket/incoming/',
+  'Add not-null checks on id for the main table',
+  'Add a freshness check after load',
+  'Add a data quality check on orders.id',
 ];
 
 const FOLLOW_UPS = [
@@ -206,6 +218,7 @@ function PipelineActions({
   savingKey,
   savedKeys,
   onSaveWithPayload,
+  onPatchPipeline,
   onOpenBuilder,
   onOpenCanvas,
 }: {
@@ -214,6 +227,7 @@ function PipelineActions({
   savingKey: string | null;
   savedKeys: Set<string>;
   onSaveWithPayload: (payload: CreatePipelineBody, key: string) => Promise<void>;
+  onPatchPipeline: (pipelineId: string, patch: PatchPipelinePayload, key: string) => Promise<void>;
   onOpenBuilder: (pipelineId?: string) => void;
   onOpenCanvas: (pipelineId?: string) => void;
 }) {
@@ -222,11 +236,38 @@ function PipelineActions({
   const key = `${msgIdx}`;
   const isSaving = savingKey === key;
   const isSaved = savedKeys.has(key);
-  const savedWithPlaceholders = savedKeys.has(`${key}-skip`);
+
+  if (msg.patchPayload && msg.patchPipelineId) {
+    if (isSaved) {
+      return (
+        <div className="mt-2.5 pt-2.5 border-t border-slate-700 flex flex-wrap items-center gap-2">
+          <CheckCircle className="h-3.5 w-3.5 text-teal-400" />
+          <span className="text-xs text-teal-400 font-medium">Applied to canvas!</span>
+        </div>
+      );
+    }
+    return (
+      <div className="mt-2.5 pt-2.5 border-t border-slate-700">
+        {msg.componentSummary?.length ? (
+          <p className="mb-2 text-[11px] text-slate-400">
+            Components: <span className="text-teal-300">{msg.componentSummary.join(', ')}</span>
+          </p>
+        ) : null}
+        <button
+          onClick={() => void onPatchPipeline(msg.patchPipelineId!, msg.patchPayload!, key)}
+          disabled={isSaving}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-500 disabled:opacity-60 transition-colors"
+        >
+          {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+          Apply to canvas
+        </button>
+      </div>
+    );
+  }
 
   if (!msg.savePayload) return null;
 
-  if (isSaved || savedWithPlaceholders) {
+  if (isSaved || savedKeys.has(`${key}-skip`)) {
     return (
       <div className="mt-2.5 pt-2.5 border-t border-slate-700 flex flex-wrap items-center gap-2">
         <CheckCircle className="h-3.5 w-3.5 text-teal-400" />
@@ -249,6 +290,11 @@ function PipelineActions({
 
   return (
     <div className="mt-2.5 pt-2.5 border-t border-slate-700">
+      {msg.componentSummary?.length ? (
+        <p className="mb-2 text-[11px] text-slate-400">
+          Canvas components: <span className="text-teal-300">{msg.componentSummary.join(', ')}</span>
+        </p>
+      ) : null}
       {/* Code preview — always shown so user can review before saving */}
       {msg.codePreview && (
         <CodePreviewPanel code={msg.codePreview} />
@@ -319,7 +365,21 @@ function PipelineActions({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPipelineSaved?: (name: string) => void; inline?: boolean }) {
+export function AiPipelineAssistant({
+  onPipelineSaved,
+  onPipelinePatched,
+  inline = false,
+  pipelineId,
+  canvasMode = false,
+}: {
+  onPipelineSaved?: (name: string) => void;
+  onPipelinePatched?: () => void;
+  inline?: boolean;
+  /** When set, AI can add components to this pipeline via add_pipeline_components. */
+  pipelineId?: string;
+  /** Canvas sidebar styling and edit-mode starter prompts. */
+  canvasMode?: boolean;
+}) {
   const router = useRouter();
   const { permissions, loading: permsLoading } = useWorkspacePermissions();
   const canWrite = permissions?.canWrite ?? true;
@@ -353,23 +413,63 @@ export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPip
       const res = await fetch('/api/elt/ai-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: next.map((m) => ({ role: m.role, content: m.content })) }),
+        body: JSON.stringify({
+          messages: next.map((m) => ({ role: m.role, content: m.content })),
+          ...(pipelineId ? { pipelineId } : {}),
+        }),
       });
       if (!res.ok) throw new Error('Assistant request failed');
-      const data = await res.json() as { message: string; savePayload?: CreatePipelineBody; requiredFields?: InlineField[]; codePreview?: string };
+      const data = await res.json() as {
+        message: string;
+        savePayload?: CreatePipelineBody;
+        patchPayload?: PatchPipelinePayload;
+        patchPipelineId?: string;
+        requiredFields?: InlineField[];
+        codePreview?: string;
+        componentSummary?: string[];
+      };
       setMessages((prev) => [...prev, {
         role: 'assistant',
         content: data.message,
         savePayload: data.savePayload,
+        patchPayload: data.patchPayload,
+        patchPipelineId: data.patchPipelineId,
         requiredFields: data.requiredFields,
         codePreview: data.codePreview,
+        componentSummary: data.componentSummary,
       }]);
     } catch {
       setMessages((prev) => [...prev, { role: 'assistant', content: 'Sorry, something went wrong. Please try again.' }]);
     } finally {
       setLoading(false);
     }
-  }, [messages, loading, canWrite]);
+  }, [messages, loading, canWrite, pipelineId]);
+
+  const patchPipeline = useCallback(async (id: string, patch: PatchPipelinePayload, key: string) => {
+    if (!canWrite) return;
+    setSavingKey(key);
+    try {
+      const res = await fetch(`/api/elt/pipelines/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) {
+        const err = await res.json() as { error?: string; errors?: string[] };
+        const detail = Array.isArray(err.errors) && err.errors.length ? err.errors.join(' ') : err.error;
+        throw new Error(detail ?? 'Apply failed');
+      }
+      setSavedKeys((prev) => { const next = new Set(prev); next.add(key); return next; });
+      onPipelinePatched?.();
+    } catch (e) {
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: `Could not apply to canvas: ${e instanceof Error ? e.message : 'unknown error'}`,
+      }]);
+    } finally {
+      setSavingKey(null);
+    }
+  }, [canWrite, onPipelinePatched]);
 
   const savePipeline = useCallback(async (payload: CreatePipelineBody, key: string) => {
     if (!canWrite) return;
@@ -413,7 +513,14 @@ export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPip
   };
 
   const lastMsg = messages[messages.length - 1];
-  const showFollowUps = lastMsg?.role === 'assistant' && !lastMsg.savePayload && !loading;
+  const showFollowUps = lastMsg?.role === 'assistant' && !lastMsg.savePayload && !lastMsg.patchPayload && !loading;
+  const starterPrompts = canvasMode ? CANVAS_STARTER_PROMPTS : STARTER_PROMPTS;
+  const emptyHint = canvasMode
+    ? 'Describe components to add — sensors, quality checks, transforms…'
+    : 'Describe the pipeline you want to build…';
+  const welcomeHint = canvasMode
+    ? 'Tell me what to add to this pipeline — monitors, checks, or transforms. Or pick a starter below.'
+    : 'Tell me what data you want to move and I\'ll build the pipeline. Or pick a starter below.';
   const panelW = expanded ? 'w-[480px]' : 'w-[420px]';
   const panelH = expanded ? 'h-[680px]' : 'h-[520px]';
 
@@ -426,7 +533,7 @@ export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPip
   // ── Inline variant: embedded in the builder page ─────────────────────────────
   if (inline) {
     return (
-      <div className="flex flex-col" style={{ height: '420px' }}>
+      <div className={clsx('flex flex-col', canvasMode ? 'h-[320px]' : '')} style={canvasMode ? undefined : { height: '420px' }}>
         {readOnlyBanner}
         <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 pr-1">
           {messages.length === 0 && (
@@ -435,12 +542,17 @@ export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPip
                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-sky-500">
                   <Bot className="h-3.5 w-3.5 text-white" />
                 </div>
-                <div className="rounded-xl rounded-tl-none bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 px-3 py-2.5 text-sm text-slate-700 dark:text-slate-200">
-                  Tell me what data you want to move and I&apos;ll build the pipeline. Or pick a starter below.
+                <div className={clsx(
+                  'rounded-xl rounded-tl-none px-3 py-2.5 text-sm',
+                  canvasMode
+                    ? 'bg-slate-100 border border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200'
+                    : 'bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 text-slate-700 dark:text-slate-200'
+                )}>
+                  {welcomeHint}
                 </div>
               </div>
               <div className="flex flex-wrap gap-1.5 pl-8">
-                {STARTER_PROMPTS.map((p) => (
+                {starterPrompts.map((p) => (
                   <button key={p} onClick={() => void sendMessage(p)} className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-[11px] text-teal-700 hover:border-teal-400 hover:bg-teal-100 dark:border-teal-700 dark:bg-teal-900/20 dark:text-teal-300 transition-colors">
                     {p}
                   </button>
@@ -461,7 +573,7 @@ export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPip
                 ) : (
                   <>
                     {renderContent(msg.content)}
-                    <PipelineActions msg={msg} msgIdx={idx} savingKey={savingKey} savedKeys={savedKeys} onSaveWithPayload={savePipeline} onOpenBuilder={openBuilder} onOpenCanvas={openCanvas} />
+                    <PipelineActions msg={msg} msgIdx={idx} savingKey={savingKey} savedKeys={savedKeys} onSaveWithPayload={savePipeline} onPatchPipeline={patchPipeline} onOpenBuilder={openBuilder} onOpenCanvas={openCanvas} />
                   </>
                 )}
               </div>
@@ -488,7 +600,7 @@ export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPip
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Describe the pipeline you want to build…"
+            placeholder={emptyHint}
             rows={2}
             className="flex-1 resize-none bg-transparent text-sm text-slate-800 dark:text-white placeholder-slate-400 outline-none"
           />
@@ -579,6 +691,7 @@ export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPip
                         savingKey={savingKey}
                         savedKeys={savedKeys}
                         onSaveWithPayload={savePipeline}
+                        onPatchPipeline={patchPipeline}
                         onOpenBuilder={openBuilder}
                         onOpenCanvas={openCanvas}
                       />

@@ -44,6 +44,7 @@ import { minimalSourceConfigurationForNewPipeline } from "@/lib/elt/minimal-sour
 import { ensureGithubReposForForm } from "@/lib/elt/normalize-source-configuration";
 import clsx from "clsx";
 import { ComponentPalette } from "@/components/elt/component-palette";
+import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
 
 type PipelineRow = { id: string; name: string };
 
@@ -1058,10 +1059,23 @@ export function CanvasPageClient() {
                 aria-label="Pipeline settings"
               >
                 {inspectorFocus.kind === "none" ? (
-                  <ComponentPalette
-                    className="mb-4 h-[280px] lg:h-[320px]"
-                    onSelect={(c) => canvasControlRef.current?.addComponentNode(c)}
-                  />
+                  <>
+                    <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        AI canvas builder
+                      </p>
+                      <AiPipelineAssistant
+                        inline
+                        canvasMode
+                        pipelineId={selectedId}
+                        onPipelinePatched={() => void loadPipelineGraph(selectedId)}
+                      />
+                    </div>
+                    <ComponentPalette
+                      className="mb-4 h-[280px] lg:h-[320px]"
+                      onSelect={(c) => canvasControlRef.current?.addComponentNode(c)}
+                    />
+                  </>
                 ) : null}
                 {renderCanvasInspectorPanel(inspectorFocus)}
               </aside>

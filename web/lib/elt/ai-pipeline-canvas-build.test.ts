@@ -1,0 +1,75 @@
+import { describe, expect, it } from "vitest";
+import {
+  applyCanvasComponentsToSourceConfig,
+  buildPipelineCanvasFromComponents,
+} from "@/lib/elt/ai-pipeline-canvas-build";
+import { extractComponentsFromCanvas } from "@/lib/elt/canvas-component-sync";
+
+describe("ai-pipeline-canvas-build", () => {
+  it("builds source → dest backbone with quality after dest", () => {
+    const { nodes, edges } = buildPipelineCanvasFromComponents({
+      sourceType: "github",
+      destinationType: "snowflake",
+      components: [
+        {
+          component_id: "dq_check",
+          config: { table: "issues", not_null: ["id"] },
+        },
+      ],
+    });
+
+    expect(nodes.some((n) => n.type === "sourceNode")).toBe(true);
+    expect(nodes.some((n) => n.type === "destNode")).toBe(true);
+    expect(nodes.filter((n) => n.type === "componentNode")).toHaveLength(1);
+
+    const dest = nodes.find((n) => n.type === "destNode")!;
+    const quality = nodes.find((n) => n.type === "componentNode")!;
+    expect(edges.some((e) => e.source === dest.id && e.target === quality.id)).toBe(true);
+
+    const extracted = extractComponentsFromCanvas(nodes, edges);
+    expect(extracted.quality[0]?.table).toBe("issues");
+  });
+
+  it("places s3 monitor as parallel branch from source", () => {
+    const { nodes, edges } = buildPipelineCanvasFromComponents({
+      sourceType: "github",
+      destinationType: "snowflake",
+      components: [{ component_id: "s3_monitor", config: { prefix: "s3://bucket/in/" } }],
+    });
+
+    const source = nodes.find((n) => n.type === "sourceNode")!;
+    const monitor = nodes.find((n) => n.type === "componentNode")!;
+    expect(edges.some((e) => e.source === source.id && e.target === monitor.id)).toBe(true);
+    expect(edges.some((e) => e.source === source.id && e.target !== monitor.id)).toBe(true);
+  });
+
+  it("merges new components into existing canvas", () => {
+    const existing = buildPipelineCanvasFromComponents({
+      sourceType: "github",
+      destinationType: "snowflake",
+      components: [{ component_id: "s3_monitor" }],
+    });
+
+    const merged = buildPipelineCanvasFromComponents({
+      existingCanvas: { nodes: existing.nodes, edges: existing.edges, v: 1 },
+      components: [{ component_id: "dq_check", config: { table: "orders", not_null: ["id"] } }],
+    });
+
+    expect(merged.nodes.filter((n) => n.type === "componentNode")).toHaveLength(2);
+  });
+
+  it("applyCanvasComponentsToSourceConfig writes elt_components", () => {
+    const result = applyCanvasComponentsToSourceConfig(
+      {},
+      {
+        sourceType: "github",
+        destinationType: "snowflake",
+        components: [{ component_id: "dq_check", config: { table: "t", not_null: ["id"] } }],
+      }
+    );
+
+    expect(result.canvas.nodes.length).toBeGreaterThan(2);
+    expect(Array.isArray(result.sourceConfiguration.elt_components)).toBe(true);
+    expect(result.skippedComponents).toHaveLength(0);
+  });
+});
