@@ -256,7 +256,7 @@ async function snowflakeRunQuery(
   host: string,
   sql: string,
   auth: { type: "jwt"; token: string } | { type: "session"; token: string },
-  context: { warehouse: string; database: string; role?: string }
+  context: { warehouse: string; database: string; role?: string; schema?: string }
 ): Promise<string[][]> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -273,7 +273,7 @@ async function snowflakeRunQuery(
       asyncExec: false,
       warehouse: context.warehouse,
       database: context.database,
-      schema: "PUBLIC",
+      schema: context.schema?.trim() || "PUBLIC",
       ...(context.role?.trim() ? { role: context.role.trim() } : {}),
     }),
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
@@ -341,6 +341,45 @@ export async function introspectSnowflake(
     const detail = e instanceof Error ? e.message : String(e);
     return fail("snowflake", `Could not introspect Snowflake: ${detail.slice(0, 180)}`);
   }
+}
+
+/** Run a read-only SQL statement against Snowflake (internal + catalog sample queries). */
+export async function runSnowflakeReadOnlyQuery(
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  sql: string,
+  opts?: { schema?: string }
+): Promise<{ columns: string[]; rows: string[][] }> {
+  const account = secret(secrets, "SNOWFLAKE_ACCOUNT") || configString(config, "account");
+  const username = secret(secrets, "SNOWFLAKE_USER") || configString(config, "username");
+  const warehouse = secret(secrets, "SNOWFLAKE_WAREHOUSE") || configString(config, "warehouse");
+  const database = secret(secrets, "SNOWFLAKE_DATABASE") || configString(config, "database");
+  const role = secret(secrets, "SNOWFLAKE_ROLE") || configString(config, "role");
+  const authMethod = secret(secrets, "SNOWFLAKE_AUTH_METHOD") || "password";
+  const schema = opts?.schema?.trim() || secret(secrets, "SNOWFLAKE_SCHEMA") || configString(config, "schema") || "PUBLIC";
+
+  if (!account || !username || !warehouse || !database) {
+    throw new Error("Snowflake connection needs account, user, warehouse, and database.");
+  }
+
+  const host = snowflakeHost(account);
+  const context = { warehouse, database, role, schema };
+
+  let rowset: string[][] = [];
+  if (authMethod === "keypair") {
+    const privateKey = secret(secrets, "SNOWFLAKE_PRIVATE_KEY");
+    if (!privateKey) throw new Error("Set SNOWFLAKE_PRIVATE_KEY for key-pair authentication.");
+    const jwt = snowflakeJwt(account, username, privateKey, secret(secrets, "SNOWFLAKE_PRIVATE_KEY_PASSPHRASE"));
+    rowset = await snowflakeRunQuery(host, sql, { type: "jwt", token: jwt }, context);
+  } else {
+    const password = secret(secrets, "SNOWFLAKE_PASSWORD");
+    if (!password) throw new Error("Set SNOWFLAKE_PASSWORD for Snowflake authentication.");
+    const session = await snowflakeSessionToken(host, account, username, password, warehouse, database, role);
+    rowset = await snowflakeRunQuery(host, sql, { type: "session", token: session }, context);
+  }
+
+  const columns = rowset.length > 0 ? rowset[0].map((_, i) => `col_${i}`) : [];
+  return { columns, rows: rowset };
 }
 
 // ─── Databricks ──────────────────────────────────────────────────────────────

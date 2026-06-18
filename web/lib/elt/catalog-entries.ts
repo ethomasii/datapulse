@@ -1,3 +1,5 @@
+import { parseCatalogMetadata } from "@/lib/elt/catalog-metadata";
+import { catalogImportMetadataPatch } from "@/lib/elt/asset-technical-profile";
 import type { PipelineAssetBundle, WorkspaceAsset, WorkspaceAssetsResponse } from "@/lib/elt/pipeline-assets";
 
 export type CatalogEntryRow = {
@@ -34,11 +36,13 @@ export function catalogMetaForAsset(
 ): WorkspaceAsset {
   if (!entry) return asset;
   const tags = parseTags(entry.tags);
+  const metadata = parseCatalogMetadata(entry.metadata);
   return {
     ...asset,
     catalogDescription: entry.description ?? undefined,
     catalogTags: tags.length ? tags : undefined,
     catalogDisplayName: entry.displayName ?? undefined,
+    catalogColumnCount: metadata.columns?.length,
   };
 }
 
@@ -80,6 +84,7 @@ export function catalogEntriesFromAssets(
         kind: asset.kind,
         displayName: asset.displayName,
         pipelineId: asset.pipelineId,
+        metadata: catalogImportMetadataPatch(undefined, asset, bundle),
       });
     }
   }

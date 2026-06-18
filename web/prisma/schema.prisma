@@ -91,6 +91,9 @@ model User {
   connections Connection[]
   eltMonitors EltMonitor[]
   catalogEntries CatalogEntry[]
+  catalogAssetViews CatalogAssetView[]
+  catalogCollections CatalogCollection[]
+  glossaryTerms GlossaryTerm[]
   dbtProjects DbtProject[]
 
   /// Membership in a shared org (not the owner row — use `ownedOrganization`).
@@ -253,6 +256,8 @@ model CatalogEntry {
   metadata    Json     @default("{}")
   pipelineId  String?  @map("pipeline_id")
   importedAt  DateTime? @map("imported_at")
+  certifiedAt DateTime? @map("certified_at")
+  certifiedById String? @map("certified_by_id")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -260,6 +265,79 @@ model CatalogEntry {
   @@index([userId])
   @@index([pipelineId])
   @@map("CatalogEntry")
+}
+
+/// Recently viewed catalog assets (per user).
+model CatalogAssetView {
+  id       String   @id @default(cuid())
+  userId   String   @map("user_id")
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assetKey String   @map("asset_key")
+  viewedAt DateTime @default(now()) @map("viewed_at")
+
+  @@unique([userId, assetKey])
+  @@index([userId, viewedAt(sort: Desc)])
+  @@map("CatalogAssetView")
+}
+
+/// Curated data product / collection of catalog assets.
+model CatalogCollection {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug        String
+  name        String
+  description String?  @db.Text
+  featured    Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  items       CatalogCollectionItem[]
+
+  @@unique([userId, slug])
+  @@index([userId])
+  @@map("CatalogCollection")
+}
+
+model CatalogCollectionItem {
+  id           String   @id @default(cuid())
+  collectionId String   @map("collection_id")
+  collection   CatalogCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  assetKey     String   @map("asset_key")
+  sortOrder    Int      @default(0) @map("sort_order")
+
+  @@unique([collectionId, assetKey])
+  @@index([collectionId])
+  @@map("CatalogCollectionItem")
+}
+
+/// Business glossary term linked to catalog assets.
+model GlossaryTerm {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  term       String
+  definition String   @db.Text
+  aliases    Json     @default("[]")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  links      GlossaryTermLink[]
+
+  @@unique([userId, term])
+  @@index([userId])
+  @@map("GlossaryTerm")
+}
+
+model GlossaryTermLink {
+  id         String   @id @default(cuid())
+  termId     String   @map("term_id")
+  term       GlossaryTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+  assetKey   String   @map("asset_key")
+  columnName String?  @map("column_name")
+
+  @@unique([termId, assetKey, columnName])
+  @@index([termId])
+  @@index([assetKey])
+  @@map("GlossaryTermLink")
 }
 
 /// First-class dbt project — standalone or linked to one or more pipelines (Snowflake dbt Projects / dbt Cloud style).

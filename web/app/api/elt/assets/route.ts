@@ -11,7 +11,10 @@ import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
 import { db } from "@/lib/db/client";
 import { applyWarehouseVerificationToAssets } from "@/lib/elt/asset-warehouse-reconcile";
 import { buildWorkspaceAssets, type PipelineRunAssetInput } from "@/lib/elt/pipeline-assets";
-import { mergeCatalogIntoAssetsPayload } from "@/lib/elt/catalog-entries";
+import { mergeCatalogIntoAssetsPayload, parseTags } from "@/lib/elt/catalog-entries";
+import { parseCatalogMetadata } from "@/lib/elt/catalog-metadata";
+import { buildAssetTechnicalProfile } from "@/lib/elt/asset-technical-profile";
+import { fetchWarehouseColumnsForAsset } from "@/lib/elt/warehouse-column-introspect";
 import { introspectDestinationConnection } from "@/lib/elt/warehouse-introspect";
 
 export async function GET(req: Request) {
@@ -20,6 +23,7 @@ export async function GET(req: Request) {
   if (!hasCatalogReadScope(auth)) return scopeForbiddenResponse();
 
   const verifyWarehouse = new URL(req.url).searchParams.get("verifyWarehouse") === "1";
+  const fetchColumns = new URL(req.url).searchParams.get("columns") === "1";
   const perms = await getWorkspacePermissions(auth.user.id);
 
   const ownerIds = await getAccessibleResourceOwnerIds(auth.user.id);
@@ -140,7 +144,57 @@ export async function GET(req: Request) {
     if (!bundle) {
       return NextResponse.json({ error: "Pipeline not found" }, { status: 404 });
     }
-    return NextResponse.json({ asset, bundle });
+
+    const catalogRow = entriesByKey.get(asset.id);
+    const catalogMetadata = parseCatalogMetadata(catalogRow?.metadata);
+
+    let warehouseColumns: Awaited<ReturnType<typeof fetchWarehouseColumnsForAsset>> | undefined;
+    if (fetchColumns) {
+      const pipelineRow = rows.find((r) => r.id === asset.pipelineId);
+      const destId = pipelineRow?.destinationConnectionId;
+      if (destId) {
+        const conn = await db.connection.findFirst({
+          where: { id: destId, ...connectionOwnerWhere(ownerIds) },
+          select: {
+            id: true,
+            connector: true,
+            config: true,
+            connectionSecretsEnc: true,
+          },
+        });
+        if (conn) {
+          warehouseColumns = await fetchWarehouseColumnsForAsset(conn, asset.landingQualified);
+        }
+      }
+    }
+
+    const technicalProfile = buildAssetTechnicalProfile(
+      asset,
+      bundle,
+      catalogMetadata,
+      warehouseColumns?.columns
+    );
+
+    return NextResponse.json({
+      asset,
+      bundle,
+      catalogEntry: catalogRow
+        ? {
+            description: catalogRow.description,
+            tags: parseTags(catalogRow.tags),
+            metadata: catalogMetadata,
+            aiGeneratedAt: catalogMetadata.aiGeneratedAt,
+          }
+        : null,
+      technicalProfile,
+      warehouseColumns: warehouseColumns
+        ? { ok: warehouseColumns.ok, message: warehouseColumns.message }
+        : undefined,
+      permissions: {
+        canEditCatalog: perms.canEditCatalog,
+        catalogVisibility: perms.catalogVisibility,
+      },
+    });
   }
 
   return NextResponse.json({

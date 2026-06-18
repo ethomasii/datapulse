@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CatalogAccessBanner } from "@/components/catalog/catalog-access-banner";
+import { PipelineHealthPanel } from "@/components/catalog/pipeline-health-panel";
 import { RelatedLinks } from "@/components/ui/related-links";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 import {
@@ -30,6 +31,7 @@ import { computePipelineFreshness } from "@/lib/elt/asset-freshness";
 import { assetDetailHref } from "@/lib/elt/asset-path";
 import { syncModeLabel } from "@/lib/elt/pipeline-tool-labels";
 import type { WarehouseVerificationSummary } from "@/lib/elt/asset-warehouse-reconcile";
+import type { PipelineHealthSummary } from "@/lib/elt/pipeline-health";
 import type {
   PipelineAssetBundle,
   WorkspaceAsset,
@@ -115,6 +117,11 @@ function AssetListRow({ asset }: { asset: WorkspaceAsset }) {
           ) : null}
           <WarehouseStatusBadge status={asset.warehouseStatus} runObserved={asset.runObserved} />
           <AssetFreshnessBadge meta={asset.assetFreshness} />
+          {asset.catalogColumnCount ? (
+            <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+              {asset.catalogColumnCount} cols
+            </span>
+          ) : null}
         </div>
         {asset.landingQualified ? (
           <code className="block truncate font-mono text-[11px] text-slate-500">{asset.landingQualified}</code>
@@ -258,6 +265,7 @@ export function AssetsPageClient() {
   const [query, setQuery] = useState("");
   const [view, setView] = useState<ViewMode>("flat");
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
+  const [health, setHealth] = useState<PipelineHealthSummary[]>([]);
 
   const load = useCallback(async (verifyWarehouse = false) => {
     if (verifyWarehouse) setVerifying(true);
@@ -291,6 +299,11 @@ export function AssetsPageClient() {
 
   useEffect(() => {
     void load();
+    void fetch("/api/elt/pipelines/health")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => {
+        if (body?.health) setHealth(body.health as PipelineHealthSummary[]);
+      });
   }, [load]);
 
   const q = query.trim().toLowerCase();
@@ -376,6 +389,8 @@ export function AssetsPageClient() {
             <SummaryCard label="dbt models" value={data.summary.transforms} icon={GitBranch} />
             <SummaryCard label="Sources" value={data.summary.sources} icon={Database} />
           </div>
+
+          {health.length > 0 && !pipelineFilter ? <PipelineHealthPanel health={health} /> : null}
 
           {data.warehouseVerification ? (
             <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-950/50">

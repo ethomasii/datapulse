@@ -7,6 +7,7 @@ import { ArrowLeft, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { DbtConfigFields, type DbtConfigValues } from "@/components/dbt/dbt-config-fields";
 import { SavedDestinationSelect } from "@/components/elt/saved-destination-select";
 import { GithubRepoPicker } from "@/components/integrations/github-repo-picker";
+import { GithubRepoFolderPicker } from "@/components/integrations/github-repo-folder-picker";
 import { defaultDbtRepoSubpath } from "@/lib/elt/eltpulse-repo-layout";
 import { parseGithubRepositoryUrl } from "@/lib/integrations/parse-github-repo-url";
 
@@ -24,6 +25,7 @@ export function CatalogDbtNewClient() {
   const [gitMode, setGitMode] = useState<GitSourceMode>(sourceSlug ? "scaffold" : "github");
   const [githubRepo, setGithubRepo] = useState<{ owner: string; repo: string; branch: string } | null>(null);
   const [gitSubpath, setGitSubpath] = useState("");
+  const [subpathManual, setSubpathManual] = useState(false);
   const [gitUrlInput, setGitUrlInput] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [destinationConnectionId, setDestinationConnectionId] = useState<string | null>(null);
@@ -69,6 +71,29 @@ export function CatalogDbtNewClient() {
       patchDbt({ repositoryBranch: githubRepo.branch, packagePath: resolvedSubpath });
     }
   }, [githubRepo, resolvedSubpath]);
+
+  /** Auto-fill folder when repo or project name changes (until user edits manually). */
+  useEffect(() => {
+    if (subpathManual || !name.trim()) return;
+    if (gitMode === "github" && githubRepo) {
+      setGitSubpath(defaultDbtRepoSubpath(name.trim()));
+    }
+    if (gitMode === "url" && gitUrlInput.trim()) {
+      setGitSubpath(defaultDbtRepoSubpath(name.trim()));
+    }
+  }, [name, githubRepo, gitUrlInput, gitMode, subpathManual]);
+
+  function handleSubpathChange(path: string) {
+    setSubpathManual(true);
+    setGitSubpath(path);
+  }
+
+  function handleRepoPick(r: { owner: string; repo: string; branch: string }) {
+    setGithubRepo(r);
+    if (!subpathManual && name.trim()) {
+      setGitSubpath(defaultDbtRepoSubpath(name.trim()));
+    }
+  }
 
   function patchDbt(patch: Partial<DbtConfigValues>) {
     setDbt((prev) => ({ ...prev, ...patch }));
@@ -278,18 +303,14 @@ export function CatalogDbtNewClient() {
             <div className="mt-4 space-y-3">
               <GithubRepoPicker
                 value={githubRepo}
-                onChange={(r) => setGithubRepo({ owner: r.owner, repo: r.repo, branch: r.branch })}
+                onChange={handleRepoPick}
               />
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                Folder in repo
-                <input
-                  type="text"
-                  value={gitSubpath}
-                  onChange={(e) => setGitSubpath(e.target.value)}
-                  placeholder={name.trim() ? defaultDbtRepoSubpath(name.trim()) : "eltpulse/dbt/my_project"}
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                />
-              </label>
+              <GithubRepoFolderPicker
+                repo={githubRepo}
+                projectName={name}
+                value={gitSubpath}
+                onChange={handleSubpathChange}
+              />
             </div>
           ) : null}
 
@@ -305,16 +326,22 @@ export function CatalogDbtNewClient() {
                   className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
                 />
               </label>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                Folder in repo
-                <input
-                  type="text"
-                  value={gitSubpath}
-                  onChange={(e) => setGitSubpath(e.target.value)}
-                  placeholder={name.trim() ? defaultDbtRepoSubpath(name.trim()) : "eltpulse/dbt/my_project"}
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                />
-              </label>
+              <GithubRepoFolderPicker
+                repo={
+                  (() => {
+                    const parsed = parseGithubRepositoryUrl(gitUrlInput.trim());
+                    if (!parsed) return null;
+                    return {
+                      owner: parsed.owner,
+                      repo: parsed.repo,
+                      branch: parsed.branch ?? (dbt.repositoryBranch.trim() || "main"),
+                    };
+                  })()
+                }
+                projectName={name}
+                value={gitSubpath}
+                onChange={handleSubpathChange}
+              />
             </div>
           ) : null}
 

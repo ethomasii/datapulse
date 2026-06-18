@@ -12,6 +12,8 @@ import {
   Table2,
 } from "lucide-react";
 import { AssetCatalogMetaEditor } from "@/components/assets/asset-catalog-meta-editor";
+import { AssetCatalogAiPanel } from "@/components/assets/asset-catalog-ai-panel";
+import { AssetColumnsTable } from "@/components/assets/asset-columns-table";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 import {
   AssetFreshnessBadge,
@@ -24,11 +26,15 @@ import { RelatedLinks } from "@/components/ui/related-links";
 import { buildAssetLineageGraph } from "@/lib/elt/asset-lineage";
 import { computePipelineFreshness } from "@/lib/elt/asset-freshness";
 import { syncModeLabel } from "@/lib/elt/pipeline-tool-labels";
+import type { AssetTechnicalProfile } from "@/lib/elt/asset-technical-profile";
 import type { PipelineAssetBundle, WorkspaceAsset } from "@/lib/elt/pipeline-assets";
 
 type AssetDetailResponse = {
   asset: WorkspaceAsset;
   bundle: PipelineAssetBundle;
+  technicalProfile?: AssetTechnicalProfile;
+  warehouseColumns?: { ok: boolean; message: string };
+  permissions?: { canEditCatalog: boolean };
 };
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -60,11 +66,16 @@ export function AssetDetailClient({ assetKey }: { assetKey: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const [loadingColumns, setLoadingColumns] = useState(false);
+
+  const load = useCallback(async (withColumns = false) => {
     setLoading(true);
+    if (withColumns) setLoadingColumns(true);
     setError(null);
     try {
-      const res = await fetch(`/api/elt/assets?assetKey=${encodeURIComponent(assetKey)}`);
+      const qs = new URLSearchParams({ assetKey });
+      if (withColumns) qs.set("columns", "1");
+      const res = await fetch(`/api/elt/assets?${qs.toString()}`);
       if (res.status === 404) throw new Error("Asset not found");
       if (!res.ok) throw new Error("Failed to load asset");
       setData((await res.json()) as AssetDetailResponse);
@@ -72,12 +83,18 @@ export function AssetDetailClient({ assetKey }: { assetKey: string }) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
       setLoading(false);
+      setLoadingColumns(false);
     }
   }, [assetKey]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void load(true);
+    void fetch("/api/elt/catalog/views", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assetKey }),
+    });
+  }, [load, assetKey]);
 
   if (loading) {
     return (
@@ -100,7 +117,8 @@ export function AssetDetailClient({ assetKey }: { assetKey: string }) {
     );
   }
 
-  const { asset, bundle } = data;
+  const { asset, bundle, technicalProfile, warehouseColumns } = data;
+  const canEdit = data.permissions?.canEditCatalog ?? canEditCatalog;
   const freshness = computePipelineFreshness(bundle.lastRun, bundle.enabled);
   const lineage = buildAssetLineageGraph(bundle);
   const siblings = [bundle.source, ...bundle.rawAssets, ...bundle.transforms, ...bundle.postTransforms].filter(
@@ -171,16 +189,45 @@ export function AssetDetailClient({ assetKey }: { assetKey: string }) {
             <div className="mt-4">
               <AssetCatalogMetaEditor
                 variant="detail"
-                readOnly={!canEditCatalog}
+                readOnly={!canEdit}
                 assetKey={asset.id}
                 kind={asset.kind}
                 pipelineId={asset.pipelineId}
                 initialDescription={asset.catalogDescription ?? ""}
                 initialTags={asset.catalogTags ?? []}
-                onSaved={load}
+                onSaved={() => void load(true)}
               />
             </div>
           </section>
+
+          {technicalProfile?.inferredDescription && !asset.catalogDescription ? (
+            <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Inferred context</h2>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{technicalProfile.inferredDescription}</p>
+            </section>
+          ) : null}
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Schema</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Column names and types from your warehouse, dbt, or ingestion config.
+            </p>
+            <div className="mt-4">
+              <AssetColumnsTable
+                columns={technicalProfile?.columns ?? []}
+                columnSources={technicalProfile?.columnSources}
+                warehouseMessage={warehouseColumns?.message}
+                onRefresh={() => void load(true)}
+                refreshing={loadingColumns}
+              />
+            </div>
+          </section>
+
+          <AssetCatalogAiPanel
+            assetKey={asset.id}
+            canEditCatalog={canEdit}
+            onDescriptionGenerated={() => void load(true)}
+          />
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Technical details</h2>

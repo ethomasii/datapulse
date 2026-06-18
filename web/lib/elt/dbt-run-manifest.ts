@@ -10,6 +10,9 @@ export type DbtModelRunResult = {
   name: string;
   status: "success" | "skipped" | "error";
   executionTimeMs?: number;
+  /** From dbt manifest / docs generation */
+  description?: string;
+  columns?: { name: string; type?: string; description?: string }[];
 };
 
 export type DbtTestRunResult = {
@@ -65,7 +68,28 @@ export function sanitizeDbtRunManifest(raw: unknown): DbtRunManifest | null {
       const name = str(m.name, 256);
       if (!name) continue;
       const ms = typeof m.executionTimeMs === "number" && Number.isFinite(m.executionTimeMs) ? m.executionTimeMs : undefined;
-      models.push({ name, status: modelStatus(m.status), ...(ms !== undefined ? { executionTimeMs: ms } : {}) });
+      const description = str(m.description, 4000);
+      const columns: DbtModelRunResult["columns"] = [];
+      if (Array.isArray(m.columns)) {
+        for (const col of m.columns) {
+          if (!col || typeof col !== "object") continue;
+          const c = col as Record<string, unknown>;
+          const name = str(c.name, 256);
+          if (!name) continue;
+          columns.push({
+            name,
+            ...(str(c.type, 128) ? { type: str(c.type, 128) } : {}),
+            ...(str(c.description, 2000) ? { description: str(c.description, 2000) } : {}),
+          });
+        }
+      }
+      models.push({
+        name,
+        status: modelStatus(m.status),
+        ...(ms !== undefined ? { executionTimeMs: ms } : {}),
+        ...(description ? { description } : {}),
+        ...(columns.length ? { columns } : {}),
+      });
     }
   }
 

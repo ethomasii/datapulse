@@ -54,6 +54,8 @@ export type WorkspaceAsset = {
   catalogDescription?: string;
   catalogTags?: string[];
   catalogDisplayName?: string;
+  /** Column count from catalog metadata when known. */
+  catalogColumnCount?: number;
   enabled: boolean;
 };
 

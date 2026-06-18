@@ -14,8 +14,12 @@ import {
   Workflow,
 } from "lucide-react";
 import { CatalogAccessBanner } from "@/components/catalog/catalog-access-banner";
+import { AssetCatalogAiPanel } from "@/components/assets/asset-catalog-ai-panel";
 import { RelatedLinks } from "@/components/ui/related-links";
+import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
+import { PipelineHealthPanel } from "@/components/catalog/pipeline-health-panel";
 import { assetDetailHref } from "@/lib/elt/asset-path";
+import type { PipelineHealthSummary } from "@/lib/elt/pipeline-health";
 
 type Overview = {
   summary: {
@@ -45,14 +49,33 @@ type SearchHit = {
   pipelineId?: string;
   pipelineName?: string;
   source: "catalog_entry" | "asset";
+  score?: number;
+  qualityBadges?: string[];
+  relatedAssetKeys?: string[];
+};
+
+type RecentView = { assetKey: string; viewedAt: string };
+
+type Collection = {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string | null;
+  featured: boolean;
+  items: { assetKey: string }[];
 };
 
 export function CatalogHubClient() {
+  const { permissions } = useWorkspacePermissions();
+  const canEditCatalog = permissions?.canEditCatalog ?? false;
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQ, setSearchQ] = useState("");
   const [searchHits, setSearchHits] = useState<SearchHit[]>([]);
   const [searching, setSearching] = useState(false);
+  const [recentViews, setRecentViews] = useState<RecentView[]>([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [health, setHealth] = useState<PipelineHealthSummary[]>([]);
 
   useEffect(() => {
     void (async () => {
@@ -61,6 +84,25 @@ export function CatalogHubClient() {
         if (res.ok) setData((await res.json()) as Overview);
       } finally {
         setLoading(false);
+      }
+    })();
+    void (async () => {
+      const [viewsRes, collRes, healthRes] = await Promise.all([
+        fetch("/api/elt/catalog/views"),
+        fetch("/api/elt/catalog/collections"),
+        fetch("/api/elt/pipelines/health"),
+      ]);
+      if (viewsRes.ok) {
+        const body = (await viewsRes.json()) as { views: RecentView[] };
+        setRecentViews(body.views ?? []);
+      }
+      if (collRes.ok) {
+        const body = (await collRes.json()) as { collections: Collection[] };
+        setCollections(body.collections ?? []);
+      }
+      if (healthRes.ok) {
+        const body = (await healthRes.json()) as { health: PipelineHealthSummary[] };
+        setHealth(body.health ?? []);
       }
     })();
   }, []);
@@ -111,7 +153,7 @@ export function CatalogHubClient() {
           type="search"
           value={searchQ}
           onChange={(e) => setSearchQ(e.target.value)}
-          placeholder="Tags, descriptions, asset names…"
+          placeholder="Tags, descriptions, column names, asset names…"
           className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
         />
         {searchQ.trim().length >= 2 ? (
@@ -137,6 +179,18 @@ export function CatalogHubClient() {
                       {hit.pipelineName ? ` · ${hit.pipelineName}` : ""}
                       {hit.tags.length ? ` · ${hit.tags.join(", ")}` : ""}
                     </p>
+                    {hit.qualityBadges?.length ? (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {hit.qualityBadges.map((b) => (
+                          <span
+                            key={b}
+                            className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-950/40 dark:text-sky-300"
+                          >
+                            {b}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                     {hit.description ? (
                       <p className="mt-0.5 line-clamp-2 text-xs text-slate-600 dark:text-slate-400">
                         {hit.description}
@@ -149,6 +203,43 @@ export function CatalogHubClient() {
           </div>
         ) : null}
       </section>
+
+      <AssetCatalogAiPanel variant="catalog" canEditCatalog={canEditCatalog} />
+
+      {recentViews.length > 0 ? (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Recently viewed</h2>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {recentViews.map((v) => (
+              <li key={v.assetKey}>
+                <Link
+                  href={assetDetailHref(v.assetKey)}
+                  className="inline-flex rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-sky-300 dark:border-slate-700 dark:text-slate-200"
+                >
+                  {v.assetKey.split(":").pop() ?? v.assetKey}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {collections.length > 0 ? (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Collections</h2>
+          <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+            {collections.filter((c) => c.featured).slice(0, 4).map((c) => (
+              <li key={c.id} className="rounded-lg border border-slate-100 p-3 dark:border-slate-800">
+                <p className="font-medium text-slate-900 dark:text-white">{c.name}</p>
+                {c.description ? <p className="mt-1 line-clamp-2 text-xs text-slate-500">{c.description}</p> : null}
+                <p className="mt-2 text-xs text-slate-400">{c.items.length} assets</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {health.length > 0 ? <PipelineHealthPanel health={health} /> : null}
 
       <CatalogAccessBanner />
 
