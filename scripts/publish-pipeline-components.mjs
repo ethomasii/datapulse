@@ -22,8 +22,19 @@ const branch = process.env.PIPELINE_COMPONENTS_BRANCH ?? "main";
 const fallbackRepo = process.env.PIPELINE_COMPONENTS_FALLBACK ?? "ethomasii/datapulse";
 const fallbackBranch =
   process.env.PIPELINE_COMPONENTS_FALLBACK_BRANCH ?? "pipeline-components-catalog";
-const sshRemote = `git@github.com:${repo}.git`;
 const tmp = join(root, ".tmp-pipeline-components-push");
+
+function pushToken() {
+  return process.env.PIPELINE_COMPONENTS_GH_TOKEN || process.env.GITHUB_TOKEN || "";
+}
+
+function gitRemote(repoSlug) {
+  const token = pushToken();
+  if (token && (process.env.GITHUB_ACTIONS || process.env.CI)) {
+    return `https://x-access-token:${token}@github.com/${repoSlug}.git`;
+  }
+  return `git@github.com:${repoSlug}.git`;
+}
 
 function ghUser() {
   try {
@@ -70,7 +81,8 @@ if (activeGh && activeGh !== "ethomasii") {
   console.log(`Using SSH as ethomasii (gh API: ${activeGh}).`);
 }
 
-let repoExists = remoteExists(sshRemote);
+const primaryRemote = gitRemote(repo);
+let repoExists = remoteExists(primaryRemote);
 if (!repoExists) {
   // Try gh create when authenticated as ethomasii, or with explicit PAT.
   const createToken = process.env.PIPELINE_COMPONENTS_GH_TOKEN;
@@ -85,7 +97,7 @@ if (!repoExists) {
           env: createToken ? { ...process.env, GH_TOKEN: createToken } : ghEnv(),
         }
       );
-      repoExists = remoteExists(sshRemote);
+      repoExists = remoteExists(primaryRemote);
     } catch {
       /* fall through */
     }
@@ -93,6 +105,8 @@ if (!repoExists) {
 }
 
 run("git init");
+run('git config user.name "github-actions[bot]"');
+run('git config user.email "41898282+github-actions[bot]@users.noreply.github.com"');
 run("git add -A");
 try {
   run('git commit -m "sync from datapulse monorepo"');
@@ -102,13 +116,13 @@ try {
 run(`git branch -M ${branch}`);
 
 if (repoExists) {
-  run(`git remote add origin ${sshRemote}`);
+  run(`git remote add origin ${primaryRemote}`);
   run(`git push --force -u origin ${branch}`);
   console.log(`Published https://github.com/${repo}`);
   process.exit(0);
 }
 
 console.log(`${repo} not found — publishing to ${fallbackRepo} branch ${fallbackBranch}…`);
-const fallbackRemote = `git@github.com:${fallbackRepo}.git`;
+const fallbackRemote = gitRemote(fallbackRepo);
 run(`git push --force ${fallbackRemote} ${branch}:refs/heads/${fallbackBranch}`);
 console.log(`Published https://github.com/${fallbackRepo}/tree/${fallbackBranch}`);

@@ -41,12 +41,19 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: bash scripts/ci-push-pipeline-components-catalog.sh
 
-      - name: Publish standalone repo (when it exists)
+      - name: Publish standalone repo (when token configured)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PIPELINE_COMPONENTS_GH_TOKEN: ${{ secrets.PIPELINE_COMPONENTS_GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.PIPELINE_COMPONENTS_GH_TOKEN }}
+          GITHUB_ACTIONS: "true"
         run: |
+          if [ -z "${PIPELINE_COMPONENTS_GH_TOKEN}" ]; then
+            echo "PIPELINE_COMPONENTS_GH_TOKEN not set; skipping external repo publish."
+            echo "Catalog branch sync succeeded — that is the CI canonical path."
+            exit 0
+          fi
           if gh repo view ethomasii/eltpulse-pipeline-components >/dev/null 2>&1; then
             node scripts/publish-pipeline-components.mjs
           else
-            echo "ethomasii/eltpulse-pipeline-components not created yet; catalog branch is canonical."
+            echo "ethomasii/eltpulse-pipeline-components not visible; catalog branch is canonical."
           fi
