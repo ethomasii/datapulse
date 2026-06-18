@@ -26,6 +26,8 @@ type Props = {
   dbtProjectId?: string | null;
   fieldClass?: string;
   compact?: boolean;
+  /** Hide package path field (Git configured elsewhere). */
+  gitOnly?: boolean;
 };
 
 const defaultFieldClass =
@@ -40,6 +42,7 @@ export function DbtConfigFields({
   dbtProjectId,
   fieldClass = defaultFieldClass,
   compact = false,
+  gitOnly = false,
 }: Props) {
   const [scaffolding, setScaffolding] = useState(false);
   const [scaffoldMsg, setScaffoldMsg] = useState<string | null>(null);
@@ -107,32 +110,36 @@ export function DbtConfigFields({
         </p>
       ) : null}
 
-      <DbtPackagePicker sourceSlug={sourceSlug} onSelect={applyHubPackage} />
+      {!gitOnly ? (
+        <>
+          <DbtPackagePicker sourceSlug={sourceSlug} onSelect={applyHubPackage} />
 
-      {pipelineId || dbtProjectId ? (
-        <button
-          type="button"
-          disabled={scaffolding || !sourceSlug}
-          onClick={() => void scaffoldToGit()}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
-        >
-          {scaffolding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-          Scaffold dbt project to Git
-        </button>
+          {pipelineId || dbtProjectId ? (
+            <button
+              type="button"
+              disabled={scaffolding || !sourceSlug}
+              onClick={() => void scaffoldToGit()}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+            >
+              {scaffolding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              Scaffold dbt project to Git
+            </button>
+          ) : null}
+          {scaffoldMsg ? <p className={`${intro} text-slate-600 dark:text-slate-400`}>{scaffoldMsg}</p> : null}
+
+          <label className={`block font-medium text-amber-900 dark:text-amber-100 ${compact ? "text-xs" : "text-sm"}`}>
+            GitHub repo folder path
+            <input
+              type="text"
+              className={`${fieldClass} ${compact ? "font-mono text-xs" : "font-mono text-sm"}`}
+              value={values.packagePath}
+              onChange={(e) => onChange({ packagePath: e.target.value })}
+              placeholder="e.g. eltpulse/dbt/my_project"
+              autoComplete="off"
+            />
+          </label>
+        </>
       ) : null}
-      {scaffoldMsg ? <p className={`${intro} text-slate-600 dark:text-slate-400`}>{scaffoldMsg}</p> : null}
-
-      <label className={`block font-medium text-amber-900 dark:text-amber-100 ${compact ? "text-xs" : "text-sm"}`}>
-        dbt project path or git URL
-        <input
-          type="text"
-          className={`${fieldClass} ${compact ? "font-mono text-xs" : "font-mono text-sm"}`}
-          value={values.packagePath}
-          onChange={(e) => onChange({ packagePath: e.target.value })}
-          placeholder="e.g. ./eltpulse/dbt/my_pipeline or https://github.com/org/dbt-analytics"
-          autoComplete="off"
-        />
-      </label>
       <label className={`block font-medium text-amber-900 dark:text-amber-100 ${compact ? "text-xs" : "text-sm"}`}>
         Output dataset / schema (optional)
         <input

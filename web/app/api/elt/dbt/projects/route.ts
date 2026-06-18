@@ -40,6 +40,10 @@ const createSchema = z.object({
   pipelineId: z.string().nullable().optional(),
   scaffoldFromHub: z.boolean().optional(),
   linkPipelineId: z.string().nullable().optional(),
+  draft: z.boolean().optional(),
+  scaffoldToDefaultRepo: z.boolean().optional(),
+  gitOwner: z.string().max(200).optional(),
+  gitRepo: z.string().max(200).optional(),
 });
 
 export async function GET(req: Request) {
@@ -95,6 +99,10 @@ export async function POST(req: Request) {
       destinationConnectionId: body.destinationConnectionId,
       pipelineId: body.pipelineId ?? body.linkPipelineId,
       scaffoldFromHub: body.scaffoldFromHub,
+      draft: body.draft,
+      scaffoldToDefaultRepo: body.scaffoldToDefaultRepo,
+      gitOwner: body.gitOwner,
+      gitRepo: body.gitRepo,
     });
 
     const linkId = body.linkPipelineId ?? body.pipelineId;

@@ -11,7 +11,14 @@ export const ELTPULSE_REPO = {
   pipelineConfigFile: "config.yaml",
   /** User-visible label for the primary sync runner file */
   syncRunnerFile: "sync.elp",
+  /** Default folder in a Git repo for dbt project files */
+  dbtDir: "eltpulse/dbt",
 } as const;
+
+/** Repo-relative path for a named dbt project (not a local filesystem path). */
+export function defaultDbtRepoSubpath(projectName: string): string {
+  return `${ELTPULSE_REPO.dbtDir}/${pipelineModuleSegment(projectName)}`;
+}
 
 /** Safe segment for Python import paths derived from pipeline name */
 export function pipelineModuleSegment(name: string): string {

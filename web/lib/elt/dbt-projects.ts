@@ -4,7 +4,7 @@ import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
 import { setDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
 import { resolveDbtHubPackage } from "@/lib/elt/dbt-hub-packages";
 import { generateDbtScaffoldFiles, scaffoldPackagePathForPipeline } from "@/lib/elt/dbt-scaffold";
-import { pipelineModuleSegment } from "@/lib/elt/eltpulse-repo-layout";
+import { defaultDbtRepoSubpath } from "@/lib/elt/eltpulse-repo-layout";
 
 export type DbtProjectRow = DbtProject & {
   pipelines?: Pick<EltPipeline, "id" | "name" | "enabled" | "sourceType" | "destinationType">[];
@@ -221,24 +221,51 @@ export type CreateDbtProjectInput = {
   destinationConnectionId?: string | null;
   pipelineId?: string | null;
   scaffoldFromHub?: boolean;
+  /** When true, allow creating without gitUrl (configure Git on detail page). */
+  draft?: boolean;
+  /** Push hub scaffold to connected default GitHub repo on create. */
+  scaffoldToDefaultRepo?: boolean;
+  gitOwner?: string | null;
+  gitRepo?: string | null;
 };
 
+/** @deprecated Use defaultDbtRepoSubpath — kept for callers expecting this name. */
 export function defaultPackagePathForProjectName(name: string): string {
-  return `./eltpulse/dbt/${pipelineModuleSegment(name)}`;
+  return defaultDbtRepoSubpath(name);
+}
+
+function gitUrlFromOwnerRepo(owner?: string | null, repo?: string | null): string | null {
+  const o = owner?.trim();
+  const r = repo?.trim();
+  if (!o || !r) return null;
+  return `https://github.com/${o}/${r}`;
 }
 
 export async function createDbtProject(userId: string, input: CreateDbtProjectInput): Promise<DbtProject> {
-  let packagePath = input.packagePath.trim() || defaultPackagePathForProjectName(input.name);
   const sourceSlug = input.sourceSlug?.trim() || null;
   let hubPackageKey = input.hubPackageKey?.trim() || null;
+  const gitUrl =
+    input.gitUrl?.trim() ||
+    gitUrlFromOwnerRepo(input.gitOwner, input.gitRepo) ||
+    null;
+  const gitBranch = input.gitBranch?.trim() || "main";
+  let gitSubpath = input.gitSubpath?.trim() || null;
+
+  let packagePath = input.packagePath.trim();
+  if (!packagePath && gitUrl) {
+    gitSubpath = gitSubpath || defaultDbtRepoSubpath(input.name);
+    packagePath = gitSubpath;
+  } else if (!packagePath && !gitUrl && input.draft) {
+    packagePath = "";
+  } else if (!packagePath) {
+    gitSubpath = gitSubpath || defaultDbtRepoSubpath(input.name);
+    packagePath = gitSubpath;
+  }
 
   if (input.scaffoldFromHub && sourceSlug) {
     const hub = resolveDbtHubPackage(sourceSlug);
     if (hub) {
       hubPackageKey = hub.package;
-      if (!input.packagePath.trim()) {
-        packagePath = defaultPackagePathForProjectName(input.name);
-      }
     }
   }
 
@@ -248,9 +275,9 @@ export async function createDbtProject(userId: string, input: CreateDbtProjectIn
       name: input.name.trim(),
       description: input.description?.trim() || null,
       packagePath,
-      gitUrl: input.gitUrl?.trim() || null,
-      gitBranch: input.gitBranch?.trim() || "main",
-      gitSubpath: input.gitSubpath?.trim() || null,
+      gitUrl,
+      gitBranch,
+      gitSubpath,
       targetSchema: input.targetSchema?.trim() || null,
       sourceSlug,
       hubPackageKey,
@@ -273,7 +300,7 @@ export function scaffoldFilesForDbtProject(name: string, sourceSlug: string) {
   return {
     hub,
     files: generateDbtScaffoldFiles(name, hub),
-    packagePath: defaultPackagePathForProjectName(name),
+    packagePath: defaultDbtRepoSubpath(name),
   };
 }
 

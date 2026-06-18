@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { getGithubAccessTokenForUser } from "@/lib/integrations/github-access-token";
 import { githubJson, type GithubRepoListItem } from "@/lib/integrations/github-rest";
@@ -45,4 +46,61 @@ export async function GET(req: Request) {
   }
 
   return NextResponse.json({ repos });
+}
+
+const createRepoSchema = z.object({
+  name: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[a-zA-Z0-9._-]+$/, "Invalid repository name"),
+  private: z.boolean().optional().default(true),
+  description: z.string().max(500).optional(),
+});
+
+/** Create a new repository under the connected GitHub user/org. */
+export async function POST(req: Request) {
+  const user = await getCurrentDbUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const token = await getGithubAccessTokenForUser(user.id);
+  if (!token) {
+    return NextResponse.json({ error: "GitHub is not connected. Use Integrations to connect." }, { status: 400 });
+  }
+
+  const parsed = createRepoSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
+  }
+
+  const { ok, status, json } = await githubJson<GithubRepoListItem>(token, "/user/repos", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: parsed.data.name,
+      private: parsed.data.private,
+      description: parsed.data.description,
+      auto_init: true,
+    }),
+  });
+
+  if (!ok || !json) {
+    return NextResponse.json(
+      { error: "Could not create GitHub repository." },
+      { status: status >= 400 && status < 600 ? status : 502 }
+    );
+  }
+
+  const repo = {
+    name: json.name,
+    fullName: json.full_name,
+    url: json.html_url ?? `https://github.com/${json.full_name}`,
+    description: json.description ?? null,
+    private: json.private,
+    defaultBranch: json.default_branch ?? "main",
+  };
+
+  return NextResponse.json({ repo }, { status: 201 });
 }
