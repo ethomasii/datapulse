@@ -162,8 +162,7 @@ export function CatalogProductsClient() {
           </div>
           <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Curated data products</h1>
           <p className="mt-3 max-w-3xl text-slate-600 dark:text-slate-300">
-            Data products are governed bundles of catalog assets — like DataHub data products. Each product can have an
-            owner, domain, intended consumers, and an optional{" "}
+            Data products are governed bundles of catalog assets with owners, domains, intended consumers, and an optional{" "}
             <Link href="/catalog/contracts" className="text-sky-600 hover:underline dark:text-sky-400">
               data contract
             </Link>{" "}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Search } from "lucide-react";
-import { ELTPULSE_COMPONENT_DRAG_MIME } from "@/lib/elt/canvas-drag";
+import { compileTargetLabel } from "@/lib/elt/compile-target-labels";
 import { ComponentIcon } from "@/components/elt/component-icon";
 
 export type ComponentListItem = {
@@ -11,6 +11,7 @@ export type ComponentListItem = {
   category: string;
   description: string;
   compileTarget: string;
+  compileTargetLabel?: string;
   compileBadge?: string;
   compileHint: string;
   canvasPorts: { left: boolean; right: boolean };
@@ -190,7 +191,7 @@ export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter
                     <span
                       className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${badgeColor[c.compileTarget] ?? "bg-slate-100 text-slate-600"}`}
                     >
-                      {c.compileTarget}
+                      {c.compileTargetLabel ?? compileTargetLabel(c.compileTarget)}
                     </span>
                   </div>
                 </div>

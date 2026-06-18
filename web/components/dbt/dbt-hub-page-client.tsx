@@ -143,7 +143,7 @@ export function DbtHubPageClient({ variant = "marketing" }: { variant?: "marketi
         <div className="rounded-2xl border border-violet-200 bg-violet-50/50 p-6 dark:border-violet-900 dark:bg-violet-950/30">
           <h2 className="text-lg font-bold text-slate-900 dark:text-white">dbt v2 roadmap</h2>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Building toward Fivetran+dbt-class handoffs without vendor lock-in.
+            Building toward managed handoffs between sync and transform without vendor lock-in.
           </p>
           <ul className="mt-4 space-y-2">
             {V2_ROADMAP.map((item) => (
@@ -165,7 +165,7 @@ export function DbtHubPageClient({ variant = "marketing" }: { variant?: "marketi
       <section className={variant === "marketing" ? "mt-16" : "mt-8"}>
         <h2 className="text-xl font-bold text-slate-900 dark:text-white">Staging packages by connector</h2>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-          Curated dbt Hub packages that match eltPulse connectors — pick one below, then enable dbt in the pipeline
+          Curated transform packages that match eltPulse connectors — pick one below, then enable SQL transforms in the pipeline
           builder&apos;s <strong>Post-load transform</strong> section.
         </p>
         <div className="relative mt-4 max-w-md">
@@ -208,7 +208,7 @@ export function DbtHubPageClient({ variant = "marketing" }: { variant?: "marketi
                     rel="noreferrer"
                     className="text-xs font-medium text-slate-600 hover:underline dark:text-slate-400"
                   >
-                    dbt Hub →
+                    Transform package →
                   </a>
                   <SignedIn>
                     <Link

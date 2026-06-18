@@ -39,8 +39,8 @@ const CARDS = [
   { href: "/catalog/contracts", label: "Data contracts", icon: Shield, desc: "Schema and freshness SLAs" },
   { href: "/catalog/connectors", label: "Connectors", icon: LayoutGrid, desc: "What your workspace uses + full registry" },
   { href: "/catalog/scenarios", label: "Scenarios", icon: Route, desc: "Starter recipes you can deploy" },
-  { href: "/catalog/dbt", label: "dbt projects", icon: GitBranch, desc: "Projects, models, runs — Snowflake-style hub" },
-  { href: "/catalog/transform-hub", label: "Transform hub", icon: Workflow, desc: "Browse dbt staging packages by connector" },
+  { href: "/catalog/dbt", label: "Transform projects", icon: GitBranch, desc: "SQL models, projects, and run history" },
+  { href: "/catalog/transform-hub", label: "Transform hub", icon: Workflow, desc: "Browse staging packages by connector" },
 ] as const;
 
 type SearchHit = {

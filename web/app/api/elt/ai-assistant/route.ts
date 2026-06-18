@@ -46,7 +46,7 @@ When a user describes a pipeline (e.g. "Load GitHub issues into Snowflake"), cal
 
 After generating, give ONE short sentence: "Pipeline ready — click Save, then edit the repo/credentials in the builder or canvas."
 
-## NL → canvas components (Lakeflow loop)
+## NL → canvas components
 When the user mentions monitors, sensors, quality checks, freshness, or data validation:
 1. Call **search_components** then **get_component_details** (include_schema=true when config fields matter).
 2. **New pipeline**: pass \`components\` on **generate_pipeline** — each item needs \`component_id\` and sensible \`config\` (e.g. dq_check: table + not_null columns; s3_monitor: prefix/bucket defaults).
@@ -79,12 +79,12 @@ Component config defaults:
 - Never ask about credentials, env vars, or optional config — use defaults.
 - If the user cannot write pipelines (see workspace permissions), explain their role and suggest asking an admin — do NOT call generate_pipeline.
 
-## Component catalog (dagster-component-templates)
-- 864+ reusable pipeline components compile to dlt/Sling/dbt/monitors/Python — use **search_components** when the user asks for checks, sensors, transforms, or ingestion patterns by name.
-- **get_component_details** returns compile target (dlt, quality, monitor, dbt, python, dagster) and monitor↔ingestion pairs.
+## Component catalog
+- 864+ reusable pipeline components compile to ingest, replicate, transform, monitors, and Python steps — use **search_components** when the user asks for checks, sensors, transforms, or ingestion patterns by name.
+- **get_component_details** returns compile target (ingest, quality, monitor, transform, python, platform) and monitor↔ingestion pairs.
 - **generate_pipeline** accepts \`components[]\` to place nodes on the canvas for new pipelines.
 - **add_pipeline_components** adds nodes to an open pipeline (canvas edit mode).
-- Prefer native compile targets (dlt, sling, quality, monitor, dbt) over dagster badge items unless user explicitly needs Dagster.
+- Prefer native executable components over platform-only schema templates.
 
 ## Format
 - Be extremely brief. 1-3 sentences max after a generation.
@@ -293,7 +293,7 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "search_components",
     description:
-      "Search the dagster-component-templates catalog (864+ components). Use for quality checks, sensors, ingestion templates, transforms. Returns compile target (dlt/sling/quality/monitor/dbt/python/dagster).",
+      "Search the pipeline component catalog (864+ components). Use for quality checks, sensors, ingestion templates, transforms. Returns compile target (ingest, replicate, quality, monitor, transform, python, platform).",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -304,7 +304,7 @@ const TOOLS: Anthropic.Tool[] = [
         },
         compile_target: {
           type: "string",
-          description: "Optional filter: dlt, sling, quality, monitor, dbt, python, dagster",
+          description: "Optional filter: ingest, replicate, quality, monitor, transform, python, platform (internal ids: dlt, sling, dbt, dagster)",
         },
       },
       required: ["query"],
@@ -692,7 +692,7 @@ async function toolGetComponentDetails(componentId: string, includeSchema?: bool
           ? "Call generate_pipeline with matching source_type/destination_type — or add as components[] for canvas placement."
           : route.target === "dbt"
             ? "Use list_dbt_projects + post_transform_type=dbt on generate_pipeline."
-            : "May need Python post-transform or Dagster — explain compile_badge to user.",
+            : "May need Python post-transform or a platform-only template — explain compile badge to user.",
   };
 }
 

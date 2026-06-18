@@ -290,7 +290,7 @@ export default function HomePage() {
               </h2>
               <p className="mt-2 text-slate-600 dark:text-slate-300">
                 Every pipeline ships with workspace YAML — schedules, owners, tags, and monitor hooks. Connect a
-                customer gateway in your VPC, use eltPulse-managed workers, or export to Dagster and dbt when you&apos;re
+                customer gateway in your VPC, use eltPulse-managed workers, or export pipeline artifacts when you&apos;re
                 ready.
               </p>
               <ul className="mt-4 grid gap-2 sm:grid-cols-2">

@@ -4,9 +4,9 @@ import type { AssetColumnDef } from "@/lib/elt/catalog-metadata";
 
 const SOURCE_LABELS: Record<string, string> = {
   warehouse: "Warehouse",
-  dbt: "dbt",
-  dlt: "dlt",
-  sling: "Sling",
+  dbt: "Transform",
+  dlt: "Ingest",
+  sling: "Replicate",
   inferred: "Inferred",
   manual: "Manual",
 };

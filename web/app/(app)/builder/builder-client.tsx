@@ -1337,7 +1337,7 @@ export function BuilderClient({
                   Declarative pipeline spec (YAML v2)
                 </span>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Lakeflow-style spec — <code className="font-mono">destination: &quot;@workspace&quot;</code>, tables,
+                  Declarative pipeline spec — <code className="font-mono">destination: &quot;@workspace&quot;</code>, tables,
                   sync, slices, transform, quality, components. Applied via{" "}
                   <code className="font-mono">POST /api/elt/pipelines/declaration</code>.
                 </p>

@@ -91,7 +91,7 @@ export function ComponentCatalogSettings({ className }: { className?: string }) 
       <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
         Add GitHub repos with <code className="text-[11px]">component.json</code> +{" "}
         <code className="text-[11px]">compile.mjs</code> — merged into the builder palette and pipeline compile
-        (Lakeflow-style BYO packages). Use <code className="text-[11px]">owner/repo</code> or a raw GitHub URL.
+        (bring-your-own packages). Use <code className="text-[11px]">owner/repo</code> or a raw GitHub URL.
       </p>
 
       <div className="mt-3 flex flex-wrap gap-2">

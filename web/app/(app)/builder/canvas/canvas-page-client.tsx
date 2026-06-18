@@ -694,7 +694,7 @@ export function CanvasPageClient() {
           <div className={stickyHeaderClass}>
             <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Component template</h2>
             <p className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-400">
-              Lakeflow-style step — compiles to dlt/Sling/dbt/monitor/quality on save.
+              Visual pipeline step — compiles to ingest, replicate, transform, monitor, or quality on save.
             </p>
           </div>
           <CanvasComponentInspector
@@ -1077,7 +1077,7 @@ export function CanvasPageClient() {
                   {canvasView === "ingest"
                     ? "Source → landing tables · configure extract in the sidebar"
                     : canvasView === "dag"
-                      ? "Lakeflow-style DT graph from component edges → after[]"
+                      ? "Transform dependency graph from component edges → after[]"
                       : "Drag components onto the canvas · drop on a wire to insert"}
                 </span>
               </div>

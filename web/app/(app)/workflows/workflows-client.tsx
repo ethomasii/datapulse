@@ -120,7 +120,7 @@ export function WorkflowsClient() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Workflows</h1>
         <p className="mt-2 text-slate-600 dark:text-slate-300">
-          Lakeflow Jobs lite — chain pipelines after success. Monitor triggers fan out via workflow runner.
+          Chain pipelines after success. Monitor triggers fan out via workflow runner.
         </p>
         <p className="mt-1 text-sm text-slate-500">
           See{" "}

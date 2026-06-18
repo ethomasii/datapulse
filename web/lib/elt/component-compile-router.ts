@@ -1,6 +1,6 @@
 /**
- * Routes dagster-component-templates categories to eltPulse compile targets.
- * Templates are discovery + config UX — execution stays dlt/sling/dbt/monitors/Python.
+ * Routes pipeline component catalog categories to eltPulse compile targets.
+ * Templates are discovery + config UX — execution stays ingest/replicate/transform/monitors/Python.
  */
 
 import { companionIngestionForSensor, companionSensorForIngestion } from "@/lib/elt/component-sensor-pairs";
@@ -27,29 +27,29 @@ export const TOP_COMPONENT_ROUTES: Record<string, ComponentRoute> = {
   s3_to_database_asset: {
     target: "dlt",
     badge: "native",
-    hint: "Compile to dlt filesystem/S3 source → workspace destination",
+    hint: "Filesystem or object storage ingest → workspace destination",
   },
-  sqs_to_database_asset: { target: "dlt", badge: "native", hint: "dlt REST/queue ingest pattern" },
-  kafka_to_database_asset: { target: "dlt", badge: "native", hint: "dlt or custom Python queue consumer" },
-  sql_to_database_asset: { target: "sling", badge: "native", hint: "Sling database replication" },
-  rest_api_fetcher: { target: "dlt", badge: "native", hint: "dlt rest_api source" },
-  csv_file_ingestion: { target: "dlt", badge: "native", hint: "dlt filesystem source" },
+  sqs_to_database_asset: { target: "dlt", badge: "native", hint: "Queue ingest pattern" },
+  kafka_to_database_asset: { target: "dlt", badge: "native", hint: "Streaming queue consumer ingest" },
+  sql_to_database_asset: { target: "sling", badge: "native", hint: "Database replication between systems" },
+  rest_api_fetcher: { target: "dlt", badge: "native", hint: "REST API source ingest" },
+  csv_file_ingestion: { target: "dlt", badge: "native", hint: "File-based ingest from storage" },
   s3_monitor: {
     target: "monitor",
     badge: "native",
-    hint: "EltMonitor S3 prefix — triggers paired ingestion pipeline on new objects",
+    hint: "Object storage prefix monitor — triggers paired ingestion pipeline on new objects",
   },
-  sqs_monitor: { target: "monitor", badge: "native", hint: "EltMonitor SQS depth / message age" },
-  kafka_monitor: { target: "monitor", badge: "native", hint: "EltMonitor Kafka lag" },
+  sqs_monitor: { target: "monitor", badge: "native", hint: "Queue depth / message age monitor" },
+  kafka_monitor: { target: "monitor", badge: "native", hint: "Streaming lag monitor" },
   great_expectations_check: {
     target: "quality",
     badge: "native",
-    hint: "Maps to declarative quality block + data contracts",
+    hint: "Declarative quality block + data contracts",
   },
   soda_check: { target: "quality", badge: "native", hint: "Quality step in pipeline spec" },
   dq_check: { target: "quality", badge: "native", hint: "Simple SQL/not_null checks" },
   freshness_check: { target: "quality", badge: "native", hint: "Asset freshness SLA + observability alert" },
-  dbt_docs_enriched_project: { target: "dbt", badge: "native", hint: "Link DbtProject + catalog enrichment" },
+  dbt_docs_enriched_project: { target: "dbt", badge: "native", hint: "Linked transform project + catalog enrichment" },
   filter_rows: { target: "python", badge: "python", hint: "Post-load Python transform step on worker" },
   join_tables: { target: "python", badge: "python", hint: "Pandas transform — Python component step" },
   lookup: { target: "python", badge: "native", hint: "Left join lookup against reference table" },
@@ -62,7 +62,7 @@ export const TOP_COMPONENT_ROUTES: Record<string, ComponentRoute> = {
   rank: { target: "python", badge: "native", hint: "Rank rows by column" },
   running_total: { target: "python", badge: "native", hint: "Cumulative sum per group" },
   semi_join: { target: "python", badge: "native", hint: "Rows in left with match in right" },
-  gcs_to_database_asset: { target: "dlt", badge: "native", hint: "GCS filesystem → warehouse" },
+  gcs_to_database_asset: { target: "dlt", badge: "native", hint: "Cloud storage → warehouse ingest" },
   summarize: { target: "python", badge: "native", hint: "Group by + aggregations" },
   melt: { target: "python", badge: "native", hint: "Alias for unpivot" },
   hl7_v2_parser: { target: "python", badge: "native", hint: "HL7 v2 segment parser (healthcare)" },
@@ -71,8 +71,8 @@ export const TOP_COMPONENT_ROUTES: Record<string, ComponentRoute> = {
   regex_parser: { target: "python", badge: "native", hint: "Regex extract/match/replace/split" },
   html_parser: { target: "python", badge: "native", hint: "HTML strip/extract (beautifulsoup4)" },
   group_aggregate: { target: "python", badge: "native", hint: "Group by + aggregations" },
-  litellm_inference_asset: { target: "dagster", badge: "dagster", hint: "Requires Dagster runtime or custom Python" },
-  terraform_asset: { target: "dagster", badge: "dagster", hint: "Infrastructure — optional Dagster executor" },
+  litellm_inference_asset: { target: "dagster", badge: "dagster", hint: "Requires custom Python or external orchestration" },
+  terraform_asset: { target: "dagster", badge: "dagster", hint: "Infrastructure — manual ops or custom step" },
   external_snowflake_table: {
     target: "catalog_external",
     badge: "native",
@@ -86,19 +86,19 @@ export const TOP_COMPONENT_ROUTES: Record<string, ComponentRoute> = {
 };
 
 const CATEGORY_DEFAULTS: Record<string, ComponentRoute> = {
-  ingestion: { target: "dlt", badge: "native", hint: "Prefer dlt/Sling codegen over reimplementing ingest" },
-  source: { target: "dlt", badge: "native", hint: "dlt source connector" },
-  sink: { target: "dlt", badge: "native", hint: "dlt destination write" },
+  ingestion: { target: "dlt", badge: "native", hint: "Prefer built-in ingest codegen over custom reimplementation" },
+  source: { target: "dlt", badge: "native", hint: "Source connector ingest" },
+  sink: { target: "dlt", badge: "native", hint: "Destination write step" },
   check: { target: "quality", badge: "native", hint: "Declarative quality + contracts" },
-  sensor: { target: "monitor", badge: "native", hint: "EltMonitor YAML" },
+  sensor: { target: "monitor", badge: "native", hint: "EltMonitor trigger" },
   observation: { target: "monitor", badge: "native", hint: "Freshness / health monitor" },
-  dbt: { target: "dbt", badge: "native", hint: "DbtProject or in-pipeline dlt_dbt" },
+  dbt: { target: "dbt", badge: "native", hint: "Linked transform project or in-pipeline SQL models" },
   external: { target: "catalog_external", badge: "native", hint: "Catalog external asset" },
   transformation: { target: "python", badge: "python", hint: "Python post-transform on managed worker" },
   analytics: { target: "python", badge: "python", hint: "Python analytics step (pandas/sklearn)" },
   ai: { target: "python", badge: "python", hint: "Python LLM enrichment step" },
-  infrastructure: { target: "dagster", badge: "dagster", hint: "Dagster or manual ops" },
-  integration: { target: "dagster", badge: "dagster", hint: "Platform integration — Dagster optional" },
+  infrastructure: { target: "dagster", badge: "dagster", hint: "Platform ops — not runnable as a pipeline step" },
+  integration: { target: "dagster", badge: "dagster", hint: "Platform integration — custom step or manual setup" },
   resource: { target: "skip", hint: "Connection profile — use eltPulse Connections" },
 };
 
@@ -109,7 +109,7 @@ export function routeComponent(componentId: string, category: string): Component
   const cat = category.trim().toLowerCase();
   if (CATEGORY_DEFAULTS[cat]) return CATEGORY_DEFAULTS[cat];
 
-  return { target: "dagster", badge: "dagster", hint: "No native compiler — use Dagster or Python step" };
+  return { target: "dagster", badge: "dagster", hint: "No native compiler — add a Python step or pick a native component" };
 }
 
 export function suggestMonitorPipelinePair(componentId: string): {

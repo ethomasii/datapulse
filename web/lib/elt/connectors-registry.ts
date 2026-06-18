@@ -410,7 +410,7 @@ const STORAGE_CONNECTORS: ConnectorDef[] = [
         { value: "nessie", label: "Project Nessie" },
       ]},
       { key: "namespace", label: "Default namespace / schema", type: "text", placeholder: "analytics" },
-      { key: "table_format", label: "Table format", type: "text", default: "iceberg", help: "Always iceberg — stored for dlt/Sling destination hints" },
+      { key: "table_format", label: "Table format", type: "text", default: "iceberg", help: "Always iceberg — stored for destination codegen hints" },
     ],
     credentialFields: [
       { key: "AWS_ACCESS_KEY_ID", label: "AWS Access Key ID", type: "text", required: false, help: "For S3-backed warehouses" },

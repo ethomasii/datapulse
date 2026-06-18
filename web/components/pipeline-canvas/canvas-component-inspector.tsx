@@ -8,6 +8,7 @@ import { ComponentSchemaForm } from "@/components/elt/component-schema-form";
 import { ComponentDataPreview } from "@/components/elt/component-data-preview";
 import { RunStepPanel } from "@/components/elt/run-step-panel";
 import type { NativeComponentField } from "@/lib/elt/native-components";
+import { compileTargetLabel } from "@/lib/elt/compile-target-labels";
 
 type ComponentDetail = {
   id: string;
@@ -15,6 +16,7 @@ type ComponentDetail = {
   category: string;
   description: string;
   compileTarget: string;
+  compileTargetLabel?: string;
   compileHint: string;
   isNative?: boolean;
   isPackage?: boolean;
@@ -102,7 +104,7 @@ export function CanvasComponentInspector({
     <div className="space-y-4">
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-600">
-          {detail?.compileTarget ?? "component"}
+          {compileTargetLabel(detail?.compileTarget ?? "component")}
           {detail?.isExecutable ? (
             <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
               {detail?.isPackage ? "PACKAGE" : detail?.isNative ? "NATIVE" : "EXECUTABLE"}
@@ -138,12 +140,12 @@ export function CanvasComponentInspector({
       ) : detail?.compilerTier === "category" ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
           Category fallback only — emits ingest hints, basic checks, or a table copy. This is not the
-          Dagster template&apos;s real logic. Prefer a native component with the same shape, or add
+          template&apos;s full logic. Prefer a native component with the same shape, or add
           one to eltpulse-pipeline-components.
         </p>
       ) : detail?.compilerTier === "schema" ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-          Schema template — form fields come from the Dagster catalog. Pipeline save will not run this
+          Schema template — form fields come from the component catalog. Pipeline save will not run this
           component&apos;s Python unless you add a native compiler or a custom Python step.
         </p>
       ) : null}

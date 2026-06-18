@@ -46,7 +46,7 @@ export function compilerTierHint(tier: ComponentCompilerTier): string {
     case "native":
       return "Executable compiler — runs the real transform/ingest/check logic.";
     case "category":
-      return "Category fallback only — wires ingest/quality/monitor or copies a table; not this template's Dagster logic.";
+      return "Category fallback only — wires ingest/quality/monitor or copies a table; not this template's full logic.";
     case "schema":
       return "Schema template — use for discovery and forms; needs a native compiler or custom Python for real behavior.";
     default:

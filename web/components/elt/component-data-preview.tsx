@@ -74,7 +74,7 @@ export function ComponentDataPreview({
   if (!table && !readOnly) {
     return (
       <p className="text-xs text-slate-500">
-        Wire an upstream step or set a table to enable auto-preview (Alteryx-style).
+        Wire an upstream step or set a table to enable auto-preview for this step.
       </p>
     );
   }

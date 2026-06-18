@@ -26,7 +26,7 @@ export function TransformDagPanel({ nodes, edges, specComponents, pipelineName }
         <p className="text-sm font-medium text-slate-700 dark:text-slate-300">No transform DAG yet</p>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           Add component nodes on the designer canvas (join, filter, aggregate, checks) — edges define execution order
-          like Lakeflow DT dependencies.
+          for downstream transform steps.
         </p>
       </div>
     );
@@ -43,7 +43,7 @@ export function TransformDagPanel({ nodes, edges, specComponents, pipelineName }
       </div>
       <p className="text-xs text-slate-600 dark:text-slate-400">
         Topological execution order from canvas edges → declarative <code className="text-[11px]">components[].after</code>.
-        Output assets chain downstream inputs (Lakeflow-style DT lineage).
+        Output assets chain downstream inputs in transform lineage order.
       </p>
 
       <div className="space-y-3">

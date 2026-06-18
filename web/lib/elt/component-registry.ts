@@ -13,6 +13,7 @@ import {
   resolveCompilerTier,
   type ComponentCompilerTier,
 } from "@/lib/elt/component-compiler-tier";
+import { compileTargetLabel } from "@/lib/elt/compile-target-labels";
 import { isNativeComponent } from "@/lib/elt/native-components";
 
 export type ComponentManifestEntry = {
@@ -42,6 +43,8 @@ export type ComponentListItem = ComponentManifestEntry & {
   /** Native or published package — faithful template behavior. */
   isExecutable?: boolean;
   compilerTierHint?: string;
+  /** User-facing compile target label (no vendor names). */
+  compileTargetLabel?: string;
 };
 
 type ManifestIndex = {
@@ -136,6 +139,7 @@ export function getComponentById(id: string): ComponentListItem | null {
     category,
     description: curated.hint,
     compileTarget: curated.target,
+    compileTargetLabel: compileTargetLabel(curated.target),
     compileBadge: curated.badge,
     compileHint: curated.hint,
     canvasPorts: { left: ports.left, right: ports.right },
@@ -170,6 +174,7 @@ function enrichComponent(row: ComponentManifestEntry): ComponentListItem {
   return {
     ...row,
     compileTarget: route.target,
+    compileTargetLabel: compileTargetLabel(route.target),
     compileBadge: route.badge,
     compileHint: route.hint,
     canvasPorts: { left: ports.left, right: ports.right },

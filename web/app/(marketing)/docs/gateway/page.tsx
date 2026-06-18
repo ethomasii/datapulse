@@ -118,7 +118,7 @@ export default function GatewayDocsPage() {
           eltpulsehq/integrations
         </a>
         : a lightweight <strong>gateway</strong> (poll + claim + launch) and a <strong>worker</strong> image per run (
-        <code>ghcr.io/eltpulsehq/gateway-worker</code>) that executes dlt/Sling and PATCHes logs/telemetry directly to the
+        <code>ghcr.io/eltpulsehq/gateway-worker</code>) that executes pipeline workloads and PATCHes logs/telemetry directly to the
         control plane. The monorepo mirrors the same layout under <code>integrations/</code>.
       </p>
       <p>
