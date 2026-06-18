@@ -43,6 +43,10 @@ const qualityCheckSpecSchema = z.object({
 export const pipelineComponentSpecSchema = z.object({
   id: z.string().min(1).max(128),
   type: z.enum(["quality", "dbt", "sql", "python", "custom"]),
+  /** Canonical materialized output key (Lakeflow-style asset key). */
+  assetKey: z.string().min(1).max(256).optional(),
+  /** Upstream asset keys this step reads. */
+  inputs: z.array(z.string().min(1)).optional(),
   config: z.record(z.string(), z.unknown()).default({}),
   after: z.array(z.string().min(1)).optional(),
 });

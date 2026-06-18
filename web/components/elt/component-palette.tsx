@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Search } from "lucide-react";
+import { ELTPULSE_COMPONENT_DRAG_MIME } from "@/lib/elt/canvas-drag";
 
 export type ComponentListItem = {
   id: string;
@@ -79,7 +80,7 @@ export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter
     <div className={className ?? "flex h-full flex-col rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"}>
       <div className="border-b border-slate-200 p-3 dark:border-slate-700">
         <p className="text-sm font-semibold text-slate-900 dark:text-white">Component catalog</p>
-        <p className="mt-0.5 text-xs text-slate-500">{total} templates — compiles to dlt/Sling/dbt/monitors</p>
+        <p className="mt-0.5 text-xs text-slate-500">{total} templates — drag onto canvas or click to add</p>
         <div className="relative mt-2">
           <Search className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-slate-400" aria-hidden />
           <input
@@ -115,8 +116,13 @@ export function ComponentPalette({ onSelect, categoryFilter, compileTargetFilter
             <li key={c.id}>
               <button
                 type="button"
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(ELTPULSE_COMPONENT_DRAG_MIME, JSON.stringify(c));
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
                 onClick={() => onSelect(c)}
-                className="mb-1 w-full rounded-md px-2 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                className="mb-1 w-full cursor-grab rounded-md px-2 py-2 text-left hover:bg-slate-50 active:cursor-grabbing dark:hover:bg-slate-800"
               >
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-sm font-medium text-slate-900 dark:text-white">{c.name}</span>

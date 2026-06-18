@@ -10,12 +10,13 @@ type TransformDagPanelProps = {
   nodes: Node[];
   edges: Edge[];
   specComponents?: PipelineComponentSpec[] | null;
+  pipelineName?: string;
 };
 
-export function TransformDagPanel({ nodes, edges, specComponents }: TransformDagPanelProps) {
+export function TransformDagPanel({ nodes, edges, specComponents, pipelineName }: TransformDagPanelProps) {
   const dag = useMemo(
-    () => deriveTransformDag(nodes, edges, specComponents),
-    [nodes, edges, specComponents]
+    () => deriveTransformDag(nodes, edges, specComponents, { pipelineName }),
+    [nodes, edges, specComponents, pipelineName]
   );
 
   if (!dag.nodes.length) {
@@ -69,7 +70,10 @@ export function TransformDagPanel({ nodes, edges, specComponents }: TransformDag
                       </span>
                     </div>
                     <p className="mt-0.5 font-mono text-[10px] text-violet-600 dark:text-violet-400">{n.componentId}</p>
-                    {n.outputAsset ? (
+                    {n.assetKey ? (
+                      <p className="mt-1 font-mono text-[10px] text-emerald-700 dark:text-emerald-400">{n.assetKey}</p>
+                    ) : null}
+                    {n.outputAsset && n.outputAsset !== n.assetKey ? (
                       <p className="mt-2 text-[11px] text-slate-600 dark:text-slate-400">
                         → <span className="font-mono text-emerald-700 dark:text-emerald-400">{n.outputAsset}</span>
                       </p>

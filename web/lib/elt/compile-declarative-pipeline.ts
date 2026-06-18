@@ -6,6 +6,8 @@ import type {
 } from "@/lib/elt/declarative-pipeline-spec";
 import { defaultSyncModeForSource } from "@/lib/elt/sync-mode-defaults";
 import { minimalSourceConfigurationForNewPipeline } from "@/lib/elt/minimal-source-configuration";
+import { buildCanvasFromDeclarativeSpec } from "@/lib/elt/spec-components-to-canvas";
+import { enrichComponentListAssets } from "@/lib/elt/pipeline-asset-keys";
 import {
   loadWorkspaceDefaults,
   resolveSpecDestination,
@@ -126,9 +128,10 @@ function applyTransformToSourceConfig(
 
 function applyComponentsToSourceConfig(
   components: PipelineComponentSpec[],
-  config: Record<string, unknown>
+  config: Record<string, unknown>,
+  pipelineName: string
 ): void {
-  config.elt_components = components;
+  config.elt_components = enrichComponentListAssets(pipelineName, components);
 
   const qualityComponents = components.filter((c) => c.type === "quality");
   if (qualityComponents.length) {
@@ -214,11 +217,19 @@ export async function compileDeclarativePipelineSpec(
   }
 
   if (spec.components?.length) {
-    applyComponentsToSourceConfig(spec.components, sourceConfiguration);
+    applyComponentsToSourceConfig(spec.components, sourceConfiguration, spec.name);
   }
 
   if (spec.medallion) {
     applyMedallionToSourceConfig(spec.medallion, sourceConfiguration);
+  }
+
+  if (!sourceConfiguration.canvas) {
+    sourceConfiguration.canvas = buildCanvasFromDeclarativeSpec(
+      spec,
+      sourceRes.sourceType,
+      destRes.destinationType
+    );
   }
 
   const body: CreatePipelineBody = {

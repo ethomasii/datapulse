@@ -484,7 +484,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
       const extracted = extractComponentsFromCanvas(
         p.canvas.nodes as Node[],
-        p.canvas.edges as Edge[]
+        p.canvas.edges as Edge[],
+        { pipelineName: existing.name }
       );
       if (extracted.sensorMonitors.length) {
         monitorApply = await applyCanvasSensorMonitors(

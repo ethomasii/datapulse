@@ -13,6 +13,7 @@ import {
 import { routeComponent, type ComponentCompileTarget } from "@/lib/elt/component-compile-router";
 import { isValidComponentEdge } from "@/lib/elt/component-canvas-io";
 import { getComponentById } from "@/lib/elt/component-registry";
+import { enrichComponentListAssets } from "@/lib/elt/pipeline-asset-keys";
 import { eltPipelineToDeclarativeSpec } from "@/lib/elt/pipeline-spec-export";
 import { isPipelineCanvasGraph, type PipelineCanvasGraph } from "@/lib/elt/canvas-source-config";
 
@@ -92,7 +93,8 @@ function topoComponentOrder(nodes: Node[], edges: Edge[]): Node[] {
 /** Extract component templates from React Flow canvas nodes (Lakeflow Designer model). */
 export function extractComponentsFromCanvas(
   nodes: Node[],
-  edges: Edge[]
+  edges: Edge[],
+  opts?: { pipelineName?: string }
 ): ExtractedCanvasComponents {
   const ordered = topoComponentOrder(nodes, edges);
   const components: PipelineComponentSpec[] = [];
@@ -157,7 +159,10 @@ export function extractComponentsFromCanvas(
     }
   }
 
-  return { components, quality, sensorMonitors };
+  const pipelineName = String(opts?.pipelineName ?? "pipeline").trim() || "pipeline";
+  const enriched = enrichComponentListAssets(pipelineName, components);
+
+  return { components: enriched, quality, sensorMonitors };
 }
 
 /** Merge canvas component extraction into sourceConfiguration + rebuild v2 YAML. */
@@ -181,7 +186,7 @@ export async function syncCanvasToPipelineSpec(
   const canvas = canvasRaw as PipelineCanvasGraph;
   const nodes = canvas.nodes as Node[];
   const edges = canvas.edges as Edge[];
-  const extracted = extractComponentsFromCanvas(nodes, edges);
+  const extracted = extractComponentsFromCanvas(nodes, edges, { pipelineName: pipeline.name });
 
   if (extracted.components.length) {
     next.elt_components = extracted.components;

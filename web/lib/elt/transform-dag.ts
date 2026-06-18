@@ -1,19 +1,29 @@
 /**
- * Lakeflow-style transform DAG — component steps as asset-centric dependency graph.
+ * Lakeflow-style unified transform DAG — components + dbt/python/sql transform nodes.
  */
 import type { Edge, Node } from "@xyflow/react";
 import type { PipelineComponentSpec } from "@/lib/elt/declarative-pipeline-spec";
 import { routeComponent } from "@/lib/elt/component-compile-router";
 import { getComponentById } from "@/lib/elt/component-registry";
 import type { CanvasComponentNodeData } from "@/lib/elt/canvas-component-sync";
+import {
+  deriveStepAssetKey,
+  enrichComponentListAssets,
+  normalizeAssetKey,
+  resolveStepInputAssetKeys,
+} from "@/lib/elt/pipeline-asset-keys";
+
+export type TransformDagNodeKind = "extract" | "load" | "transform" | "component";
 
 export type TransformDagNode = {
   id: string;
   specId: string;
+  kind: TransformDagNodeKind;
   componentId: string;
   label: string;
   category: string;
   compileTarget: string;
+  assetKey: string | null;
   outputAsset: string | null;
   inputAssets: string[];
   order: number;
@@ -31,21 +41,6 @@ export type TransformDagGraph = {
   layers: string[][];
   mermaid: string;
 };
-
-function resolveOutputAsset(config: Record<string, unknown>): string | null {
-  const out = String(
-    config.output_table ?? config.asset_name ?? config.table_name ?? config.table ?? ""
-  ).trim();
-  return out || null;
-}
-
-function resolveInputAsset(config: Record<string, unknown>): string | null {
-  const left = String(config.left_table ?? config.left_asset_key ?? "").trim();
-  const right = String(config.right_table ?? config.right_asset_key ?? "").trim();
-  const table = String(config.table ?? config.input_table ?? "").trim();
-  if (left && right) return `${left} + ${right}`;
-  return table || null;
-}
 
 function topoFromSpecs(components: PipelineComponentSpec[]): PipelineComponentSpec[] {
   const byId = new Map(components.map((c) => [c.id, c]));
@@ -80,7 +75,7 @@ function topoFromSpecs(components: PipelineComponentSpec[]): PipelineComponentSp
   return out;
 }
 
-function specsFromCanvas(nodes: Node[], edges: Edge[]): PipelineComponentSpec[] {
+function specsFromCanvas(nodes: Node[], edges: Edge[], pipelineName: string): PipelineComponentSpec[] {
   const componentNodes = nodes.filter((n) => n.type === "componentNode");
   const specs: PipelineComponentSpec[] = [];
   const nodeToSpec = new Map<string, string>();
@@ -115,77 +110,168 @@ function specsFromCanvas(nodes: Node[], edges: Edge[]): PipelineComponentSpec[] 
     if (after.length) spec.after = after;
   }
 
-  return specs;
+  return enrichComponentListAssets(pipelineName, specs);
+}
+
+function transformStepsFromCanvas(
+  nodes: Node[],
+  edges: Edge[],
+  pipelineName: string,
+  lastComponentId: string | null
+): PipelineComponentSpec[] {
+  const transforms = nodes.filter((n) => n.type === "transformNode");
+  const out: PipelineComponentSpec[] = [];
+  let prevId = lastComponentId;
+
+  transforms.forEach((node, i) => {
+    const d = node.data as Record<string, unknown>;
+    const tool = String(d.transformTool ?? "other");
+    const specId = `transform_${tool}_${i + 1}`;
+    const type = tool === "dbt" ? "dbt" : tool === "sql" ? "sql" : "python";
+    const config: Record<string, unknown> = {
+      transform_tool: tool,
+      ...(tool === "dbt"
+        ? {
+            package_path: d.dbtPackagePath,
+            selector: d.dbtSelector,
+            dataset_name: d.dbtTargetSchema,
+          }
+        : {}),
+      ...(tool === "python" || tool === "sql" ? { code: d.postTransformCode } : {}),
+    };
+    out.push({
+      id: specId,
+      type,
+      config,
+      ...(prevId ? { after: [prevId] } : {}),
+      assetKey: deriveStepAssetKey(pipelineName, specId, {
+        asset_name: `${pipelineName}.${specId}`,
+      }),
+    });
+    prevId = specId;
+  });
+
+  return out;
+}
+
+function backboneNodes(pipelineName: string): TransformDagNode[] {
+  return [
+    {
+      id: "__source",
+      specId: "__source",
+      kind: "extract",
+      componentId: "source",
+      label: "Extract",
+      category: "source",
+      compileTarget: "dlt",
+      assetKey: null,
+      outputAsset: `${pipelineName}.raw`,
+      inputAssets: [],
+      order: 0,
+    },
+    {
+      id: "__dest",
+      specId: "__dest",
+      kind: "load",
+      componentId: "destination",
+      label: "Load",
+      category: "sink",
+      compileTarget: "dlt",
+      assetKey: `${pipelineName}.staging`,
+      outputAsset: `${pipelineName}.staging`,
+      inputAssets: [`${pipelineName}.raw`],
+      order: 0,
+    },
+  ];
 }
 
 export function deriveTransformDag(
   nodes: Node[],
   edges: Edge[],
-  specComponents?: PipelineComponentSpec[] | null
+  specComponents?: PipelineComponentSpec[] | null,
+  opts?: { pipelineName?: string }
 ): TransformDagGraph {
-  const components =
-    specComponents?.length ? specComponents : specsFromCanvas(nodes, edges);
-  const ordered = topoFromSpecs(components);
-  const assetBySpec = new Map<string, string | null>();
+  const pipelineName = String(opts?.pipelineName ?? "pipeline").trim() || "pipeline";
+  const componentSpecs =
+    specComponents?.length
+      ? enrichComponentListAssets(pipelineName, specComponents)
+      : specsFromCanvas(nodes, edges, pipelineName);
 
-  const dagNodes: TransformDagNode[] = ordered.map((spec, idx) => {
+  const lastCompId = componentSpecs.length ? componentSpecs[componentSpecs.length - 1]!.id : null;
+  const transformSpecs = transformStepsFromCanvas(nodes, edges, pipelineName, lastCompId);
+  const allSpecs = [...componentSpecs, ...transformSpecs];
+  const ordered = topoFromSpecs(allSpecs);
+  const assetBySpec = new Map<string, string>();
+
+  const dagNodes: TransformDagNode[] = [];
+  let order = 0;
+
+  for (const b of backboneNodes(pipelineName)) {
+    dagNodes.push({ ...b, order: order++ });
+  }
+
+  for (const spec of ordered) {
     const cfg = (spec.config ?? {}) as Record<string, unknown>;
     const componentId = String(cfg.template_id ?? cfg.component_id ?? spec.id).trim();
-    const catalog = getComponentById(componentId);
-    const category = catalog?.category ?? "transformation";
-    const route = routeComponent(componentId, category);
-    const outputAsset = resolveOutputAsset(cfg);
-    if (outputAsset) assetBySpec.set(spec.id, outputAsset);
-    const inputFromCfg = resolveInputAsset(cfg);
-    const inputAssets: string[] = [];
-    if (inputFromCfg) inputAssets.push(inputFromCfg);
-    for (const dep of spec.after ?? []) {
-      const upstream = assetBySpec.get(dep);
-      if (upstream && !inputAssets.includes(upstream)) inputAssets.push(upstream);
-    }
-    return {
+    const isTransform = spec.id.startsWith("transform_");
+    const catalog = isTransform ? null : getComponentById(componentId);
+    const category = isTransform ? "transform" : (catalog?.category ?? "transformation");
+    const route = isTransform
+      ? { target: spec.type, hint: spec.type }
+      : routeComponent(componentId, category);
+    const assetKey = spec.assetKey ?? deriveStepAssetKey(pipelineName, spec.id, cfg);
+    assetBySpec.set(spec.id, assetKey);
+    const inputAssets = spec.inputs ?? resolveStepInputAssetKeys(cfg, assetBySpec);
+
+    dagNodes.push({
       id: spec.id,
       specId: spec.id,
-      componentId,
-      label: String(cfg.label ?? catalog?.name ?? componentId),
+      kind: isTransform ? "transform" : "component",
+      componentId: isTransform ? String(cfg.transform_tool ?? spec.type) : componentId,
+      label: String(cfg.label ?? catalog?.name ?? spec.id),
       category,
       compileTarget: route.target,
-      outputAsset,
+      assetKey,
+      outputAsset: assetKey,
       inputAssets,
-      order: idx + 1,
-    };
-  });
+      order: order++,
+    });
+  }
 
-  const dagEdges: TransformDagEdge[] = [];
-  for (const spec of components) {
+  const dagEdges: TransformDagEdge[] = [
+    { id: "extract->load", source: "__source", target: "__dest" },
+  ];
+
+  const firstStep = ordered[0];
+  if (firstStep) {
+    dagEdges.push({ id: "load->first", source: "__dest", target: firstStep.id });
+  }
+
+  for (const spec of allSpecs) {
     for (const dep of spec.after ?? []) {
       dagEdges.push({ id: `${dep}->${spec.id}`, source: dep, target: spec.id });
     }
   }
 
-  const layers: string[][] = [];
-  const placed = new Set<string>();
-  let frontier = dagNodes.filter((n) => !dagEdges.some((e) => e.target === n.specId)).map((n) => n.specId);
-  while (frontier.length) {
-    layers.push([...frontier]);
-    frontier.forEach((id) => placed.add(id));
-    const next = new Set<string>();
-    for (const e of dagEdges) {
-      if (frontier.includes(e.source) && !placed.has(e.target)) next.add(e.target);
+  const layers: string[][] = [["__source"], ["__dest"]];
+  const stepIds = ordered.map((s) => s.id);
+  if (stepIds.length) {
+    const layerMap = new Map<number, string[]>();
+    for (const spec of ordered) {
+      const depth = (spec.after ?? []).length;
+      if (!layerMap.has(depth)) layerMap.set(depth, []);
+      layerMap.get(depth)!.push(spec.id);
     }
-    frontier = [...next].filter((id) => !placed.has(id));
-    if (!frontier.length) break;
-  }
-  for (const n of dagNodes) {
-    if (!placed.has(n.specId)) {
-      if (!layers.length) layers.push([]);
-      layers[layers.length - 1]!.push(n.specId);
+    const depths = [...layerMap.keys()].sort((a, b) => a - b);
+    for (const d of depths) {
+      layers.push(layerMap.get(d)!);
     }
   }
 
   const lines = ["flowchart LR"];
   for (const n of dagNodes) {
-    const label = `${n.label}\\n(${n.componentId})`;
+    const keyLabel = n.assetKey ? `\\n${n.assetKey}` : "";
+    const label = `${n.label}${keyLabel}`;
     const safe = n.specId.replace(/[^a-zA-Z0-9_]/g, "_");
     lines.push(`  ${safe}["${label}"]`);
   }
@@ -202,3 +288,5 @@ export function deriveTransformDag(
     mermaid: lines.join("\n"),
   };
 }
+
+export { normalizeAssetKey };

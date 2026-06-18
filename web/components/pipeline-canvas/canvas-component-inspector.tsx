@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { ComponentSchemaForm } from "@/components/elt/component-schema-form";
+import { ComponentDataPreview } from "@/components/elt/component-data-preview";
 import type { NativeComponentField } from "@/lib/elt/native-components";
 
 type ComponentDetail = {
@@ -130,6 +131,10 @@ export function CanvasComponentInspector({
           Sensor pair: saves as monitor and triggers{" "}
           <code className="font-mono">{detail.monitorPair.pipelineComponentId}</code> when linked.
         </p>
+      ) : null}
+
+      {detail?.hasCompiler ? (
+        <ComponentDataPreview pipelineId={pipelineId} config={config} readOnly={readOnly} />
       ) : null}
 
       {formFields.length > 0 && !showAdvancedJson ? (

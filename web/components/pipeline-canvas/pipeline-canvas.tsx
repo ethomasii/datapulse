@@ -27,6 +27,7 @@ import { useTheme } from "next-themes";
 import { Download, Loader2, Plus, RotateCcw, Save, Trash2, Upload } from "lucide-react";
 import { CanvasBindingsProvider, type CanvasBindingsContextValue } from "./canvas-bindings-context";
 import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-graph";
+import { isValidPipelineCanvasEdge } from "@/lib/elt/canvas-component-sync";
 import { dashedAnimatedEdgeStyle, resolveCanvasEdges } from "./canvas-edge-defaults";
 import { pipelineNodeTypes } from "./custom-nodes";
 
@@ -78,16 +79,21 @@ export type CanvasInspectorFocus =
 
 export type PipelineCanvasControl = {
   patchNodeData: (nodeId: string, patch: Record<string, unknown>) => void;
-  addComponentNode: (component: {
-    id: string;
-    name: string;
-    category: string;
-    compileTarget: string;
-    compileBadge?: string;
-    compileHint: string;
-    canvasPorts: { left: boolean; right: boolean };
-  }) => void;
+  addComponentNode: (
+    component: {
+      id: string;
+      name: string;
+      category: string;
+      compileTarget: string;
+      compileBadge?: string;
+      compileHint: string;
+      canvasPorts: { left: boolean; right: boolean };
+    },
+    position?: { x: number; y: number }
+  ) => void;
 };
+
+import { ELTPULSE_COMPONENT_DRAG_MIME } from "@/lib/elt/canvas-drag";
 
 export type PipelineCanvasProps = {
   /**
@@ -197,16 +203,17 @@ function FlowCanvas({
       const sourceNode = nodes.find((n) => n.id === source);
       const targetNode = nodes.find((n) => n.id === target);
       if (!sourceNode?.type || !targetNode?.type) return false;
-      if (sourceNode.type === "transformNode") {
-        return targetNode.type === "transformNode";
-      }
-      if (targetNode.type === "transformNode") {
-        return sourceNode.type === "destNode" || sourceNode.type === "transformNode";
-      }
-      return true;
+      return isValidPipelineCanvasEdge(sourceNode, targetNode);
     },
     [nodes]
   );
+
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes(ELTPULSE_COMPONENT_DRAG_MIME)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    }
+  }, []);
 
   const onConnect = useCallback(
     (params: Connection) =>
@@ -237,7 +244,11 @@ function FlowCanvas({
   }, []);
 
   const addNode = useCallback(
-    (type: "sourceNode" | "transformNode" | "destNode" | "componentNode", data?: Record<string, unknown>) => {
+    (
+      type: "sourceNode" | "transformNode" | "destNode" | "componentNode",
+      data?: Record<string, unknown>,
+      position?: { x: number; y: number }
+    ) => {
       idCounter += 1;
       const id = `n-${idCounter}`;
       const labels: Record<string, Record<string, unknown>> = {
@@ -255,7 +266,7 @@ function FlowCanvas({
         {
           id,
           type,
-          position: { x: 120 + nds.length * 24, y: 80 + nds.length * 18 },
+          position: position ?? { x: 120 + nds.length * 24, y: 80 + nds.length * 18 },
           data: labels[type],
         },
       ]);
@@ -264,27 +275,50 @@ function FlowCanvas({
   );
 
   const addComponentNode = useCallback(
-    (component: {
-      id: string;
-      name: string;
-      category: string;
-      compileTarget: string;
-      compileBadge?: string;
-      compileHint: string;
-      canvasPorts: { left: boolean; right: boolean };
-    }) => {
-      addNode("componentNode", {
-        componentId: component.id,
-        label: component.name,
-        category: component.category,
-        compileTarget: component.compileTarget,
-        compileBadge: component.compileBadge ?? component.compileTarget,
-        compileHint: component.compileHint,
-        canvasPorts: component.canvasPorts,
-        config: {},
-      });
+    (
+      component: {
+        id: string;
+        name: string;
+        category: string;
+        compileTarget: string;
+        compileBadge?: string;
+        compileHint: string;
+        canvasPorts: { left: boolean; right: boolean };
+      },
+      position?: { x: number; y: number }
+    ) => {
+      addNode(
+        "componentNode",
+        {
+          componentId: component.id,
+          label: component.name,
+          category: component.category,
+          compileTarget: component.compileTarget,
+          compileBadge: component.compileBadge ?? component.compileTarget,
+          compileHint: component.compileHint,
+          canvasPorts: component.canvasPorts,
+          config: {},
+        },
+        position
+      );
     },
     [addNode]
+  );
+
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      const raw = e.dataTransfer.getData(ELTPULSE_COMPONENT_DRAG_MIME);
+      if (!raw || !rfRef.current) return;
+      e.preventDefault();
+      try {
+        const component = JSON.parse(raw) as Parameters<PipelineCanvasControl["addComponentNode"]>[0];
+        const position = rfRef.current.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+        addComponentNode(component, position);
+      } catch {
+        /* ignore malformed drag payload */
+      }
+    },
+    [addComponentNode]
   );
 
   const resetGraph = useCallback(() => {
@@ -571,7 +605,7 @@ function FlowCanvas({
           {saveError}
         </p>
       ) : null}
-      <div className="relative min-h-0 flex-1">
+      <div className="relative min-h-0 flex-1" onDragOver={onDragOver} onDrop={onDrop}>
         <ReactFlow
           nodes={nodes}
           edges={edges}

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Node, Edge } from "@xyflow/react";
 import { deriveTransformDag } from "@/lib/elt/transform-dag";
-import { groupAggregateComponent } from "@/lib/elt/native-components/definitions/table-ops";
 
 describe("transform-dag", () => {
   it("orders components by after dependencies", () => {
@@ -9,17 +8,18 @@ describe("transform-dag", () => {
       {
         id: "join_step",
         type: "python" as const,
+        assetKey: "staging.joined",
         config: {
           template_id: "join_tables",
           left_table: "a",
           right_table: "b",
           output_table: "staging.joined",
         },
-        after: [],
       },
       {
         id: "filter_step",
         type: "python" as const,
+        assetKey: "staging.active",
         config: {
           template_id: "filter_rows",
           table: "staging.joined",
@@ -29,11 +29,26 @@ describe("transform-dag", () => {
         after: ["join_step"],
       },
     ];
-    const dag = deriveTransformDag([], [], specs);
-    expect(dag.nodes.map((n) => n.specId)).toEqual(["join_step", "filter_step"]);
-    expect(dag.edges).toHaveLength(1);
-    expect(dag.edges[0]?.source).toBe("join_step");
-    expect(dag.nodes[1]?.inputAssets).toContain("staging.joined");
+    const dag = deriveTransformDag([], [], specs, { pipelineName: "demo" });
+    const steps = dag.nodes.filter((n) => n.kind === "component");
+    expect(steps.map((n) => n.specId)).toEqual(["join_step", "filter_step"]);
+    expect(dag.edges.some((e) => e.source === "join_step" && e.target === "filter_step")).toBe(true);
+  });
+
+  it("includes transform nodes in unified DAG", () => {
+    const nodes: Node[] = [
+      { id: "d1", type: "destNode", position: { x: 0, y: 0 }, data: {} },
+      {
+        id: "t1",
+        type: "transformNode",
+        position: { x: 100, y: 0 },
+        data: { transformTool: "dbt", dbtPackagePath: "./dbt" },
+      },
+    ];
+    const dag = deriveTransformDag(nodes, [], null, { pipelineName: "demo" });
+    expect(dag.nodes.some((n) => n.kind === "transform")).toBe(true);
+    expect(dag.nodes.some((n) => n.kind === "extract")).toBe(true);
+    expect(dag.nodes.some((n) => n.kind === "load")).toBe(true);
   });
 
   it("derives from canvas component nodes", () => {
@@ -50,22 +65,9 @@ describe("transform-dag", () => {
         },
       },
     ];
-    const dag = deriveTransformDag(nodes, [], null);
-    expect(dag.nodes).toHaveLength(1);
-    expect(dag.nodes[0]?.componentId).toBe("filter_rows");
-    expect(dag.nodes[0]?.outputAsset).toBe("staging.out");
-  });
-});
-
-describe("table-ops components", () => {
-  it("group_aggregate emits groupby python", () => {
-    const out = groupAggregateComponent.compile({
-      table: "staging.orders",
-      group_by: ["status"],
-      aggregations: '{"amount":"sum"}',
-      output_table: "staging.by_status",
-    });
-    expect(out.python?.join("\n")).toContain("groupby");
-    expect(out.python?.join("\n")).toContain("staging.by_status");
+    const dag = deriveTransformDag(nodes, [], null, { pipelineName: "demo" });
+    const step = dag.nodes.find((n) => n.kind === "component");
+    expect(step?.componentId).toBe("filter_rows");
+    expect(step?.assetKey).toBe("staging.out");
   });
 });

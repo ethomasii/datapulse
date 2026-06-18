@@ -289,7 +289,7 @@ export function CanvasPageClient() {
       const st = typeof row.sourceType === "string" ? row.sourceType : "github";
       const dt = typeof row.destinationType === "string" ? row.destinationType : "duckdb";
       hydrateFormFromSourceConfig(cfg, st, dt);
-      const canvas = hydrateCanvasFromSourceConfiguration(cfg) ?? getCanvasFromSourceConfig(cfg);
+      const canvas = hydrateCanvasFromSourceConfiguration(cfg, row.name) ?? getCanvasFromSourceConfig(cfg);
       if (canvas && Array.isArray(canvas.nodes) && Array.isArray(canvas.edges)) {
         const rawDbt = readDbtTransformConfig(cfg);
         const dbtObj =
@@ -1089,6 +1089,7 @@ export function CanvasPageClient() {
                   nodes={loadedGraph?.nodes ?? []}
                   edges={loadedGraph?.edges ?? []}
                   specComponents={extractSpecComponents(lastFullSourceConfigRef.current)}
+                  pipelineName={selectedName ?? "pipeline"}
                 />
               </div>
               )}
