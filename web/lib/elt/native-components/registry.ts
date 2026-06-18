@@ -14,7 +14,7 @@ import {
   kafkaMonitorComponent,
   sqlMonitorComponent,
 } from "./definitions/sensor-monitors";
-import { s3IngestComponent, sqsIngestComponent, kafkaIngestComponent, restApiIngestComponent, sqlToDatabaseComponent, gcsIngestComponent } from "./definitions/ingestion-hints";
+import { s3IngestComponent, sqsIngestComponent, kafkaIngestComponent, restApiIngestComponent, sqlToDatabaseComponent, gcsIngestComponent, deltaIngestComponent, mongodbIngestComponent, googleSheetsIngestComponent } from "./definitions/ingestion-hints";
 import { renameColumnsComponent, castColumnsComponent } from "./definitions/column-ops";
 import {
   groupAggregateComponent,
@@ -53,6 +53,24 @@ import {
   regexParserComponent,
   htmlParserComponent,
 } from "./definitions/domain-parsers";
+import {
+  hashComponent,
+  transposeComponent,
+  arrayExploderComponent,
+  alterRowComponent,
+  appendFieldsComponent,
+  nestedFieldExtractorComponent,
+  multiRowFormulaComponent,
+  windowCalculationComponent,
+  outlierClipperComponent,
+  pctChangeComponent,
+  weightedAverageComponent,
+  routerComponent,
+  dataMaskingComponent,
+  schemaValidatorComponent,
+  xmlParserComponent,
+} from "./definitions/advanced-transforms";
+import { scdType1Component, scdType2Component } from "./definitions/scd-transforms";
 import type { NativeComponentDefinition } from "./types";
 
 const ALL_NATIVE: NativeComponentDefinition[] = [
@@ -107,6 +125,26 @@ const ALL_NATIVE: NativeComponentDefinition[] = [
   emailParserComponent,
   regexParserComponent,
   htmlParserComponent,
+  hashComponent,
+  transposeComponent,
+  arrayExploderComponent,
+  alterRowComponent,
+  appendFieldsComponent,
+  nestedFieldExtractorComponent,
+  multiRowFormulaComponent,
+  windowCalculationComponent,
+  outlierClipperComponent,
+  pctChangeComponent,
+  weightedAverageComponent,
+  routerComponent,
+  dataMaskingComponent,
+  schemaValidatorComponent,
+  xmlParserComponent,
+  scdType1Component,
+  scdType2Component,
+  deltaIngestComponent,
+  mongodbIngestComponent,
+  googleSheetsIngestComponent,
 ];
 
 const byId = new Map<string, NativeComponentDefinition>();

@@ -1,0 +1,35 @@
+{
+  "id": "data_masking",
+  "aliases": [
+    "pii_masking",
+    "anonymize"
+  ],
+  "name": "Data masking",
+  "category": "transformation",
+  "description": "Rule-based PII masking: hash, partial mask, or full redact per column.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "policies",
+      "label": "Column policies",
+      "description": "JSON e.g. {\"email\":{\"method\":\"hash\"},\"ssn\":{\"method\":\"partial\",\"visible\":4}}",
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

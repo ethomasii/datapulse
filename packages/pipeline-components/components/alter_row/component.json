@@ -1,0 +1,56 @@
+{
+  "id": "alter_row",
+  "aliases": [
+    "cdc_marker",
+    "change_type"
+  ],
+  "name": "Alter row (CDC)",
+  "category": "transformation",
+  "description": "Tag rows with CDC operation (insert/update/delete) based on conditions.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "delete_condition",
+      "label": "Delete condition",
+      "type": "string",
+      "description": "pandas query, e.g. status == 'deleted'"
+    },
+    {
+      "key": "update_condition",
+      "label": "Update condition",
+      "type": "string"
+    },
+    {
+      "key": "output_column",
+      "label": "Change type column",
+      "type": "string",
+      "default": "_change_type"
+    },
+    {
+      "key": "default_operation",
+      "label": "Default operation",
+      "type": "select",
+      "options": [
+        "insert",
+        "update",
+        "upsert"
+      ],
+      "default": "insert"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

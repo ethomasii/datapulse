@@ -1,0 +1,51 @@
+{
+  "id": "weighted_average",
+  "aliases": [
+    "weighted_mean"
+  ],
+  "name": "Weighted average",
+  "category": "transformation",
+  "description": "Compute weighted average of a column, optionally grouped.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "column",
+      "label": "Value column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "weight_column",
+      "label": "Weight column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "group_by",
+      "label": "Group by",
+      "type": "string_list"
+    },
+    {
+      "key": "output_column",
+      "label": "Output column",
+      "type": "string",
+      "default": "weighted_avg"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

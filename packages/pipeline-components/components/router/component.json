@@ -1,0 +1,35 @@
+{
+  "id": "router",
+  "aliases": [
+    "conditional_split",
+    "branch"
+  ],
+  "name": "Router",
+  "category": "transformation",
+  "description": "Split rows into multiple output tables by condition.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "routes",
+      "label": "Routes",
+      "description": "JSON array [{\"condition\":\"status == \\\"active\\\"\",\"output_table\":\"active_rows\"}]",
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "default_output_table",
+      "label": "Default output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

@@ -1,0 +1,31 @@
+{
+  "id": "transpose",
+  "name": "Transpose",
+  "category": "transformation",
+  "description": "Transpose rows and columns (pandas transpose).",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "index_column",
+      "label": "New index column name",
+      "type": "string",
+      "default": "field"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

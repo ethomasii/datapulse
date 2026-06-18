@@ -1,0 +1,50 @@
+{
+  "id": "hash",
+  "aliases": [
+    "column_hash",
+    "checksum"
+  ],
+  "name": "Hash columns",
+  "category": "transformation",
+  "description": "Compute MD5/SHA-1/SHA-256 hash of one or more columns.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "columns",
+      "label": "Columns to hash",
+      "type": "string_list"
+    },
+    {
+      "key": "algorithm",
+      "label": "Algorithm",
+      "type": "select",
+      "options": [
+        "md5",
+        "sha1",
+        "sha256"
+      ],
+      "default": "sha256"
+    },
+    {
+      "key": "output_column",
+      "label": "Output column",
+      "type": "string",
+      "default": "hash"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

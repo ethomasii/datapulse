@@ -1,0 +1,41 @@
+{
+  "id": "nested_field_extractor",
+  "aliases": [
+    "json_path_extractor",
+    "dot_path_extractor"
+  ],
+  "name": "Nested field extractor",
+  "category": "transformation",
+  "description": "Extract dot-path fields from JSON/dict columns into flat columns.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "column",
+      "label": "Nested column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "paths",
+      "label": "Path mapping",
+      "description": "JSON object path → column, e.g. {\"user.email\":\"email\"}",
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

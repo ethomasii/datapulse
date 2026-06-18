@@ -1,0 +1,33 @@
+{
+  "id": "delta_ingestion",
+  "aliases": [
+    "delta_lake_ingestion"
+  ],
+  "name": "Delta Lake ingest",
+  "category": "ingestion",
+  "description": "Merge Delta Lake table path hints for delta-rs ingestion.",
+  "compileTarget": "dlt",
+  "fields": [
+    {
+      "key": "table_uri",
+      "label": "Delta table URI",
+      "description": "s3://bucket/path or abfss://...",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "version",
+      "label": "Table version (time travel)",
+      "type": "number"
+    },
+    {
+      "key": "resource_name",
+      "label": "Destination table name",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

@@ -1,0 +1,45 @@
+{
+  "id": "scd_type_1",
+  "aliases": [
+    "slowly_changing_dimension_1",
+    "dimension_merge"
+  ],
+  "name": "SCD Type 1",
+  "category": "transformation",
+  "description": "Merge staging into dimension — overwrite attributes on business key match, insert new keys.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "staging_table",
+      "label": "Staging table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "dimension_table",
+      "label": "Dimension table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "business_keys",
+      "label": "Business keys",
+      "type": "string_list",
+      "required": true
+    },
+    {
+      "key": "update_columns",
+      "label": "Columns to update",
+      "type": "string_list"
+    },
+    {
+      "key": "output_table",
+      "label": "Output dimension table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

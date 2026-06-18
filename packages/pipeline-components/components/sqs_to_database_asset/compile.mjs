@@ -24,7 +24,7 @@ var sqsIngestComponent = {
   }
 };
 
-// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-0FtTsZ/sqs_to_database_asset.ts
+// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-owfwbk/sqs_to_database_asset.ts
 function compile(config) {
   return sqsIngestComponent.compile(config);
 }

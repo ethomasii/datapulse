@@ -36,7 +36,7 @@ var s3MonitorComponent = {
   compile: (cfg) => buildSensorMonitor("s3_monitor", "S3 monitor", cfg)
 };
 
-// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-0FtTsZ/s3_monitor.ts
+// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-owfwbk/s3_monitor.ts
 function compile(config) {
   return s3MonitorComponent.compile(config);
 }

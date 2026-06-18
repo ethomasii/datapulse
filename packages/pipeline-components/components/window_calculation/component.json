@@ -1,0 +1,76 @@
+{
+  "id": "window_calculation",
+  "aliases": [
+    "window_function",
+    "analytic_function"
+  ],
+  "name": "Window calculation",
+  "category": "transformation",
+  "description": "Window functions: lag, lead, rank, row_number, cumsum, rolling mean.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "column",
+      "label": "Value column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "function",
+      "label": "Function",
+      "type": "select",
+      "options": [
+        "lag",
+        "lead",
+        "rank",
+        "dense_rank",
+        "row_number",
+        "cumsum",
+        "rolling_mean"
+      ],
+      "default": "lag"
+    },
+    {
+      "key": "partition_by",
+      "label": "Partition by",
+      "type": "string_list"
+    },
+    {
+      "key": "order_by",
+      "label": "Order by",
+      "type": "string_list"
+    },
+    {
+      "key": "periods",
+      "label": "Lag/lead periods",
+      "type": "number",
+      "default": 1
+    },
+    {
+      "key": "window",
+      "label": "Rolling window size",
+      "type": "number",
+      "default": 3
+    },
+    {
+      "key": "output_column",
+      "label": "Output column",
+      "type": "string"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

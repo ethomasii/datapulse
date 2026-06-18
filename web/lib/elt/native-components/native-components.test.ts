@@ -103,8 +103,23 @@ describe("native-components", () => {
     expect(sensors.length).toBe(1);
   });
 
-  it("lists 51 native components", () => {
-    expect(listNativeComponents().length).toBe(51);
+  it("lists 71 native components", () => {
+    expect(listNativeComponents().length).toBe(71);
+  });
+
+  it("hash emits hashlib python", () => {
+    const def = getNativeComponent("hash");
+    const out = def!.compile({ table: "t", columns: ["a", "b"], output_table: "t_hashed" });
+    expect(out.python?.join("\n")).toContain("hashlib");
+  });
+
+  it("router resolves as native", () => {
+    expect(isNativeComponent("router")).toBe(true);
+    expect(isNativeComponent("conditional_split")).toBe(true);
+  });
+
+  it("scd_type_2 resolves as native", () => {
+    expect(isNativeComponent("scd_type_2")).toBe(true);
   });
 
   it("hl7_v2_parser emits segment parsing python", () => {

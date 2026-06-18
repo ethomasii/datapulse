@@ -1,0 +1,35 @@
+{
+  "id": "array_exploder",
+  "aliases": [
+    "explode_array",
+    "unnest"
+  ],
+  "name": "Array exploder",
+  "category": "transformation",
+  "description": "Expand an array column so each element becomes its own row.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "column",
+      "label": "Array column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}
