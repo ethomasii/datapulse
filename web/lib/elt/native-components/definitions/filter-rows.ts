@@ -1,9 +1,9 @@
 import { escapePyString } from "@/lib/elt/escape-py";
-import type { NativeComponentDefinition } from "../types";
+import { inputTable, outputTable } from "./_config-helpers";
 
 export const filterRowsComponent: NativeComponentDefinition = {
   id: "filter_rows",
-  aliases: ["dataframe_filter", "row_filter"],
+  aliases: ["dataframe_filter", "row_filter", "filter", "warehouse_filter", "select_records"],
   name: "Filter rows",
   category: "transformation",
   description: "Filter rows in a loaded table with a pandas query expression.",
@@ -31,9 +31,9 @@ export const filterRowsComponent: NativeComponentDefinition = {
     },
   ],
   compile(config) {
-    const table = String(config.table ?? config.asset_name ?? "").trim();
-    const condition = String(config.condition ?? config.filter ?? "").trim();
-    const output = String(config.output_table ?? table).trim();
+    const table = inputTable(config);
+    const condition = String(config.condition ?? config.filter ?? config.expression ?? "").trim();
+    const output = outputTable(config, table);
 
     if (!table || !condition) {
       return { warnings: ["filter_rows: table and condition are required"], python: [] };

@@ -30,7 +30,7 @@ function pandasWriteTable(outputTable, label) {
 // web/lib/elt/native-components/definitions/column-ops.ts
 var renameColumnsComponent = {
   id: "rename_columns",
-  aliases: ["dynamic_rename"],
+  aliases: ["dynamic_rename", "field_mapper"],
   name: "Rename columns",
   category: "transformation",
   description: "Rename columns on a loaded table (pandas).",
@@ -80,7 +80,7 @@ var renameColumnsComponent = {
   }
 };
 
-// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-SfOGBH/rename_columns.ts
+// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-gKMp94/rename_columns.ts
 function compile(config) {
   return renameColumnsComponent.compile(config);
 }

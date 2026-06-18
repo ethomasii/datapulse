@@ -1,5 +1,9 @@
 {
   "id": "sort_rows",
+  "aliases": [
+    "sort",
+    "arrange"
+  ],
   "name": "Sort rows",
   "category": "transformation",
   "description": "Sort a table by one or more columns.",

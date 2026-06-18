@@ -1,7 +1,7 @@
 // web/lib/elt/native-components/definitions/ingestion-hints.ts
 var s3IngestComponent = {
   id: "s3_to_database_asset",
-  aliases: ["csv_file_ingestion"],
+  aliases: ["csv_file_ingestion", "file_ingestion"],
   name: "S3 / file ingest",
   category: "ingestion",
   description: "Merge filesystem/S3 ingest hints into source configuration for dlt codegen.",
@@ -41,7 +41,7 @@ var s3IngestComponent = {
   }
 };
 
-// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-SfOGBH/s3_to_database_asset.ts
+// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-gKMp94/s3_to_database_asset.ts
 function compile(config) {
   return s3IngestComponent.compile(config);
 }

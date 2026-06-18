@@ -30,7 +30,7 @@ function pandasWriteTable(outputTable, label) {
 // web/lib/elt/native-components/definitions/column-ops.ts
 var castColumnsComponent = {
   id: "cast_columns",
-  aliases: ["make_columns"],
+  aliases: ["make_columns", "type_coercer"],
   name: "Cast columns",
   category: "transformation",
   description: "Cast column dtypes after load (pandas astype).",
@@ -80,7 +80,7 @@ var castColumnsComponent = {
   }
 };
 
-// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-SfOGBH/cast_columns.ts
+// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-gKMp94/cast_columns.ts
 function compile(config) {
   return castColumnsComponent.compile(config);
 }

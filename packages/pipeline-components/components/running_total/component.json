@@ -1,0 +1,50 @@
+{
+  "id": "running_total",
+  "aliases": [
+    "cumulative_sum",
+    "cumsum"
+  ],
+  "name": "Running total",
+  "category": "transformation",
+  "description": "Cumulative sum of a column, optionally per group.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "column",
+      "label": "Value column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "group_by",
+      "label": "Group by",
+      "type": "string_list"
+    },
+    {
+      "key": "sort_by",
+      "label": "Sort before cumsum",
+      "type": "string_list"
+    },
+    {
+      "key": "output_column",
+      "label": "Output column",
+      "type": "string",
+      "default": "running_total"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

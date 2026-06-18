@@ -19,18 +19,18 @@ function pandasReadTable(table) {
     `    _df = pd.read_sql('SELECT * FROM ${escapePyString(table)}', _sql._engine)`
   ];
 }
-function pandasWriteTable(outputTable, label) {
-  const { schema, name } = parseTableParts(outputTable);
+function pandasWriteTable(outputTable2, label) {
+  const { schema, name } = parseTableParts(outputTable2);
   return [
     `    _df.to_sql("${escapePyString(name)}", _sql._engine, schema="${escapePyString(schema)}", if_exists="replace", index=False)`,
-    `    print(f"[${label}] wrote {len(_df)} rows to ${escapePyString(outputTable)}")`
+    `    print(f"[${label}] wrote {len(_df)} rows to ${escapePyString(outputTable2)}")`
   ];
 }
 
 // web/lib/elt/native-components/definitions/table-ops.ts
 var addColumnExprComponent = {
   id: "add_column_expr",
-  aliases: ["computed_column", "derive_column"],
+  aliases: ["computed_column", "derive_column", "formula", "warehouse_formula", "multi_field_formula"],
   name: "Add computed column",
   category: "transformation",
   description: "Add a column via pandas eval expression.",
@@ -69,7 +69,7 @@ var addColumnExprComponent = {
   }
 };
 
-// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-SfOGBH/add_column_expr.ts
+// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-gKMp94/add_column_expr.ts
 function compile(config) {
   return addColumnExprComponent.compile(config);
 }

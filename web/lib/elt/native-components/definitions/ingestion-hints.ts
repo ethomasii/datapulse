@@ -2,7 +2,7 @@ import type { NativeComponentDefinition } from "../types";
 
 export const s3IngestComponent: NativeComponentDefinition = {
   id: "s3_to_database_asset",
-  aliases: ["csv_file_ingestion"],
+  aliases: ["csv_file_ingestion", "file_ingestion"],
   name: "S3 / file ingest",
   category: "ingestion",
   description: "Merge filesystem/S3 ingest hints into source configuration for dlt codegen.",
@@ -138,6 +138,7 @@ export const restApiIngestComponent: NativeComponentDefinition = {
 
 export const sqlToDatabaseComponent: NativeComponentDefinition = {
   id: "sql_to_database_asset",
+  aliases: ["database_replication"],
   name: "SQL database replicate",
   category: "ingestion",
   description: "Merge Sling/database replication table hints into source configuration.",
@@ -165,6 +166,39 @@ export const sqlToDatabaseComponent: NativeComponentDefinition = {
       configPatch: {
         elt_native_ingestion: "sling",
         tables: tables.join(","),
+      },
+    };
+  },
+};
+
+export const gcsIngestComponent: NativeComponentDefinition = {
+  id: "gcs_to_database_asset",
+  aliases: ["adls_to_database_asset"],
+  name: "GCS / cloud storage ingest",
+  category: "ingestion",
+  description: "Merge GCS/cloud filesystem ingest hints into source configuration.",
+  compileTarget: "dlt",
+  fields: [
+    { key: "bucket_url", label: "Bucket URL", description: "gs://bucket/prefix", type: "string", required: true },
+    { key: "file_glob", label: "File glob", type: "string", default: "**/*" },
+    { key: "table_name", label: "Destination table name", type: "string" },
+  ],
+  compile(config) {
+    const bucketUrl = String(
+      config.bucket_url ?? config.gcs_path ?? config.path ?? config.prefix ?? ""
+    ).trim();
+    if (!bucketUrl) {
+      return { warnings: ["gcs_to_database_asset: bucket_url is required"], configPatch: {} };
+    }
+    const fileGlob = String(config.file_glob ?? config.glob ?? "**/*").trim();
+    const tableName = String(config.table_name ?? config.resource_name ?? "files_data").trim();
+    return {
+      configPatch: {
+        elt_native_ingestion: "filesystem",
+        bucket_url: bucketUrl,
+        file_glob: fileGlob,
+        resource_name: tableName,
+        files_path: bucketUrl,
       },
     };
   },

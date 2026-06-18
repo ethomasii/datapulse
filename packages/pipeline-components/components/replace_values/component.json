@@ -1,5 +1,9 @@
 {
   "id": "replace_values",
+  "aliases": [
+    "find_replace",
+    "map_values"
+  ],
   "name": "Replace values",
   "category": "transformation",
   "description": "Replace cell values in selected columns (pandas replace).",

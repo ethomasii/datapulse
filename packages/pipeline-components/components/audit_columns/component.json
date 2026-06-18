@@ -1,0 +1,44 @@
+{
+  "id": "audit_columns",
+  "aliases": [
+    "audit_columns_transform"
+  ],
+  "name": "Audit columns",
+  "category": "transformation",
+  "description": "Add created_at / updated_at / source metadata columns.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "add_created_at",
+      "label": "Add created_at",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "add_updated_at",
+      "label": "Add updated_at",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "source_label",
+      "label": "Source label column value",
+      "type": "string"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

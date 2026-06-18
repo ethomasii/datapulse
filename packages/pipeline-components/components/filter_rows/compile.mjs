@@ -3,10 +3,20 @@ function escapePyString(s) {
   return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
+// web/lib/elt/native-components/definitions/_config-helpers.ts
+function inputTable(config) {
+  return String(
+    config.table ?? config.upstream_asset_key ?? config.input_table ?? config.source_table ?? ""
+  ).trim();
+}
+function outputTable(config, fallback = "") {
+  return String(config.output_table ?? config.asset_name ?? fallback).trim();
+}
+
 // web/lib/elt/native-components/definitions/filter-rows.ts
 var filterRowsComponent = {
   id: "filter_rows",
-  aliases: ["dataframe_filter", "row_filter"],
+  aliases: ["dataframe_filter", "row_filter", "filter", "warehouse_filter", "select_records"],
   name: "Filter rows",
   category: "transformation",
   description: "Filter rows in a loaded table with a pandas query expression.",
@@ -34,9 +44,9 @@ var filterRowsComponent = {
     }
   ],
   compile(config) {
-    const table = String(config.table ?? config.asset_name ?? "").trim();
-    const condition = String(config.condition ?? config.filter ?? "").trim();
-    const output = String(config.output_table ?? table).trim();
+    const table = inputTable(config);
+    const condition = String(config.condition ?? config.filter ?? config.expression ?? "").trim();
+    const output = outputTable(config, table);
     if (!table || !condition) {
       return { warnings: ["filter_rows: table and condition are required"], python: [] };
     }
@@ -60,7 +70,7 @@ var filterRowsComponent = {
   }
 };
 
-// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-SfOGBH/filter_rows.ts
+// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-gKMp94/filter_rows.ts
 function compile(config) {
   return filterRowsComponent.compile(config);
 }

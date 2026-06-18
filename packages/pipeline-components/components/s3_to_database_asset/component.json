@@ -1,7 +1,8 @@
 {
   "id": "s3_to_database_asset",
   "aliases": [
-    "csv_file_ingestion"
+    "csv_file_ingestion",
+    "file_ingestion"
   ],
   "name": "S3 / file ingest",
   "category": "ingestion",

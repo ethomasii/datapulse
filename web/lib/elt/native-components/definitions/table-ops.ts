@@ -1,5 +1,6 @@
 import { escapePyString } from "@/lib/elt/escape-py";
 import type { NativeComponentDefinition } from "../types";
+import { inputTable, outputTable } from "./_config-helpers";
 import { pandasReadTable, pandasWriteTable, strList } from "./_pandas-helpers";
 
 function outputParts(output: string) {
@@ -10,7 +11,7 @@ function outputParts(output: string) {
 
 export const groupAggregateComponent: NativeComponentDefinition = {
   id: "group_aggregate",
-  aliases: ["aggregate_table", "group_by"],
+  aliases: ["aggregate_table", "group_by", "summarize", "make_group"],
   name: "Group & aggregate",
   category: "transformation",
   description: "Group by columns and compute aggregations (pandas groupby).",
@@ -28,8 +29,8 @@ export const groupAggregateComponent: NativeComponentDefinition = {
     { key: "output_table", label: "Output table", type: "string", required: true },
   ],
   compile(config) {
-    const table = String(config.table ?? "").trim();
-    const output = String(config.output_table ?? "").trim();
+    const table = inputTable(config);
+    const output = outputTable(config);
     const groupBy = strList(config.group_by ?? config.groupby);
     let aggs: Record<string, string> = {};
     const raw = config.aggregations ?? config.agg;
@@ -65,6 +66,7 @@ export const groupAggregateComponent: NativeComponentDefinition = {
 
 export const sortRowsComponent: NativeComponentDefinition = {
   id: "sort_rows",
+  aliases: ["sort", "arrange"],
   name: "Sort rows",
   category: "transformation",
   description: "Sort a table by one or more columns.",
@@ -146,7 +148,7 @@ export const limitRowsComponent: NativeComponentDefinition = {
 
 export const fillNullsComponent: NativeComponentDefinition = {
   id: "fill_nulls",
-  aliases: ["impute_nulls"],
+  aliases: ["impute_nulls", "imputation"],
   name: "Fill nulls",
   category: "transformation",
   description: "Fill null values with constants per column (pandas fillna).",
@@ -196,6 +198,7 @@ export const fillNullsComponent: NativeComponentDefinition = {
 
 export const replaceValuesComponent: NativeComponentDefinition = {
   id: "replace_values",
+  aliases: ["find_replace", "map_values"],
   name: "Replace values",
   category: "transformation",
   description: "Replace cell values in selected columns (pandas replace).",
@@ -245,6 +248,7 @@ export const replaceValuesComponent: NativeComponentDefinition = {
 
 export const sampleRowsComponent: NativeComponentDefinition = {
   id: "sample_rows",
+  aliases: ["sample", "create_samples"],
   name: "Sample rows",
   category: "transformation",
   description: "Random sample of rows (pandas sample).",
@@ -290,7 +294,7 @@ export const sampleRowsComponent: NativeComponentDefinition = {
 
 export const addColumnExprComponent: NativeComponentDefinition = {
   id: "add_column_expr",
-  aliases: ["computed_column", "derive_column"],
+  aliases: ["computed_column", "derive_column", "formula", "warehouse_formula", "multi_field_formula"],
   name: "Add computed column",
   category: "transformation",
   description: "Add a column via pandas eval expression.",

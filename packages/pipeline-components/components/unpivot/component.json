@@ -1,0 +1,52 @@
+{
+  "id": "unpivot",
+  "aliases": [
+    "melt",
+    "pivot_long"
+  ],
+  "name": "Unpivot / melt",
+  "category": "transformation",
+  "description": "Unpivot wide data to long format (pandas melt).",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "id_vars",
+      "label": "ID columns (keep)",
+      "type": "string_list",
+      "required": true
+    },
+    {
+      "key": "value_vars",
+      "label": "Columns to unpivot",
+      "type": "string_list"
+    },
+    {
+      "key": "var_name",
+      "label": "Variable column name",
+      "type": "string",
+      "default": "variable"
+    },
+    {
+      "key": "value_name",
+      "label": "Value column name",
+      "type": "string",
+      "default": "value"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

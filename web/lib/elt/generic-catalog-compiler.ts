@@ -49,12 +49,17 @@ export function compileGenericCatalogComponent(
 function tableFromConfig(config: Record<string, unknown>): string {
   return String(
     config.table ??
+      config.upstream_asset_key ??
       config.output_table ??
       config.table_name ??
       config.asset_name ??
       config.input_table ??
       ""
   ).trim();
+}
+
+function outputFromConfig(config: Record<string, unknown>, table: string): string {
+  return String(config.output_table ?? config.asset_name ?? table).trim();
 }
 
 function compileGenericQuality(componentId: string, config: Record<string, unknown>): NativeComponentCompileResult {
@@ -148,8 +153,8 @@ function compileGenericDbt(componentId: string, config: Record<string, unknown>)
 
 function compileGenericTransform(componentId: string, config: Record<string, unknown>): NativeComponentCompileResult {
   const table = tableFromConfig(config);
-  const output = String(config.output_table ?? table).trim();
-  const condition = String(config.condition ?? config.filter ?? config.expression ?? "").trim();
+  const output = outputFromConfig(config, table);
+  const condition = String(config.condition ?? config.filter ?? config.expression ?? config.query ?? "").trim();
 
   if (!table) {
     return { warnings: [`${componentId}: table required for transform`] };
@@ -197,6 +202,9 @@ function compileGenericPythonPassthrough(
   config: Record<string, unknown>
 ): NativeComponentCompileResult {
   const table = tableFromConfig(config);
+  if (table) {
+    return compileGenericTransform(componentId, { ...config, table, output_table: outputFromConfig(config, table) });
+  }
   const python = [
     `# ── ${componentId} (catalog template) ──`,
     `print("[${componentId}] config keys:", ${JSON.stringify(Object.keys(config))})`,

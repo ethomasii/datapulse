@@ -2,7 +2,9 @@
   "id": "group_aggregate",
   "aliases": [
     "aggregate_table",
-    "group_by"
+    "group_by",
+    "summarize",
+    "make_group"
   ],
   "name": "Group & aggregate",
   "category": "transformation",

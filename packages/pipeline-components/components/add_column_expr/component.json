@@ -2,7 +2,10 @@
   "id": "add_column_expr",
   "aliases": [
     "computed_column",
-    "derive_column"
+    "derive_column",
+    "formula",
+    "warehouse_formula",
+    "multi_field_formula"
   ],
   "name": "Add computed column",
   "category": "transformation",

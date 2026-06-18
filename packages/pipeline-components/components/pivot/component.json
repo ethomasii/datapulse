@@ -2,7 +2,8 @@
   "id": "pivot",
   "aliases": [
     "pivot_table",
-    "pivot_transform"
+    "pivot_transform",
+    "cross_tab"
   ],
   "name": "Pivot table",
   "category": "transformation",

@@ -3,6 +3,22 @@ function escapePyString(s) {
   return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
+// web/lib/elt/native-components/definitions/_config-helpers.ts
+function joinHowFromTemplate(config, defaultHow = "inner") {
+  const explicit = String(config.how ?? config.join_type ?? "").trim();
+  if (explicit) return explicit;
+  const tid = String(config.template_id ?? config.component_id ?? "").trim().toLowerCase();
+  const map = {
+    left_join: "left",
+    right_join: "right",
+    outer_join: "outer",
+    full_outer_join: "outer",
+    inner_join: "inner",
+    warehouse_join: "left"
+  };
+  return map[tid] ?? defaultHow;
+}
+
 // web/lib/elt/native-components/definitions/join-tables.ts
 function strList(v) {
   if (Array.isArray(v)) return v.map(String).filter(Boolean);
@@ -13,7 +29,17 @@ function strList(v) {
 }
 var joinTablesComponent = {
   id: "join_tables",
-  aliases: ["dataframe_join", "lookup", "dataframe_lookup"],
+  aliases: [
+    "dataframe_join",
+    "lookup",
+    "dataframe_lookup",
+    "warehouse_join",
+    "inner_join",
+    "left_join",
+    "right_join",
+    "outer_join",
+    "full_outer_join"
+  ],
   name: "Join tables",
   category: "transformation",
   description: "Join two loaded warehouse tables after sync (pandas via destination SQL client).",
@@ -97,7 +123,7 @@ var joinTablesComponent = {
     const left = String(config.left_table ?? config.left_asset_key ?? "").trim();
     const right = String(config.right_table ?? config.right_asset_key ?? "").trim();
     const output = String(config.output_table ?? config.asset_name ?? "").trim();
-    const how = String(config.how ?? "inner").trim() || "inner";
+    const how = joinHowFromTemplate(config, "inner");
     const on = strList(config.on);
     const leftOn = strList(config.left_on);
     const rightOn = strList(config.right_on);
@@ -137,7 +163,7 @@ var joinTablesComponent = {
   }
 };
 
-// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-SfOGBH/join_tables.ts
+// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-gKMp94/join_tables.ts
 function compile(config) {
   return joinTablesComponent.compile(config);
 }

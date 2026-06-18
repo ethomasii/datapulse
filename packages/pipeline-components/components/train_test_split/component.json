@@ -1,0 +1,45 @@
+{
+  "id": "train_test_split",
+  "aliases": [
+    "train_test_splitter"
+  ],
+  "name": "Train/test split",
+  "category": "transformation",
+  "description": "Split table into train and test sets.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "test_size",
+      "label": "Test fraction (0–1)",
+      "type": "number",
+      "default": 0.2
+    },
+    {
+      "key": "random_state",
+      "label": "Random seed",
+      "type": "number"
+    },
+    {
+      "key": "output_train",
+      "label": "Train output table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "output_test",
+      "label": "Test output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

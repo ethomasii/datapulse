@@ -1,5 +1,8 @@
 {
   "id": "sql_to_database_asset",
+  "aliases": [
+    "database_replication"
+  ],
   "name": "SQL database replicate",
   "category": "ingestion",
   "description": "Merge Sling/database replication table hints into source configuration.",

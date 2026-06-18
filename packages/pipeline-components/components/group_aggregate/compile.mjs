@@ -3,6 +3,16 @@ function escapePyString(s) {
   return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
+// web/lib/elt/native-components/definitions/_config-helpers.ts
+function inputTable(config) {
+  return String(
+    config.table ?? config.upstream_asset_key ?? config.input_table ?? config.source_table ?? ""
+  ).trim();
+}
+function outputTable(config, fallback = "") {
+  return String(config.output_table ?? config.asset_name ?? fallback).trim();
+}
+
 // web/lib/elt/native-components/definitions/_pandas-helpers.ts
 function pandasReadTable(table) {
   return [
@@ -28,7 +38,7 @@ function outputParts(output) {
 }
 var groupAggregateComponent = {
   id: "group_aggregate",
-  aliases: ["aggregate_table", "group_by"],
+  aliases: ["aggregate_table", "group_by", "summarize", "make_group"],
   name: "Group & aggregate",
   category: "transformation",
   description: "Group by columns and compute aggregations (pandas groupby).",
@@ -46,8 +56,8 @@ var groupAggregateComponent = {
     { key: "output_table", label: "Output table", type: "string", required: true }
   ],
   compile(config) {
-    const table = String(config.table ?? "").trim();
-    const output = String(config.output_table ?? "").trim();
+    const table = inputTable(config);
+    const output = outputTable(config);
     const groupBy = strList(config.group_by ?? config.groupby);
     let aggs = {};
     const raw = config.aggregations ?? config.agg;
@@ -81,7 +91,7 @@ var groupAggregateComponent = {
   }
 };
 
-// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-SfOGBH/group_aggregate.ts
+// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-gKMp94/group_aggregate.ts
 function compile(config) {
   return groupAggregateComponent.compile(config);
 }

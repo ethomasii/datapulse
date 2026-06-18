@@ -1,0 +1,40 @@
+{
+  "id": "count_records",
+  "aliases": [
+    "row_count",
+    "aggregate_count"
+  ],
+  "name": "Count records",
+  "category": "transformation",
+  "description": "Count rows, optionally grouped.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "group_by",
+      "label": "Group by",
+      "type": "string_list"
+    },
+    {
+      "key": "output_column",
+      "label": "Count column name",
+      "type": "string",
+      "default": "row_count"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

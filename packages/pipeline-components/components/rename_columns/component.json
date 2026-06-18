@@ -1,7 +1,8 @@
 {
   "id": "rename_columns",
   "aliases": [
-    "dynamic_rename"
+    "dynamic_rename",
+    "field_mapper"
   ],
   "name": "Rename columns",
   "category": "transformation",

@@ -19,17 +19,18 @@ function pandasReadTable(table) {
     `    _df = pd.read_sql('SELECT * FROM ${escapePyString(table)}', _sql._engine)`
   ];
 }
-function pandasWriteTable(outputTable, label) {
-  const { schema, name } = parseTableParts(outputTable);
+function pandasWriteTable(outputTable2, label) {
+  const { schema, name } = parseTableParts(outputTable2);
   return [
     `    _df.to_sql("${escapePyString(name)}", _sql._engine, schema="${escapePyString(schema)}", if_exists="replace", index=False)`,
-    `    print(f"[${label}] wrote {len(_df)} rows to ${escapePyString(outputTable)}")`
+    `    print(f"[${label}] wrote {len(_df)} rows to ${escapePyString(outputTable2)}")`
   ];
 }
 
 // web/lib/elt/native-components/definitions/table-ops.ts
 var replaceValuesComponent = {
   id: "replace_values",
+  aliases: ["find_replace", "map_values"],
   name: "Replace values",
   category: "transformation",
   description: "Replace cell values in selected columns (pandas replace).",
@@ -77,7 +78,7 @@ var replaceValuesComponent = {
   }
 };
 
-// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-SfOGBH/replace_values.ts
+// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-gKMp94/replace_values.ts
 function compile(config) {
   return replaceValuesComponent.compile(config);
 }

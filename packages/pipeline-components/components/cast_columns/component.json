@@ -1,7 +1,8 @@
 {
   "id": "cast_columns",
   "aliases": [
-    "make_columns"
+    "make_columns",
+    "type_coercer"
   ],
   "name": "Cast columns",
   "category": "transformation",

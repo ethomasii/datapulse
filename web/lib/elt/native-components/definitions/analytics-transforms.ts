@@ -10,7 +10,7 @@ function outputParts(output: string) {
 
 export const pivotComponent: NativeComponentDefinition = {
   id: "pivot",
-  aliases: ["pivot_table", "pivot_transform"],
+  aliases: ["pivot_table", "pivot_transform", "cross_tab"],
   name: "Pivot table",
   category: "transformation",
   description: "Pivot long data to wide format (pandas pivot_table).",

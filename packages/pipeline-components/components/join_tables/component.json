@@ -3,7 +3,13 @@
   "aliases": [
     "dataframe_join",
     "lookup",
-    "dataframe_lookup"
+    "dataframe_lookup",
+    "warehouse_join",
+    "inner_join",
+    "left_join",
+    "right_join",
+    "outer_join",
+    "full_outer_join"
   ],
   "name": "Join tables",
   "category": "transformation",

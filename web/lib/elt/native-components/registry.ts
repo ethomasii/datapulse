@@ -14,7 +14,7 @@ import {
   kafkaMonitorComponent,
   sqlMonitorComponent,
 } from "./definitions/sensor-monitors";
-import { s3IngestComponent, sqsIngestComponent, kafkaIngestComponent, restApiIngestComponent, sqlToDatabaseComponent } from "./definitions/ingestion-hints";
+import { s3IngestComponent, sqsIngestComponent, kafkaIngestComponent, restApiIngestComponent, sqlToDatabaseComponent, gcsIngestComponent } from "./definitions/ingestion-hints";
 import { renameColumnsComponent, castColumnsComponent } from "./definitions/column-ops";
 import {
   groupAggregateComponent,
@@ -32,6 +32,20 @@ import {
   dataCleansingComponent,
   datetimeParserComponent,
 } from "./definitions/analytics-transforms";
+import {
+  unpivotComponent,
+  rankComponent,
+  runningTotalComponent,
+  recordIdComponent,
+  textToColumnsComponent,
+  jsonFlattenComponent,
+  oneHotEncodingComponent,
+  trainTestSplitComponent,
+  topNPerGroupComponent,
+  countRecordsComponent,
+  auditColumnsComponent,
+  semiJoinComponent,
+} from "./definitions/more-transforms";
 import type { NativeComponentDefinition } from "./types";
 
 const ALL_NATIVE: NativeComponentDefinition[] = [
@@ -68,6 +82,19 @@ const ALL_NATIVE: NativeComponentDefinition[] = [
   antiJoinComponent,
   dataCleansingComponent,
   datetimeParserComponent,
+  unpivotComponent,
+  rankComponent,
+  runningTotalComponent,
+  recordIdComponent,
+  textToColumnsComponent,
+  jsonFlattenComponent,
+  oneHotEncodingComponent,
+  trainTestSplitComponent,
+  topNPerGroupComponent,
+  countRecordsComponent,
+  auditColumnsComponent,
+  semiJoinComponent,
+  gcsIngestComponent,
 ];
 
 const byId = new Map<string, NativeComponentDefinition>();

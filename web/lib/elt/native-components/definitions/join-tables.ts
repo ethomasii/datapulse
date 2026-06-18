@@ -1,5 +1,6 @@
 import { escapePyString } from "@/lib/elt/escape-py";
 import type { NativeComponentDefinition } from "../types";
+import { joinHowFromTemplate } from "./_config-helpers";
 
 function strList(v: unknown): string[] {
   if (Array.isArray(v)) return v.map(String).filter(Boolean);
@@ -11,7 +12,17 @@ function strList(v: unknown): string[] {
 
 export const joinTablesComponent: NativeComponentDefinition = {
   id: "join_tables",
-  aliases: ["dataframe_join", "lookup", "dataframe_lookup"],
+  aliases: [
+    "dataframe_join",
+    "lookup",
+    "dataframe_lookup",
+    "warehouse_join",
+    "inner_join",
+    "left_join",
+    "right_join",
+    "outer_join",
+    "full_outer_join",
+  ],
   name: "Join tables",
   category: "transformation",
   description: "Join two loaded warehouse tables after sync (pandas via destination SQL client).",
@@ -97,7 +108,7 @@ export const joinTablesComponent: NativeComponentDefinition = {
     const right =
       String(config.right_table ?? config.right_asset_key ?? "").trim();
     const output = String(config.output_table ?? config.asset_name ?? "").trim();
-    const how = String(config.how ?? "inner").trim() || "inner";
+    const how = joinHowFromTemplate(config, "inner");
     const on = strList(config.on);
     const leftOn = strList(config.left_on);
     const rightOn = strList(config.right_on);

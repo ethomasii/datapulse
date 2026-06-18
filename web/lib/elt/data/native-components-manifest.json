@@ -2,7 +2,7 @@
   "version": "1",
   "repository": "ethomasii/eltpulse-pipeline-components",
   "description": "Native executable pipeline components for eltPulse declarative v2",
-  "last_exported": "2026-06-18T21:29:04.998Z",
+  "last_exported": "2026-06-18T21:56:03.415Z",
   "sourceRepository": "eltpulsehq/datapulse",
   "sourcePath": "web/lib/elt/native-components/definitions",
   "components": [
@@ -38,6 +38,19 @@
     "cross_join",
     "anti_join",
     "data_cleansing",
-    "datetime_parser"
+    "datetime_parser",
+    "unpivot",
+    "rank",
+    "running_total",
+    "record_id",
+    "text_to_columns",
+    "json_flatten",
+    "one_hot_encoding",
+    "train_test_split",
+    "top_n_per_group",
+    "count_records",
+    "audit_columns",
+    "semi_join",
+    "gcs_to_database_asset"
   ]
 }

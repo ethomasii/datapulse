@@ -3,7 +3,7 @@ import { pandasReadTable, pandasWriteTable } from "./_pandas-helpers";
 
 export const renameColumnsComponent: NativeComponentDefinition = {
   id: "rename_columns",
-  aliases: ["dynamic_rename"],
+  aliases: ["dynamic_rename", "field_mapper"],
   name: "Rename columns",
   category: "transformation",
   description: "Rename columns on a loaded table (pandas).",
@@ -55,7 +55,7 @@ export const renameColumnsComponent: NativeComponentDefinition = {
 
 export const castColumnsComponent: NativeComponentDefinition = {
   id: "cast_columns",
-  aliases: ["make_columns"],
+  aliases: ["make_columns", "type_coercer"],
   name: "Cast columns",
   category: "transformation",
   description: "Cast column dtypes after load (pandas astype).",

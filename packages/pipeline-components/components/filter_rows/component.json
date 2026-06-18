@@ -2,7 +2,10 @@
   "id": "filter_rows",
   "aliases": [
     "dataframe_filter",
-    "row_filter"
+    "row_filter",
+    "filter",
+    "warehouse_filter",
+    "select_records"
   ],
   "name": "Filter rows",
   "category": "transformation",

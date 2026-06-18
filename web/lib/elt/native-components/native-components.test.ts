@@ -103,7 +103,17 @@ describe("native-components", () => {
     expect(sensors.length).toBe(1);
   });
 
-  it("lists 33 native components", () => {
-    expect(listNativeComponents().length).toBe(33);
+  it("lists 46 native components", () => {
+    expect(listNativeComponents().length).toBe(46);
+  });
+
+  it("resolves catalog aliases to native compilers", () => {
+    expect(isNativeComponent("summarize")).toBe(true);
+    expect(getNativeComponent("summarize")?.id).toBe("group_aggregate");
+    expect(isNativeComponent("unpivot")).toBe(true);
+    expect(isNativeComponent("melt")).toBe(true);
+    expect(getNativeComponent("melt")?.id).toBe("unpivot");
+    expect(isNativeComponent("left_join")).toBe(true);
+    expect(isNativeComponent("gcs_to_database_asset")).toBe(true);
   });
 });

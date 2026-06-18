@@ -1,7 +1,8 @@
 {
   "id": "fill_nulls",
   "aliases": [
-    "impute_nulls"
+    "impute_nulls",
+    "imputation"
   ],
   "name": "Fill nulls",
   "category": "transformation",

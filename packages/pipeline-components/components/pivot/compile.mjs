@@ -28,7 +28,7 @@ function outputParts(output) {
 }
 var pivotComponent = {
   id: "pivot",
-  aliases: ["pivot_table", "pivot_transform"],
+  aliases: ["pivot_table", "pivot_transform", "cross_tab"],
   name: "Pivot table",
   category: "transformation",
   description: "Pivot long data to wide format (pandas pivot_table).",
@@ -69,7 +69,7 @@ var pivotComponent = {
   }
 };
 
-// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-SfOGBH/pivot.ts
+// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-gKMp94/pivot.ts
 function compile(config) {
   return pivotComponent.compile(config);
 }

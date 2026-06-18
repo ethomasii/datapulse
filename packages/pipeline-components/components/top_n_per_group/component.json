@@ -1,0 +1,49 @@
+{
+  "id": "top_n_per_group",
+  "name": "Top N per group",
+  "category": "transformation",
+  "description": "Keep top N rows per group after sorting.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "group_by",
+      "label": "Group by",
+      "type": "string_list",
+      "required": true
+    },
+    {
+      "key": "sort_column",
+      "label": "Sort column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "n",
+      "label": "N per group",
+      "type": "number",
+      "default": 1
+    },
+    {
+      "key": "ascending",
+      "label": "Ascending sort",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

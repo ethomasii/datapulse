@@ -1,6 +1,7 @@
 // web/lib/elt/native-components/definitions/ingestion-hints.ts
 var sqlToDatabaseComponent = {
   id: "sql_to_database_asset",
+  aliases: ["database_replication"],
   name: "SQL database replicate",
   category: "ingestion",
   description: "Merge Sling/database replication table hints into source configuration.",
@@ -28,7 +29,7 @@ var sqlToDatabaseComponent = {
   }
 };
 
-// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-SfOGBH/sql_to_database_asset.ts
+// ../../../../private/var/folders/hr/vjhs9sj942g3fj0z8qyvxxm40000gn/T/eltpulse-compile-gKMp94/sql_to_database_asset.ts
 function compile(config) {
   return sqlToDatabaseComponent.compile(config);
 }
