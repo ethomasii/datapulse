@@ -13,6 +13,7 @@ import {
   Table2,
   Workflow,
 } from "lucide-react";
+import { CatalogAccessBanner } from "@/components/catalog/catalog-access-banner";
 import { RelatedLinks } from "@/components/ui/related-links";
 import { assetDetailHref } from "@/lib/elt/asset-path";
 
@@ -148,6 +149,8 @@ export function CatalogHubClient() {
           </div>
         ) : null}
       </section>
+
+      <CatalogAccessBanner />
 
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-slate-500">

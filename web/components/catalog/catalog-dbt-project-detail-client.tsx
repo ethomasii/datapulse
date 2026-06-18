@@ -13,10 +13,14 @@ import {
 import { DbtConfigFields, type DbtConfigValues } from "@/components/dbt/dbt-config-fields";
 import { SavedDestinationSelect } from "@/components/elt/saved-destination-select";
 import type { DbtProjectSummary } from "@/lib/elt/dbt-projects";
+import { CatalogAccessBanner } from "@/components/catalog/catalog-access-banner";
+import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 
 type PipelineOption = { id: string; name: string };
 
 export function CatalogDbtProjectDetailClient({ projectId }: { projectId: string }) {
+  const { permissions } = useWorkspacePermissions();
+  const canWrite = permissions?.canWrite ?? false;
   const [project, setProject] = useState<DbtProjectSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -186,6 +190,8 @@ export function CatalogDbtProjectDetailClient({ projectId }: { projectId: string
         ) : null}
       </div>
 
+      <CatalogAccessBanner />
+
       {error ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
           {error}
@@ -198,24 +204,28 @@ export function CatalogDbtProjectDetailClient({ projectId }: { projectId: string
       ) : null}
 
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={running !== null}
-          onClick={() => void triggerDbt("run")}
-          className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-800 disabled:opacity-50 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200"
-        >
-          {running === "run" ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
-          Run dbt
-        </button>
-        <button
-          type="button"
-          disabled={running !== null}
-          onClick={() => void triggerDbt("compile")}
-          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-200"
-        >
-          {running === "compile" ? <Loader2 className="h-4 w-4 animate-spin" /> : <GitBranch className="h-4 w-4" />}
-          Compile
-        </button>
+        {canWrite ? (
+          <>
+            <button
+              type="button"
+              disabled={running !== null}
+              onClick={() => void triggerDbt("run")}
+              className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-800 disabled:opacity-50 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200"
+            >
+              {running === "run" ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
+              Run dbt
+            </button>
+            <button
+              type="button"
+              disabled={running !== null}
+              onClick={() => void triggerDbt("compile")}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-200"
+            >
+              {running === "compile" ? <Loader2 className="h-4 w-4 animate-spin" /> : <GitBranch className="h-4 w-4" />}
+              Compile
+            </button>
+          </>
+        ) : null}
         <Link
           href="/runs"
           className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-200"
@@ -250,30 +260,32 @@ export function CatalogDbtProjectDetailClient({ projectId }: { projectId: string
             ))}
           </ul>
         )}
-        <div className="mt-4 flex flex-wrap gap-2">
-          <select
-            value={linkPipelineId}
-            onChange={(e) => setLinkPipelineId(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-          >
-            <option value="">Link to pipeline…</option>
-            {pipelines
-              .filter((p) => !project.linkedPipelineIds.includes(p.id))
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-          </select>
-          <button
-            type="button"
-            disabled={!linkPipelineId}
-            onClick={() => void linkPipeline()}
-            className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-sm font-medium text-sky-800 disabled:opacity-50 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200"
-          >
-            Link pipeline
-          </button>
-        </div>
+        {canWrite ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <select
+              value={linkPipelineId}
+              onChange={(e) => setLinkPipelineId(e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+            >
+              <option value="">Link to pipeline…</option>
+              {pipelines
+                .filter((p) => !project.linkedPipelineIds.includes(p.id))
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+            </select>
+            <button
+              type="button"
+              disabled={!linkPipelineId}
+              onClick={() => void linkPipeline()}
+              className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-sm font-medium text-sky-800 disabled:opacity-50 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200"
+            >
+              Link pipeline
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 space-y-4">
@@ -284,34 +296,40 @@ export function CatalogDbtProjectDetailClient({ projectId }: { projectId: string
           sourceSlug={project.sourceSlug ?? undefined}
           dbtProjectId={projectId}
         />
-        <div>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Warehouse</h3>
-          <SavedDestinationSelect value={destinationConnectionId} onChange={setDestinationConnectionId} />
-        </div>
-        <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200">
-            <input type="checkbox" checked={scheduleEnabled} onChange={(e) => setScheduleEnabled(e.target.checked)} />
-            Scheduled dbt-only runs
-          </label>
-          {scheduleEnabled ? (
-            <input
-              type="text"
-              value={cronSchedule}
-              onChange={(e) => setCronSchedule(e.target.value)}
-              placeholder="0 6 * * *"
-              className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-            />
-          ) : null}
-        </div>
-        <button
-          type="button"
-          disabled={saving}
-          onClick={() => void save()}
-          className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Save changes
-        </button>
+        {canWrite ? (
+          <>
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Warehouse</h3>
+              <SavedDestinationSelect value={destinationConnectionId} onChange={setDestinationConnectionId} />
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200">
+                <input type="checkbox" checked={scheduleEnabled} onChange={(e) => setScheduleEnabled(e.target.checked)} />
+                Scheduled dbt-only runs
+              </label>
+              {scheduleEnabled ? (
+                <input
+                  type="text"
+                  value={cronSchedule}
+                  onChange={(e) => setCronSchedule(e.target.value)}
+                  placeholder="0 6 * * *"
+                  className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                />
+              ) : null}
+            </div>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void save()}
+              className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Save changes
+            </button>
+          </>
+        ) : (
+          <p className="text-sm text-slate-500">Read-only — pipeline changes require a member role.</p>
+        )}
       </section>
 
       {project.hubPackageKey ? (

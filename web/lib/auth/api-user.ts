@@ -10,6 +10,8 @@ export const API_SCOPES = {
   RUNS_WRITE: "runs:write",
   CONNECTIONS_READ: "connections:read",
   CONNECTIONS_WRITE: "connections:write",
+  CATALOG_READ: "catalog:read",
+  CATALOG_WRITE: "catalog:write",
 } as const;
 
 export type ApiScope = (typeof API_SCOPES)[keyof typeof API_SCOPES];

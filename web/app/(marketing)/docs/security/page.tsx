@@ -12,10 +12,19 @@ export default function SecurityDocsPage() {
     <DocsProse>
       <h1>Security &amp; data</h1>
 
-      <h2>Authentication</h2>
+      <h2>Authentication &amp; workspace access</h2>
       <p>
-        End users sign in with <strong>Clerk</strong>. We map Clerk users to rows in our database and scope all pipeline
-        data by <code>userId</code>.
+        End users sign in with <strong>Clerk</strong>. We map Clerk users to rows in our database. Pipeline and catalog
+        data are scoped by workspace owner ids — organization members access the owner&apos;s shared resources according
+        to their invite role.
+      </p>
+
+      <h2>Team roles (RBAC)</h2>
+      <p>
+        Organization owners invite teammates with roles: <strong>member</strong> (full write), <strong>viewer</strong>{" "}
+        (read-only), <strong>catalog editor</strong> (metadata edit only), and <strong>catalog browser</strong> (browse
+        public-tagged catalog entries only). See <Link href="/docs/catalog">Catalog &amp; assets</Link> for the full
+        matrix and API scopes (<code>catalog:read</code>, <code>catalog:write</code>, <code>pipelines:*</code>).
       </p>
 
       <h2>Data at rest</h2>

@@ -11,6 +11,7 @@ import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
 import { prismaSchemaDriftResponse } from "@/lib/db/prisma-schema-drift-response";
 import { resolveRouteParamId } from "@/lib/server/route-params";
+import { assertCanWritePipelines, hasCatalogReadScope } from "@/lib/auth/workspace-auth-helpers";
 import {
   assertDbtProjectAccess,
   linkDbtProjectToPipeline,
@@ -39,7 +40,7 @@ const patchSchema = z.object({
 export async function GET(req: Request, ctx: Ctx) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
-  if (!hasScope(auth, API_SCOPES.PIPELINES_READ)) return scopeForbiddenResponse();
+  if (!hasCatalogReadScope(auth)) return scopeForbiddenResponse();
 
   const id = await resolveRouteParamId(ctx.params);
   try {
@@ -65,6 +66,8 @@ export async function PUT(req: Request, ctx: Ctx) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
   if (!hasScope(auth, API_SCOPES.PIPELINES_WRITE)) return scopeForbiddenResponse();
+  const denied = await assertCanWritePipelines(auth.user.id);
+  if (denied) return denied;
 
   const id = await resolveRouteParamId(ctx.params);
   const parsed = patchSchema.safeParse(await req.json().catch(() => null));
@@ -119,6 +122,8 @@ export async function DELETE(req: Request, ctx: Ctx) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
   if (!hasScope(auth, API_SCOPES.PIPELINES_WRITE)) return scopeForbiddenResponse();
+  const denied = await assertCanWritePipelines(auth.user.id);
+  if (denied) return denied;
 
   const id = await resolveRouteParamId(ctx.params);
   try {

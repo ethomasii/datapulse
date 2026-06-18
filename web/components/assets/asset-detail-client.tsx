@@ -12,6 +12,7 @@ import {
   Table2,
 } from "lucide-react";
 import { AssetCatalogMetaEditor } from "@/components/assets/asset-catalog-meta-editor";
+import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 import {
   AssetFreshnessBadge,
   AssetKindBadge,
@@ -53,6 +54,8 @@ function formatRelative(iso: string | null | undefined): string {
 }
 
 export function AssetDetailClient({ assetKey }: { assetKey: string }) {
+  const { permissions } = useWorkspacePermissions();
+  const canEditCatalog = permissions?.canEditCatalog ?? false;
   const [data, setData] = useState<AssetDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -168,6 +171,7 @@ export function AssetDetailClient({ assetKey }: { assetKey: string }) {
             <div className="mt-4">
               <AssetCatalogMetaEditor
                 variant="detail"
+                readOnly={!canEditCatalog}
                 assetKey={asset.id}
                 kind={asset.kind}
                 pipelineId={asset.pipelineId}

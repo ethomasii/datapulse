@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { CreatePipelineBody } from '@/lib/elt/types';
 import type { InlineField } from '@/app/api/elt/ai-assistant/route';
+import { useWorkspacePermissions } from '@/lib/hooks/use-workspace-permissions';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -19,11 +20,12 @@ interface Message {
 
 const STARTER_PROMPTS = [
   'Load GitHub issues and PRs into Snowflake',
-  'Sync Stripe payments to BigQuery incrementally',
+  'Sync Stripe payments to BigQuery with dbt staging',
   'Pull HubSpot contacts into Postgres',
   'Connect a REST API to DuckDB',
   'Replicate a Postgres table to Redshift',
-  'What sources do you support?',
+  'GitHub → Snowflake EL+T with dbt models after load',
+  'What workspace dbt projects do I have?',
 ];
 
 const FOLLOW_UPS = [
@@ -205,6 +207,7 @@ function PipelineActions({
   savedKeys,
   onSaveWithPayload,
   onOpenBuilder,
+  onOpenCanvas,
 }: {
   msg: Message;
   msgIdx: number;
@@ -212,6 +215,7 @@ function PipelineActions({
   savedKeys: Set<string>;
   onSaveWithPayload: (payload: CreatePipelineBody, key: string) => Promise<void>;
   onOpenBuilder: (pipelineId?: string) => void;
+  onOpenCanvas: (pipelineId?: string) => void;
 }) {
   const [reviewed, setReviewed] = useState(false);
   const [mode, setMode] = useState<'buttons' | 'inline'>('buttons');
@@ -224,14 +228,20 @@ function PipelineActions({
 
   if (isSaved || savedWithPlaceholders) {
     return (
-      <div className="mt-2.5 pt-2.5 border-t border-slate-700 flex items-center gap-2">
+      <div className="mt-2.5 pt-2.5 border-t border-slate-700 flex flex-wrap items-center gap-2">
         <CheckCircle className="h-3.5 w-3.5 text-teal-400" />
         <span className="text-xs text-teal-400 font-medium">Saved!</span>
         <button
           onClick={() => onOpenBuilder()}
           className="ml-auto flex items-center gap-1 text-[11px] text-slate-400 hover:text-white transition-colors"
         >
-          <ExternalLink className="h-3 w-3" /> Open in builder
+          <ExternalLink className="h-3 w-3" /> Form builder
+        </button>
+        <button
+          onClick={() => onOpenCanvas()}
+          className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white transition-colors"
+        >
+          <ExternalLink className="h-3 w-3" /> Canvas
         </button>
       </div>
     );
@@ -311,6 +321,8 @@ function PipelineActions({
 
 export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPipelineSaved?: (name: string) => void; inline?: boolean }) {
   const router = useRouter();
+  const { permissions, loading: permsLoading } = useWorkspacePermissions();
+  const canWrite = permissions?.canWrite ?? true;
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -331,7 +343,7 @@ export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPip
   }, [open]);
 
   const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || loading) return;
+    if (!text.trim() || loading || !canWrite) return;
     const userMsg: Message = { role: 'user', content: text.trim() };
     const next = [...messages, userMsg];
     setMessages(next);
@@ -357,9 +369,10 @@ export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPip
     } finally {
       setLoading(false);
     }
-  }, [messages, loading]);
+  }, [messages, loading, canWrite]);
 
   const savePipeline = useCallback(async (payload: CreatePipelineBody, key: string) => {
+    if (!canWrite) return;
     setSavingKey(key);
     try {
       const res = await fetch('/api/elt/pipelines', {
@@ -383,11 +396,16 @@ export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPip
     } finally {
       setSavingKey(null);
     }
-  }, [onPipelineSaved]);
+  }, [onPipelineSaved, canWrite]);
 
   const openBuilder = useCallback((id?: string) => {
     const target = id ?? savedPipelineId;
     router.push(target ? `/builder?pipeline=${encodeURIComponent(target)}` : '/builder');
+  }, [router, savedPipelineId]);
+
+  const openCanvas = useCallback((id?: string) => {
+    const target = id ?? savedPipelineId;
+    router.push(target ? `/builder/canvas?pipeline=${encodeURIComponent(target)}` : '/builder/canvas');
   }, [router, savedPipelineId]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -399,10 +417,17 @@ export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPip
   const panelW = expanded ? 'w-[480px]' : 'w-[420px]';
   const panelH = expanded ? 'h-[680px]' : 'h-[520px]';
 
+  const readOnlyBanner = !permsLoading && permissions && !canWrite ? (
+    <div className="mb-3 rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-xs text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+      Read-only role ({permissions.role}) — you can ask questions about connectors and catalog, but saving pipelines requires a member invite.
+    </div>
+  ) : null;
+
   // ── Inline variant: embedded in the builder page ─────────────────────────────
   if (inline) {
     return (
       <div className="flex flex-col" style={{ height: '420px' }}>
+        {readOnlyBanner}
         <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 pr-1">
           {messages.length === 0 && (
             <div className="space-y-3">
@@ -436,7 +461,7 @@ export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPip
                 ) : (
                   <>
                     {renderContent(msg.content)}
-                    <PipelineActions msg={msg} msgIdx={idx} savingKey={savingKey} savedKeys={savedKeys} onSaveWithPayload={savePipeline} onOpenBuilder={openBuilder} />
+                    <PipelineActions msg={msg} msgIdx={idx} savingKey={savingKey} savedKeys={savedKeys} onSaveWithPayload={savePipeline} onOpenBuilder={openBuilder} onOpenCanvas={openCanvas} />
                   </>
                 )}
               </div>
@@ -469,7 +494,7 @@ export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPip
           />
           <button
             onClick={() => void sendMessage(input)}
-            disabled={!input.trim() || loading}
+            disabled={!input.trim() || loading || !canWrite}
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-40 transition-colors"
           >
             <Send className="h-3.5 w-3.5" />
@@ -514,6 +539,7 @@ export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPip
 
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+            {readOnlyBanner}
             {messages.length === 0 && (
               <div className="space-y-3">
                 <div className="flex items-start gap-2">
@@ -554,6 +580,7 @@ export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPip
                         savedKeys={savedKeys}
                         onSaveWithPayload={savePipeline}
                         onOpenBuilder={openBuilder}
+                        onOpenCanvas={openCanvas}
                       />
                     </>
                   )}
@@ -602,7 +629,7 @@ export function AiPipelineAssistant({ onPipelineSaved, inline = false }: { onPip
               />
               <button
                 onClick={() => void sendMessage(input)}
-                disabled={!input.trim() || loading}
+                disabled={!input.trim() || loading || !canWrite}
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-40 transition-colors"
               >
                 <Send className="h-3.5 w-3.5" />

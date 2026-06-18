@@ -22,10 +22,18 @@ export default function GettingStartedDocsPage() {
           Open <Link href="/builder">Pipelines</Link>.
         </li>
         <li>
-          Pick a <strong>name</strong> (snake_case), <strong>source</strong>, and <strong>destination</strong>.
+          Pick <strong>Browse catalog</strong>, <strong>AI Builder</strong>, or <strong>Manual</strong> create mode.
+        </li>
+        <li>
+          Pick a <strong>name</strong> (snake_case), <strong>source</strong>, and <strong>destination</strong> (manual /
+          AI) or use the catalog wizard.
         </li>
         <li>
           Use <strong>Guided</strong> mode for GitHub or REST, or <strong>JSON</strong> for advanced configuration.
+        </li>
+        <li>
+          Optional: add post-load <strong>dbt</strong>, link a workspace dbt project, or open the{" "}
+          <Link href="/builder/canvas">visual canvas</Link> after save.
         </li>
         <li>
           Submit — we store the definition and generate <code>pipeline.py</code> or <code>replication.yaml</code>,{" "}
@@ -52,7 +60,10 @@ export default function GettingStartedDocsPage() {
           <Link href="/docs/concepts">Concepts</Link> — pipelines, runs, connections, monitors, gateways.
         </li>
         <li>
-          <Link href="/docs/pipelines">Pipelines — concepts</Link>
+          <Link href="/docs/ai-builder">AI Builder</Link> — natural-language pipeline creation.
+        </li>
+        <li>
+          <Link href="/docs/catalog">Catalog &amp; assets</Link> — browse, tag, and team RBAC.
         </li>
         <li>
           <Link href="/integrations">Integrations (app)</Link>

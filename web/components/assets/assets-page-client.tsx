@@ -15,7 +15,9 @@ import {
   Table2,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
+import { CatalogAccessBanner } from "@/components/catalog/catalog-access-banner";
 import { RelatedLinks } from "@/components/ui/related-links";
+import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 import {
   AssetFreshnessBadge,
   AssetKindBadge,
@@ -245,6 +247,8 @@ function PipelineBundleCard({ bundle, defaultOpen }: { bundle: PipelineAssetBund
 
 export function AssetsPageClient() {
   const searchParams = useSearchParams();
+  const { permissions } = useWorkspacePermissions();
+  const canEditCatalog = permissions?.canEditCatalog ?? false;
   const pipelineFilter = searchParams.get("pipeline")?.trim() ?? "";
   const [data, setData] = useState<AssetsPageData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -337,6 +341,8 @@ export function AssetsPageClient() {
         </p>
       </div>
 
+      <CatalogAccessBanner />
+
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-slate-500">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -392,15 +398,17 @@ export function AssetsPageClient() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void importMetadata()}
-                disabled={importingMeta}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-sky-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-              >
-                {importingMeta ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                Import from pipelines
-              </button>
+              {canEditCatalog ? (
+                <button
+                  type="button"
+                  onClick={() => void importMetadata()}
+                  disabled={importingMeta}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-sky-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                >
+                  {importingMeta ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  Import from pipelines
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => void load(true)}

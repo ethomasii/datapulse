@@ -2,22 +2,29 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import {
-  API_SCOPES,
-  hasScope,
   resolveApiUser,
   scopeForbiddenResponse,
   unauthorizedResponse,
 } from "@/lib/auth/api-user";
-import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
+import { filterCatalogEntriesByVisibility } from "@/lib/auth/catalog-access";
+import { getAccessibleResourceOwnerIds, pipelineOwnerWhere } from "@/lib/auth/workspace-access";
+import {
+  assertCanEditCatalog,
+  hasCatalogReadScope,
+  hasCatalogWriteScope,
+} from "@/lib/auth/workspace-auth-helpers";
+import { getWorkspacePermissions, workspaceResourceUserId } from "@/lib/auth/org-permissions";
 import { db } from "@/lib/db/client";
 import { parseTags } from "@/lib/elt/catalog-entries";
+
 export async function GET(req: Request) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
-  if (!hasScope(auth, API_SCOPES.PIPELINES_READ)) return scopeForbiddenResponse();
+  if (!hasCatalogReadScope(auth)) return scopeForbiddenResponse();
 
   const pipelineId = new URL(req.url).searchParams.get("pipelineId")?.trim() || undefined;
   const q = new URL(req.url).searchParams.get("q")?.trim().toLowerCase() || "";
+  const perms = await getWorkspacePermissions(auth.user.id);
   const ownerIds = await getAccessibleResourceOwnerIds(auth.user.id);
 
   const rows = await db.catalogEntry.findMany({
@@ -28,8 +35,10 @@ export async function GET(req: Request) {
     orderBy: { updatedAt: "desc" },
   });
 
+  const visible = filterCatalogEntriesByVisibility(rows, perms.catalogVisibility);
+
   const entries = q
-    ? rows.filter((row) => {
+    ? visible.filter((row) => {
         const tags = parseTags(row.tags);
         const hay = [
           row.assetKey,
@@ -42,9 +51,15 @@ export async function GET(req: Request) {
           .toLowerCase();
         return hay.includes(q);
       })
-    : rows;
+    : visible;
 
-  return NextResponse.json({ entries });
+  return NextResponse.json({
+    entries,
+    permissions: {
+      canEditCatalog: perms.canEditCatalog,
+      catalogVisibility: perms.catalogVisibility,
+    },
+  });
 }
 
 const patchSchema = z.object({
@@ -60,20 +75,26 @@ const patchSchema = z.object({
 export async function PUT(req: Request) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
-  if (!hasScope(auth, API_SCOPES.PIPELINES_WRITE)) return scopeForbiddenResponse();
+  if (!hasCatalogWriteScope(auth)) return scopeForbiddenResponse();
+
+  const denied = await assertCanEditCatalog(auth.user.id);
+  if (denied) return denied;
 
   const body = patchSchema.safeParse(await req.json().catch(() => null));
   if (!body.success) {
     return NextResponse.json({ error: body.error.flatten() }, { status: 400 });
   }
 
+  const perms = await getWorkspacePermissions(auth.user.id);
+  const resourceUserId = workspaceResourceUserId(perms, auth.user.id);
   const data = body.data;
+
   const row = await db.catalogEntry.upsert({
     where: {
-      userId_assetKey: { userId: auth.user.id, assetKey: data.assetKey },
+      userId_assetKey: { userId: resourceUserId, assetKey: data.assetKey },
     },
     create: {
-      userId: auth.user.id,
+      userId: resourceUserId,
       assetKey: data.assetKey,
       kind: data.kind ?? "asset",
       displayName: data.displayName ?? null,
@@ -98,7 +119,10 @@ export async function PUT(req: Request) {
 export async function POST(req: Request) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
-  if (!hasScope(auth, API_SCOPES.PIPELINES_WRITE)) return scopeForbiddenResponse();
+  if (!hasCatalogWriteScope(auth)) return scopeForbiddenResponse();
+
+  const denied = await assertCanEditCatalog(auth.user.id);
+  if (denied) return denied;
 
   const url = new URL(req.url);
   if (url.searchParams.get("action") !== "import") {
@@ -107,8 +131,9 @@ export async function POST(req: Request) {
 
   const { catalogEntriesFromAssets } = await import("@/lib/elt/catalog-entries");
   const { buildWorkspaceAssets } = await import("@/lib/elt/pipeline-assets");
-  const { pipelineOwnerWhere } = await import("@/lib/auth/workspace-access");
 
+  const perms = await getWorkspacePermissions(auth.user.id);
+  const resourceUserId = workspaceResourceUserId(perms, auth.user.id);
   const ownerIds = await getAccessibleResourceOwnerIds(auth.user.id);
   const rows = await db.eltPipeline.findMany({
     where: pipelineOwnerWhere(ownerIds),
@@ -124,13 +149,13 @@ export async function POST(req: Request) {
     },
   });
   const payload = buildWorkspaceAssets(rows);
-  const patches = catalogEntriesFromAssets(auth.user.id, payload);
+  const patches = catalogEntriesFromAssets(resourceUserId, payload);
   let imported = 0;
   for (const patch of patches) {
     await db.catalogEntry.upsert({
-      where: { userId_assetKey: { userId: auth.user.id, assetKey: patch.assetKey } },
+      where: { userId_assetKey: { userId: resourceUserId, assetKey: patch.assetKey } },
       create: {
-        userId: auth.user.id,
+        userId: resourceUserId,
         assetKey: patch.assetKey,
         kind: patch.kind ?? "asset",
         displayName: patch.displayName ?? null,

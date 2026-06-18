@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import {
-  API_SCOPES,
-  hasScope,
   resolveApiUser,
   scopeForbiddenResponse,
   unauthorizedResponse,
 } from "@/lib/auth/api-user";
+import { filterCatalogEntriesByVisibility } from "@/lib/auth/catalog-access";
 import { getAccessibleResourceOwnerIds, pipelineOwnerWhere } from "@/lib/auth/workspace-access";
+import { hasCatalogReadScope } from "@/lib/auth/workspace-auth-helpers";
+import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
 import { db } from "@/lib/db/client";
 import { dbtProjectsFromBundles } from "@/lib/elt/catalog-entries";
 import { buildWorkspaceAssets } from "@/lib/elt/pipeline-assets";
@@ -15,8 +16,9 @@ import { ALL_CONNECTORS } from "@/lib/elt/connectors-registry";
 export async function GET(req: Request) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
-  if (!hasScope(auth, API_SCOPES.PIPELINES_READ)) return scopeForbiddenResponse();
+  if (!hasCatalogReadScope(auth)) return scopeForbiddenResponse();
 
+  const perms = await getWorkspacePermissions(auth.user.id);
   const ownerIds = await getAccessibleResourceOwnerIds(auth.user.id);
   const pipelines = await db.eltPipeline.findMany({
     where: pipelineOwnerWhere(ownerIds),
@@ -37,7 +39,8 @@ export async function GET(req: Request) {
     select: { id: true, name: true, connector: true, connectionType: true },
   });
 
-  const catalogEntries = await db.catalogEntry.count({ where: { userId: { in: ownerIds } } });
+  const catalogRows = await db.catalogEntry.findMany({ where: { userId: { in: ownerIds } } });
+  const visibleCatalogRows = filterCatalogEntriesByVisibility(catalogRows, perms.catalogVisibility);
   const registeredDbtProjects = await db.dbtProject.count({ where: { userId: { in: ownerIds } } });
 
   const assetsPayload = buildWorkspaceAssets(pipelines);
@@ -52,9 +55,14 @@ export async function GET(req: Request) {
     summary: {
       pipelines: pipelines.length,
       connections: connections.length,
-      catalogEntries,
+      catalogEntries: visibleCatalogRows.length,
       dbtProjects: registeredDbtProjects,
       assets: assetsPayload.summary,
+    },
+    permissions: {
+      canEditCatalog: perms.canEditCatalog,
+      canWrite: perms.canWrite,
+      catalogVisibility: perms.catalogVisibility,
     },
     connectorUsage: {
       sources: Object.fromEntries(sourceUsage),

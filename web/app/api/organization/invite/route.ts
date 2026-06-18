@@ -39,11 +39,13 @@ export async function POST(req: Request) {
   }
 
   let email = "";
-  let role: "member" | "viewer" = "member";
+  const validRoles = ["member", "viewer", "catalog_editor", "catalog_browser"] as const;
+  type InviteRole = (typeof validRoles)[number];
+  let role: InviteRole = "member";
   try {
     const body = (await req.json()) as { email?: string; role?: string };
     email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-    if (body.role === "viewer") role = "viewer";
+    if (validRoles.includes(body.role as InviteRole)) role = body.role as InviteRole;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }

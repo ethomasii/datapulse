@@ -1,14 +1,72 @@
 import { db } from "@/lib/db/client";
 
-export type WorkspaceRole = "owner" | "member" | "viewer" | "solo";
+export type WorkspaceRole = "owner" | "member" | "viewer" | "catalog_editor" | "catalog_browser" | "solo";
+
+/** Who may browse catalog entries/assets in the workspace. */
+export type CatalogVisibility = "full" | "public_only";
 
 export type WorkspacePermissions = {
   role: WorkspaceRole;
+  /** Create/edit pipelines, connections, runs, canvas saves. */
   canWrite: boolean;
+  /** Edit catalog metadata (description, tags) without full pipeline write. */
+  canEditCatalog: boolean;
   canManageTeam: boolean;
   canManageBilling: boolean;
   resourceOwnerIds: string[];
+  /** When `public_only`, catalog reads filter to public-tagged entries. */
+  catalogVisibility: CatalogVisibility;
 };
+
+type InviteRole = "member" | "viewer" | "catalog_editor" | "catalog_browser";
+
+function permissionsFromInviteRole(
+  inviteRole: string,
+  ownerIds: string[]
+): Omit<WorkspacePermissions, "canManageTeam" | "canManageBilling"> & {
+  role: WorkspaceRole;
+} {
+  const role = (["member", "viewer", "catalog_editor", "catalog_browser"] as const).includes(
+    inviteRole as InviteRole
+  )
+    ? (inviteRole as InviteRole)
+    : "member";
+
+  switch (role) {
+    case "viewer":
+      return {
+        role: "viewer",
+        canWrite: false,
+        canEditCatalog: false,
+        catalogVisibility: "full",
+        resourceOwnerIds: ownerIds,
+      };
+    case "catalog_editor":
+      return {
+        role: "catalog_editor",
+        canWrite: false,
+        canEditCatalog: true,
+        catalogVisibility: "full",
+        resourceOwnerIds: ownerIds,
+      };
+    case "catalog_browser":
+      return {
+        role: "catalog_browser",
+        canWrite: false,
+        canEditCatalog: false,
+        catalogVisibility: "public_only",
+        resourceOwnerIds: ownerIds,
+      };
+    default:
+      return {
+        role: "member",
+        canWrite: true,
+        canEditCatalog: true,
+        catalogVisibility: "full",
+        resourceOwnerIds: ownerIds,
+      };
+  }
+}
 
 export async function getWorkspacePermissions(userId: string): Promise<WorkspacePermissions> {
   const user = await db.user.findUnique({
@@ -24,9 +82,11 @@ export async function getWorkspacePermissions(userId: string): Promise<Workspace
     return {
       role: "solo",
       canWrite: true,
+      canEditCatalog: true,
       canManageTeam: false,
       canManageBilling: true,
       resourceOwnerIds: [userId],
+      catalogVisibility: "full",
     };
   }
 
@@ -34,9 +94,11 @@ export async function getWorkspacePermissions(userId: string): Promise<Workspace
     return {
       role: "owner",
       canWrite: true,
+      canEditCatalog: true,
       canManageTeam: true,
       canManageBilling: true,
       resourceOwnerIds: [userId],
+      catalogVisibility: "full",
     };
   }
 
@@ -53,30 +115,36 @@ export async function getWorkspacePermissions(userId: string): Promise<Workspace
       },
       select: { role: true },
     });
-    const inviteRole = invite?.role ?? "member";
-    const isViewer = inviteRole === "viewer";
-    const ownerIds = org?.ownerUserId ? [org.ownerUserId, userId] : [userId];
+    const ownerIds = Array.from(
+      new Set(org?.ownerUserId ? [org.ownerUserId, userId] : [userId])
+    );
+    const base = permissionsFromInviteRole(invite?.role ?? "member", ownerIds);
     return {
-      role: isViewer ? "viewer" : "member",
-      canWrite: !isViewer,
+      ...base,
       canManageTeam: false,
       canManageBilling: false,
-      resourceOwnerIds: Array.from(new Set(ownerIds)),
     };
   }
 
   return {
     role: "solo",
     canWrite: true,
+    canEditCatalog: true,
     canManageTeam: false,
     canManageBilling: true,
     resourceOwnerIds: [userId],
+    catalogVisibility: "full",
   };
 }
 
 /** User id that owns shared workspace resources (connections, pipelines). */
 export function workspaceResourceUserId(perms: WorkspacePermissions, userId: string): string {
-  if (perms.role === "member" || perms.role === "viewer") {
+  if (
+    perms.role === "member" ||
+    perms.role === "viewer" ||
+    perms.role === "catalog_editor" ||
+    perms.role === "catalog_browser"
+  ) {
     return perms.resourceOwnerIds.find((id) => id !== userId) ?? userId;
   }
   return userId;

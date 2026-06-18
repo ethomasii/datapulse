@@ -11,6 +11,8 @@ import { FormAccordion } from "@/components/elt/form-accordion";
 import { GuidedDestinationBlock } from "@/components/elt/guided-destination-block";
 import { GuidedSourceBlock } from "@/components/elt/guided-source-block";
 import { CanvasTransformInspector } from "@/components/pipeline-canvas/canvas-transform-inspector";
+import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
+import type { DbtTransformNodeData } from "@/lib/elt/dbt-canvas";
 import { CanvasAssetLineagePanel } from "@/components/pipeline-canvas/canvas-asset-lineage-panel";
 import {
   type CanvasInspectorFocus,
@@ -88,6 +90,10 @@ export function CanvasPageClient() {
   const [newDestinationType, setNewDestinationType] = useState("duckdb");
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [linkedDbtProjectId, setLinkedDbtProjectId] = useState<string | null>(null);
+
+  const { permissions } = useWorkspacePermissions();
+  const canWrite = permissions?.canWrite ?? true;
 
   const graphAbortRef = useRef<AbortController | null>(null);
 
@@ -236,6 +242,7 @@ export function CanvasPageClient() {
       setPipelineSourceType("");
       setPipelineDestinationType("");
       setPipelineTool("dlt");
+      setLinkedDbtProjectId(null);
       setLoadedGraph(null);
     setLoadedSig("loading");
     setSourceConfigText("");
@@ -260,7 +267,13 @@ export function CanvasPageClient() {
         throw new Error(msg);
       }
       const data = await res.json();
-      const row = data.pipeline as { sourceType?: string; destinationType?: string; tool?: string };
+      const row = data.pipeline as {
+        sourceType?: string;
+        destinationType?: string;
+        tool?: string;
+        dbtProjectId?: string | null;
+      };
+      setLinkedDbtProjectId(row.dbtProjectId ?? null);
       setPipelineSourceType(typeof row.sourceType === "string" ? row.sourceType : "");
       setPipelineDestinationType(typeof row.destinationType === "string" ? row.destinationType : "");
       const st0 = typeof row.sourceType === "string" ? row.sourceType : "github";
@@ -441,16 +454,82 @@ export function CanvasPageClient() {
     setSelectedId((s) => (s === pipelineFromUrl ? s : pipelineFromUrl));
   }, [pipelineFromUrl, pipelines]);
 
+  function hasDbtTransform(nodes: Node[]): boolean {
+    return nodes.some(
+      (n) =>
+        n.type === "transformNode" &&
+        String((n.data as DbtTransformNodeData | undefined)?.transformTool) === "dbt"
+    );
+  }
+
+  function parseGitFromDbtPath(path: string): { gitUrl: string | null; packagePath: string } {
+    const trimmed = path.trim();
+    if (/^https?:\/\//i.test(trimmed)) {
+      return { gitUrl: trimmed, packagePath: trimmed };
+    }
+    return { gitUrl: null, packagePath: trimmed };
+  }
+
+  async function syncLinkedDbtProjectBeforeSave(nodes: Node[]): Promise<boolean> {
+    if (!linkedDbtProjectId || !hasDbtTransform(nodes)) return true;
+    const dbtNode = nodes.find(
+      (n) =>
+        n.type === "transformNode" &&
+        String((n.data as DbtTransformNodeData | undefined)?.transformTool) === "dbt"
+    );
+    if (!dbtNode) return true;
+    const d = (dbtNode.data ?? {}) as DbtTransformNodeData;
+    const { gitUrl, packagePath } = parseGitFromDbtPath(String(d.dbtPackagePath ?? ""));
+    if (!packagePath) {
+      setSaveError("dbt project path or Git URL is required");
+      return false;
+    }
+    const runScope = String(d.dbtRunScope ?? "all").trim() === "selection" ? "selection" : "all";
+    try {
+      const res = await fetch(`/api/elt/dbt/projects/${linkedDbtProjectId}`, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          packagePath,
+          gitUrl,
+          gitBranch: String(d.dbtRepositoryBranch ?? "").trim() || "main",
+          targetSchema: String(d.dbtDatasetName ?? "").trim() || null,
+          runScope,
+          selector: runScope === "selection" ? String(d.dbtSelector ?? "").trim() || null : null,
+        }),
+      });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(typeof err.error === "string" ? err.error : "Failed to update linked dbt project");
+      }
+      return true;
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Failed to update linked dbt project");
+      return false;
+    }
+  }
+
   async function handleSave(nodes: Node[], edges: Edge[]) {
-    if (!selectedId) return;
+    if (!selectedId || !canWrite) return;
     setSaving(true);
     setSaveError(null);
     try {
+      if (!(await syncLinkedDbtProjectBeforeSave(nodes))) {
+        setSaving(false);
+        return;
+      }
+      const body: Record<string, unknown> = { canvas: { nodes, edges, v: 1 } };
+      if (hasDbtTransform(nodes)) {
+        body.dbtProjectId = linkedDbtProjectId;
+      } else if (linkedDbtProjectId) {
+        body.dbtProjectId = null;
+      }
       const res = await fetch(`/api/elt/pipelines/${selectedId}`, {
         method: "PATCH",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ canvas: { nodes, edges, v: 1 } }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const err = (await res.json().catch(() => ({}))) as { error?: string; errors?: string[] };
@@ -484,7 +563,7 @@ export function CanvasPageClient() {
   }
 
   async function handleSaveSourceConfiguration() {
-    if (!selectedId) return;
+    if (!selectedId || !canWrite) return;
     setSourceConfigSaving(true);
     setSourceConfigError(null);
     try {
@@ -586,6 +665,9 @@ export function CanvasPageClient() {
             pipelineTool={pipelineTool}
             pipelineId={selectedId}
             sourceSlug={pipelineSourceType}
+            linkedDbtProjectId={linkedDbtProjectId}
+            onLinkedDbtProjectChange={setLinkedDbtProjectId}
+            readOnly={!canWrite}
             onPatch={(p) => canvasControlRef.current?.patchNodeData(focus.nodeId, p)}
           />
         </div>
@@ -607,7 +689,7 @@ export function CanvasPageClient() {
               <button
                 type="button"
                 onClick={() => void handleSaveSourceConfiguration()}
-                disabled={sourceConfigSaving}
+                disabled={sourceConfigSaving || !canWrite}
                 className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
               >
                 {sourceConfigSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
@@ -760,6 +842,12 @@ export function CanvasPageClient() {
   return (
     <div className={clsx("w-full min-w-0 max-w-7xl mx-auto space-y-6", showDockedInspector && "lg:pr-[380px]")}>
       <h1 className="text-left text-2xl font-bold text-slate-900 dark:text-white">Visual pipeline canvas</h1>
+
+      {!canWrite && permissions ? (
+        <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+          Read-only workspace role ({permissions.role}) — you can browse the canvas but cannot save pipeline changes.
+        </p>
+      ) : null}
 
       <div className="w-full min-w-0 space-y-4">
         {listLoading ? (
@@ -920,6 +1008,7 @@ export function CanvasPageClient() {
                   onSave={handleSave}
                   saving={saving}
                   saveError={saveError}
+                  saveDisabled={!canWrite}
                   pipelineSourceType={pipelineSourceType}
                   pipelineDestinationType={pipelineDestinationType}
                   onPickSourceType={(t) => void patchPipelineBindings({ sourceType: t })}

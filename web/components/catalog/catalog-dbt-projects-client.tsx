@@ -14,6 +14,8 @@ import {
   Plus,
 } from "lucide-react";
 import type { DbtProjectSummary } from "@/lib/elt/dbt-projects";
+import { CatalogAccessBanner } from "@/components/catalog/catalog-access-banner";
+import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 
 type LegacyDbtProject = {
   pipelineId: string;
@@ -28,6 +30,8 @@ type LegacyDbtProject = {
 };
 
 export function CatalogDbtProjectsClient() {
+  const { permissions } = useWorkspacePermissions();
+  const canWrite = permissions?.canWrite ?? false;
   const [projects, setProjects] = useState<DbtProjectSummary[]>([]);
   const [legacy, setLegacy] = useState<LegacyDbtProject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,13 +112,17 @@ export function CatalogDbtProjectsClient() {
             orchestrated EL+T.
           </p>
         </div>
-        <Link
-          href="/catalog/dbt/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
-        >
-          <Plus className="h-4 w-4" /> New project
-        </Link>
+        {canWrite ? (
+          <Link
+            href="/catalog/dbt/new"
+            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+          >
+            <Plus className="h-4 w-4" /> New project
+          </Link>
+        ) : null}
       </div>
+
+      <CatalogAccessBanner />
 
       {runError ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
@@ -133,12 +141,16 @@ export function CatalogDbtProjectsClient() {
               Create a standalone dbt project from Git or scaffold from the Transform hub — then optionally link it to a
               pipeline for post-load transforms.
             </p>
-            <Link
-              href="/catalog/dbt/new"
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
-            >
-              <Plus className="h-4 w-4" /> Create dbt project
-            </Link>
+            {canWrite ? (
+              <Link
+                href="/catalog/dbt/new"
+                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+              >
+                <Plus className="h-4 w-4" /> Create dbt project
+              </Link>
+            ) : (
+              <p className="mt-4 text-sm text-slate-500">Ask a workspace member to create dbt projects.</p>
+            )}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
@@ -203,19 +215,21 @@ export function CatalogDbtProjectsClient() {
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={running !== null}
-                  onClick={() => void triggerDbt({ dbtProjectId: p.id }, "run")}
-                  className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800 hover:border-violet-300 disabled:opacity-50 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200"
-                >
-                  {running === `${p.id}:run` ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <PlayCircle className="h-3.5 w-3.5" />
-                  )}{" "}
-                  Run dbt
-                </button>
+                {canWrite ? (
+                  <button
+                    type="button"
+                    disabled={running !== null}
+                    onClick={() => void triggerDbt({ dbtProjectId: p.id }, "run")}
+                    className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800 hover:border-violet-300 disabled:opacity-50 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200"
+                  >
+                    {running === `${p.id}:run` ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <PlayCircle className="h-3.5 w-3.5" />
+                    )}{" "}
+                    Run dbt
+                  </button>
+                ) : null}
                 <Link
                   href={`/catalog/dbt/${p.id}`}
                   className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-sky-300 dark:border-slate-700 dark:text-slate-200"
@@ -258,14 +272,16 @@ export function CatalogDbtProjectsClient() {
                     </div>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={!p.enabled || running !== null}
-                      onClick={() => void triggerDbt({ pipelineId: p.pipelineId }, "run")}
-                      className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800 disabled:opacity-50 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200"
-                    >
-                      Run dbt
-                    </button>
+                    {canWrite ? (
+                      <button
+                        type="button"
+                        disabled={!p.enabled || running !== null}
+                        onClick={() => void triggerDbt({ pipelineId: p.pipelineId }, "run")}
+                        className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800 disabled:opacity-50 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200"
+                      >
+                        Run dbt
+                      </button>
+                    ) : null}
                     <Link
                       href={`/builder?pipeline=${p.pipelineId}&dbt=1`}
                       className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:text-slate-200"

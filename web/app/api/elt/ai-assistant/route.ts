@@ -2,16 +2,24 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
+import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
+import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
 import { DLT_HUB_SOURCES, getDltHubSource, getDltHubSourcesByCategory } from "@/lib/elt/dlt-hub-registry";
 import { SOURCE_GROUPS, DESTINATION_GROUPS } from "@/lib/elt/catalog";
 import { chooseTool } from "@/lib/elt/choose-tool";
+import { toDbtProjectSummary } from "@/lib/elt/dbt-projects";
 import { generatePipelineArtifacts } from "@/lib/elt/generate-artifacts";
+import { setDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
+import { supportsInPipelineDbt } from "@/lib/elt/pipeline-tool-labels";
 import type { CreatePipelineBody } from "@/lib/elt/types";
 
 const MODEL = "claude-sonnet-4-6";
 const MAX_TOKENS = 4096;
 
-const SYSTEM_PROMPT = `You are the eltPulse Pipeline Builder AI. Your ONLY job is to generate pipeline configs as fast as possible.
+function buildSystemPrompt(workspaceBlock: string) {
+  return `You are the eltPulse Pipeline Builder AI. Your ONLY job is to generate pipeline configs as fast as possible.
+
+${workspaceBlock}
 
 ## Core rule: Generate immediately, don't interrogate
 
@@ -20,13 +28,25 @@ When a user describes a pipeline (e.g. "Load GitHub issues into Snowflake"), cal
 - Stripe: start_date="2024-01-01"
 - REST API: base_url from context or placeholder, pagination_type="auto"
 - Database sources: tables="public.users" as a placeholder
+- EL+T with dbt: set post_transform_type="dbt" and dbt_package_path to a Git URL or ./dbt path; use list_dbt_projects to link an existing workspace project via dbt_project_id when one matches
 
-After generating, give ONE short sentence: "Pipeline ready — click Save, then edit the repo/credentials in the builder."
+After generating, give ONE short sentence: "Pipeline ready — click Save, then edit the repo/credentials in the builder or canvas."
+
+## Post-load transforms (EL+T)
+- **dbt** — connector sync pipelines (dlt) support in-pipeline dbt after load. Set post_transform_type="dbt". Config persists as sourceConfiguration.dbt (enabled, package_path, dataset_name, repository_branch, run_scope, selector).
+- **Link workspace dbt project** — when list_dbt_projects returns a match, pass dbt_project_id on generate_pipeline to link the pipeline row (same as the builder dbt project picker).
+- **python / sql** — post_transform_type="python"|"sql" with post_transform_code snippet.
+- Database-only replication (sling) does NOT support in-pipeline dbt — mention running dbt separately or use a connector sync source.
+
+## Catalog & assets (informational)
+- Workspace catalog (/catalog, /assets): browse pipelines, assets, dbt models; edit descriptions/tags when the user has catalog edit permission.
+- Standalone dbt projects live at /catalog/dbt — register Git-backed projects, run standalone, or link to pipelines.
 
 ## Only ask questions when truly ambiguous
 - If you genuinely cannot determine source OR destination, ask for just that one thing.
 - For REST APIs with no URL at all: ask for the base URL only.
 - Never ask about credentials, env vars, or optional config — use defaults.
+- If the user cannot write pipelines (see workspace permissions), explain their role and suggest asking an admin — do NOT call generate_pipeline.
 
 ## Format
 - Be extremely brief. 1-3 sentences max after a generation.
@@ -36,7 +56,8 @@ After generating, give ONE short sentence: "Pipeline ready — click Save, then 
 Available source types: ${Object.values(SOURCE_GROUPS).flat().join(", ")}
 Available destination types: ${Object.values(DESTINATION_GROUPS).flat().join(", ")}
 
-Verified connectors: ${DLT_HUB_SOURCES.map(s => `${s.slug} (${s.name})`).join(", ")}`;
+Verified connectors: ${DLT_HUB_SOURCES.map((s) => `${s.slug} (${s.name})`).join(", ")}`;
+}
 
 
 const TOOLS: Anthropic.Tool[] = [
@@ -138,8 +159,57 @@ const TOOLS: Anthropic.Tool[] = [
           type: "boolean",
           description: "Whether this pipeline should use incremental/partition loading",
         },
+        post_transform_type: {
+          type: "string",
+          enum: ["none", "dbt", "python", "sql"],
+          description: "Post-load transform after sync. Use dbt for EL+T on connector sync pipelines.",
+        },
+        dbt_package_path: {
+          type: "string",
+          description: "dbt project directory or Git URL (when post_transform_type=dbt)",
+        },
+        dbt_target_schema: {
+          type: "string",
+          description: "Warehouse schema/dataset for dbt models",
+        },
+        dbt_repository_branch: {
+          type: "string",
+          description: "Git branch for dbt project (default main)",
+        },
+        dbt_run_scope: {
+          type: "string",
+          enum: ["all", "selection"],
+          description: "Run all models or a selection",
+        },
+        dbt_selector: {
+          type: "string",
+          description: "dbt --select expression when dbt_run_scope=selection",
+        },
+        dbt_project_id: {
+          type: "string",
+          description: "Optional workspace DbtProject id from list_dbt_projects to link instead of inline-only config",
+        },
+        post_transform_code: {
+          type: "string",
+          description: "Python or SQL code when post_transform_type is python or sql",
+        },
       },
       required: ["name", "source_type", "destination_type"],
+    },
+  },
+  {
+    name: "list_dbt_projects",
+    description:
+      "List workspace dbt projects (standalone first-class projects at /catalog/dbt). Use before generate_pipeline when the user wants EL+T with an existing registered project.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        source_slug: {
+          type: "string",
+          description: "Optional filter — projects tagged for this connector slug",
+        },
+      },
+      required: [],
     },
   },
 ];
@@ -376,14 +446,113 @@ function getInlineFields(sourceType: string): InlineField[] {
   return SOURCE_INLINE_FIELDS[sourceType.toLowerCase()] ?? [];
 }
 
-function toolGeneratePipeline(params: {
+async function toolListDbtProjects(userId: string, sourceSlug?: string) {
+  const ownerIds = await getAccessibleResourceOwnerIds(userId);
+  const rows = await db.dbtProject.findMany({
+    where: { userId: { in: ownerIds } },
+    orderBy: { updatedAt: "desc" },
+    include: {
+      pipelines: {
+        select: { id: true, name: true, enabled: true, sourceType: true, destinationType: true },
+      },
+    },
+  });
+  let projects = rows.map(toDbtProjectSummary);
+  if (sourceSlug?.trim()) {
+    const slug = sourceSlug.trim().toLowerCase();
+    projects = projects.filter((p) => (p.sourceSlug ?? "").toLowerCase() === slug);
+  }
+  return {
+    projects: projects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      packagePath: p.packagePath,
+      gitUrl: p.gitUrl,
+      targetSchema: p.targetSchema,
+      sourceSlug: p.sourceSlug,
+      linkedPipelineCount: p.linkedPipelineIds.length,
+    })),
+    hint:
+      projects.length > 0
+        ? "Pass dbt_project_id to generate_pipeline to link a pipeline to one of these projects."
+        : "No workspace dbt projects yet — use inline dbt_package_path or tell the user to create one at /catalog/dbt/new.",
+  };
+}
+
+type GeneratePipelineParams = {
   name: string;
   source_type: string;
   destination_type: string;
   description?: string;
   source_configuration?: Record<string, unknown>;
   incremental?: boolean;
-}) {
+  post_transform_type?: string;
+  dbt_package_path?: string;
+  dbt_target_schema?: string;
+  dbt_repository_branch?: string;
+  dbt_run_scope?: string;
+  dbt_selector?: string;
+  dbt_project_id?: string;
+  post_transform_code?: string;
+};
+
+function applyPostTransformToConfig(
+  base: Record<string, unknown>,
+  params: GeneratePipelineParams,
+  sourceType: string,
+  destinationType: string
+): { dbtProjectId?: string | null; warnings: string[] } {
+  const warnings: string[] = [];
+  const transformType = String(params.post_transform_type ?? "none").toLowerCase();
+
+  if (transformType === "dbt" || params.dbt_project_id) {
+    if (!supportsInPipelineDbt(chooseTool(sourceType, destinationType))) {
+      warnings.push(
+        "In-pipeline dbt is not supported for this source/destination pair (database replication). dbt config was omitted."
+      );
+      return { warnings };
+    }
+
+    if (params.dbt_project_id) {
+      return { dbtProjectId: params.dbt_project_id, warnings };
+    }
+
+    const packagePath = String(params.dbt_package_path ?? "").trim();
+    if (!packagePath) {
+      warnings.push("post_transform_type=dbt but no dbt_package_path — add a Git URL or ./dbt path.");
+      return { warnings };
+    }
+
+    const runScope = params.dbt_run_scope === "selection" ? "selection" : "all";
+    const cfg: Record<string, unknown> = {
+      enabled: true,
+      package_path: packagePath,
+      run_scope: runScope,
+    };
+    if (/^https?:\/\//i.test(packagePath)) cfg.git_url = packagePath;
+    const schema = String(params.dbt_target_schema ?? "").trim();
+    if (schema) cfg.dataset_name = schema;
+    const branch = String(params.dbt_repository_branch ?? "").trim();
+    if (branch) cfg.repository_branch = branch;
+    const selector = String(params.dbt_selector ?? "").trim();
+    if (runScope === "selection" && selector) cfg.selector = selector;
+    setDbtTransformConfig(base, cfg);
+    return { warnings };
+  }
+
+  if (transformType === "python" || transformType === "sql") {
+    const code = String(params.post_transform_code ?? "").trim();
+    if (code) {
+      base.post_transform = { type: transformType, code };
+    } else {
+      warnings.push(`${transformType} transform requested but post_transform_code is empty.`);
+    }
+  }
+
+  return { warnings };
+}
+
+function toolGeneratePipeline(params: GeneratePipelineParams) {
   const name = params.name.replace(/[^a-zA-Z0-9_]/g, "_").replace(/^[^a-zA-Z]/, "p_");
   const tool = chooseTool(params.source_type, params.destination_type);
 
@@ -393,8 +562,16 @@ function toolGeneratePipeline(params: {
     destinationType: params.destination_type,
     tool: tool === "sling" ? "sling" : "dlt",
     description: params.description ?? `Load ${params.source_type} data into ${params.destination_type}`,
-    sourceConfiguration: params.source_configuration ?? {},
+    sourceConfiguration: { ...(params.source_configuration ?? {}) },
   };
+
+  const { dbtProjectId, warnings } = applyPostTransformToConfig(
+    body.sourceConfiguration as Record<string, unknown>,
+    params,
+    params.source_type,
+    params.destination_type
+  );
+  if (dbtProjectId) body.dbtProjectId = dbtProjectId;
 
   const requiredFields = getInlineFields(params.source_type);
 
@@ -407,6 +584,7 @@ function toolGeneratePipeline(params: {
       save_payload: body,
       required_fields: requiredFields,
       generated_code_preview: preview,
+      warnings: warnings.length > 0 ? warnings : undefined,
     };
   } catch (e) {
     return {
@@ -416,6 +594,7 @@ function toolGeneratePipeline(params: {
       save_payload: body,
       required_fields: requiredFields,
       generated_code_preview: null,
+      warnings: warnings.length > 0 ? warnings : undefined,
     };
   }
 }
@@ -443,6 +622,29 @@ export async function POST(request: Request) {
   const { messages, lastRunError, pipelineId } = body;
   if (!Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: "messages required" }, { status: 400 });
+  }
+
+  const perms = await getWorkspacePermissions(user.id);
+  const workspaceBlock = `## Workspace permissions (current user)
+- Role: ${perms.role}
+- Can create/save pipelines: ${perms.canWrite ? "yes" : "no (read-only)"}
+- Can edit catalog metadata: ${perms.canEditCatalog ? "yes" : "no"}
+- Catalog browse: ${perms.catalogVisibility === "public_only" ? "public-tagged entries only" : "full workspace catalog"}`;
+
+  if (!perms.canWrite) {
+    return NextResponse.json({
+      message:
+        "Your workspace role is read-only for pipelines (" +
+        perms.role +
+        "). You can browse the catalog and assets, but creating or saving pipelines requires a member role. Ask your workspace owner to upgrade your invite.",
+      savePayload: undefined,
+      permissions: {
+        role: perms.role,
+        canWrite: perms.canWrite,
+        canEditCatalog: perms.canEditCatalog,
+        catalogVisibility: perms.catalogVisibility,
+      },
+    });
   }
 
   let runErrorContext = lastRunError;
@@ -483,7 +685,7 @@ export async function POST(request: Request) {
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      system: SYSTEM_PROMPT,
+      system: buildSystemPrompt(workspaceBlock),
       tools: TOOLS,
       messages: anthropicMessages,
     });
@@ -570,7 +772,12 @@ export async function POST(request: Request) {
             typeof inp.auth_hint === "string" ? inp.auth_hint : undefined,
           );
         } else if (name === "generate_pipeline") {
-          result = toolGeneratePipeline(inp as Parameters<typeof toolGeneratePipeline>[0]);
+          result = toolGeneratePipeline(inp as GeneratePipelineParams);
+        } else if (name === "list_dbt_projects") {
+          result = await toolListDbtProjects(
+            user.id,
+            typeof inp.source_slug === "string" ? inp.source_slug : undefined
+          );
         } else {
           result = { error: `Unknown tool: ${name}` };
         }

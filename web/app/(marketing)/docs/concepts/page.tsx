@@ -34,6 +34,27 @@ export default function ConceptsDocsPage() {
       <h2>Core objects</h2>
       <dl className="space-y-4 not-prose text-sm">
         <div>
+          <dt className="font-semibold text-slate-900 dark:text-white">DbtProject</dt>
+          <dd className="mt-1 text-slate-600 dark:text-slate-400">
+            A first-class workspace dbt project (Git URL, schema, schedule) at{" "}
+            <Link href="/catalog/dbt" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+              /catalog/dbt
+            </Link>
+            . Optional <code>dbtProjectId</code> on pipelines links EL+T config. Runs may reference{" "}
+            <code>dbtProjectId</code> without a pipeline for standalone transforms.
+          </dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-900 dark:text-white">Catalog entry / asset</dt>
+          <dd className="mt-1 text-slate-600 dark:text-slate-400">
+            Metadata (description, tags) for warehouse assets and catalog search. Visibility may be restricted by team
+            role — see <Link href="/docs/catalog" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+              Catalog docs
+            </Link>
+            .
+          </dd>
+        </div>
+        <div>
           <dt className="font-semibold text-slate-900 dark:text-white">Pipeline</dt>
           <dd className="mt-1 text-slate-600 dark:text-slate-400">
             A named definition (source → destination, generated code, workspace YAML). Stored per user. Optional{" "}

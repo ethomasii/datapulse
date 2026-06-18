@@ -10,6 +10,7 @@ type Props = {
   initialDescription?: string;
   initialTags?: string[];
   variant?: "inline" | "detail";
+  readOnly?: boolean;
   onSaved?: () => void;
 };
 
@@ -20,6 +21,7 @@ export function AssetCatalogMetaEditor({
   initialDescription = "",
   initialTags = [],
   variant = "inline",
+  readOnly = false,
   onSaved,
 }: Props) {
   const [description, setDescription] = useState(initialDescription);
@@ -28,6 +30,7 @@ export function AssetCatalogMetaEditor({
   const [saved, setSaved] = useState(false);
 
   async function save() {
+    if (readOnly) return;
     setSaving(true);
     setSaved(false);
     try {
@@ -63,6 +66,8 @@ export function AssetCatalogMetaEditor({
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+          readOnly={readOnly}
+          disabled={readOnly}
           rows={isDetail ? 5 : 2}
           placeholder="What this asset contains, freshness expectations, ownership, links to docs…"
           className={
@@ -79,6 +84,8 @@ export function AssetCatalogMetaEditor({
         <input
           value={tagsText}
           onChange={(e) => setTagsText(e.target.value)}
+          readOnly={readOnly}
+          disabled={readOnly}
           placeholder="Tags (comma-separated, e.g. pii, finance, daily)"
           className={
             isDetail
@@ -87,21 +94,25 @@ export function AssetCatalogMetaEditor({
           }
         />
       </div>
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void save()}
-          disabled={saving}
-          className={
-            isDetail
-              ? "rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
-              : "rounded bg-sky-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
-          }
-        >
-          {saving ? <Loader2 className="inline h-4 w-4 animate-spin" /> : "Save metadata"}
-        </button>
-        {saved ? <span className="text-sm text-emerald-600 dark:text-emerald-400">Saved</span> : null}
-      </div>
+      {readOnly ? (
+        <p className="text-xs text-slate-500">Read-only — you do not have catalog edit permission.</p>
+      ) : (
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={saving}
+            className={
+              isDetail
+                ? "rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
+                : "rounded bg-sky-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
+            }
+          >
+            {saving ? <Loader2 className="inline h-4 w-4 animate-spin" /> : "Save metadata"}
+          </button>
+          {saved ? <span className="text-sm text-emerald-600 dark:text-emerald-400">Saved</span> : null}
+        </div>
+      )}
     </div>
   );
 }

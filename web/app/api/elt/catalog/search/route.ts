@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import {
-  API_SCOPES,
-  hasScope,
   resolveApiUser,
   scopeForbiddenResponse,
   unauthorizedResponse,
 } from "@/lib/auth/api-user";
+import {
+  filterCatalogEntriesByVisibility,
+} from "@/lib/auth/catalog-access";
 import { getAccessibleResourceOwnerIds, pipelineOwnerWhere } from "@/lib/auth/workspace-access";
+import { hasCatalogReadScope } from "@/lib/auth/workspace-auth-helpers";
+import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
 import { db } from "@/lib/db/client";
 import { parseTags } from "@/lib/elt/catalog-entries";
 import { buildWorkspaceAssets } from "@/lib/elt/pipeline-assets";
@@ -29,13 +32,14 @@ function matchesQuery(hay: string, q: string): boolean {
 export async function GET(req: Request) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
-  if (!hasScope(auth, API_SCOPES.PIPELINES_READ)) return scopeForbiddenResponse();
+  if (!hasCatalogReadScope(auth)) return scopeForbiddenResponse();
 
   const q = new URL(req.url).searchParams.get("q")?.trim().toLowerCase() ?? "";
   if (!q || q.length < 2) {
     return NextResponse.json({ error: "Provide q with at least 2 characters" }, { status: 400 });
   }
 
+  const perms = await getWorkspacePermissions(auth.user.id);
   const ownerIds = await getAccessibleResourceOwnerIds(auth.user.id);
   const limit = Math.min(100, Math.max(1, Number(new URL(req.url).searchParams.get("limit") ?? 50) || 50));
 
@@ -60,10 +64,11 @@ export async function GET(req: Request) {
   ]);
 
   const pipelineNameById = new Map(pipelines.map((p) => [p.id, p.name]));
+  const visibleEntries = filterCatalogEntriesByVisibility(entries, perms.catalogVisibility);
   const hits: CatalogSearchHit[] = [];
   const seen = new Set<string>();
 
-  for (const row of entries) {
+  for (const row of visibleEntries) {
     const tags = parseTags(row.tags);
     const hay = [row.assetKey, row.displayName ?? "", row.description ?? "", row.kind, ...tags].join(" ");
     if (!matchesQuery(hay, q)) continue;
@@ -81,7 +86,7 @@ export async function GET(req: Request) {
     if (hits.length >= limit) break;
   }
 
-  if (hits.length < limit) {
+  if (hits.length < limit && perms.catalogVisibility === "full") {
     const assetsPayload = buildWorkspaceAssets(pipelines);
     for (const asset of assetsPayload.assets) {
       if (seen.has(asset.id)) continue;
@@ -109,5 +114,5 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ q, hits, total: hits.length });
+  return NextResponse.json({ q, hits, total: hits.length, permissions: { catalogVisibility: perms.catalogVisibility } });
 }

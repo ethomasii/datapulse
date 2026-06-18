@@ -24,6 +24,8 @@ import { syncDltDbtWithCanvas } from "@/lib/elt/dbt-canvas";
 import { linkDbtProjectToPipeline, unlinkDbtProjectFromPipeline } from "@/lib/elt/dbt-projects";
 import { resolveRouteParamId } from "@/lib/server/route-params";
 import { assertUserOwnsGatewayToken } from "@/lib/agent/gateway-routing";
+import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
+import { assertCanWritePipelines } from "@/lib/auth/workspace-auth-helpers";
 
 const canvasPayloadSchema = z.union([
   z.object({
@@ -47,6 +49,7 @@ const pipelinePatchSchema = z
     executionHost: z.enum(["inherit", "eltpulse_managed", "customer_gateway"]).optional(),
     sourceConnectionId: z.union([z.string().min(1), z.null()]).optional(),
     destinationConnectionId: z.union([z.string().min(1), z.null()]).optional(),
+    dbtProjectId: z.union([z.string().min(1), z.null()]).optional(),
   })
   .refine(
     (d) =>
@@ -58,7 +61,8 @@ const pipelinePatchSchema = z
       d.defaultTargetAgentTokenId !== undefined ||
       d.executionHost !== undefined ||
       d.sourceConnectionId !== undefined ||
-      d.destinationConnectionId !== undefined,
+      d.destinationConnectionId !== undefined ||
+      d.dbtProjectId !== undefined,
     { message: "No updatable fields" }
   );
 
@@ -70,9 +74,10 @@ export async function GET(req: Request, ctx: Ctx) {
   if (!hasScope(auth, API_SCOPES.PIPELINES_READ)) return scopeForbiddenResponse();
   const user = auth.user;
   const pipelineId = await resolveRouteParamId(ctx.params);
+  const ownerIds = await getAccessibleResourceOwnerIds(user.id);
   try {
     const row = await db.eltPipeline.findFirst({
-      where: { id: pipelineId, userId: user.id },
+      where: { id: pipelineId, userId: { in: ownerIds } },
     });
     if (!row) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -90,9 +95,12 @@ export async function DELETE(req: Request, ctx: Ctx) {
   if (!auth) return unauthorizedResponse();
   if (!hasScope(auth, API_SCOPES.PIPELINES_WRITE)) return scopeForbiddenResponse();
   const user = auth.user;
+  const denied = await assertCanWritePipelines(user.id);
+  if (denied) return denied;
   const pipelineId = await resolveRouteParamId(ctx.params);
+  const ownerIds = await getAccessibleResourceOwnerIds(user.id);
   const res = await db.eltPipeline.deleteMany({
-    where: { id: pipelineId, userId: user.id },
+    where: { id: pipelineId, userId: { in: ownerIds } },
   });
   if (res.count === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -105,7 +113,10 @@ export async function PUT(req: Request, ctx: Ctx) {
   if (!auth) return unauthorizedResponse();
   if (!hasScope(auth, API_SCOPES.PIPELINES_WRITE)) return scopeForbiddenResponse();
   const user = auth.user;
+  const denied = await assertCanWritePipelines(user.id);
+  if (denied) return denied;
   const pipelineId = await resolveRouteParamId(ctx.params);
+  const ownerIds = await getAccessibleResourceOwnerIds(user.id);
   let json: unknown;
   try {
     json = await req.json();
@@ -130,7 +141,7 @@ export async function PUT(req: Request, ctx: Ctx) {
 
   try {
     const existing = await db.eltPipeline.findFirst({
-      where: { id: pipelineId, userId: user.id },
+      where: { id: pipelineId, userId: { in: ownerIds } },
     });
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -226,7 +237,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if (!auth) return unauthorizedResponse();
   if (!hasScope(auth, API_SCOPES.PIPELINES_WRITE)) return scopeForbiddenResponse();
   const user = auth.user;
+  const denied = await assertCanWritePipelines(user.id);
+  if (denied) return denied;
   const pipelineId = await resolveRouteParamId(ctx.params);
+  const ownerIds = await getAccessibleResourceOwnerIds(user.id);
   let json: unknown;
   try {
     json = await req.json();
@@ -276,17 +290,43 @@ export async function PATCH(req: Request, ctx: Ctx) {
     p.sourceConnectionId === undefined &&
     p.destinationConnectionId === undefined;
 
+  const onlyDbtProject =
+    p.dbtProjectId !== undefined &&
+    p.canvas === undefined &&
+    typeof p.enabled !== "boolean" &&
+    p.sourceType === undefined &&
+    p.destinationType === undefined &&
+    p.sourceConfiguration === undefined &&
+    p.defaultTargetAgentTokenId === undefined &&
+    p.executionHost === undefined &&
+    p.sourceConnectionId === undefined &&
+    p.destinationConnectionId === undefined;
+
   try {
+    if (onlyDbtProject) {
+      const existing = await db.eltPipeline.findFirst({
+        where: { id: pipelineId, userId: { in: ownerIds } },
+      });
+      if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      if (p.dbtProjectId) {
+        await linkDbtProjectToPipeline(user.id, p.dbtProjectId, existing.id);
+      } else {
+        await unlinkDbtProjectFromPipeline(user.id, existing.id);
+      }
+      const pipeline = await db.eltPipeline.findUnique({ where: { id: existing.id } });
+      return NextResponse.json({ pipeline });
+    }
+
     if (onlyExecutionHost) {
       const row = await db.eltPipeline.updateMany({
-        where: { id: pipelineId, userId: user.id },
+        where: { id: pipelineId, userId: { in: ownerIds } },
         data: { executionHost: p.executionHost },
       });
       if (row.count === 0) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
       const pipeline = await db.eltPipeline.findFirst({
-        where: { id: pipelineId, userId: user.id },
+        where: { id: pipelineId, userId: { in: ownerIds } },
       });
       return NextResponse.json({ pipeline });
     }
@@ -294,7 +334,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     if (onlyDefaultGateway) {
       if (p.defaultTargetAgentTokenId === null) {
         const row = await db.eltPipeline.updateMany({
-          where: { id: pipelineId, userId: user.id },
+          where: { id: pipelineId, userId: { in: ownerIds } },
           data: { defaultTargetAgentTokenId: null },
         });
         if (row.count === 0) {
@@ -311,7 +351,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
           return NextResponse.json({ error: "Invalid default gateway" }, { status: 400 });
         }
         const row = await db.eltPipeline.updateMany({
-          where: { id: pipelineId, userId: user.id },
+          where: { id: pipelineId, userId: { in: ownerIds } },
           data: { defaultTargetAgentTokenId: tokenId },
         });
         if (row.count === 0) {
@@ -319,27 +359,27 @@ export async function PATCH(req: Request, ctx: Ctx) {
         }
       }
       const pipeline = await db.eltPipeline.findFirst({
-        where: { id: pipelineId, userId: user.id },
+        where: { id: pipelineId, userId: { in: ownerIds } },
       });
       return NextResponse.json({ pipeline });
     }
 
     if (onlyEnabled) {
       const row = await db.eltPipeline.updateMany({
-        where: { id: pipelineId, userId: user.id },
+        where: { id: pipelineId, userId: { in: ownerIds } },
         data: { enabled: p.enabled },
       });
       if (row.count === 0) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
       const pipeline = await db.eltPipeline.findFirst({
-        where: { id: pipelineId, userId: user.id },
+        where: { id: pipelineId, userId: { in: ownerIds } },
       });
       return NextResponse.json({ pipeline });
     }
 
     const existing = await db.eltPipeline.findFirst({
-      where: { id: pipelineId, userId: user.id },
+      where: { id: pipelineId, userId: { in: ownerIds } },
     });
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -462,7 +502,16 @@ export async function PATCH(req: Request, ctx: Ctx) {
       },
     });
 
-    return NextResponse.json({ pipeline: row });
+    if (p.dbtProjectId !== undefined) {
+      if (p.dbtProjectId) {
+        await linkDbtProjectToPipeline(user.id, p.dbtProjectId, row.id);
+      } else {
+        await unlinkDbtProjectFromPipeline(user.id, row.id);
+      }
+    }
+
+    const refreshed = await db.eltPipeline.findUnique({ where: { id: row.id } });
+    return NextResponse.json({ pipeline: refreshed ?? row });
   } catch (e) {
     const drift = prismaSchemaDriftResponse(e);
     if (drift) return drift;

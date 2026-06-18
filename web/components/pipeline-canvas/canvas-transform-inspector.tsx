@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supportsInPipelineDbt } from "@/lib/elt/pipeline-tool-labels";
+import { applyDbtProjectToForm, DbtProjectPicker } from "@/components/dbt/dbt-project-picker";
 import { DbtConfigFields } from "@/components/dbt/dbt-config-fields";
 import { TRANSFORM_TOOLS } from "./transform-tools";
 
@@ -17,6 +18,9 @@ type Props = {
   pipelineTool: "dlt" | "sling";
   pipelineId?: string;
   sourceSlug?: string;
+  linkedDbtProjectId?: string | null;
+  onLinkedDbtProjectChange?: (projectId: string | null) => void;
+  readOnly?: boolean;
 };
 
 export function CanvasTransformInspector({
@@ -26,6 +30,9 @@ export function CanvasTransformInspector({
   pipelineTool,
   pipelineId,
   sourceSlug,
+  linkedDbtProjectId,
+  onLinkedDbtProjectChange,
+  readOnly = false,
 }: Props) {
   const [label, setLabel] = useState(() => String(initialData.label ?? ""));
   const [hint, setHint] = useState(() => String(initialData.hint ?? ""));
@@ -67,6 +74,7 @@ export function CanvasTransformInspector({
         <select
           className={fieldClass}
           value={transformTool}
+          disabled={readOnly}
           onChange={(e) => {
             const v = e.target.value;
             setTransformTool(v);
@@ -89,13 +97,39 @@ export function CanvasTransformInspector({
       ) : null}
 
       {transformTool === "dbt" && supportsInPipelineDbt(pipelineTool) ? (
-        <DbtConfigFields
-          compact
-          fieldClass={fieldClass}
-          sourceSlug={sourceSlug}
-          pipelineTool={pipelineTool}
-          pipelineId={pipelineId}
-          values={{
+        <>
+          <DbtProjectPicker
+            value={linkedDbtProjectId ?? null}
+            pipelineId={pipelineId}
+            sourceSlug={sourceSlug}
+            disabled={readOnly}
+            onChange={(id, project) => {
+              onLinkedDbtProjectChange?.(id);
+              if (project) {
+                const fields = applyDbtProjectToForm(project);
+                setDbtPackagePath(fields.packagePath);
+                setDbtDatasetName(fields.datasetName);
+                setDbtRepositoryBranch(fields.repositoryBranch);
+                setDbtRunScope(fields.runScope);
+                setDbtSelector(fields.selector);
+                onPatch({
+                  dbtPackagePath: fields.packagePath,
+                  dbtDatasetName: fields.datasetName,
+                  dbtRepositoryBranch: fields.repositoryBranch,
+                  dbtRunScope: fields.runScope,
+                  dbtSelector: fields.selector,
+                });
+              }
+            }}
+          />
+          <DbtConfigFields
+            compact
+            fieldClass={fieldClass}
+            sourceSlug={sourceSlug}
+            pipelineTool={pipelineTool}
+            pipelineId={pipelineId}
+            dbtProjectId={linkedDbtProjectId ?? null}
+            values={{
             packagePath: dbtPackagePath,
             datasetName: dbtDatasetName,
             repositoryBranch: dbtRepositoryBranch,
@@ -135,6 +169,7 @@ export function CanvasTransformInspector({
             }
           }}
         />
+        </>
       ) : null}
 
       {(transformTool === "python" || transformTool === "sql") ? (

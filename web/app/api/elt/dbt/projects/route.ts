@@ -7,6 +7,10 @@ import {
   scopeForbiddenResponse,
   unauthorizedResponse,
 } from "@/lib/auth/api-user";
+import {
+  assertCanWritePipelines,
+  hasCatalogReadScope,
+} from "@/lib/auth/workspace-auth-helpers";
 import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
 import { prismaSchemaDriftResponse } from "@/lib/db/prisma-schema-drift-response";
@@ -41,7 +45,7 @@ const createSchema = z.object({
 export async function GET(req: Request) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
-  if (!hasScope(auth, API_SCOPES.PIPELINES_READ)) return scopeForbiddenResponse();
+  if (!hasCatalogReadScope(auth)) return scopeForbiddenResponse();
 
   try {
     const ownerIds = await getAccessibleResourceOwnerIds(auth.user.id);
@@ -66,6 +70,8 @@ export async function POST(req: Request) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
   if (!hasScope(auth, API_SCOPES.PIPELINES_WRITE)) return scopeForbiddenResponse();
+  const denied = await assertCanWritePipelines(auth.user.id);
+  if (denied) return denied;
 
   const parsed = createSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {

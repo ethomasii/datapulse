@@ -24,6 +24,21 @@ export default function PipelinesDocsPage() {
         builder lands.
       </p>
 
+      <h2>Visual canvas</h2>
+      <p>
+        The <Link href="/builder/canvas">visual canvas</Link> edits the same pipeline as the form builder — including{" "}
+        <code>sourceConfiguration.canvas</code> for the node graph and transform inspector fields. Transform nodes sync{" "}
+        <code>dlt_dbt</code> / <code>post_transform</code> back into source config on save. The canvas transform
+        inspector includes the same <strong>workspace dbt project picker</strong> as the builder.
+      </p>
+
+      <h2>AI Builder</h2>
+      <p>
+        Describe a pipeline in natural language from the builder create tab or floating widget. The AI generates{" "}
+        <code>savePayload</code> compatible with <code>POST /api/elt/pipelines</code>, including optional post-load dbt
+        and <code>dbtProjectId</code>. See <Link href="/docs/ai-builder">AI Builder</Link>.
+      </p>
+
       <h2>Artifacts</h2>
       <ul>
         <li>
@@ -50,7 +65,7 @@ export default function PipelinesDocsPage() {
         include <code>eltpulse_pipeline_declaration: 1</code> and the same fields as{" "}
         <code>POST /api/elt/pipelines</code> (e.g. <code>name</code>, <code>sourceType</code>,{" "}
         <code>destinationType</code>, <code>sourceConfiguration</code>, optional <code>dbt</code> transform config,{" "}
-        <code>_partitionConfig</code>, execution settings).
+        <code>dbtProjectId</code>, <code>_partitionConfig</code>, execution settings).
       </p>
       <ul>
         <li>

@@ -16,11 +16,20 @@ type TeamPayload = {
   pendingInvites: Invite[];
 };
 
+type InviteRole = "member" | "viewer" | "catalog_editor" | "catalog_browser";
+
+const INVITE_ROLE_LABELS: Record<InviteRole, string> = {
+  member: "Member (full edit)",
+  viewer: "Viewer (read-only)",
+  catalog_editor: "Catalog editor (metadata only)",
+  catalog_browser: "Catalog browser (public entries)",
+};
+
 export function TeamClient() {
   const [data, setData] = useState<TeamPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"member" | "viewer">("member");
+  const [inviteRole, setInviteRole] = useState<InviteRole>("member");
   const [inviting, setInviting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -147,11 +156,14 @@ export function TeamClient() {
               />
               <select
                 value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value as "member" | "viewer")}
+                onChange={(e) => setInviteRole(e.target.value as InviteRole)}
                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
               >
-                <option value="member">Member (edit)</option>
-                <option value="viewer">Viewer (read-only)</option>
+                {(Object.keys(INVITE_ROLE_LABELS) as InviteRole[]).map((r) => (
+                  <option key={r} value={r}>
+                    {INVITE_ROLE_LABELS[r]}
+                  </option>
+                ))}
               </select>
               <button
                 type="submit"
@@ -171,7 +183,8 @@ export function TeamClient() {
                   className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs dark:bg-slate-950"
                 >
                   <span>
-                    {i.email} — pending since {new Date(i.invitedAt).toLocaleDateString()}
+                    {i.email} — {INVITE_ROLE_LABELS[i.role as InviteRole] ?? i.role} — pending since{" "}
+                    {new Date(i.invitedAt).toLocaleDateString()}
                   </span>
                   <button
                     type="button"

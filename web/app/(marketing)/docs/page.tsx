@@ -22,7 +22,17 @@ const CARDS = [
   {
     href: "/docs/pipelines",
     title: "Pipelines",
-    desc: "Sources, destinations, generated code, and workspace manifests.",
+    desc: "Sources, destinations, canvas, generated code, and workspace manifests.",
+  },
+  {
+    href: "/docs/ai-builder",
+    title: "AI Builder",
+    desc: "Natural-language pipeline generation with dbt and workspace project linking.",
+  },
+  {
+    href: "/docs/catalog",
+    title: "Catalog & assets",
+    desc: "Authenticated browse, metadata tags, and team RBAC roles.",
   },
   {
     href: "/docs/runs",

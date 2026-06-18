@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import {
-  API_SCOPES,
-  hasScope,
   resolveApiUser,
   scopeForbiddenResponse,
   unauthorizedResponse,
 } from "@/lib/auth/api-user";
+import { isPublicCatalogTags } from "@/lib/auth/catalog-access";
 import { connectionOwnerWhere, getAccessibleResourceOwnerIds, pipelineOwnerWhere } from "@/lib/auth/workspace-access";
+import { hasCatalogReadScope } from "@/lib/auth/workspace-auth-helpers";
+import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
 import { db } from "@/lib/db/client";
 import { applyWarehouseVerificationToAssets } from "@/lib/elt/asset-warehouse-reconcile";
 import { buildWorkspaceAssets, type PipelineRunAssetInput } from "@/lib/elt/pipeline-assets";
@@ -16,9 +17,10 @@ import { introspectDestinationConnection } from "@/lib/elt/warehouse-introspect"
 export async function GET(req: Request) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
-  if (!hasScope(auth, API_SCOPES.PIPELINES_READ)) return scopeForbiddenResponse();
+  if (!hasCatalogReadScope(auth)) return scopeForbiddenResponse();
 
   const verifyWarehouse = new URL(req.url).searchParams.get("verifyWarehouse") === "1";
+  const perms = await getWorkspacePermissions(auth.user.id);
 
   const ownerIds = await getAccessibleResourceOwnerIds(auth.user.id);
   const rows = await db.eltPipeline.findMany({
@@ -70,6 +72,21 @@ export async function GET(req: Request) {
   });
   const entriesByKey = new Map(catalogRows.map((r) => [r.assetKey, r]));
   payload = mergeCatalogIntoAssetsPayload(payload, entriesByKey);
+
+  if (perms.catalogVisibility === "public_only") {
+    const visibleAssets = payload.assets.filter((a) => isPublicCatalogTags(a.catalogTags));
+    const visiblePipelineIds = new Set(visibleAssets.map((a) => a.pipelineId));
+    payload = {
+      ...payload,
+      assets: visibleAssets,
+      pipelines: payload.pipelines.filter((b) => visiblePipelineIds.has(b.pipelineId)),
+      summary: {
+        ...payload.summary,
+        rawAssets: visibleAssets.filter((a) => a.kind !== "transform").length,
+        transforms: visibleAssets.filter((a) => a.kind === "transform").length,
+      },
+    };
+  }
 
   if (verifyWarehouse) {
     const pipelineDestinationConnectionId = new Map(
@@ -126,5 +143,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ asset, bundle });
   }
 
-  return NextResponse.json(payload);
+  return NextResponse.json({
+    ...payload,
+    permissions: {
+      canEditCatalog: perms.canEditCatalog,
+      canWrite: perms.canWrite,
+      catalogVisibility: perms.catalogVisibility,
+    },
+  });
 }

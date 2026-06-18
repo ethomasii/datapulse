@@ -93,6 +93,8 @@ export type PipelineCanvasProps = {
   onSave?: (nodes: Node[], edges: Edge[]) => void | Promise<void>;
   saving?: boolean;
   saveError?: string | null;
+  /** When true, hide pipeline save (read-only workspace role). */
+  saveDisabled?: boolean;
   /** When pipeline is selected: catalog types for source/destination nodes (PATCH updates server). */
   pipelineSourceType?: string | null;
   pipelineDestinationType?: string | null;
@@ -113,6 +115,7 @@ function FlowCanvas({
   onSave,
   saving,
   saveError,
+  saveDisabled = false,
   pipelineSourceType,
   pipelineDestinationType,
   onPickSourceType,
@@ -455,7 +458,7 @@ function FlowCanvas({
           <Upload className="h-3.5 w-3.5" />
           Import
         </button>
-        {pipelineId && onSave ? (
+        {pipelineId && onSave && !saveDisabled ? (
           <>
             <div className="mx-1 h-4 w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
             <button
