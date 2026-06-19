@@ -14,6 +14,7 @@ import { Sparkles, ArrowRight,
   Workflow,
 } from "lucide-react";
 import { CatalogAccessBanner } from "@/components/catalog/catalog-access-banner";
+import { PipelineHealthPanel } from "@/components/catalog/pipeline-health-panel";
 import { AssetCatalogAiPanel } from "@/components/assets/asset-catalog-ai-panel";
 import { RelatedLinks } from "@/components/ui/related-links";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";

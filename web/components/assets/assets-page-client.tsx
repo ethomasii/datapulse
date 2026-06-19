@@ -15,6 +15,7 @@ import {
   Table2,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
+import { CatalogAccessBanner } from "@/components/catalog/catalog-access-banner";
 import { TransformJourneyStrip } from "@/components/elt/transform-journey-strip";
 import { AddTransformsCta } from "@/components/elt/add-transforms-cta";
 import { PipelineHealthPanel } from "@/components/catalog/pipeline-health-panel";

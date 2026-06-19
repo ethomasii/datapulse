@@ -19,6 +19,7 @@ const PATHS = [
     color: "indigo",
     description: "Best for production — versioned SQL, tests, docs, and incremental models in git.",
     href: "/catalog/dbt",
+    muted: false,
   },
   {
     id: "warehouse",
@@ -28,6 +29,7 @@ const PATHS = [
     color: "sky",
     description: "Fast visual path — recipes and CTAS on the canvas. Promote to dbt when logic stabilizes.",
     href: "/catalog/components#recipes",
+    muted: false,
   },
   {
     id: "dataframe",

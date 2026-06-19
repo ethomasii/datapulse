@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
+import { isClerkConfigured } from "@/lib/clerk/is-configured";
 import {
   Activity,
   ArrowRight,
@@ -59,40 +60,54 @@ export function DbtHubPageClient({ variant = "marketing" }: { variant?: "marketi
     );
   }, [packages, query]);
 
+  const clerkReady = isClerkConfigured();
+
   return (
     <>
       {variant === "marketing" ? (
         <div className="mt-8 flex flex-wrap gap-3">
-          <SignedIn>
+          {clerkReady ? (
+            <>
+              <SignedIn>
+                <Link
+                  href="/builder?dbt=1"
+                  className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-500"
+                >
+                  Create pipeline with dbt
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  href="/catalog/transform-hub"
+                  className="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-900"
+                >
+                  Transform hub (app)
+                </Link>
+                <Link
+                  href="/runs"
+                  className="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-900"
+                >
+                  View runs
+                </Link>
+              </SignedIn>
+              <SignedOut>
+                <Link
+                  href="/sign-up"
+                  className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-500"
+                >
+                  Start free
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </SignedOut>
+            </>
+          ) : (
             <Link
-              href="/builder?dbt=1"
+              href="/dev-setup"
               className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-500"
             >
-              Create pipeline with dbt
+              Configure local env
               <ArrowRight className="h-4 w-4" />
             </Link>
-            <Link
-              href="/catalog/transform-hub"
-              className="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-900"
-            >
-              Transform hub (app)
-            </Link>
-            <Link
-              href="/runs"
-              className="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-900"
-            >
-              View runs
-            </Link>
-          </SignedIn>
-          <SignedOut>
-            <Link
-              href="/sign-up"
-              className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-500"
-            >
-              Start free
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </SignedOut>
+          )}
           <Link
             href="/docs/dbt"
             className="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-900"
@@ -210,15 +225,17 @@ export function DbtHubPageClient({ variant = "marketing" }: { variant?: "marketi
                   >
                     Transform package →
                   </a>
-                  <SignedIn>
-                    <Link
-                      href={`/builder?source=${encodeURIComponent(pkg.sourceSlugs[0])}&dbt=1`}
-                      className="inline-flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-sky-500"
-                    >
-                      Create pipeline with package
-                      <ArrowRight className="h-3 w-3" />
-                    </Link>
-                  </SignedIn>
+                  {clerkReady ? (
+                    <SignedIn>
+                      <Link
+                        href={`/builder?source=${encodeURIComponent(pkg.sourceSlugs[0])}&dbt=1`}
+                        className="inline-flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-sky-500"
+                      >
+                        Create pipeline with package
+                        <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    </SignedIn>
+                  ) : null}
                 </div>
               </article>
             ))}

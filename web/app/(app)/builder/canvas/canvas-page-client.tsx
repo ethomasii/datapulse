@@ -350,6 +350,7 @@ export function CanvasPageClient() {
       }
       const data = await res.json();
       const row = data.pipeline as {
+        name?: string;
         sourceType?: string;
         destinationType?: string;
         tool?: string;

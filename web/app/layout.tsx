@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/theme-provider";
+import { isClerkConfigured } from "@/lib/clerk/is-configured";
 import "./globals.css";
 import "@xyflow/react/dist/style.css";
 
@@ -39,16 +40,21 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return (
-    <ClerkProvider>
-      <html lang="en" suppressHydrationWarning>
-        <body className={inter.className}>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-            {children}
-          </ThemeProvider>
-          <Analytics />
-        </body>
-      </html>
-    </ClerkProvider>
+  const clerkKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim();
+  const shell = (
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          {children}
+        </ThemeProvider>
+        <Analytics />
+      </body>
+    </html>
   );
+
+  if (!isClerkConfigured() || !clerkKey) {
+    return shell;
+  }
+
+  return <ClerkProvider publishableKey={clerkKey}>{shell}</ClerkProvider>;
 }
