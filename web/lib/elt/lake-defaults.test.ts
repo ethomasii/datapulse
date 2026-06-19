@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultSourceTable, medallionHintsForStarter } from "@/lib/elt/lake-defaults";
+import { canvasStarterHref, defaultSourceTable, medallionHintsForStarter } from "@/lib/elt/lake-defaults";
 
 describe("lake-defaults", () => {
   it("derives staging table from pipeline name", () => {
@@ -16,5 +16,26 @@ describe("lake-defaults", () => {
       transform: "gold",
     });
     expect(medallionHintsForStarter("single_source_to_mart")).toBeUndefined();
+  });
+
+  it("builds canvas deep link with starter and source table", () => {
+    const href = canvasStarterHref({
+      pipelineId: "pipe-1",
+      starterId: "entity_360_profile",
+      pipelineName: "Zendesk Tickets",
+    });
+    expect(href).toContain("/builder/canvas?");
+    expect(href).toContain("pipeline=pipe-1");
+    expect(href).toContain("starter=entity_360_profile");
+    expect(href).toContain("source_table=staging.events");
+  });
+
+  it("uses pipeline name for source table when no fallback", () => {
+    expect(
+      canvasStarterHref({
+        pipelineId: "pipe-2",
+        sourceTable: defaultSourceTable({ pipelineName: "Zendesk Tickets" }),
+      })
+    ).toContain("source_table=staging.zendesk_tickets");
   });
 });

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowRight, Route, Search } from "lucide-react";
-import { PIPELINE_SCENARIOS, SCENARIO_INDUSTRY_LABELS } from "@/lib/marketing/pipeline-scenarios";
+import { PIPELINE_SCENARIOS, SCENARIO_INDUSTRY_LABELS, lakeStarterIdForScenario } from "@/lib/marketing/pipeline-scenarios";
 import { connectorDisplayName } from "@/lib/marketing/connector-display-names";
 
 export function CatalogScenariosClient() {
@@ -28,7 +28,8 @@ export function CatalogScenariosClient() {
         </Link>
         <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Pipeline scenarios</h1>
         <p className="mt-2 max-w-3xl text-slate-600 dark:text-slate-300">
-          Curated source → destination recipes. Deploy directly into your workspace with one click.
+          Curated source → destination recipes. Deploy into your workspace — then open canvas with a matching lake
+          recipe to add transforms.
         </p>
       </div>
 
@@ -55,9 +56,12 @@ export function CatalogScenariosClient() {
             </div>
             <h2 className="mt-2 font-semibold text-slate-900 dark:text-white">{s.title}</h2>
             <p className="mt-2 flex-1 text-sm text-slate-600 dark:text-slate-400">{s.description}</p>
-            <p className="mt-3 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-slate-500">
               {connectorDisplayName(s.sourceSlug) ?? s.sourceSlug} →{" "}
               {connectorDisplayName(s.destinationSlug) ?? s.destinationSlug}
+            </p>
+            <p className="mt-2 text-[10px] font-medium text-violet-600 dark:text-violet-400">
+              After deploy → {lakeStarterIdForScenario(s).replace(/_/g, " ")} on canvas
             </p>
             <Link
               href={`/quick-start?source=${encodeURIComponent(s.sourceSlug)}&destination=${encodeURIComponent(s.destinationSlug)}&scenario=${encodeURIComponent(s.id)}`}

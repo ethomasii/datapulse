@@ -27,6 +27,7 @@ import { RelatedLinks } from "@/components/ui/related-links";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BarChart } from "@/components/ui/bar-chart";
 import { parseSliceFromTriggeredBy } from "@/lib/elt/slice-trigger";
+import { AddTransformsCta } from "@/components/elt/add-transforms-cta";
 import { runSubjectLabel } from "@/lib/elt/run-display";
 
 type PipelineOpt = { id: string; name: string; partitionColumn: string | null };
@@ -358,6 +359,23 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
     () => sortedRuns.filter((r) => r.status === "pending" || r.status === "running").map((r) => r.id),
     [sortedRuns]
   );
+
+  const transformsCtaTarget = useMemo(() => {
+    const succeeded = runs.filter((r) => r.status === "succeeded" && r.pipeline?.id);
+    if (succeeded.length === 0) return null;
+    if (pipelineFilterId) {
+      const match = succeeded.find((r) => r.pipeline?.id === pipelineFilterId);
+      if (match?.pipeline) {
+        return { pipelineId: match.pipeline.id, pipelineName: match.pipeline.name };
+      }
+    }
+    const latest = [...succeeded].sort(
+      (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+    )[0];
+    return latest?.pipeline
+      ? { pipelineId: latest.pipeline.id, pipelineName: latest.pipeline.name }
+      : null;
+  }, [runs, pipelineFilterId]);
 
   useEffect(() => {
     const el = selectAllRef.current;
@@ -852,6 +870,13 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
         );
       })()}
 
+      {!loading && transformsCtaTarget ? (
+        <AddTransformsCta
+          pipelineId={transformsCtaTarget.pipelineId}
+          pipelineName={transformsCtaTarget.pipelineName}
+        />
+      ) : null}
+
       {error && (
         <p className="text-sm text-red-600 dark:text-red-400" role="alert">
           {error}
@@ -991,6 +1016,13 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                             >
                               Details <ChevronRight className="h-3.5 w-3.5 shrink-0" />
                             </button>
+                            {r.status === "succeeded" && r.pipeline?.id ? (
+                              <AddTransformsCta
+                                pipelineId={r.pipeline.id}
+                                pipelineName={r.pipeline.name}
+                                compact
+                              />
+                            ) : null}
                           </div>
                         </div>
                       </td>

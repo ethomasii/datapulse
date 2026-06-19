@@ -1,5 +1,7 @@
 /** Curated pipeline recipes for marketing — links real catalog slugs. */
 
+import { canvasStarterHref } from "@/lib/elt/lake-defaults";
+
 export type ScenarioIndustry =
   | "saas"
   | "ecommerce"
@@ -29,6 +31,8 @@ export type PipelineScenario = {
   industry: ScenarioIndustry;
   benefits: string[];
   tags: string[];
+  /** Lake recipe to open on canvas after deploy (default: quick mart). */
+  lakeStarterId?: string;
 };
 
 export const PIPELINE_SCENARIOS: PipelineScenario[] = [
@@ -115,6 +119,7 @@ export const PIPELINE_SCENARIOS: PipelineScenario[] = [
     industry: "support",
     benefits: ["Ticket history", "Join with app DB", "Incremental sync"],
     tags: ["support", "saas"],
+    lakeStarterId: "entity_360_profile",
   },
   {
     id: "google-ads-snowflake",
@@ -151,6 +156,7 @@ export const PIPELINE_SCENARIOS: PipelineScenario[] = [
     industry: "data-platform",
     benefits: ["File-based sources", "Batch-friendly loads", "Partition-friendly"],
     tags: ["files", "lake"],
+    lakeStarterId: "single_lake_medallion",
   },
   {
     id: "mysql-redshift",
@@ -175,8 +181,27 @@ export const PIPELINE_SCENARIOS: PipelineScenario[] = [
     industry: "support",
     benefits: ["Conversation objects", "BigQuery ML ready", "Webhook on run complete"],
     tags: ["support", "product"],
+    lakeStarterId: "entity_360_profile",
   },
 ];
+
+export const DEFAULT_SCENARIO_LAKE_STARTER = "single_source_to_mart";
+
+export function lakeStarterIdForScenario(scenario: PipelineScenario): string {
+  return scenario.lakeStarterId ?? DEFAULT_SCENARIO_LAKE_STARTER;
+}
+
+export function scenarioCanvasHref(
+  pipelineId: string,
+  scenario: PipelineScenario,
+  pipelineName?: string
+): string {
+  return canvasStarterHref({
+    pipelineId,
+    starterId: lakeStarterIdForScenario(scenario),
+    pipelineName,
+  });
+}
 
 export function scenariosForConnector(slug: string): PipelineScenario[] {
   const key = slug.toLowerCase();

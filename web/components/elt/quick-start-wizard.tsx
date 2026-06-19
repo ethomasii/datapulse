@@ -25,6 +25,8 @@ import {
   duckdbDestinationConfig,
   quickStartSecretFields,
 } from "@/lib/elt/quick-start-credentials";
+import { scenarioById, lakeStarterIdForScenario } from "@/lib/marketing/pipeline-scenarios";
+import { canvasStarterHref } from "@/lib/elt/lake-defaults";
 
 type Step = "destination" | "source" | "credentials" | "name" | "done";
 
@@ -74,7 +76,13 @@ export function QuickStartWizard({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
+  const [createdPipelineName, setCreatedPipelineName] = useState<string | null>(null);
   const [runTriggered, setRunTriggered] = useState(false);
+  const scenarioStarterId = useMemo(() => {
+    if (!scenarioId) return undefined;
+    const scenario = scenarioById(scenarioId);
+    return scenario ? lakeStarterIdForScenario(scenario) : undefined;
+  }, [scenarioId]);
   const [executionLabel, setExecutionLabel] = useState<string | null>(null);
 
   const defaultName = `${source}_to_${destination}`.replace(/[^a-zA-Z0-9_]/g, "_");
@@ -212,6 +220,7 @@ export function QuickStartWizard({
       const pipelineId = data.pipeline?.id;
       if (!pipelineId) throw new Error("Pipeline created but no id returned");
       setCreatedId(pipelineId);
+      setCreatedPipelineName(effectiveName);
 
       const execRes = await fetch("/api/execution/mode", { credentials: "same-origin" });
       if (execRes.ok) {
@@ -475,8 +484,8 @@ export function QuickStartWizard({
           <h2 className="mt-4 text-xl font-bold text-slate-900 dark:text-white">Pipeline created!</h2>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
             {runTriggered
-              ? `Sync started${executionLabel ? ` (${executionLabel})` : ""}. Watch live telemetry below.`
-              : "Pipeline saved. Trigger a run from the builder when you're ready."}
+              ? `Sync started${executionLabel ? ` (${executionLabel})` : ""}. When load finishes, add transforms on the canvas.`
+              : "Pipeline saved. Run ingest, then wire transforms with a lake recipe."}
           </p>
           {executionLabel === "Demo (stub)" ? (
             <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
@@ -484,6 +493,19 @@ export function QuickStartWizard({
             </p>
           ) : null}
           <div className="mt-6 flex flex-wrap justify-center gap-3">
+            {createdId ? (
+              <Link
+                href={canvasStarterHref({
+                  pipelineId: createdId,
+                  starterId: scenarioStarterId,
+                  pipelineName: createdPipelineName ?? undefined,
+                })}
+                className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500"
+              >
+                <Sparkles className="h-4 w-4" aria-hidden />
+                Add transforms
+              </Link>
+            ) : null}
             <Link
               href={createdId ? `/builder?pipeline=${encodeURIComponent(createdId)}` : "/builder"}
               className="inline-flex rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500"

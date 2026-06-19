@@ -36,3 +36,23 @@ export function medallionHintsForStarter(starterId: string): MedallionHints | un
   }
   return undefined;
 }
+
+export const DEFAULT_LAKE_STARTER_ID = "single_source_to_mart";
+
+/** Deep link to canvas with a lake starter recipe applied after ingest. */
+export function canvasStarterHref(opts: {
+  pipelineId: string;
+  starterId?: string;
+  pipelineName?: string;
+  sourceTable?: string;
+}): string {
+  const starter = opts.starterId ?? DEFAULT_LAKE_STARTER_ID;
+  const source_table =
+    opts.sourceTable ?? defaultSourceTable({ pipelineName: opts.pipelineName, fallback: "staging.events" });
+  const q = new URLSearchParams({
+    pipeline: opts.pipelineId,
+    starter,
+    source_table,
+  });
+  return `/builder/canvas?${q.toString()}`;
+}

@@ -14,6 +14,7 @@ import {
   type ComponentCompilerTier,
 } from "@/lib/elt/component-compiler-tier";
 import { compileTargetLabel } from "@/lib/elt/compile-target-labels";
+import { sanitizeCatalogDescription } from "@/lib/elt/sanitize-catalog-copy";
 import { isNativeComponent } from "@/lib/elt/native-components";
 
 export type ComponentManifestEntry = {
@@ -171,8 +172,10 @@ function enrichComponent(row: ComponentManifestEntry): ComponentListItem {
   const native = isNativeComponent(row.id);
   const compilerTier = resolveCompilerTier(row.id, route);
   const isExecutable = isFaithfulCompiler(compilerTier);
+  const description = sanitizeCatalogDescription(row.description);
   return {
     ...row,
+    description,
     compileTarget: route.target,
     compileTargetLabel: compileTargetLabel(route.target),
     compileBadge: route.badge,

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TransformJourneyStrip } from "@/components/elt/transform-journey-strip";
+import { AddTransformsCta } from "@/components/elt/add-transforms-cta";
 import { PipelineHealthPanel } from "@/components/catalog/pipeline-health-panel";
 import { RelatedLinks } from "@/components/ui/related-links";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
@@ -342,6 +343,14 @@ export function AssetsPageClient() {
     });
   }, [data, q, kindFilter, pipelineFilter]);
 
+  const transformsCtaBundle = useMemo(() => {
+    if (!data) return null;
+    const candidates = pipelineFilter
+      ? data.pipelines.filter((b) => b.pipelineId === pipelineFilter)
+      : data.pipelines;
+    return candidates.find((b) => b.rawAssets.length > 0 && b.transforms.length === 0) ?? null;
+  }, [data, pipelineFilter]);
+
   return (
     <div className="mx-auto w-full min-w-0 max-w-6xl space-y-8">
       <div>
@@ -399,6 +408,13 @@ export function AssetsPageClient() {
             <SummaryCard label="Transform outputs" value={data.summary.transforms} icon={GitBranch} />
             <SummaryCard label="Sources" value={data.summary.sources} icon={Database} />
           </div>
+
+          {transformsCtaBundle ? (
+            <AddTransformsCta
+              pipelineId={transformsCtaBundle.pipelineId}
+              pipelineName={transformsCtaBundle.pipelineName}
+            />
+          ) : null}
 
           {health.length > 0 && !pipelineFilter ? <PipelineHealthPanel health={health} /> : null}
 
