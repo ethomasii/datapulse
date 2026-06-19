@@ -10,6 +10,7 @@ export type ComponentCompileTarget =
   | "sling"
   | "quality"
   | "monitor"
+  | "warehouse"
   | "dbt"
   | "python"
   | "dagster"
@@ -50,12 +51,12 @@ export const TOP_COMPONENT_ROUTES: Record<string, ComponentRoute> = {
   dq_check: { target: "quality", badge: "native", hint: "Simple SQL/not_null checks" },
   freshness_check: { target: "quality", badge: "native", hint: "Asset freshness SLA + observability alert" },
   dbt_docs_enriched_project: { target: "dbt", badge: "native", hint: "Linked transform project + catalog enrichment" },
-  filter_rows: { target: "dbt", badge: "native", hint: "Warehouse SQL filter (CTAS) — dataframe optional" },
-  join_tables: { target: "dbt", badge: "native", hint: "Warehouse SQL join — dataframe optional" },
+  filter_rows: { target: "warehouse", badge: "native", hint: "Warehouse SQL filter (CTAS) — dataframe optional" },
+  join_tables: { target: "warehouse", badge: "native", hint: "Warehouse SQL join — dataframe optional" },
   lookup: { target: "python", badge: "native", hint: "Left join lookup against reference table" },
   pivot: { target: "python", badge: "native", hint: "Pivot long → wide with pandas" },
   cross_join: { target: "python", badge: "native", hint: "Cartesian product of two tables" },
-  anti_join: { target: "dbt", badge: "native", hint: "Warehouse SQL anti-join — dataframe optional" },
+  anti_join: { target: "warehouse", badge: "native", hint: "Warehouse SQL anti-join — dataframe optional" },
   data_cleansing: { target: "python", badge: "native", hint: "Trim, lowercase, drop null rows" },
   datetime_parser: { target: "python", badge: "native", hint: "Parse string columns to datetime" },
   unpivot: { target: "python", badge: "native", hint: "Unpivot wide → long (melt)" },
@@ -70,7 +71,7 @@ export const TOP_COMPONENT_ROUTES: Record<string, ComponentRoute> = {
   email_parser: { target: "python", badge: "native", hint: "RFC 2822 email field extraction" },
   regex_parser: { target: "python", badge: "native", hint: "Regex extract/match/replace/split" },
   html_parser: { target: "python", badge: "native", hint: "HTML strip/extract (beautifulsoup4)" },
-  group_aggregate: { target: "dbt", badge: "native", hint: "Warehouse SQL group-by — dataframe optional" },
+  group_aggregate: { target: "warehouse", badge: "native", hint: "Warehouse SQL group-by — dataframe optional" },
   litellm_inference_asset: { target: "dagster", badge: "dagster", hint: "Requires custom Python or external orchestration" },
   terraform_asset: { target: "dagster", badge: "dagster", hint: "Infrastructure — manual ops or custom step" },
   external_snowflake_table: {
@@ -94,7 +95,7 @@ const CATEGORY_DEFAULTS: Record<string, ComponentRoute> = {
   observation: { target: "monitor", badge: "native", hint: "Freshness / health monitor" },
   dbt: { target: "dbt", badge: "native", hint: "Linked transform project or in-pipeline SQL models" },
   external: { target: "catalog_external", badge: "native", hint: "Catalog external asset" },
-  transformation: { target: "dbt", badge: "native", hint: "Warehouse SQL or dataframe transform after load" },
+  transformation: { target: "warehouse", badge: "native", hint: "Warehouse SQL or dataframe transform after load" },
   analytics: { target: "python", badge: "python", hint: "Python analytics step (pandas/sklearn)" },
   ai: { target: "python", badge: "python", hint: "Python LLM enrichment step" },
   infrastructure: { target: "dagster", badge: "dagster", hint: "Platform ops — not runnable as a pipeline step" },

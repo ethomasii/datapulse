@@ -35,6 +35,7 @@ type Overview = {
 
 const CARDS = [
   { href: "/assets", label: "Assets", icon: Table2, desc: "Tables, objects, and dbt models across pipelines" },
+  { href: "/catalog/components", label: "Transforms", icon: Workflow, desc: "Recipes, warehouse SQL components, and BYO compile packages" },
   { href: "/catalog/products", label: "Data products", icon: Database, desc: "Curated governed asset bundles" },
   { href: "/catalog/contracts", label: "Data contracts", icon: Shield, desc: "Schema and freshness SLAs" },
   { href: "/catalog/connectors", label: "Connectors", icon: LayoutGrid, desc: "What your workspace uses + full registry" },

@@ -104,7 +104,7 @@ export const antiJoinComponent: NativeComponentDefinition = {
   name: "Anti join",
   category: "transformation",
   description: "Rows in left table not in right — warehouse SQL anti-join (default) or dataframe.",
-  compileTarget: "dbt",
+  compileTarget: "warehouse",
   fields: [
     { key: "left_table", label: "Left table", type: "string", required: true },
     { key: "right_table", label: "Right table", type: "string", required: true },

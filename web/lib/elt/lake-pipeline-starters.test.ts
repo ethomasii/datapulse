@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLakePipeline, matchLakeStarter } from "./lake-pipeline-starters";
+import { buildLakePipeline, lakeStarterCanvasGraph, matchLakeStarter } from "./lake-pipeline-starters";
 
 describe("lake-pipeline-starters", () => {
   it("matches single lake medallion trigger", () => {
@@ -26,5 +26,15 @@ describe("lake-pipeline-starters", () => {
     });
     expect(out.components[0]?.config?.right_table).toBe("dims.accounts");
     expect(out.components[1]?.config?.group_by).toEqual(["account_id"]);
+  });
+
+  it("builds canvas graph from starter", () => {
+    const out = lakeStarterCanvasGraph({
+      starter_id: "single_source_to_mart",
+      source_table: "staging.orders",
+    });
+    expect(out.nodes.length).toBeGreaterThan(2);
+    expect(out.edges.length).toBeGreaterThan(0);
+    expect(out.nodes.some((n) => n.type === "destNode")).toBe(true);
   });
 });

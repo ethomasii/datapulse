@@ -22,7 +22,7 @@ export const groupAggregateComponent: NativeComponentDefinition = {
   name: "Group & aggregate",
   category: "transformation",
   description: "Group by columns and aggregate in warehouse SQL (default) or dataframe groupby.",
-  compileTarget: "dbt",
+  compileTarget: "warehouse",
   fields: [
     { key: "table", label: "Table", type: "string", required: true },
     { key: "group_by", label: "Group by columns", type: "string_list", required: true },
@@ -100,7 +100,7 @@ export const sortRowsComponent: NativeComponentDefinition = {
   name: "Sort rows",
   category: "transformation",
   description: "Sort a table by columns via warehouse SQL (default) or dataframe.",
-  compileTarget: "dbt",
+  compileTarget: "warehouse",
   fields: [
     { key: "table", label: "Table", type: "string", required: true },
     { key: "columns", label: "Sort columns", type: "string_list", required: true },
@@ -176,7 +176,7 @@ export const limitRowsComponent: NativeComponentDefinition = {
   name: "Limit rows",
   category: "transformation",
   description: "Keep first N rows via warehouse SQL LIMIT (default) or dataframe head.",
-  compileTarget: "dbt",
+  compileTarget: "warehouse",
   fields: [
     { key: "table", label: "Table", type: "string", required: true },
     { key: "limit", label: "Row limit", type: "number", default: 1000, required: true },

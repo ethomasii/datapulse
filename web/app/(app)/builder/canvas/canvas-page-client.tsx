@@ -7,6 +7,8 @@ import type { Edge, Node } from "@xyflow/react";
 import { Loader2, Plus } from "lucide-react";
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
 import { ComponentPalette } from "@/components/elt/component-palette";
+import { LakeStarterGallery } from "@/components/elt/lake-starter-gallery";
+import { TransformPathsPanel } from "@/components/elt/transform-paths-panel";
 import { CopyEnvButton } from "@/components/elt/copy-env-button";
 import { EltLoadingState } from "@/components/elt/elt-loading-state";
 import { FormAccordion } from "@/components/elt/form-accordion";
@@ -48,6 +50,7 @@ import clsx from "clsx";
 import { hydrateCanvasFromSourceConfiguration, extractSpecComponents } from "@/lib/elt/spec-components-to-canvas";
 import { TransformDagPanel } from "@/components/pipeline-canvas/transform-dag-panel";
 import { IngestPanel } from "@/components/pipeline-canvas/ingest-panel";
+import { lakeStarterCanvasGraph } from "@/lib/elt/lake-pipeline-starters";
 
 type PipelineRow = { id: string; name: string };
 
@@ -98,6 +101,11 @@ export function CanvasPageClient() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [linkedDbtProjectId, setLinkedDbtProjectId] = useState<string | null>(null);
   const [canvasView, setCanvasView] = useState<"designer" | "dag" | "ingest">("designer");
+  const [starterNotice, setStarterNotice] = useState<string | null>(null);
+  const starterAppliedRef = useRef(false);
+
+  const starterFromUrl = searchParams.get("starter");
+  const sourceTableFromUrl = searchParams.get("source_table") ?? "staging.events";
 
   const { permissions } = useWorkspacePermissions();
   const canWrite = permissions?.canWrite ?? true;
@@ -230,6 +238,30 @@ export function CanvasPageClient() {
   useEffect(() => {
     void loadPipelines();
   }, [loadPipelines]);
+
+  useEffect(() => {
+    starterAppliedRef.current = false;
+    setStarterNotice(null);
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (!selectedId || !starterFromUrl || starterAppliedRef.current || detailLoading) return;
+    const timer = window.setTimeout(() => {
+      if (!canvasControlRef.current) return;
+      const result = lakeStarterCanvasGraph({
+        starter_id: starterFromUrl,
+        source_table: sourceTableFromUrl,
+        existingCanvas: loadedGraph
+          ? { nodes: loadedGraph.nodes, edges: loadedGraph.edges, v: 1 }
+          : null,
+      });
+      if (!result.nodes.length) return;
+      canvasControlRef.current.replaceGraph(result.nodes, result.edges);
+      setStarterNotice(`${result.title} loaded — save pipeline to compile warehouse SQL.`);
+      starterAppliedRef.current = true;
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [selectedId, starterFromUrl, sourceTableFromUrl, detailLoading, loadedSig, loadedGraph]);
 
   const loadPipelineGraph = useCallback(async (id: string) => {
     if (!id) {
@@ -1203,6 +1235,31 @@ export function CanvasPageClient() {
                   </div>
                 ) : inspectorFocus.kind === "none" ? (
                   <>
+                    {starterNotice ? (
+                      <p className="mb-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-100">
+                        {starterNotice}
+                      </p>
+                    ) : null}
+                    <TransformPathsPanel compact className="mb-4" />
+                    <LakeStarterGallery
+                      compact
+                      className="mb-4"
+                      requirePipeline
+                      defaultSourceTable={sourceTableFromUrl}
+                      existingCanvas={
+                        loadedGraph ? { nodes: loadedGraph.nodes, edges: loadedGraph.edges, v: 1 } : null
+                      }
+                      onApplyToCanvas={(result) => {
+                        if (!selectedId) {
+                          setStarterNotice("Select or create a pipeline first.");
+                          return;
+                        }
+                        canvasControlRef.current?.replaceGraph(result.nodes, result.edges);
+                        setStarterNotice(
+                          `${result.title}: ${result.stepCount} steps on canvas — save to compile.`
+                        );
+                      }}
+                    />
                     <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
                       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                         AI canvas builder

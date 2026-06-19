@@ -94,6 +94,7 @@ export type PipelineCanvasControl = {
     },
     position?: { x: number; y: number }
   ) => void;
+  replaceGraph: (nodes: Node[], edges: Edge[]) => void;
 };
 
 import { ELTPULSE_COMPONENT_DRAG_MIME } from "@/lib/elt/canvas-drag";
@@ -462,11 +463,17 @@ function FlowCanvas({
         );
       },
       addComponentNode,
+      replaceGraph: (nextNodes: Node[], nextEdges: Edge[]) => {
+        setNodes(nextNodes);
+        setEdges(resolveCanvasEdges(nextNodes, nextEdges));
+        setLocalValidationError(null);
+        setTimeout(fit, 60);
+      },
     };
     return () => {
       canvasControlRef.current = null;
     };
-  }, [canvasControlRef, setNodes, addComponentNode]);
+  }, [canvasControlRef, setNodes, setEdges, addComponentNode, fit]);
 
   const onSelectionChange = useCallback(
     ({ nodes: selectedNodes }: { nodes: Node[] }) => {

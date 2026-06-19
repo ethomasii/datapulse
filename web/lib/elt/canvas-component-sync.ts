@@ -53,6 +53,7 @@ function componentSpecType(
 ): PipelineComponentSpec["type"] {
   if (compileTarget === "quality") return "quality";
   if (compileTarget === "dbt") return "dbt";
+  if (compileTarget === "warehouse") return "sql";
   if (compileTarget === "python") return "python";
   if (compileTarget === "monitor") return "custom";
   return "custom";

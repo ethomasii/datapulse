@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import { compileTargetLabel } from "@/lib/elt/compile-target-labels";
+import { ELTPULSE_COMPONENT_DRAG_MIME } from "@/lib/elt/canvas-drag";
 import { ComponentIcon } from "@/components/elt/component-icon";
 
 export type ComponentListItem = {
@@ -102,6 +103,7 @@ export function ComponentPalette({
         quality: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200",
         monitor: "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200",
         dbt: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200",
+        warehouse: "bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-200",
         python: "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200",
         dagster: "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200",
       }) as Record<string, string>,

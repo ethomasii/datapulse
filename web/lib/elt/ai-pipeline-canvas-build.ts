@@ -44,6 +44,14 @@ function placementForComponent(
   const cat = normalizeComponentCategory(category);
   if (compileTarget === "monitor" || cat === "sensor" || cat === "observation") return "parallel";
   if (compileTarget === "quality" || cat === "check") return "post_dest";
+  if (
+    cat === "transformation" ||
+    compileTarget === "warehouse" ||
+    compileTarget === "dbt" ||
+    compileTarget === "python"
+  ) {
+    return "post_dest";
+  }
   return "pre_dest";
 }
 

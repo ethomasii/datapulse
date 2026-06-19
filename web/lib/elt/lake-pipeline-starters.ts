@@ -1,8 +1,11 @@
 /**
  * Agnostic single-lake (and light multi-source) pipeline starters — wire transforms after ingest.
  */
+import type { Edge, Node } from "@xyflow/react";
 import type { AiPipelineComponentInput } from "@/lib/elt/ai-pipeline-canvas-build";
+import { buildPipelineCanvasFromComponents } from "@/lib/elt/ai-pipeline-canvas-build";
 import type { CanvasGraphEditAction } from "@/lib/elt/canvas-graph-edit";
+import type { PipelineCanvasGraph } from "@/lib/elt/canvas-source-config";
 
 export type LakePipelineStarter = {
   id: string;
@@ -319,7 +322,14 @@ export function buildLakePipeline(input: {
     id_column: input.id_column,
   };
 
-  const components = starter.components(ctx);
+  const components = starter.components(ctx).map((c) => ({
+    ...c,
+    config: {
+      ...(c.config ?? {}),
+      execution: (c.config as Record<string, unknown> | undefined)?.execution ?? "warehouse",
+      template_id: c.component_id,
+    },
+  }));
   return {
     starter_id: starter.id,
     title: starter.title,
@@ -331,4 +341,26 @@ export function buildLakePipeline(input: {
       "All steps use warehouse SQL push-down by default (execution=warehouse).",
     ],
   };
+}
+
+/** Build a React Flow graph from a lake starter (for canvas UI). */
+export function lakeStarterCanvasGraph(input: {
+  starter_id: string;
+  source_table: string;
+  second_table?: string;
+  dimension_table?: string;
+  layer_prefix?: string;
+  join_key?: string;
+  id_column?: string;
+  existingCanvas?: PipelineCanvasGraph | null;
+}): LakeStarterBuildResult & { nodes: Node[]; edges: Edge[] } {
+  const built = buildLakePipeline(input);
+  if (!built.components.length) {
+    return { ...built, nodes: [], edges: [] };
+  }
+  const { nodes, edges } = buildPipelineCanvasFromComponents({
+    components: built.components,
+    existingCanvas: input.existingCanvas ?? null,
+  });
+  return { ...built, nodes, edges };
 }

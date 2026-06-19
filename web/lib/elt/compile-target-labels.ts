@@ -7,8 +7,10 @@ export function compileTargetLabel(target: string): string {
       return "Ingest";
     case "sling":
       return "Replicate";
+    case "warehouse":
+      return "Warehouse SQL";
     case "dbt":
-      return "Transform";
+      return "dbt project";
     case "quality":
       return "Quality";
     case "monitor":

@@ -117,7 +117,9 @@ export function ComponentIcon({
             ? FileInput
             : compileTarget === "dbt"
               ? GitBranch
-              : compileTarget === "python"
+              : compileTarget === "warehouse"
+                ? Database
+                : compileTarget === "python"
                 ? Filter
                 : Box;
   }

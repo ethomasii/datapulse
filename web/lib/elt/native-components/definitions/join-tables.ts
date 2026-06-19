@@ -88,7 +88,7 @@ export const joinTablesComponent: NativeComponentDefinition = {
   name: "Join tables",
   category: "transformation",
   description: "Join two warehouse tables via SQL push-down (default) or dataframe merge.",
-  compileTarget: "dbt",
+  compileTarget: "warehouse",
   dagsterOnlyFields: [
     "asset_name",
     "left_asset_key",

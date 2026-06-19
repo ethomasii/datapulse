@@ -38,7 +38,7 @@ export const filterRowsComponent: NativeComponentDefinition = {
   name: "Filter rows",
   category: "transformation",
   description: "Filter rows in warehouse SQL (default) or in-memory dataframe when execution=dataframe.",
-  compileTarget: "dbt",
+  compileTarget: "warehouse",
   fields: [
     {
       key: "table",

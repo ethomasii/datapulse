@@ -13,7 +13,7 @@ export const dropDuplicatesComponent: NativeComponentDefinition = {
   name: "Drop duplicates",
   category: "transformation",
   description: "Deduplicate rows by key columns via warehouse SQL (default) or dataframe.",
-  compileTarget: "dbt",
+  compileTarget: "warehouse",
   fields: [
     { key: "table", label: "Table", type: "string", required: true },
     {

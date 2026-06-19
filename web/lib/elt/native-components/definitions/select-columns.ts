@@ -13,7 +13,7 @@ export const selectColumnsComponent: NativeComponentDefinition = {
   name: "Select columns",
   category: "transformation",
   description: "Project a subset of columns via warehouse SQL (default) or dataframe.",
-  compileTarget: "dbt",
+  compileTarget: "warehouse",
   fields: [
     { key: "table", label: "Table", type: "string", required: true },
     {
