@@ -44,6 +44,13 @@ describe("resolveManagedExecutorMode", () => {
     vi.unstubAllEnvs();
   });
 
+  it("defaults to local in development when worker secrets are set", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("ELTPULSE_INTERNAL_API_SECRET", "dev-secret");
+    vi.stubEnv("ELTPULSE_TOKEN_ENCRYPTION_KEY", "dGVzdC1rZXk=");
+    expect(resolveManagedExecutorMode()).toBe("local");
+  });
+
   it("defaults to stub when no GitHub dispatch env", () => {
     expect(resolveManagedExecutorMode()).toBe("stub");
   });

@@ -25,6 +25,11 @@ export function ComponentCatalogClient() {
           </p>
         </div>
         <TransformJourneyStrip />
+        <p className="text-sm">
+          <Link href="/catalog/dbt/new" className="font-semibold text-indigo-600 hover:underline dark:text-indigo-400">
+            Promote canvas recipes to a dbt project →
+          </Link>
+        </p>
       </header>
 
       <LakeStarterGallery />

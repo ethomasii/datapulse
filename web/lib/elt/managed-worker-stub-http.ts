@@ -149,6 +149,13 @@ export function resolveManagedExecutorMode(): ManagedExecutorMode {
   ) {
     return "gha";
   }
+  if (
+    process.env.NODE_ENV === "development" &&
+    process.env.ELTPULSE_INTERNAL_API_SECRET?.trim() &&
+    process.env.ELTPULSE_TOKEN_ENCRYPTION_KEY?.trim()
+  ) {
+    return "local";
+  }
   return "stub";
 }
 

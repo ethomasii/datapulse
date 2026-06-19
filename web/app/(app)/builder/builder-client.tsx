@@ -22,6 +22,7 @@ import {
   Layers,
 } from "lucide-react";
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
+import { ExecutionStatusBanner } from "@/components/elt/execution-status-banner";
 import { DbtConfigFields } from "@/components/dbt/dbt-config-fields";
 import { applyDbtProjectToForm, DbtProjectPicker } from "@/components/dbt/dbt-project-picker";
 import { SourceCatalogWizard } from "@/components/elt/source-catalog-wizard";
@@ -729,6 +730,8 @@ export function BuilderClient({
           next to Guided / JSON for the diagram, or open Canvas from the table row — same record as this form.
         </p>
       </div>
+
+      <ExecutionStatusBanner />
 
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">

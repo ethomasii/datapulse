@@ -1300,9 +1300,17 @@ export function CanvasPageClient() {
                 ) : inspectorFocus.kind === "none" ? (
                   <>
                     {starterNotice ? (
-                      <p className="mb-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-100">
-                        {starterNotice}
-                      </p>
+                      <div className="mb-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-100">
+                        <p>{starterNotice}</p>
+                        {selectedId ? (
+                          <Link
+                            href={`/catalog/dbt/new?pipeline=${encodeURIComponent(selectedId)}`}
+                            className="mt-2 inline-flex font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
+                          >
+                            Promote to dbt project →
+                          </Link>
+                        ) : null}
+                      </div>
                     ) : null}
                     <TransformJourneyStrip compact showRecipeLink={false} className="mb-3" />
                     <LakeStarterGallery

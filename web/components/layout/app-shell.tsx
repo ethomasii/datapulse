@@ -79,7 +79,7 @@ const ADVANCED_NAV: NavItem[] = [
   { href: "/repos", label: "Repositories", icon: FolderGit2 },
   { href: "/integrations", label: "Integrations", icon: Plug },
   { href: "/help", label: "Help", icon: CircleHelp },
-  { href: "/team", label: "Team", icon: Users, soon: true },
+  { href: "/team", label: "Team", icon: Users },
 ];
 
 const ACCOUNT_NAV: NavItem[] = [

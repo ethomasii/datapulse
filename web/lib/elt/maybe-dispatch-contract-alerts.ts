@@ -9,7 +9,7 @@ import { parseCatalogMetadata } from "@/lib/elt/catalog-metadata";
 import { buildAssetTechnicalProfile } from "@/lib/elt/asset-technical-profile";
 import { evaluateContractCompliance } from "@/lib/elt/data-contract";
 import { buildWorkspaceAssets } from "@/lib/elt/pipeline-assets";
-import { parseRunTelemetry } from "@/lib/elt/run-telemetry";
+import { parseRunTelemetry, runTelemetryToJson } from "@/lib/elt/run-telemetry";
 import { deliverRunWebhook } from "@/lib/elt/run-webhook";
 
 export type ContractViolation = {
@@ -111,6 +111,14 @@ export async function maybeDispatchContractAlerts(runId: string, userId: string)
   }
 
   if (!violations.length) return;
+
+  const tel = parseRunTelemetry((run as { telemetry?: unknown }).telemetry);
+  if (!tel.contractViolations?.length) {
+    await db.eltPipelineRun.update({
+      where: { id: runId },
+      data: { telemetry: runTelemetryToJson({ ...tel, contractViolations: violations }) },
+    });
+  }
 
   const webhookUrl = run.pipeline?.runsWebhookUrl ?? run.user.runsWebhookUrl;
   if (webhookUrl) {

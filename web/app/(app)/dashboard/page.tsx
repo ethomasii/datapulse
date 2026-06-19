@@ -8,7 +8,9 @@ import { effectiveRunTelemetry, formatBytes, formatRows } from "@/lib/elt/run-te
 import { runSubjectLabel } from "@/lib/elt/run-display";
 import { ONBOARDING_STEPS } from "@/lib/onboarding/config";
 import { OnboardingChecklist } from "@/components/onboarding/checklist";
+import { ExecutionStatusBanner } from "@/components/elt/execution-status-banner";
 import { BarChart } from "@/components/ui/bar-chart";
+import { getManagedExecutionStatus } from "@/lib/elt/managed-execution-status";
 
 function dayKey(d: Date): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -79,11 +81,14 @@ export default async function DashboardPage() {
       }),
     ]);
 
+  const executionStatus = getManagedExecutionStatus();
+
   // Onboarding: compute which steps are done
   const completedIds = ONBOARDING_STEPS.map((s) => s.id).filter((id) => {
     if (id === "pipeline") return pipelineCount > 0;
     if (id === "connection") return connectionCount > 0;
     if (id === "gateway") return namedAgents.length > 0 || !!user.agentToken;
+    if (id === "execution") return executionStatus.readyForRealRuns || namedAgents.length > 0;
     if (id === "run") return !!anyRun;
     if (id === "webhook") return !!user.runsWebhookUrl;
     return false;
@@ -115,6 +120,8 @@ export default async function DashboardPage() {
       </div>
 
       {showOnboarding && <OnboardingChecklist completedIds={completedIds} />}
+
+      <ExecutionStatusBanner />
 
       <section className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">

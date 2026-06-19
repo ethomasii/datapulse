@@ -27,7 +27,9 @@ import { RelatedLinks } from "@/components/ui/related-links";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BarChart } from "@/components/ui/bar-chart";
 import { parseSliceFromTriggeredBy } from "@/lib/elt/slice-trigger";
+import { ExecutionStatusBanner } from "@/components/elt/execution-status-banner";
 import { AddTransformsCta } from "@/components/elt/add-transforms-cta";
+import { RunContractViolationsPanel } from "@/components/elt/run-contract-violations-panel";
 import { runSubjectLabel } from "@/lib/elt/run-display";
 
 type PipelineOpt = { id: string; name: string; partitionColumn: string | null };
@@ -611,6 +613,8 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
           </Link>
         </p>
       </div>
+
+      <ExecutionStatusBanner />
 
       {/* 14-day activity charts */}
       {hasChartData && (
@@ -1215,6 +1219,11 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                     </pre>
                   </div>
                 )}
+
+                {(() => {
+                  const violations = parseRunTelemetry(detail.run.telemetry).contractViolations;
+                  return violations?.length ? <RunContractViolationsPanel violations={violations} /> : null;
+                })()}
 
                 <RunTelemetryView telemetryRaw={detail.run.telemetry} logEntriesRaw={detail.run.logEntries} />
 

@@ -53,8 +53,17 @@ export type RunTelemetry = {
   resources?: ResourceRollup[];
   /** dbt model/test results from the transform phase (v2). */
   dbt?: DbtRunManifest;
+  /** Data contract violations evaluated after a succeeded run. */
+  contractViolations?: ContractViolationSummary[];
   /** Numeric rollup was inferred from structured log lines (no telemetry summary on the run). */
   derivedFromLogs?: boolean;
+};
+
+export type ContractViolationSummary = {
+  contractSlug: string;
+  contractName: string;
+  assetKey: string;
+  issues: string[];
 };
 
 function finiteNonNeg(n: unknown): number | undefined {
@@ -72,6 +81,27 @@ function str(n: unknown, max: number): string | undefined {
   const t = n.trim();
   if (!t) return undefined;
   return t.length > max ? t.slice(0, max) : t;
+}
+
+function sanitizeContractViolations(raw: unknown): ContractViolationSummary[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: ContractViolationSummary[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const o = item as Record<string, unknown>;
+    const contractSlug = str(o.contractSlug, 120);
+    const contractName = str(o.contractName, 200);
+    const assetKey = str(o.assetKey, 512);
+    const issuesRaw = o.issues;
+    if (!contractSlug || !contractName || !assetKey || !Array.isArray(issuesRaw)) continue;
+    const issues = issuesRaw
+      .map((x) => (typeof x === "string" ? x.trim() : ""))
+      .filter(Boolean)
+      .slice(0, 20);
+    if (!issues.length) continue;
+    out.push({ contractSlug, contractName, assetKey, issues });
+  }
+  return out.length ? out : undefined;
 }
 
 function sanitizeSystem(raw: unknown): TelemetrySystemMetrics | undefined {
@@ -220,6 +250,7 @@ export function parseRunTelemetry(raw: unknown): RunTelemetry {
     }
   }
   const dbt = sanitizeDbtRunManifest(o.dbt) ?? undefined;
+  const contractViolations = sanitizeContractViolations(o.contractViolations);
   const resourcesRaw = o.resources;
   let resources: ResourceRollup[] | undefined;
   if (Array.isArray(resourcesRaw)) {
@@ -239,6 +270,7 @@ export function parseRunTelemetry(raw: unknown): RunTelemetry {
     samples: samples.slice(-TELEMETRY_SAMPLES_MAX),
     ...(resources?.length ? { resources } : {}),
     ...(dbt ? { dbt } : {}),
+    ...(contractViolations?.length ? { contractViolations } : {}),
   };
 }
 
@@ -333,6 +365,7 @@ export function runTelemetryToJson(t: RunTelemetry): Record<string, unknown> {
     samples: t.samples,
     ...(t.resources?.length ? { resources: t.resources } : {}),
     ...(t.dbt ? { dbt: t.dbt } : {}),
+    ...(t.contractViolations?.length ? { contractViolations: t.contractViolations } : {}),
     ...(t.derivedFromLogs ? { derivedFromLogs: true } : {}),
   };
 }

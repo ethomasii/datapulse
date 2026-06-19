@@ -37,14 +37,14 @@ export function getManagedExecutionStatus(): ManagedExecutionStatus {
       id: "internal_secret",
       label: "ELTPULSE_INTERNAL_API_SECRET",
       ok: Boolean(process.env.ELTPULSE_INTERNAL_API_SECRET?.trim()),
-      required: true,
+      required: mode === "gha" || mode === "local",
       hint: "Random secret shared with GitHub Actions repo secrets",
     },
     {
       id: "encryption_key",
       label: "ELTPULSE_TOKEN_ENCRYPTION_KEY",
       ok: Boolean(process.env.ELTPULSE_TOKEN_ENCRYPTION_KEY?.trim()),
-      required: true,
+      required: mode === "gha" || mode === "local",
       hint: "32-byte base64 key for decrypting connection secrets in workers",
     },
     {

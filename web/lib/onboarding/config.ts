@@ -27,8 +27,15 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: "run",
     label: "Run your first sync",
-    description: "Hit Run in the builder — managed execution works out of the box",
+    description: "Hit Run in the builder — demo mode works instantly; enable real execution on Gateway",
     href: "/builder",
+  },
+  {
+    id: "execution",
+    label: "Enable real execution",
+    description: "GitHub Actions or customer gateway — skip if demo telemetry is enough for now",
+    href: "/gateway",
+    optional: true,
   },
   {
     id: "webhook",
