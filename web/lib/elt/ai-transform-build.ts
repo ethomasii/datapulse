@@ -1,5 +1,5 @@
 /**
- * Build transform chains from structured steps — dataframe (in-memory) or dbt push-down (warehouse SQL).
+ * Build transform chains from structured steps — dataframe, warehouse SQL, or linked dbt project.
  */
 import type { AiPipelineComponentInput } from "@/lib/elt/ai-pipeline-canvas-build";
 import type { CanvasGraphEditAction } from "@/lib/elt/canvas-graph-edit";
@@ -25,7 +25,7 @@ export type TransformBuildStep = {
   output_suffix?: string;
 };
 
-export type TransformBuildMode = "dataframe" | "dbt";
+export type TransformBuildMode = "dataframe" | "warehouse" | "dbt";
 
 export type TransformBuildInput = {
   mode: TransformBuildMode;
@@ -33,7 +33,7 @@ export type TransformBuildInput = {
   source_table: string;
   steps: TransformBuildStep[];
   output_schema?: string;
-  /** For dbt mode when a project is linked */
+  /** Linked git dbt project — only used when mode is dbt */
   dbt_package_path?: string;
   dbt_target_schema?: string;
   dbt_selector?: string;
@@ -223,7 +223,7 @@ function buildWarehouseComponents(
   return buildStepComponents(sourceTable, steps, "warehouse");
 }
 
-function buildDbtSqlChain(sourceTable: string, steps: TransformBuildStep[]): string {
+function buildWarehouseSqlChain(sourceTable: string, steps: TransformBuildStep[]): string {
   const src = splitTableRef(sourceTable);
   const statements: string[] = [];
   let currentTable = src.qualified;
@@ -316,53 +316,58 @@ function graphEditsForComponents(components: AiPipelineComponentInput[]): Canvas
 }
 
 export function buildTransformPipeline(input: TransformBuildInput): TransformBuildResult {
-  const mode = input.mode;
+  const requestedMode = input.mode;
   const sourceTable = String(input.source_table ?? "").trim();
   const steps = input.steps ?? [];
   const messages: string[] = [];
 
   if (!sourceTable) {
-    return { mode, components: [], graph_edits: [], messages: ["source_table is required"] };
+    return { mode: requestedMode, components: [], graph_edits: [], messages: ["source_table is required"] };
   }
   if (!steps.length) {
-    return { mode, components: [], graph_edits: [], messages: ["At least one transform step is required"] };
+    return {
+      mode: requestedMode,
+      components: [],
+      graph_edits: [],
+      messages: ["At least one transform step is required"],
+    };
   }
 
-  if (mode === "dataframe") {
+  if (requestedMode === "dataframe") {
     const components = buildDataframeComponents(sourceTable, steps);
     messages.push(
       `Dataframe path: ${components.length} step(s) — runs in-memory on worker after load (filter/sort/aggregate via native components).`
     );
     return {
-      mode,
+      mode: "dataframe",
       components,
       graph_edits: graphEditsForComponents(components),
       messages,
     };
   }
 
-  const sql = buildDbtSqlChain(sourceTable, steps);
+  const sql = buildWarehouseSqlChain(sourceTable, steps);
   if (!sql.trim()) {
-    return { mode, components: [], graph_edits: [], messages: ["No SQL generated from steps"] };
+    return { mode: requestedMode, components: [], graph_edits: [], messages: ["No SQL generated from steps"] };
   }
 
   const packagePath = String(input.dbt_package_path ?? "").trim();
   const warehouseComponents = buildWarehouseComponents(sourceTable, steps);
 
-  if (packagePath) {
+  if (requestedMode === "dbt" && packagePath) {
     const selector = String(input.dbt_selector ?? "").trim() || "tag:eltpulse_ai";
     messages.push(
-      `dbt push-down: linked transform project + ${warehouseComponents.length} warehouse component step(s) on canvas.`
+      `dbt project: linked transform + ${warehouseComponents.length} warehouse SQL preview step(s) on canvas.`
     );
     return {
-      mode,
+      mode: "dbt",
       components: warehouseComponents,
       graph_edits: [
         ...graphEditsForComponents(warehouseComponents),
         {
           op: "add_transform",
           tool: "dbt",
-          label: "Transform models",
+          label: "dbt project",
           after: "dest",
           package_path: packagePath,
           selector,
@@ -378,12 +383,16 @@ export function buildTransformPipeline(input: TransformBuildInput): TransformBui
     };
   }
 
+  if (requestedMode === "dbt" && !packagePath) {
+    messages.push("dbt project mode needs dbt_package_path — using warehouse SQL components instead.");
+  }
+
   if (warehouseComponents.length) {
     messages.push(
-      `Warehouse path: ${warehouseComponents.length} native transform step(s) — SQL push-down after load (no data movement off the lake).`
+      `Warehouse SQL: ${warehouseComponents.length} native transform step(s) after load (CTAS — not a dbt project).`
     );
     return {
-      mode,
+      mode: "warehouse",
       components: warehouseComponents,
       graph_edits: graphEditsForComponents(warehouseComponents),
       messages,
@@ -391,10 +400,10 @@ export function buildTransformPipeline(input: TransformBuildInput): TransformBui
   }
 
   messages.push(
-    "dbt push-down: warehouse SQL runs after load (CREATE TABLE AS …). Link a transform project at /catalog/dbt for managed dbt models."
+    "Warehouse SQL: inline CTAS after load. Link a dbt project at /catalog/dbt when logic should live in git."
   );
   return {
-    mode,
+    mode: "warehouse",
     components: [],
     graph_edits: [
       {
@@ -411,18 +420,46 @@ export function buildTransformPipeline(input: TransformBuildInput): TransformBui
   };
 }
 
-/** Infer transform mode — warehouse default for lake/single-source; dataframe for quick worker ops. */
-export function inferTransformMode(query: string): TransformBuildMode {
+export function transformBuildModeLabel(mode: TransformBuildMode): string {
+  switch (mode) {
+    case "dataframe":
+      return "Dataframe";
+    case "warehouse":
+      return "Warehouse SQL";
+    case "dbt":
+      return "dbt project";
+  }
+}
+
+/** Resolve AI/API mode — legacy `dbt` without a linked project maps to warehouse SQL. */
+export function normalizeTransformBuildMode(
+  modeRaw: string | undefined,
+  opts?: { userQuery?: string; dbtPackagePath?: string }
+): TransformBuildMode {
+  const raw = String(modeRaw ?? "auto").toLowerCase();
+  const packagePath = String(opts?.dbtPackagePath ?? "").trim();
+
+  if (raw === "dataframe") return "dataframe";
+  if (raw === "warehouse") return "warehouse";
+  if (raw === "dbt") return packagePath ? "dbt" : "warehouse";
+
+  return inferTransformMode(opts?.userQuery ?? "", packagePath);
+}
+
+/** Infer transform mode — dbt default for production; warehouse for canvas/recipes; dataframe legacy only. */
+export function inferTransformMode(query: string, dbtPackagePath?: string): TransformBuildMode {
+  if (String(dbtPackagePath ?? "").trim()) return "dbt";
+
   const q = query.toLowerCase();
-  if (/\b(dataframe|pandas|in.?memory|worker)\b/.test(q)) {
+  if (/\b(dataframe|pandas|legacy|in.?memory|worker python)\b/.test(q)) {
     return "dataframe";
   }
   if (
-    /\b(dbt|push.?down|warehouse|sql model|materialized|snowflake|bigquery|redshift|databricks|lake|medallion|single source|one source|mart|cdp)\b/.test(
+    /\b(recipe|medallion|canvas component|warehouse sql|ctas|native component|quick mart|lake starter|build_lake)\b/.test(
       q
     )
   ) {
-    return "dbt";
+    return "warehouse";
   }
   return "dbt";
 }

@@ -28,7 +28,7 @@ import {
 } from "@/lib/elt/lake-pipeline-starters";
 import {
   buildTransformPipeline,
-  inferTransformMode,
+  normalizeTransformBuildMode,
   type TransformBuildMode,
   type TransformBuildStep,
 } from "@/lib/elt/ai-transform-build";
@@ -58,15 +58,16 @@ When a user describes a pipeline (e.g. "Load GitHub issues into Snowflake"), cal
 
 After generating, give ONE short sentence: "Pipeline ready — click Save, then edit the repo/credentials in the builder or canvas."
 
-## Transform-only focus (two execution paths)
+## Transform-only focus (three execution paths)
 
 When the user asks to **filter, sort, aggregate, dedupe, or reshape loaded data** (not ingest):
 
 1. Call **build_transform_steps** with structured \`steps[]\` and \`mode\`:
-   - **dbt** (default) — warehouse SQL push-down: native components with \`execution=warehouse\` chained after load.
-   - **dataframe** — in-memory path on the worker when they say dataframe/pandas/in-memory.
-2. If \`mode\` is unclear, default **dbt** for lake/single-source/mart requests; **dataframe** only when they ask for worker/pandas.
-3. For **single-lake pipeline patterns** (medallion, source→mart, enrich+DQ, union): call **build_lake_pipeline** with a starter_id + source_table.
+   - **dbt** (default for production) — link a git dbt project when possible (\`dbt_package_path\` / \`dbt_project_id\`).
+   - **warehouse** — canvas recipes and native CTAS components (fast prototype; not a substitute for dbt in prod).
+   - **dataframe** (legacy) — worker pandas only when they explicitly ask for dataframe/pandas/legacy.
+2. If \`mode\` is unclear, default **dbt** for mart/staging/production transforms; **warehouse** for recipe/medallion/canvas-native requests; **dataframe** only when legacy pandas is explicit.
+3. For **single-lake pipeline patterns** (medallion, source→mart, enrich+DQ, union): call **build_lake_pipeline** (warehouse canvas path) — suggest promoting to dbt after.
 4. Apply results via **generate_pipeline** / **add_pipeline_components** + **edit_pipeline_canvas** (\`graph_edits\`).
 5. \`source_table\` default: \`staging.{pipeline_name}\` — never ask if a reasonable default exists.
 6. Do **not** add ingest/sensor components for pure transform requests.
@@ -75,7 +76,7 @@ When the user asks to **filter, sort, aggregate, dedupe, or reshape loaded data*
 ${listLakeStartersForPrompt()}
 
 Example — "filter active orders, sort by created_at desc, sum amount by day":
-- build_transform_steps (mode=dbt default) → warehouse filter + sort + aggregate components after dest
+- Prefer **dbt** if a workspace project matches; else **build_transform_steps** mode=warehouse for canvas CTAS chain
 
 Example — "one ingested table, build medallion layers":
 - build_lake_pipeline starter_id=single_lake_medallion source_table=staging.events
@@ -291,8 +292,9 @@ const TOOLS: Anthropic.Tool[] = [
         },
         transform_mode: {
           type: "string",
-          enum: ["dataframe", "dbt", "auto"],
-          description: "With transform_steps: dataframe = in-memory components; dbt = warehouse SQL",
+          enum: ["dataframe", "warehouse", "dbt", "auto"],
+          description:
+            "With transform_steps: warehouse = native SQL after load; dataframe = worker pandas; dbt = linked git project only",
         },
         transform_source_table: {
           type: "string",
@@ -425,14 +427,15 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "build_transform_steps",
     description:
-      "Build a filter/sort/aggregate transform chain. Returns components (dataframe path) or warehouse SQL + graph_edits (dbt push-down path). Use for transform-only requests.",
+      "Build a filter/sort/aggregate transform chain. Returns components (dataframe) or warehouse SQL + graph_edits (warehouse path). Use dbt mode only with dbt_package_path.",
     input_schema: {
       type: "object" as const,
       properties: {
         mode: {
           type: "string",
-          enum: ["dataframe", "dbt", "auto"],
-          description: "dataframe = in-memory components; dbt = warehouse SQL push-down; auto = infer from user wording",
+          enum: ["dataframe", "warehouse", "dbt", "auto"],
+          description:
+            "dataframe = in-memory components; warehouse = native SQL CTAS after load; dbt = linked git project; auto = infer",
         },
         source_table: {
           type: "string",
@@ -542,9 +545,10 @@ function toolBuildTransformSteps(params: {
     })
     .filter((x): x is TransformBuildStep => x !== null);
 
-  const modeRaw = String(params.mode ?? "auto").toLowerCase();
-  const mode: TransformBuildMode =
-    modeRaw === "dbt" ? "dbt" : modeRaw === "dataframe" ? "dataframe" : inferTransformMode(params.user_query ?? "");
+  const mode = normalizeTransformBuildMode(params.mode, {
+    userQuery: params.user_query,
+    dbtPackagePath: params.dbt_package_path,
+  });
 
   const built = buildTransformPipeline({
     mode,
@@ -1230,9 +1234,9 @@ async function toolGeneratePipeline(userId: string, params: GeneratePipelinePara
   const componentInputs = normalizeAiComponents(params.components);
 
   if (params.transform_steps?.length && params.transform_source_table) {
-    const modeRaw = String(params.transform_mode ?? "auto").toLowerCase();
-    const mode: TransformBuildMode =
-      modeRaw === "dbt" ? "dbt" : modeRaw === "dataframe" ? "dataframe" : "dataframe";
+    const mode = normalizeTransformBuildMode(params.transform_mode, {
+      dbtPackagePath: params.dbt_package_path,
+    });
     const built = buildTransformPipeline({
       mode,
       source_table: params.transform_source_table,

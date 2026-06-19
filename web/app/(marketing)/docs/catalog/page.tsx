@@ -14,22 +14,25 @@ export default function CatalogDocsPage() {
       <h1>Catalog &amp; workspace assets</h1>
       <p>
         eltPulse exposes an <strong>authenticated catalog</strong> for everyone in a workspace — not a public internet
-        index. Signed-in users browse pipelines, connections, dbt projects, and warehouse assets; team roles control who
-        can edit metadata and who sees the full catalog vs public-tagged entries only.
+        Signed-in users browse pipelines, connections, transform outputs, and optional git SQL projects; team roles
+        control who can edit metadata and who sees the full catalog vs public-tagged entries only.
       </p>
 
       <h2>Where to browse</h2>
       <ul>
         <li>
-          <Link href="/catalog">Catalog hub</Link> — overview counts, dbt project shortcuts, search entry points.
+          <Link href="/catalog">Catalog hub</Link> — overview counts, transform recipes, search entry points.
         </li>
         <li>
-          <Link href="/assets">Workspace assets</Link> — tables, raw landing assets, dbt models, lineage, warehouse
+          <Link href="/catalog/components">Transforms</Link> — lake pipeline recipes and warehouse SQL components (no git
+          required).
+        </li>
+        <li>
+          <Link href="/assets">Workspace assets</Link> — landing tables, transform outputs, lineage, warehouse
           verification.
         </li>
         <li>
-          <Link href="/catalog/dbt">dbt projects</Link> — first-class workspace projects (standalone or linked to
-          pipelines).
+          <Link href="/catalog/dbt">Git SQL projects</Link> — optional dbt projects (standalone or linked to pipelines).
         </li>
       </ul>
 

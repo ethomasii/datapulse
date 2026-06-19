@@ -176,19 +176,18 @@ export function CanvasTransformInspector({
         <div className="space-y-3 rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-3 dark:border-amber-800/50 dark:bg-amber-950/20">
           {transformTool === "python" ? (
             <p className="text-[11px] leading-snug text-amber-950 dark:text-amber-100">
-              Python script appended after <code className="rounded bg-amber-100/80 px-0.5 font-mono text-[10px] dark:bg-amber-900/50">pipeline.run()</code>.
-              Has access to <code className="font-mono text-[10px]">pipeline</code>, <code className="font-mono text-[10px]">info</code>,
-              and <code className="font-mono text-[10px]">partition_key</code>.
+              Legacy — Python on the worker after load. Prefer dbt or warehouse SQL when possible.
             </p>
           ) : (
             <p className="text-[11px] leading-snug text-amber-950 dark:text-amber-100">
-              SQL statements executed against the destination after load. Separate multiple statements with{" "}
+              Warehouse SQL — statements run against the destination after load (CREATE TABLE AS …). Separate multiple
+              statements with{" "}
               <code className="rounded bg-amber-100/80 px-0.5 font-mono text-[10px] dark:bg-amber-900/50">;</code>.
-              Use fully-qualified table names (schema.table) as needed.
+              Use fully-qualified table names (schema.table) as needed. Not the same as a linked dbt project.
             </p>
           )}
           <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
-            {transformTool === "python" ? "Python script" : "SQL statements"}
+            {transformTool === "python" ? "Python script" : "Warehouse SQL"}
             <textarea
               value={postTransformCode}
               onChange={(e) => {
@@ -219,7 +218,7 @@ export function CanvasTransformInspector({
             setLabel(v);
             onPatch({ label: v });
           }}
-          placeholder="dbt / models"
+          placeholder="dbt (recommended) / warehouse SQL / legacy"
           maxLength={200}
           className={fieldClass}
         />

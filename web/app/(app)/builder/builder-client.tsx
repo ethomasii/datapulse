@@ -1213,7 +1213,7 @@ export function BuilderClient({
                 <FormAccordion
                   id="acc-transform"
                   title="Post-load transform"
-                  subtitle="Optional dbt, Python, or SQL to run after ingest"
+                  subtitle="Recommended: dbt project. Warehouse SQL to prototype; legacy Python when SQL fails."
                   defaultOpen={wantDbtSetup}
                   badge={wantDbtSetup ? "dbt setup" : undefined}
                 >
@@ -1226,9 +1226,9 @@ export function BuilderClient({
                         className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
                       >
                         <option value="">None</option>
-                        <option value="dbt">dbt (post-load dbt run)</option>
-                        <option value="python">Python script</option>
-                        <option value="sql">SQL statements</option>
+                        <option value="dbt">dbt project (recommended)</option>
+                        <option value="sql">Warehouse SQL (canvas / CTAS)</option>
+                        <option value="python">Legacy — Python / dataframe</option>
                       </select>
                     </label>
                     {postTransformType === "dbt" && (
@@ -1291,11 +1291,11 @@ export function BuilderClient({
                     {postTransformType === "sql" && (
                       <>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
-                          Executed against the destination after load. Separate statements with{" "}
-                          <code className="font-mono">;</code>. Use fully-qualified names (schema.table).
+                          Warehouse SQL — executed against the destination after load (CTAS, views). Separate statements
+                          with <code className="font-mono">;</code>. Not the same as a linked dbt project.
                         </p>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                          SQL statements
+                          Warehouse SQL
                           <textarea
                             value={postTransformCode}
                             onChange={(e) => setPostTransformCode(e.target.value)}

@@ -97,7 +97,7 @@ export function AssetCatalogAiPanel({
             </h2>
             <p className="mt-1 text-sm text-slate-500">
               {variant === "catalog"
-                ? "Ask questions across pipelines, assets, and dbt models in your workspace."
+                ? "Ask questions across pipelines, assets, and transform outputs in your workspace."
                 : "Generate documentation or ask about metadata and live data samples (when warehouse is connected)."}
             </p>
           </div>

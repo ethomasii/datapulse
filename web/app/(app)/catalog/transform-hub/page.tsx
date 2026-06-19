@@ -3,7 +3,7 @@ import { CatalogTransformHubClient } from "@/components/catalog/catalog-transfor
 
 export const metadata: Metadata = {
   title: "Transform hub",
-  description: "Browse dbt staging packages and attach transforms to your pipelines.",
+  description: "Browse optional dbt staging packages — warehouse SQL recipes are the default transform path.",
 };
 
 export default function CatalogTransformHubPage() {

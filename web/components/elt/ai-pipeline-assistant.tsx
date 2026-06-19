@@ -34,14 +34,15 @@ const STARTER_PROMPTS = [
 ];
 
 const CANVAS_STARTER_PROMPTS = [
+  'Build medallion layers on one ingested table — cleanse, dedupe, gold rollup',
+  'Single source to curated mart — filter, project, aggregate',
+  'Entity 360 profile — join dimension and roll up metrics',
   'Build a SaaS ingest pipeline with filter active rows and DQ on id',
   'Join loaded data to a customers dimension table',
   'Clean strings, parse created_at dates, and dedupe by id',
-  'Add S3 file sensor and ingest CSVs from s3://my-bucket/incoming/',
   'Group by date and sum amount after load',
   'Find orphan rows with anti-join against reference table',
-  'Add dbt staging models after the warehouse load',
-  'Pivot metrics by category column',
+  'Union two sources and roll up daily metrics',
 ];
 
 const FOLLOW_UPS = [

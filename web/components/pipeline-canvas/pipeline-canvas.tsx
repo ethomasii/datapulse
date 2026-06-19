@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type MutableRefObject,
+  type ReactNode,
 } from "react";
 import {
   Background,
@@ -126,6 +127,11 @@ export type PipelineCanvasProps = {
   onInspectorFocusChange?: (focus: CanvasInspectorFocus) => void;
   /** Set by the canvas; use `patchNodeData` from the transform inspector (and similar). */
   canvasControlRef?: MutableRefObject<PipelineCanvasControl | null>;
+  /** Fires when component node count changes (for empty-state UI). */
+  onGraphStatsChange?: (stats: { componentNodeCount: number }) => void;
+  /** Overlay when graph has no transform components (e.g. recipe chips). */
+  emptyStateOverlay?: ReactNode;
+  showEmptyStateOverlay?: boolean;
 };
 
 function FlowCanvas({
@@ -144,6 +150,9 @@ function FlowCanvas({
   bindingsError = null,
   onInspectorFocusChange,
   canvasControlRef,
+  onGraphStatsChange,
+  emptyStateOverlay,
+  showEmptyStateOverlay = false,
 }: PipelineCanvasProps) {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -199,6 +208,11 @@ function FlowCanvas({
   useEffect(() => {
     setLocalValidationError(null);
   }, [nodes, edges, pipelineSourceType, pipelineDestinationType, pipelineId]);
+
+  useEffect(() => {
+    const componentNodeCount = nodes.filter((n) => n.type === "componentNode").length;
+    onGraphStatsChange?.({ componentNodeCount });
+  }, [nodes, onGraphStatsChange]);
 
   const isValidConnection: IsValidConnection = useCallback(
     (edge) => {
@@ -711,6 +725,11 @@ function FlowCanvas({
             nodeStrokeWidth={2}
           />
         </ReactFlow>
+        {showEmptyStateOverlay && emptyStateOverlay ? (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6">
+            <div className="pointer-events-auto w-full max-w-lg">{emptyStateOverlay}</div>
+          </div>
+        ) : null}
       </div>
     </div>
     </CanvasBindingsProvider>

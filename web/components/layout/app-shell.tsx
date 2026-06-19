@@ -62,7 +62,7 @@ const CATALOG_NAV: NavItem[] = [
   { href: "/catalog", label: "Overview", icon: LayoutGrid },
   { href: "/assets", label: "Assets", icon: Table2 },
   { href: "/catalog/components", label: "Transforms", icon: Sparkles },
-  { href: "/catalog/transform-hub", label: "Transform hub", icon: Workflow },
+  { href: "/catalog/transform-hub", label: "dbt packages", icon: Workflow },
   { href: "/catalog/dbt", label: "My dbt projects", icon: GitBranch },
   { href: "/catalog/connectors", label: "Connectors", icon: Plug },
   { href: "/catalog/scenarios", label: "Scenarios", icon: Route },

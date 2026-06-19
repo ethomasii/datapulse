@@ -8,7 +8,7 @@ import { DESTINATION_OPTIONS, SOURCE_OPTIONS } from "@/lib/elt/catalog";
 import { ConnectorCombobox } from "@/components/elt/connector-combobox";
 import { cn } from "@/lib/utils";
 import { useCanvasBindings } from "./canvas-bindings-context";
-import { TRANSFORM_TOOLS } from "./transform-tools";
+import { TRANSFORM_TOOLS, transformToolBadge } from "./transform-tools";
 
 function handleClass(kind: "emerald" | "amber" | "sky") {
   const map = {
@@ -169,19 +169,32 @@ export function TransformNode({ id, data }: NodeProps) {
         <p className="nodrag mb-1 truncate text-[10px] leading-snug text-amber-900/85 dark:text-amber-100/85">
           {String(data.dbtPackagePath ?? "").trim() ? (
             <>
-              dbt: <span className="font-mono text-[9px]">{String(data.dbtPackagePath).trim().slice(0, 42)}</span>
+              dbt project:{" "}
+              <span className="font-mono text-[9px]">{String(data.dbtPackagePath).trim().slice(0, 42)}</span>
               {String(data.dbtPackagePath).trim().length > 42 ? "…" : ""}
               {String(data.dbtRunScope ?? "") === "selection" && String(data.dbtSelector ?? "").trim() ? (
                 <span className="text-amber-800 dark:text-amber-200"> · select</span>
               ) : null}
             </>
           ) : (
-            <>dbt: set project path in the inspector →</>
+            <>dbt project: link at /catalog/dbt →</>
           )}
+        </p>
+      ) : transformTool === "sql" ? (
+        <p className="nodrag mb-1 text-[10px] leading-snug text-amber-900/85 dark:text-amber-100/85">
+          Warehouse SQL — CTAS after load (not a dbt model)
+        </p>
+      ) : transformTool === "python" ? (
+        <p className="nodrag mb-1 text-[10px] leading-snug text-amber-900/85 dark:text-amber-100/85">
+          Dataframe (legacy) — Python on worker when SQL cannot express the transform
+        </p>
+      ) : transformTool ? (
+        <p className="nodrag mb-1 text-[10px] leading-snug text-amber-900/85 dark:text-amber-100/85">
+          {transformToolBadge(transformTool)}
         </p>
       ) : null}
       <p className="nodrag mb-1 text-[10px] leading-snug text-slate-500 dark:text-slate-400">
-        Part of this pipeline’s runnable graph — wire dbt/SQL in your repo; use{" "}
+        Part of this pipeline’s runnable graph — use{" "}
         <span className="font-medium text-slate-600 dark:text-slate-300">Save to pipeline</span> to persist.
       </p>
       <NodeTitleField

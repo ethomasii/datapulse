@@ -99,17 +99,8 @@ export function CatalogDbtProjectsClient() {
           </Link>
           <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">dbt projects</h1>
           <p className="mt-2 max-w-3xl text-slate-600 dark:text-slate-300">
-            First-class dbt projects in your workspace — like{" "}
-            <a
-              href="https://www.snowflake.com/en/developers/guides/dbt-projects-on-snowflake/"
-              className="font-medium text-sky-600 hover:underline dark:text-sky-400"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              dbt Projects on Snowflake
-            </a>{" "}
-            or dbt Cloud. Register Git-backed projects, run transforms standalone, or wire them into EL pipelines for
-            orchestrated EL+T.
+          Optional git-backed SQL projects — recommended for production. Use canvas recipes to prototype, then link dbt
+          when models need version control, tests, and docs.
           </p>
         </div>
         {canWrite ? (
@@ -138,8 +129,11 @@ export function CatalogDbtProjectsClient() {
             <GitBranch className="mx-auto h-8 w-8 text-slate-400" />
             <p className="mt-3 font-medium text-slate-900 dark:text-white">No dbt projects yet</p>
             <p className="mx-auto mt-2 max-w-lg text-sm text-slate-500">
-              Create a standalone dbt project from Git or scaffold from the Transform hub — then optionally link it to a
-              pipeline for post-load transforms.
+              Start with{" "}
+              <Link href="/catalog/components#recipes" className="font-medium text-violet-600 underline dark:text-violet-400">
+                pipeline recipes
+              </Link>{" "}
+              for warehouse SQL on any lake — then add a git project here when you need versioned models.
             </p>
             {canWrite ? (
               <Link

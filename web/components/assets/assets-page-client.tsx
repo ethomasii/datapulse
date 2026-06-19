@@ -15,13 +15,14 @@ import {
   Table2,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
-import { CatalogAccessBanner } from "@/components/catalog/catalog-access-banner";
+import { TransformJourneyStrip } from "@/components/elt/transform-journey-strip";
 import { PipelineHealthPanel } from "@/components/catalog/pipeline-health-panel";
 import { RelatedLinks } from "@/components/ui/related-links";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 import {
   AssetFreshnessBadge,
   AssetKindBadge,
+  MedallionLayerBadge,
   AssetCatalogPreview,
   WarehouseStatusBadge,
 } from "@/components/assets/asset-display";
@@ -107,6 +108,7 @@ function AssetListRow({ asset }: { asset: WorkspaceAsset }) {
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex flex-wrap items-center gap-2">
           <AssetKindBadge kind={asset.kind} />
+          {asset.medallionLayer ? <MedallionLayerBadge layer={asset.medallionLayer} /> : null}
           <span className="text-sm font-medium text-slate-900 group-hover:text-sky-700 dark:text-white dark:group-hover:text-sky-300">
             {asset.displayName}
           </span>
@@ -349,8 +351,16 @@ export function AssetsPageClient() {
         </div>
         <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Workspace assets</h1>
         <p className="mt-3 max-w-3xl text-slate-600 dark:text-slate-300">
-          Browse tables, objects, and dbt models across your pipelines. Open any asset for catalog metadata,
-          lineage, and warehouse status — Postgres, Snowflake, BigQuery, DuckDB, S3, GCS, Azure Blob, and more.
+          Browse landing tables and transform outputs across pipelines. Medallion badges appear when a pipeline uses lake
+          recipes.
+        </p>
+        <div className="mt-4 max-w-3xl">
+          <TransformJourneyStrip compact showRecipeLink={false} />
+        </div>
+        <p className="mt-3 text-sm">
+          <Link href="/catalog/components#recipes" className="font-medium text-violet-600 underline dark:text-violet-400">
+            Add transforms with pipeline recipes
+          </Link>
         </p>
       </div>
 
@@ -369,7 +379,7 @@ export function AssetsPageClient() {
         <EmptyState
           icon={Layers}
           title="No assets yet"
-          description="Create a pipeline to see ingested sources, landing tables, and dbt transforms here."
+          description="Create a pipeline to see ingested sources, landing tables, and transform outputs here."
           action={{ href: "/quick-start", label: "Quick start" }}
           secondaryAction={{ href: "/builder", label: "Open builder" }}
         />
@@ -386,7 +396,7 @@ export function AssetsPageClient() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <SummaryCard label="Pipelines" value={data.summary.pipelines} icon={Layers} />
             <SummaryCard label="Raw tables" value={data.summary.rawAssets} icon={Table2} />
-            <SummaryCard label="dbt models" value={data.summary.transforms} icon={GitBranch} />
+            <SummaryCard label="Transform outputs" value={data.summary.transforms} icon={GitBranch} />
             <SummaryCard label="Sources" value={data.summary.sources} icon={Database} />
           </div>
 
@@ -459,7 +469,7 @@ export function AssetsPageClient() {
                   <option value="source">Sources</option>
                   <option value="raw">Raw</option>
                   <option value="object">Objects</option>
-                  <option value="transform">dbt models</option>
+                  <option value="transform">Transform outputs</option>
                   <option value="post_transform">Post-transforms</option>
                 </select>
               ) : null}

@@ -8,6 +8,9 @@ import { Loader2, Plus } from "lucide-react";
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
 import { ComponentPalette } from "@/components/elt/component-palette";
 import { LakeStarterGallery } from "@/components/elt/lake-starter-gallery";
+import { LakeStarterChips } from "@/components/elt/lake-starter-chips";
+import type { LakeStarterApplyResult } from "@/components/elt/lake-starter-apply-dialog";
+import { TransformJourneyStrip } from "@/components/elt/transform-journey-strip";
 import { TransformPathsPanel } from "@/components/elt/transform-paths-panel";
 import { CopyEnvButton } from "@/components/elt/copy-env-button";
 import { EltLoadingState } from "@/components/elt/elt-loading-state";
@@ -51,6 +54,7 @@ import { hydrateCanvasFromSourceConfiguration, extractSpecComponents } from "@/l
 import { TransformDagPanel } from "@/components/pipeline-canvas/transform-dag-panel";
 import { IngestPanel } from "@/components/pipeline-canvas/ingest-panel";
 import { lakeStarterCanvasGraph } from "@/lib/elt/lake-pipeline-starters";
+import { defaultSourceTable } from "@/lib/elt/lake-defaults";
 
 type PipelineRow = { id: string; name: string };
 
@@ -102,6 +106,7 @@ export function CanvasPageClient() {
   const [linkedDbtProjectId, setLinkedDbtProjectId] = useState<string | null>(null);
   const [canvasView, setCanvasView] = useState<"designer" | "dag" | "ingest">("designer");
   const [starterNotice, setStarterNotice] = useState<string | null>(null);
+  const [componentNodeCount, setComponentNodeCount] = useState(0);
   const starterAppliedRef = useRef(false);
 
   const starterFromUrl = searchParams.get("starter");
@@ -137,6 +142,44 @@ export function CanvasPageClient() {
 
   const canvasControlRef = useRef<PipelineCanvasControl | null>(null);
   const [inspectorFocus, setInspectorFocus] = useState<CanvasInspectorFocus>({ kind: "none" });
+
+  const existingCanvasGraph = useMemo(
+    () => (loadedGraph ? { nodes: loadedGraph.nodes, edges: loadedGraph.edges, v: 1 as const } : null),
+    [loadedGraph]
+  );
+
+  const handleLakeStarterApply = useCallback(
+    async (result: LakeStarterApplyResult) => {
+      if (!selectedId) {
+        setStarterNotice("Select or create a pipeline first.");
+        return;
+      }
+      canvasControlRef.current?.replaceGraph(result.nodes, result.edges);
+      let notice = `${result.title}: ${result.stepCount} warehouse SQL steps on canvas — save to compile on your destination.`;
+      if (result.medallion) {
+        const merged = {
+          ...lastFullSourceConfigRef.current,
+          elt_medallion: result.medallion,
+        };
+        lastFullSourceConfigRef.current = merged;
+        try {
+          const res = await fetch(`/api/elt/pipelines/${selectedId}`, {
+            method: "PATCH",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sourceConfiguration: merged }),
+          });
+          if (res.ok) {
+            notice += " Bronze→gold medallion layers tagged on assets.";
+          }
+        } catch {
+          /* best-effort medallion hint */
+        }
+      }
+      setStarterNotice(notice);
+    },
+    [selectedId]
+  );
 
   useEffect(() => {
     setInspectorFocus({ kind: "none" });
@@ -898,6 +941,16 @@ export function CanvasPageClient() {
   }
 
   const selectedName = pipelines.find((p) => p.id === selectedId)?.name;
+  const lakeDefaultSourceTable = useMemo(
+    () =>
+      defaultSourceTable({
+        pipelineName: selectedName,
+        schemaOverride:
+          typeof sourceCfg.schema_override === "string" ? sourceCfg.schema_override : undefined,
+        fallback: sourceTableFromUrl,
+      }),
+    [selectedName, sourceCfg.schema_override, sourceTableFromUrl]
+  );
 
   const lineageSourceConfig = useMemo(
     () => ({ ...lastFullSourceConfigRef.current, ...sourceCfg }),
@@ -1132,6 +1185,16 @@ export function CanvasPageClient() {
                   bindingsError={bindingsError}
                   canvasControlRef={canvasControlRef}
                   onInspectorFocusChange={setInspectorFocus}
+                  onGraphStatsChange={({ componentNodeCount: count }) => setComponentNodeCount(count)}
+                  showEmptyStateOverlay={componentNodeCount === 0}
+                  emptyStateOverlay={
+                    <LakeStarterChips
+                      variant="overlay"
+                      defaultSourceTable={lakeDefaultSourceTable}
+                      existingCanvas={existingCanvasGraph}
+                      onApply={handleLakeStarterApply}
+                    />
+                  }
                 />
               </div>
               ) : canvasView === "ingest" ? (
@@ -1240,26 +1303,15 @@ export function CanvasPageClient() {
                         {starterNotice}
                       </p>
                     ) : null}
-                    <TransformPathsPanel compact className="mb-4" />
+                    <TransformJourneyStrip compact showRecipeLink={false} className="mb-3" />
                     <LakeStarterGallery
                       compact
                       className="mb-4"
-                      requirePipeline
-                      defaultSourceTable={sourceTableFromUrl}
-                      existingCanvas={
-                        loadedGraph ? { nodes: loadedGraph.nodes, edges: loadedGraph.edges, v: 1 } : null
-                      }
-                      onApplyToCanvas={(result) => {
-                        if (!selectedId) {
-                          setStarterNotice("Select or create a pipeline first.");
-                          return;
-                        }
-                        canvasControlRef.current?.replaceGraph(result.nodes, result.edges);
-                        setStarterNotice(
-                          `${result.title}: ${result.stepCount} steps on canvas — save to compile.`
-                        );
-                      }}
+                      defaultSourceTable={lakeDefaultSourceTable}
+                      existingCanvas={existingCanvasGraph}
+                      onApplyToCanvas={handleLakeStarterApply}
                     />
+                    <TransformPathsPanel compact className="mb-4" />
                     <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
                       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                         AI canvas builder

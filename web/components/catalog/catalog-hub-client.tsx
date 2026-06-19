@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import {
-  ArrowRight,
+import { Sparkles, ArrowRight,
   Database,
   GitBranch,
   LayoutGrid,
@@ -18,7 +17,7 @@ import { CatalogAccessBanner } from "@/components/catalog/catalog-access-banner"
 import { AssetCatalogAiPanel } from "@/components/assets/asset-catalog-ai-panel";
 import { RelatedLinks } from "@/components/ui/related-links";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
-import { PipelineHealthPanel } from "@/components/catalog/pipeline-health-panel";
+import { TransformJourneyStrip } from "@/components/elt/transform-journey-strip";
 import { assetDetailHref } from "@/lib/elt/asset-path";
 import type { PipelineHealthSummary } from "@/lib/elt/pipeline-health";
 
@@ -34,14 +33,14 @@ type Overview = {
 };
 
 const CARDS = [
-  { href: "/assets", label: "Assets", icon: Table2, desc: "Tables, objects, and dbt models across pipelines" },
-  { href: "/catalog/components", label: "Transforms", icon: Workflow, desc: "Recipes, warehouse SQL components, and BYO compile packages" },
+  { href: "/assets", label: "Assets", icon: Table2, desc: "Landing tables, transform outputs, and lineage on any warehouse" },
+  { href: "/catalog/dbt", label: "Git SQL projects", icon: GitBranch, desc: "Recommended — dbt models, tests, docs" },
+  { href: "/catalog/transform-hub", label: "dbt package hub", icon: Workflow, desc: "Connector staging packages" },
+  { href: "/catalog/components", label: "Transforms", icon: Sparkles, desc: "Canvas recipes — prototype before dbt" },
   { href: "/catalog/products", label: "Data products", icon: Database, desc: "Curated governed asset bundles" },
   { href: "/catalog/contracts", label: "Data contracts", icon: Shield, desc: "Schema and freshness SLAs" },
   { href: "/catalog/connectors", label: "Connectors", icon: LayoutGrid, desc: "What your workspace uses + full registry" },
-  { href: "/catalog/scenarios", label: "Scenarios", icon: Route, desc: "Starter recipes you can deploy" },
-  { href: "/catalog/dbt", label: "Transform projects", icon: GitBranch, desc: "SQL models, projects, and run history" },
-  { href: "/catalog/transform-hub", label: "Transform hub", icon: Workflow, desc: "Browse staging packages by connector" },
+  { href: "/catalog/scenarios", label: "Scenarios", icon: Route, desc: "Ingest recipes — add transforms after deploy" },
 ] as const;
 
 type SearchHit = {
@@ -143,9 +142,12 @@ export function CatalogHubClient() {
         </div>
         <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Workspace catalog</h1>
         <p className="mt-3 max-w-3xl text-slate-600 dark:text-slate-300">
-          Your data inventory, connector usage, pipeline scenarios, and dbt projects — all in the app, not marketing pages.
-          Import metadata from pipelines on the Assets page, then edit descriptions and tags per asset.
+          Your data inventory on any warehouse — lake recipes, warehouse SQL transforms, connectors, and optional git
+          projects.
         </p>
+        <div className="mt-4 max-w-3xl">
+          <TransformJourneyStrip compact showRecipeLink={false} />
+        </div>
       </div>
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -257,11 +259,12 @@ export function CatalogHubClient() {
           <Loader2 className="h-4 w-4 animate-spin" /> Loading catalog…
         </div>
       ) : data ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {[
             { label: "Pipelines", value: data.summary.pipelines },
             { label: "Catalog entries", value: data.summary.catalogEntries },
-            { label: "dbt projects", value: data.dbtProjects.length },
+            { label: "Transform outputs", value: data.summary.assets.transforms },
+            { label: "Git SQL projects", value: data.dbtProjects.length },
             { label: "Connectors", value: data.connectorsAvailable },
           ].map((s) => (
             <div
@@ -276,7 +279,28 @@ export function CatalogHubClient() {
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {CARDS.map((card) => (
+        <Link
+          href="/catalog/components"
+          className="group col-span-full rounded-xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-white p-5 transition hover:border-violet-400 dark:border-violet-800 dark:from-violet-950/40 dark:to-slate-900 dark:hover:border-violet-600"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <Sparkles className="h-8 w-8 shrink-0 text-violet-600 dark:text-violet-400" aria-hidden />
+              <div>
+                <h2 className="font-semibold text-slate-900 dark:text-white">Transforms</h2>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                  Pipeline recipes (medallion, source→mart, entity 360), warehouse SQL components, and custom compile
+                  packages — everything after ingest on one lake.
+                </p>
+                <p className="mt-2 text-xs font-medium text-violet-700 dark:text-violet-300">
+                  Recipes to prototype · dbt for production · dataframe legacy
+                </p>
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 shrink-0 text-violet-400 transition group-hover:translate-x-0.5 group-hover:text-violet-600" />
+          </div>
+        </Link>
+        {CARDS.filter((c) => c.href !== "/catalog/components").map((card) => (
           <Link
             key={card.href}
             href={card.href}
@@ -294,8 +318,9 @@ export function CatalogHubClient() {
 
       <RelatedLinks
         links={[
-          { href: "/sources", icon: Database, label: "Source registry", desc: "Browse dlt-hub connector catalog" },
-          { href: "/builder", icon: LayoutGrid, label: "Pipelines", desc: "Edit sync and transform config" },
+          { href: "/catalog/components", icon: Sparkles, label: "Transforms", desc: "Recipes and warehouse SQL" },
+          { href: "/sources", icon: Database, label: "Source registry", desc: "Browse connector catalog" },
+          { href: "/builder/canvas", icon: LayoutGrid, label: "Canvas", desc: "Visual ingest + transform graph" },
         ]}
       />
     </div>

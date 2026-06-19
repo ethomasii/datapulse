@@ -107,10 +107,10 @@ export const AI_PIPELINE_PLAYBOOKS: AiPipelinePlaybook[] = [
     graphEdits: [{ op: "connect", source: "dest", target: "group" }],
   },
   {
-    id: "transform_dbt_sql",
-    title: "Warehouse SQL transforms (dbt path)",
-    description: "Push-down SQL after load — use build_transform_steps with mode=dbt.",
-    triggers: ["dbt transform", "push down", "warehouse sql", "sql model after load"],
+    id: "transform_warehouse_sql",
+    title: "Warehouse SQL transforms",
+    description: "Push-down SQL after load — use build_transform_steps with mode=warehouse.",
+    triggers: ["warehouse sql", "push down", "sql model after load", "ctas after load"],
     components: [],
     graphEdits: [
       {
@@ -156,18 +156,18 @@ export const AI_PIPELINE_PLAYBOOKS: AiPipelinePlaybook[] = [
         label: "Enrich events",
         config: {
           how: "left",
-          on: ["customer_id"],
+          on: ["entity_id"],
           output_table: "marts.events_enriched",
         },
       },
       {
         component_id: "group_aggregate",
-        label: "Customer metrics",
+        label: "Entity metrics",
         config: {
           table: "marts.events_enriched",
-          group_by: ["customer_id"],
+          group_by: ["entity_id"],
           aggregations: '{"amount":"sum","event_id":"count"}',
-          output_table: "marts.customer_360",
+          output_table: "marts.entity_360",
         },
       },
     ],

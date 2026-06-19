@@ -6,6 +6,8 @@ import type { AiPipelineComponentInput } from "@/lib/elt/ai-pipeline-canvas-buil
 import { buildPipelineCanvasFromComponents } from "@/lib/elt/ai-pipeline-canvas-build";
 import type { CanvasGraphEditAction } from "@/lib/elt/canvas-graph-edit";
 import type { PipelineCanvasGraph } from "@/lib/elt/canvas-source-config";
+import type { MedallionHints } from "@/lib/elt/lake-defaults";
+import { medallionHintsForStarter, WAREHOUSE_COMPUTE_HINT } from "@/lib/elt/lake-defaults";
 
 export type LakePipelineStarter = {
   id: string;
@@ -38,6 +40,7 @@ export type LakeStarterBuildResult = {
   components: AiPipelineComponentInput[];
   graph_edits: CanvasGraphEditAction[];
   messages: string[];
+  medallion?: MedallionHints;
 };
 
 function layerTable(ctx: LakeStarterContext, layer: string, suffix?: string): string {
@@ -330,15 +333,18 @@ export function buildLakePipeline(input: {
       template_id: c.component_id,
     },
   }));
+  const medallion = medallionHintsForStarter(starter.id);
   return {
     starter_id: starter.id,
     title: starter.title,
     source_table: sourceTable,
     components,
     graph_edits: starter.graphEdits ?? [],
+    ...(medallion ? { medallion } : {}),
     messages: [
       `${starter.title}: ${components.length} transform step(s) wired after load on ${sourceTable}.`,
-      "All steps use warehouse SQL push-down by default (execution=warehouse).",
+      "Warehouse SQL push-down by default (execution=warehouse) — runs on your connected destination.",
+      WAREHOUSE_COMPUTE_HINT,
     ],
   };
 }

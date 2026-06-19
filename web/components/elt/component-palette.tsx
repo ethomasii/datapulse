@@ -116,7 +116,7 @@ export function ComponentPalette({
         <p className="text-sm font-semibold text-slate-900 dark:text-white">Component catalog</p>
         <p className="mt-0.5 text-xs text-slate-500">
           {transformDesigner
-            ? `${total} transform components — warehouse SQL push-down or dataframe`
+            ? `${total} transform components — warehouse SQL default; legacy dataframe optional`
             : executableOnly
               ? `${total} executable components — faithful compilers only`
               : `${total} templates — drag onto canvas or click to add`}

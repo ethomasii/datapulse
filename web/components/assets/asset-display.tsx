@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { CheckCircle2, HelpCircle, XCircle } from "lucide-react";
 import type { AssetFreshnessMeta } from "@/lib/elt/asset-freshness";
+import type { MedallionLayer } from "@/lib/elt/declarative-pipeline-spec";
+import { MEDALLION_LAYER_COLORS, MEDALLION_LAYER_LABELS } from "@/lib/elt/medallion-layer";
 import type { WarehouseAssetStatus, WorkspaceAssetKind } from "@/lib/elt/pipeline-assets";
 import { assetDetailHref } from "@/lib/elt/asset-path";
 
@@ -14,7 +16,7 @@ export const KIND_META: Record<WorkspaceAssetKind, { label: string; badge: strin
     badge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200",
   },
   transform: {
-    label: "dbt model",
+    label: "Transform output",
     badge: "bg-violet-100 text-violet-800 dark:bg-violet-950/50 dark:text-violet-200",
   },
   post_transform: {
@@ -52,6 +54,16 @@ const WAREHOUSE_STATUS_META: Record<
     icon: HelpCircle,
   },
 };
+
+export function MedallionLayerBadge({ layer }: { layer: MedallionLayer }) {
+  return (
+    <span
+      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${MEDALLION_LAYER_COLORS[layer]}`}
+    >
+      {MEDALLION_LAYER_LABELS[layer]}
+    </span>
+  );
+}
 
 export function AssetKindBadge({ kind }: { kind: WorkspaceAssetKind }) {
   const meta = KIND_META[kind];
