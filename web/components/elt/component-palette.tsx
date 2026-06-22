@@ -5,6 +5,7 @@ import { Loader2, Search } from "lucide-react";
 import { compileTargetLabel } from "@/lib/elt/compile-target-labels";
 import { ELTPULSE_COMPONENT_DRAG_MIME } from "@/lib/elt/canvas-drag";
 import { ComponentIcon } from "@/components/elt/component-icon";
+import { cn } from "@/lib/utils";
 
 export type ComponentListItem = {
   id: string;
@@ -123,9 +124,12 @@ export function ComponentPalette({
   return (
     <div
       id={id}
-      className={className ?? "flex h-full flex-col rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"}
+      className={cn(
+        "flex min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900",
+        className
+      )}
     >
-      <div className="border-b border-slate-200 p-3 dark:border-slate-700">
+      <div className="shrink-0 border-b border-slate-200 p-3 dark:border-slate-700">
         <p className="text-sm font-semibold text-slate-900 dark:text-white">
           {nativeOnly ? "Native transforms" : "Component catalog"}
         </p>
@@ -179,7 +183,7 @@ export function ComponentPalette({
           </p>
         ) : null}
       </div>
-      <ul className="flex-1 overflow-y-auto p-2">
+      <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
         {loading ? (
           <li className="flex justify-center py-8 text-slate-400">
             <Loader2 className="h-5 w-5 animate-spin" aria-hidden />

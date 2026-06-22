@@ -110,10 +110,10 @@ export function AddTransformMenu({ onAddNative, onAddCode }: Props) {
           onClick={() => setNativeOpen(false)}
         >
           <div
-            className="flex max-h-[min(90dvh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-950"
+            className="flex h-[min(90dvh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-950"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+            <div className="flex shrink-0 items-start justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
               <div>
                 <h2 id="native-transform-picker-title" className="text-sm font-semibold text-slate-900 dark:text-white">
                   Add native transform
@@ -132,7 +132,7 @@ export function AddTransformMenu({ onAddNative, onAddCode }: Props) {
               </button>
             </div>
             <ComponentPalette
-              className="min-h-0 flex-1 border-0"
+              className="h-full min-h-0 flex-1 border-0"
               transformDesigner
               nativeOnly
               onSelect={pickNative}
