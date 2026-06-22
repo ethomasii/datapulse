@@ -116,16 +116,20 @@ export function PricingPageClient() {
 
   return (
     <div className="bg-white">
-      {/* Header — matches ServicePulse pricing hero */}
-      <section className="bg-slate-950 py-20 text-center">
-        <h1 className="text-4xl font-bold text-white sm:text-5xl">Simple, transparent pricing</h1>
-        <p className="mt-4 text-lg text-slate-400">Start free. Upgrade when you&apos;re ready.</p>
-        <div className="mt-8 inline-flex items-center gap-1 rounded-xl bg-slate-800 p-1">
+      {/* Header — ServicePulse-style light hero */}
+      <section className="bg-slate-100 py-20 text-center dark:bg-slate-950">
+        <h1 className="text-4xl font-bold text-slate-900 dark:text-white sm:text-5xl">
+          Simple, transparent pricing
+        </h1>
+        <p className="mt-4 text-lg text-slate-600 dark:text-slate-400">Start free. Upgrade when you&apos;re ready.</p>
+        <div className="mt-8 inline-flex items-center gap-1 rounded-xl bg-slate-200 p-1 dark:bg-slate-800">
           <button
             type="button"
             onClick={() => setBilling("monthly")}
             className={`rounded-lg px-5 py-2 text-sm font-medium transition ${
-              billing === "monthly" ? "bg-white text-slate-900" : "text-slate-400 hover:text-white"
+              billing === "monthly"
+                ? "bg-white text-slate-900 dark:bg-slate-950 dark:text-white"
+                : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
             }`}
           >
             Monthly
@@ -134,7 +138,9 @@ export function PricingPageClient() {
             type="button"
             onClick={() => setBilling("annual")}
             className={`flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-medium transition ${
-              billing === "annual" ? "bg-white text-slate-900" : "text-slate-400 hover:text-white"
+              billing === "annual"
+                ? "bg-white text-slate-900 dark:bg-slate-950 dark:text-white"
+                : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
             }`}
           >
             Annual

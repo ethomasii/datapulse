@@ -1,199 +1,95 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ELTPULSE_GITHUB_URL } from "@/lib/marketing/github-repo";
 
 export const metadata: Metadata = {
   title: "Changelog",
-  description: "eltPulse release notes.",
+  description: "Recent product updates and improvements to eltPulse.",
 };
 
-type Entry = {
-  version: string;
-  date: string;
-  highlights: string[];
-};
-
-const ENTRIES: Entry[] = [
+const ENTRIES = [
   {
-    version: "0.9.5",
-    date: "2026-06-17",
-    highlights: [
-      "Catalog hub — in-app /catalog with connectors, scenarios, and dbt projects (no more marketing-page sidebar links).",
-      "Catalog metadata — import from pipelines, edit descriptions/tags per asset; CatalogEntry stored in workspace DB.",
-      "Object store inventory — S3, GCS, and filesystem verification; object landing paths on assets map.",
+    date: "June 2026",
+    title: "Team+ security, compare pages & pricing refresh",
+    items: [
+      "Air-gap metadata v2 — cloud logs redacted after successful export to your vault",
+      "SSO/SAML and air-gap included on Team+ (no per-customer env flags)",
+      "ServicePulse-style marketing nav, /compare/vs-* pages, and light-mode pricing hero",
+      "Enterprise platform floor ($2,400/mo) and dedicated compute add-on billing",
     ],
   },
   {
-    version: "0.9.4",
-    date: "2026-06-17",
-    highlights: [
-      "Assets v4 — per-asset freshness from run telemetry and dbt manifests; dbt config vs last-run diff on /assets.",
-      "Canvas data map — config-derived lineage graph in the canvas inspector with link to workspace catalog.",
-      "Assets deep link — /assets?pipeline= filters to a single pipeline (from canvas or builder).",
+    date: "June 2026",
+    title: "Catalog hub & asset intelligence (0.9.x)",
+    items: [
+      "Catalog hub — in-app /catalog with connectors, scenarios, and dbt projects",
+      "Assets v4 — per-asset freshness, warehouse verify, and dbt config vs last-run diff",
+      "Column lineage UI, Git artifact export, and tier gates aligned to pricing",
     ],
   },
   {
-    version: "0.9.3",
-    date: "2026-06-17",
-    highlights: [
-      "Assets v3+ — warehouse verify for Postgres, Redshift, Snowflake, BigQuery, DuckDB, MotherDuck, Databricks, ClickHouse, MySQL, Trino, and SQLite.",
-      "Warehouse badges on /assets — verified, missing, and last-run dbt observed markers per asset.",
-      "GET /api/elt/assets?verifyWarehouse=1 introspects destination connections and reconciles landing targets.",
+    date: "June 2026",
+    title: "dbt, connectors & pipeline builder",
+    items: [
+      "dbt v2 hub — package browser, scaffold-to-Git API, run phases (sync → load → dbt)",
+      "Connector catalog — 120+ sources & destinations with per-connector pages",
+      "Pipeline scenarios, managed compute stub, and customer gateway on all tiers",
     ],
   },
   {
-    version: "0.9.2",
-    date: "2026-06-17",
-    highlights: [
-      "Assets v2 — freshness badges (fresh/stale/failed), lineage graph per pipeline, last-run row counts.",
-      "dbt on runs — manifest panel on run detail; PATCH dbtManifest on runs; webhooks include dbtTestFailures.",
-      "Post-replication dbt — database replication pipelines can declare dbt transforms in the asset map.",
-    ],
-  },
-  {
-    version: "0.9.1",
-    date: "2026-06-17",
-    highlights: [
-      "Workspace assets — config-derived data map at /assets: sources, raw landing tables, and dbt models across pipelines.",
-      "Assets API — GET /api/elt/assets aggregates pipeline config with latest run summaries.",
-      "Pipelines API — syncMode field (connector_sync / database_replication) alongside internal tool id.",
-    ],
-  },
-  {
-    version: "0.9.0",
-    date: "2026-06-17",
-    highlights: [
-      "dbt v2 hub — interactive /dbt page with package browser, scaffold-to-Git API, and sprint roadmap.",
-      "Package picker in builder and canvas — connector staging packages, shared DbtConfigFields, ?dbt=1&source= deep links.",
-      "Run phases — sync → load → dbt telemetry when dbt transform is enabled; GHA worker installs dbt adapters.",
-    ],
-  },
-  {
-    version: "0.8.0",
-    date: "2026-06-17",
-    highlights: [
-      "Connector catalog — browse 120+ sources & destinations with brand icons, trust tiers, and per-connector pages.",
-      "Pipeline scenarios — industry filters and one-click Start this scenario into Quick start.",
-      "SEO — sitemap.xml, robots.txt, Open Graph metadata, and JSON-LD on connector pages.",
-    ],
-  },
-  {
-    version: "0.7.0",
-    date: "2026-06-17",
-    highlights: [
-      "Production GHA execution — dispatch targets a specific run, stub fallback removed in GHA mode, Gateway setup checklist.",
-      "Auto Git push — pipeline declaration YAML commits to your connected repo on save (disable with ELTPULSE_AUTO_GIT_PUSH=false).",
-      "Golden-path codegen — Stripe, Postgres database sync, Snowflake destination hints.",
-    ],
-  },
-  {
-    version: "0.6.0",
-    date: "2026-06-17",
-    highlights: [
-      "Quick start credentials step — test connections, save encrypted secrets, link to pipeline before run.",
-      "Test connection API for Postgres, GitHub, Stripe, REST, and catalog connectors.",
-      "Team RBAC: invite as member or viewer; workspace-scoped runs, connections, and pipelines.",
-      "Run failure hints, execution mode badge (stub vs GHA), dashboard usage & freshness cards.",
-      "Connector trust badges (Verified / Beta / Catalog), incremental sync defaults on new pipelines.",
-      "AI assistant auto-loads last failed run when pipelineId is sent.",
-    ],
-  },
-  {
-    version: "0.5.0",
-    date: "2026-06-17",
-    highlights: [
-      "Stripe Customer Portal — manage payment method, invoices, and subscription in-app.",
-      "Usage reporting — monthly row counts on billing; optional Stripe Billing Meter integration.",
-      "Team invites with email, accept page, auto-join on signup, and live Team page.",
-      "Org members see shared pipelines and runs from the workspace owner.",
-      "Real managed execution paths — local subprocess, GitHub Actions dispatch, vercel-python, delegate.",
-      "Features marketing page with product mockups, case studies, and competitor positioning.",
-      "Free tier pipeline limit (3) enforced at creation.",
-    ],
-  },
-  {
-    version: "0.4.0",
-    date: "2026-06-17",
-    highlights: [
-      "Quick start wizard — destination → source → create & run in under a minute.",
-      "Marketing site refresh: product preview hero, expanded homepage sections, pricing FAQ, compare vs Fivetran+dbt.",
-      "Workspace API keys with scoped access to pipelines, runs, and connections.",
-      "In-process managed executor — runs complete immediately on Vercel without gateway setup.",
-      "Stripe Checkout scaffold, org invites, progressive app sidebar, and help center FAQ.",
-      "Demo pipeline seeded on signup; inline Run panel in the pipeline builder.",
-    ],
-  },
-  {
-    version: "0.3.0",
-    date: "2026-03-30",
-    highlights: [
-      "Collapsible app sidebar (persisted) and light / dark / system theme toggle in app + marketing headers.",
-      "Documentation section with sidebar: overview, getting started, pipelines, integrations, repositories, security.",
-      "Roadmap and changelog pages expanded with structured content.",
-      "Prisma `workspaceYaml` maps to DB column `workspace_yaml` (renamed from a legacy column).",
-    ],
-  },
-  {
-    version: "0.2.0",
-    date: "2026-03",
-    highlights: [
-      "Public docs, roadmap, changelog routes; Help section in sidebar (ServicePulse-style).",
-      "Managed vs BYO GitHub documented; optional OAuth behind env flag.",
-      "eltPulse workspace YAML replaces older artifact naming in the product UI.",
-    ],
-  },
-  {
-    version: "0.1.0",
-    date: "2026-03",
-    highlights: [
-      "Initial Next.js app: Clerk, Prisma EltPipeline, builder with GitHub + REST generators, dashboard and account.",
+    date: "March 2026",
+    title: "Foundation — docs, workspace YAML & auth",
+    items: [
+      "Public docs with sidebar: getting started, pipelines, gateway, security",
+      "Clerk auth, Prisma pipelines, builder with GitHub + REST generators",
+      "Roadmap and changelog pages; eltPulse workspace YAML in product UI",
     ],
   },
 ];
 
 export default function ChangelogPage() {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
-      <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Changelog</h1>
-      <p className="mt-4 text-slate-600 dark:text-slate-300">
-        Release notes for the eltPulse web app. Version numbers are logical product milestones until we publish npm
-        packages or a formal API semver.
-      </p>
+    <div className="bg-white py-20 dark:bg-slate-950">
+      <div className="mx-auto max-w-3xl px-6">
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Changelog</h1>
+        <p className="mt-2 text-slate-600 dark:text-slate-400">
+          What we&apos;ve shipped recently. For what&apos;s next, see the{" "}
+          <Link href="/roadmap" className="text-blue-600 hover:underline dark:text-blue-400">
+            roadmap
+          </Link>
+          .
+        </p>
 
-      <ol className="mt-12 space-y-12 border-l-2 border-slate-200 pl-8 dark:border-slate-700">
-        {ENTRIES.map((entry) => (
-          <li key={entry.version} className="relative">
-            <span className="absolute -left-[calc(0.5rem+2px)] top-1.5 h-3 w-3 rounded-full border-2 border-white bg-sky-500 dark:border-slate-950" />
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{entry.version}</h2>
-              <time className="text-sm text-slate-500 dark:text-slate-400" dateTime={entry.date}>
-                {entry.date}
-              </time>
-            </div>
-            <ul className="mt-4 list-inside list-disc space-y-2 text-sm text-slate-700 dark:text-slate-300">
-              {entry.highlights.map((h) => (
-                <li key={h}>{h}</li>
-              ))}
-            </ul>
-          </li>
-        ))}
-      </ol>
+        <div className="mt-12 space-y-12">
+          {ENTRIES.map((entry) => (
+            <article key={entry.title} className="border-l-2 border-blue-200 pl-6 dark:border-blue-800">
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">{entry.date}</p>
+              <h2 className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{entry.title}</h2>
+              <ul className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-400">
+                {entry.items.map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <span className="text-blue-500">•</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
 
-      <p className="mt-14 text-sm text-slate-500 dark:text-slate-500">
-        Older history lives in git — see{" "}
-        <a
-          href="https://github.com/eltpulsehq/eltpulse"
-          className="text-sky-600 hover:underline dark:text-sky-400"
-          target="_blank"
-          rel="noreferrer"
-        >
-          github.com/eltpulsehq/eltpulse
-        </a>
-        . Product updates are summarized here and on the{" "}
-        <Link href="/roadmap" className="text-sky-600 hover:underline dark:text-sky-400">
-          roadmap
-        </Link>
-        .
-      </p>
+        <p className="mt-14 text-sm text-slate-500 dark:text-slate-500">
+          Older history lives in git — see{" "}
+          <a
+            href={ELTPULSE_GITHUB_URL}
+            className="text-blue-600 hover:underline dark:text-blue-400"
+            target="_blank"
+            rel="noreferrer"
+          >
+            github.com/eltpulsehq/eltpulse
+          </a>
+          .
+        </p>
+      </div>
     </div>
   );
 }

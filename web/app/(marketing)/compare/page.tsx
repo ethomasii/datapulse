@@ -1,179 +1,128 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowRight, CheckCircle, Code2, GitBranch, Server, Wallet, XCircle } from "lucide-react";
+import { COMPETITORS } from "@/lib/marketing/competitors";
 
 export const metadata: Metadata = {
-  title: "Compare",
+  title: "Compare — eltPulse vs Fivetran, Airbyte, Hevo & other ELT tools",
   description:
-    "How eltPulse relates to Fivetran, Airbyte, Hevo, and other ELT approaches — managed SaaS, open source, and git-native control planes.",
+    "Honest comparisons: how eltPulse relates to Fivetran, Airbyte, Hevo, and other managed ELT approaches — git-native control plane, BYO compute, and transparent pricing.",
 };
 
-type Row = {
-  dimension: string;
-  eltpulse: string;
-  fivetran: string;
-  airbyte: string;
-  hevo: string;
-  others: string;
-};
-
-const rows: Row[] = [
+const HIGHLIGHTS = [
   {
-    dimension: "What it optimizes for",
-    eltpulse:
-      "Definitions as code, Git review, control plane for pipeline codegen and policy — you choose where jobs run.",
-    fivetran:
-      "Broad managed connectors and reliability; you operate inside their product and billing model.",
-    airbyte:
-      "Large connector catalog; strong self-hosted and Airbyte Cloud options; community and extensibility.",
-    hevo:
-      "Managed pipelines and activation (e.g. reverse ETL); approachable for teams wanting less infra.",
-    others:
-      "Varies: e.g. Matillion (transform in the warehouse), Meltano / Singer (pipelines as projects), Stitch (Singer, Talend ecosystem), Portable and niche ELT tools — each with a different center of gravity.",
+    icon: GitBranch,
+    title: "Git-native by default",
+    body: "Pipeline definitions live in your repo — PRs, environments, and ownership like application code.",
   },
   {
-    dimension: "Where pipeline logic lives",
-    eltpulse: "Repo-friendly artifacts + UI; built to diff, PR, and export like application code.",
-    fivetran: "Primarily in-product configuration; Git integrations exist but the core model is managed SaaS.",
-    airbyte: "Connector configs and syncs in Airbyte; OSS lets you fork and extend.",
-    hevo: "In-product pipelines and dashboards; less emphasis on Git-as-source-of-truth.",
-    others: "Often UI-first or Singer/YAML projects; depends on vendor and self-host vs cloud.",
+    icon: Server,
+    title: "Your compute, any tier",
+    body: "Customer gateways on Free, Pro, and Team — or eltPulse-managed workers when you want zero ops.",
   },
   {
-    dimension: "Execution & data plane",
-    eltpulse:
-      "Designed for BYO runners or future managed gateways; infra cost with transparent markup is the direction of travel.",
-    fivetran: "Runs on Fivetran’s infrastructure; you pay for usage and plan tier.",
-    airbyte: "Self-hosted (your compute) or Airbyte Cloud (managed).",
-    hevo: "Hevo-hosted execution for managed product tiers.",
-    others: "Ranges from fully managed to self-hosted open core; check each vendor’s deployment model.",
+    icon: Wallet,
+    title: "Transparent usage economics",
+    body: "Subscription + metered rows and egress — no black-box MAR surprises as you scale.",
   },
   {
-    dimension: "Pricing posture (high level)",
-    eltpulse:
-      "Usage-oriented (rows, network, compute) with explicit margin on hosted compute — see Pricing & Billing.",
-    fivetran: "Consumption (e.g. MAR) and plan-based; enterprise contracts common.",
-    airbyte: "Cloud credits / usage; OSS is free, ops cost is yours.",
-    hevo: "Event- or connector-based tiers; varies by product line.",
-    others: "Seat, row, credit, or warehouse-time models are all common — compare list prices and egress carefully.",
-  },
-  {
-    dimension: "Open source",
-    eltpulse: "Open-source core plus SaaS shell; built on battle-tested open-source sync engines.",
-    fivetran: "Proprietary managed service.",
-    airbyte: "OSS core + commercial cloud.",
-    hevo: "Proprietary managed service.",
-    others: "Meltano OSS; Matillion commercial; many Singer taps are open — the product wrapper varies.",
-  },
-  {
-    dimension: "vs DIY / code-first ELT",
-    eltpulse:
-      "Control plane + UI on top of open sync engines — catalog wizard, runs, schedules, Git export. You get code flexibility without wiring runners yourself.",
-    fivetran: "—",
-    airbyte: "—",
-    hevo: "—",
-    others:
-      "Roll-your-own Python pipelines are flexible but you own runners, secrets, retries, and observability. eltPulse adds the product layer while keeping artifacts in your repo.",
-  },
-  {
-    dimension: "vs Fivetran + dbt (merged 2026)",
-    eltpulse:
-      "Git-native artifacts, BYO execution, no vendor lock-in. Broad connector catalog; wins on code ownership and transparent pricing.",
-    fivetran:
-      "Unified ingest + transform platform post-merger — push-button connectors, dbt Wizard AI, Agents Schema. ~$600M ARR combined; optimized for managed SaaS.",
-    airbyte: "—",
-    hevo: "—",
-    others:
-      "Fivetran + dbt Labs merged June 2026 into open data infrastructure for AI agents. Strong when you want one vendor for movement + modeling; less code portability.",
+    icon: Code2,
+    title: "Open engines, product shell",
+    body: "Built on dlt, Sling, and dbt — with catalog, runs, monitors, and Git export in one control plane.",
   },
 ];
 
 export default function ComparePage() {
   return (
-    <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-      <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Marketing</p>
-      <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
-        eltPulse and other ELT vendors
-      </h1>
-      <p className="mt-4 max-w-3xl text-lg text-slate-600 dark:text-slate-300">
-        Buyers compare dozens of tools:{" "}
-        <span className="font-medium text-slate-800 dark:text-slate-200">Fivetran</span>,{" "}
-        <span className="font-medium text-slate-800 dark:text-slate-200">Airbyte</span>,{" "}
-        <span className="font-medium text-slate-800 dark:text-slate-200">Hevo</span>, Matillion, Meltano, Stitch,
-        Portable, and others. None of them are “wrong” — they optimize for different constraints. This page situates{" "}
-        <span className="font-medium text-slate-800 dark:text-slate-200">eltPulse</span> honestly: a{" "}
-        <strong className="font-medium">git-native control plane</strong> for designing, running, and observing data
-        pipelines — with transparent usage economics and the ability to run workloads on your own gateways.
-      </p>
-      <p className="mt-4 text-sm text-slate-500 dark:text-slate-500">
-        Product names are trademarks of their respective owners. Summaries are for orientation only — verify features and
-        pricing with each vendor before you buy.
-      </p>
-
-      <div className="mt-12 overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
-        <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/80">
-              <th className="sticky left-0 z-10 w-40 bg-slate-50 px-4 py-3 font-semibold text-slate-900 dark:bg-slate-900 dark:text-white">
-                Dimension
-              </th>
-              <th className="px-4 py-3 font-semibold text-sky-800 dark:text-sky-200">eltPulse</th>
-              <th className="px-4 py-3 font-semibold text-slate-900 dark:text-white">Fivetran</th>
-              <th className="px-4 py-3 font-semibold text-slate-900 dark:text-white">Airbyte</th>
-              <th className="px-4 py-3 font-semibold text-slate-900 dark:text-white">Hevo</th>
-              <th className="px-4 py-3 font-semibold text-slate-900 dark:text-white">Other ELT / ETL</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.dimension} className="border-b border-slate-100 dark:border-slate-800">
-                <th
-                  scope="row"
-                  className="sticky left-0 bg-white px-4 py-3 align-top text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-950 dark:text-slate-400"
-                >
-                  {row.dimension}
-                </th>
-                <td className="bg-sky-50/50 px-4 py-3 align-top text-slate-700 dark:bg-sky-950/20 dark:text-slate-300">
-                  {row.eltpulse}
-                </td>
-                <td className="px-4 py-3 align-top text-slate-600 dark:text-slate-400">{row.fivetran}</td>
-                <td className="px-4 py-3 align-top text-slate-600 dark:text-slate-400">{row.airbyte}</td>
-                <td className="px-4 py-3 align-top text-slate-600 dark:text-slate-400">{row.hevo}</td>
-                <td className="px-4 py-3 align-top text-slate-600 dark:text-slate-400">{row.others}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <section className="mt-12 space-y-4 text-slate-600 dark:text-slate-400">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">When eltPulse is a strong fit</h2>
-        <ul className="list-inside list-disc space-y-2">
-          <li>You want pipeline definitions to live next to application code: PRs, environments, ownership.</li>
-          <li>You want a product layer for connector catalog, smart hints, and pipeline exports — without building it yourself.</li>
-          <li>You care about transparent pass-through pricing for any hosted execution we add later.</li>
-        </ul>
-        <h2 className="pt-4 text-lg font-semibold text-slate-900 dark:text-white">When to look elsewhere</h2>
-        <ul className="list-inside list-disc space-y-2">
-          <li>You need the widest managed connector catalog on day one — mature SaaS catalogs still lead on breadth.</li>
-          <li>You want a fully turnkey reverse-ETL or CDP; that is not eltPulse’s core focus today.</li>
-          <li>You have no appetite for Git or code artifacts; a UI-only managed tool may feel simpler.</li>
-        </ul>
+    <div className="bg-white dark:bg-slate-950">
+      <section className="bg-slate-100 py-24 text-center dark:bg-slate-950">
+        <div className="mx-auto max-w-3xl px-6">
+          <span className="mb-4 inline-block rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1 text-xs font-semibold uppercase tracking-widest text-blue-600 dark:text-blue-400">
+            How we stack up
+          </span>
+          <h1 className="mt-4 text-4xl font-bold text-slate-900 dark:text-white sm:text-5xl">
+            eltPulse vs. the alternatives
+          </h1>
+          <p className="mt-6 text-lg text-slate-600 dark:text-slate-400">
+            Buyers compare Fivetran, Airbyte, Hevo, Matillion, Meltano, and dozens of others. None are wrong — they
+            optimize for different constraints. This page situates eltPulse honestly: a git-native control plane with
+            transparent usage economics and BYO execution.
+          </p>
+        </div>
       </section>
 
-      <div className="mt-12 flex flex-wrap gap-4">
-        <Link
-          href="/pricing"
-          className="inline-flex rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-500"
-        >
-          View pricing
-        </Link>
-        <Link
-          href="/docs"
-          className="inline-flex rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-        >
-          Read the docs
-        </Link>
-      </div>
+      <section className="border-b border-slate-200 py-16 dark:border-slate-800">
+        <div className="mx-auto max-w-5xl px-6">
+          <div className="grid gap-8 sm:grid-cols-2">
+            {HIGHLIGHTS.map(({ icon: Icon, title, body }) => (
+              <div key={title} className="flex gap-4">
+                <div className="mt-1 shrink-0 rounded-lg bg-blue-50 p-2 dark:bg-blue-950/40">
+                  <Icon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900 dark:text-white">{title}</h3>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-5xl px-6 py-20">
+        <h2 className="mb-2 text-center text-2xl font-bold text-slate-900 dark:text-white">Pick your comparison</h2>
+        <p className="mb-12 text-center text-slate-500 dark:text-slate-400">
+          Detailed, honest feature-by-feature breakdowns.
+        </p>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {COMPETITORS.map((c) => (
+            <Link
+              key={c.slug}
+              href={`/compare/${c.slug}`}
+              className="group rounded-2xl border border-slate-200 bg-white p-6 transition hover:border-blue-300 hover:shadow-md hover:shadow-blue-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-blue-700 dark:hover:shadow-blue-900/20"
+            >
+              <div className="flex items-start justify-between">
+                <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400">
+                  eltPulse vs. {c.name}
+                </h3>
+                <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-1 group-hover:text-blue-500" />
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">{c.description}</p>
+              <div className="mt-4 space-y-1.5">
+                {c.whereTheyFallShort.slice(0, 2).map((w) => (
+                  <div key={w} className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400">
+                    <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" />
+                    {w}
+                  </div>
+                ))}
+                <div className="flex items-start gap-2 text-xs font-medium text-blue-600 dark:text-blue-400">
+                  <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
+                  eltPulse covers git-native control + BYO compute
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="bg-blue-600 py-16 text-center">
+        <h2 className="text-2xl font-bold text-white">See how eltPulse fits your stack</h2>
+        <p className="mt-2 text-blue-200">Start free — connect a source and run your first pipeline in minutes.</p>
+        <div className="mt-6 flex flex-wrap justify-center gap-4">
+          <Link
+            href="/sign-up"
+            className="rounded-lg bg-white px-8 py-3 text-sm font-semibold text-blue-600 transition hover:bg-blue-50"
+          >
+            Start free →
+          </Link>
+          <Link
+            href="/pricing"
+            className="rounded-lg border border-blue-400 px-8 py-3 text-sm font-semibold text-white transition hover:bg-blue-500"
+          >
+            View pricing
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }

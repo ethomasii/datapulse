@@ -9,7 +9,7 @@ import clsx from "clsx";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { isClerkConfigured } from "@/lib/clerk/is-configured";
 import { ELTPULSE_GITHUB_URL } from "@/lib/marketing/github-repo";
-import { ELT_COMPARE_COMPETITORS } from "@/lib/marketing/compare-competitors";
+import { COMPETITORS } from "@/lib/marketing/competitors";
 
 function CompareDropdown({ linkClass }: { linkClass: string }) {
   const [open, setOpen] = useState(false);
@@ -55,10 +55,10 @@ function CompareDropdown({ linkClass }: { linkClass: string }) {
             All comparisons →
           </Link>
           <div className="my-1 border-t border-slate-200 dark:border-slate-800" />
-          {ELT_COMPARE_COMPETITORS.map((c) => (
+          {COMPETITORS.map((c) => (
             <Link
               key={c.slug}
-              href="/compare"
+              href={`/compare/${c.slug}`}
               role="menuitem"
               onClick={() => setOpen(false)}
               className="block px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
@@ -99,8 +99,11 @@ export function MarketingNavLinks({ mobile = false, onNavigate }: { mobile?: boo
     ? "text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
     : "hover:text-slate-900 dark:hover:text-white";
 
-  const isActive = (href: string, prefix = false) =>
-    prefix ? pathname === href || pathname.startsWith(`${href}/`) : pathname === href;
+  const isActive = (href: string, prefix = false) => {
+    if (href === "/compare") return pathname === "/compare" || pathname.startsWith("/compare/");
+    if (prefix) return pathname === href || pathname.startsWith(`${href}/`);
+    return pathname === href;
+  };
 
   if (mobile) {
     return (
@@ -111,21 +114,13 @@ export function MarketingNavLinks({ mobile = false, onNavigate }: { mobile?: boo
         <NavLink href="/docs" linkClass={linkClass} active={isActive("/docs", true)} onNavigate={onNavigate}>
           Docs
         </NavLink>
-        <NavLink
-          href="/orchestrators"
-          linkClass={linkClass}
-          active={isActive("/orchestrators") || isActive("/docs/orchestration")}
-          onNavigate={onNavigate}
-        >
-          Orchestrators
-        </NavLink>
         <NavLink href="/compare" linkClass={`${linkClass} font-medium`} active={isActive("/compare")} onNavigate={onNavigate}>
           Compare
         </NavLink>
-        {ELT_COMPARE_COMPETITORS.map((c) => (
+        {COMPETITORS.map((c) => (
           <Link
             key={c.slug}
-            href="/compare"
+            href={`/compare/${c.slug}`}
             onClick={onNavigate}
             className="pl-4 text-sm text-slate-500 dark:text-slate-500"
           >
@@ -167,13 +162,6 @@ export function MarketingNavLinks({ mobile = false, onNavigate }: { mobile?: boo
       </NavLink>
       <NavLink href="/docs" linkClass={linkClass} active={isActive("/docs", true)}>
         Docs
-      </NavLink>
-      <NavLink
-        href="/orchestrators"
-        linkClass={linkClass}
-        active={isActive("/orchestrators") || isActive("/docs/orchestration")}
-      >
-        Orchestrators
       </NavLink>
       <CompareDropdown linkClass={linkClass} />
       <NavLink href="/changelog" linkClass={linkClass} active={isActive("/changelog")}>
