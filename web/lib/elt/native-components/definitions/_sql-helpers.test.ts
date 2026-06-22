@@ -3,7 +3,7 @@ import {
   pandasQueryToSqlWhere,
   sqlCreateTableAs,
   sqlQualifiedTable,
-  useDataframeExecution,
+  isDataframeExecution,
 } from "./_sql-helpers";
 
 describe("_sql-helpers", () => {
@@ -23,7 +23,7 @@ describe("_sql-helpers", () => {
   });
 
   it("detects dataframe execution mode", () => {
-    expect(useDataframeExecution({ execution: "dataframe" })).toBe(true);
-    expect(useDataframeExecution({})).toBe(false);
+    expect(isDataframeExecution({ execution: "dataframe" })).toBe(true);
+    expect(isDataframeExecution({})).toBe(false);
   });
 });

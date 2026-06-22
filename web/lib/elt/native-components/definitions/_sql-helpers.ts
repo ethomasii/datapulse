@@ -14,7 +14,7 @@ export function sqlCreateTableAs(output: string, selectSql: string): string {
 }
 
 /** Worker dataframe path when execution is dataframe|pandas|worker. */
-export function useDataframeExecution(config: Record<string, unknown>): boolean {
+export function isDataframeExecution(config: Record<string, unknown>): boolean {
   const mode = String(config.execution ?? config.transform_mode ?? "warehouse").toLowerCase();
   return mode === "dataframe" || mode === "pandas" || mode === "worker";
 }

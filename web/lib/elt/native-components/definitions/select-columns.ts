@@ -4,7 +4,7 @@ import {
   sqlCreateTableAs,
   sqlQuotedColumns,
   sqlQualifiedTable,
-  useDataframeExecution,
+  isDataframeExecution,
 } from "./_sql-helpers";
 
 export const selectColumnsComponent: NativeComponentDefinition = {
@@ -40,7 +40,7 @@ export const selectColumnsComponent: NativeComponentDefinition = {
       return { warnings: ["select_columns: table and columns are required"], sql: [], python: [] };
     }
 
-    if (useDataframeExecution(config)) {
+    if (isDataframeExecution(config)) {
       const colsPy = `[${columns.map((c) => JSON.stringify(c)).join(", ")}]`;
       const python = [
         `# ── select_columns (dataframe): ${table} ──`,

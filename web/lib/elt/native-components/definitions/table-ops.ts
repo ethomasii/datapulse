@@ -7,7 +7,7 @@ import {
   sqlCreateTableAs,
   sqlQuotedColumns,
   sqlQualifiedTable,
-  useDataframeExecution,
+  isDataframeExecution,
 } from "./_sql-helpers";
 
 function outputParts(output: string) {
@@ -61,7 +61,7 @@ export const groupAggregateComponent: NativeComponentDefinition = {
       return { warnings: ["group_aggregate: table, group_by, aggregations, output_table required"], sql: [], python: [] };
     }
 
-    if (useDataframeExecution(config)) {
+    if (isDataframeExecution(config)) {
       const { outSchema, outName } = outputParts(output);
       const groupPy = `[${groupBy.map((c) => JSON.stringify(c)).join(", ")}]`;
       const aggPy = JSON.stringify(aggs);
@@ -138,7 +138,7 @@ export const sortRowsComponent: NativeComponentDefinition = {
       return { warnings: ["sort_rows: table and columns required"], sql: [], python: [] };
     }
 
-    if (useDataframeExecution(config)) {
+    if (isDataframeExecution(config)) {
       const colsPy = `[${columns.map((c) => JSON.stringify(c)).join(", ")}]`;
       const python = [
         `# ── sort_rows (dataframe): ${table} ──`,
@@ -195,7 +195,7 @@ export const limitRowsComponent: NativeComponentDefinition = {
     const limit = Math.max(1, Math.floor(Number(config.limit ?? config.n ?? 1000)));
     if (!table) return { warnings: ["limit_rows: table required"], sql: [], python: [] };
 
-    if (useDataframeExecution(config)) {
+    if (isDataframeExecution(config)) {
       const python = [
         `# ── limit_rows (dataframe): ${table} (n=${limit}) ──`,
         "try:",

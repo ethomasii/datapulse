@@ -5,7 +5,7 @@ import {
   pandasQueryToSqlWhere,
   sqlCreateTableAs,
   sqlQualifiedTable,
-  useDataframeExecution,
+  isDataframeExecution,
 } from "./_sql-helpers";
 
 function compileFilterRowsDataframe(
@@ -78,7 +78,7 @@ export const filterRowsComponent: NativeComponentDefinition = {
       return { warnings: ["filter_rows: table and condition are required"], sql: [], python: [] };
     }
 
-    if (useDataframeExecution(config)) {
+    if (isDataframeExecution(config)) {
       return { python: compileFilterRowsDataframe(table, condition, output) };
     }
 

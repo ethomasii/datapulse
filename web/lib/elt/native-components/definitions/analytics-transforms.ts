@@ -5,7 +5,7 @@ import {
   sqlCreateTableAs,
   sqlJoinOnClause,
   sqlQualifiedTable,
-  useDataframeExecution,
+  isDataframeExecution,
 } from "./_sql-helpers";
 
 function outputParts(output: string) {
@@ -127,7 +127,7 @@ export const antiJoinComponent: NativeComponentDefinition = {
       return { warnings: ["anti_join: left_table, right_table, on, output_table required"], sql: [], python: [] };
     }
 
-    if (useDataframeExecution(config)) {
+    if (isDataframeExecution(config)) {
       const { outSchema, outName } = outputParts(output);
       const onPy = `[${on.map((c) => JSON.stringify(c)).join(", ")}]`;
       const python = [

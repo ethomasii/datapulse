@@ -366,8 +366,10 @@ function DatabaseConfigureStep({
           onChange={(e) => onDestinationChange(e.target.value)}
           className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm dark:text-white"
         >
-          {DESTINATION_GROUPS.flatMap((g) => g.destinations).map((d) => (
-            <option key={d} value={d}>{d}</option>
+          {Object.entries(DESTINATION_GROUPS).map(([group, items]) => (
+            <optgroup key={group} label={group}>
+              {items.map((d) => <option key={d} value={d}>{d}</option>)}
+            </optgroup>
           ))}
         </select>
         <InlineConnectionPicker
@@ -505,8 +507,10 @@ function SaasConfigureStep({
           onChange={(e) => onDestinationChange(e.target.value)}
           className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm dark:text-white"
         >
-          {DESTINATION_GROUPS.flatMap((g) => g.destinations).map((d) => (
-            <option key={d} value={d}>{d}</option>
+          {Object.entries(DESTINATION_GROUPS).map(([group, items]) => (
+            <optgroup key={group} label={group}>
+              {items.map((d) => <option key={d} value={d}>{d}</option>)}
+            </optgroup>
           ))}
         </select>
         <InlineConnectionPicker

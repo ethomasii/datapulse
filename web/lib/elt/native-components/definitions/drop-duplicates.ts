@@ -4,7 +4,7 @@ import {
   sqlCreateTableAs,
   sqlDedupeSelect,
   sqlQualifiedTable,
-  useDataframeExecution,
+  isDataframeExecution,
 } from "./_sql-helpers";
 
 export const dropDuplicatesComponent: NativeComponentDefinition = {
@@ -48,7 +48,7 @@ export const dropDuplicatesComponent: NativeComponentDefinition = {
       return { warnings: ["drop_duplicates: table is required"], sql: [], python: [] };
     }
 
-    if (useDataframeExecution(config)) {
+    if (isDataframeExecution(config)) {
       const subsetPy = subset.length
         ? `[${subset.map((c) => JSON.stringify(c)).join(", ")}]`
         : "None";

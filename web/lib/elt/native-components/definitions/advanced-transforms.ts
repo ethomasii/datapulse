@@ -590,7 +590,7 @@ export const routerComponent: NativeComponentDefinition = {
   compile(config) {
     const table = inputTable(config);
     const defaultOut = String(config.default_output_table ?? config.default_table ?? "").trim();
-    let routes: Array<{ condition?: string; output_table?: string }> = [];
+    let routes: Array<{ condition?: string; output_table?: string; table?: string }> = [];
     const raw = config.routes ?? config.outputs;
     if (typeof raw === "string") {
       try {

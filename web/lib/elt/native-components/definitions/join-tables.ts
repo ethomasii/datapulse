@@ -6,7 +6,7 @@ import {
   sqlJoinKeyword,
   sqlJoinOnClause,
   sqlQualifiedTable,
-  useDataframeExecution,
+  isDataframeExecution,
 } from "./_sql-helpers";
 
 function strList(v: unknown): string[] {
@@ -191,7 +191,7 @@ export const joinTablesComponent: NativeComponentDefinition = {
       warnings.push("join_tables: provide 'on' or both left_on and right_on");
     }
 
-    if (useDataframeExecution(config)) {
+    if (isDataframeExecution(config)) {
       return compileJoinDataframe(left, right, output, how, on, leftOn, rightOn, warnings);
     }
 
