@@ -79,7 +79,7 @@ const TIERS: TierDef[] = [
   {
     key: "enterprise",
     subtitle: "Self-hosted control plane in your VPC",
-    monthlyUsd: PLAN_PRICES_USD.enterprise.monthly,
+    monthlyUsd: null,
     features: [
       "Everything in Team",
       "Self-hosted eltPulse control plane (Docker)",
@@ -182,9 +182,7 @@ export function PricingPageClient() {
                   {price !== null ? (
                     <div>
                       <span className="text-4xl font-bold text-slate-900">${price}</span>
-                      <span className="text-slate-500">
-                        {plan.key === "enterprise" ? "/month platform" : "/month + usage"}
-                      </span>
+                      <span className="text-slate-500">/month + usage</span>
                       {billing === "annual" ? (
                         <p className="mt-1 text-xs font-medium text-green-600">
                           billed annually — 2 months free
@@ -199,6 +197,9 @@ export function PricingPageClient() {
                   ) : (
                     <div>
                       <span className="text-4xl font-bold text-slate-900">Custom</span>
+                      {plan.key === "enterprise" ? (
+                        <p className="mt-1 text-sm text-slate-500">Platform license from $24k/yr</p>
+                      ) : null}
                     </div>
                   )}
                 </div>
