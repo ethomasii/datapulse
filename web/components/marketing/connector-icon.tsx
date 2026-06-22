@@ -1,3 +1,5 @@
+"use client";
+
 import { Database } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getConnectorIconFallbackUrl, getConnectorIconUrl } from "@/lib/marketing/connector-icons";

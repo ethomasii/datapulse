@@ -1,5 +1,5 @@
 import type { DltHubSource } from "@/lib/elt/dlt-hub-registry";
-import { hasDiscoverCatalog } from "@/lib/elt/source-discover";
+import { hasDiscoverCatalog } from "@/lib/elt/source-discover-catalog";
 import { isDatabaseCatalogSource } from "@/lib/elt/catalog-wizard-database";
 
 /** Discover API connector slug for a catalog source (may differ from pipeline sourceType). */

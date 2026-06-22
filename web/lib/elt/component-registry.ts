@@ -15,7 +15,7 @@ import {
 } from "@/lib/elt/component-compiler-tier";
 import { compileTargetLabel } from "@/lib/elt/compile-target-labels";
 import { sanitizeCatalogDescription } from "@/lib/elt/sanitize-catalog-copy";
-import { isNativeComponent } from "@/lib/elt/native-components";
+import { isNativeComponent } from "@/lib/elt/native-components/registry";
 
 export type ComponentManifestEntry = {
   id: string;

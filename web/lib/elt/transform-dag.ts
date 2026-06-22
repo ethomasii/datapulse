@@ -99,7 +99,7 @@ function specsFromCanvas(nodes: Node[], edges: Edge[], pipelineName: string): Pi
   }
 
   for (const spec of specs) {
-    const nodeId = [...nodeToSpec.entries()].find(([, sid]) => sid === spec.id)?.[0];
+    const nodeId = Array.from(nodeToSpec.entries()).find(([, sid]) => sid === spec.id)?.[0];
     if (!nodeId) continue;
     const after: string[] = [];
     for (const e of edges) {
@@ -262,7 +262,7 @@ export function deriveTransformDag(
       if (!layerMap.has(depth)) layerMap.set(depth, []);
       layerMap.get(depth)!.push(spec.id);
     }
-    const depths = [...layerMap.keys()].sort((a, b) => a - b);
+    const depths = Array.from(layerMap.keys()).sort((a, b) => a - b);
     for (const d of depths) {
       layers.push(layerMap.get(d)!);
     }

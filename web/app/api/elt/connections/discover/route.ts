@@ -6,8 +6,8 @@ import { discoverSource } from "@/lib/elt/source-discover";
 const inlineSchema = z.object({
   connectionType: z.enum(["source", "destination"]).default("source"),
   connector: z.string().min(1),
-  config: z.record(z.unknown()).optional().default({}),
-  secrets: z.record(z.string()).optional(),
+  config: z.record(z.string(), z.unknown()).optional().default({}),
+  secrets: z.record(z.string(), z.string()).optional(),
 });
 
 /** POST /api/elt/connections/discover — inline discover (quick-start, before save). */

@@ -2,6 +2,7 @@
  * After a terminal run, evaluate data contracts for pipeline assets and notify webhooks/Slack.
  */
 
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
 import { getAccessibleResourceOwnerIds, pipelineOwnerWhere } from "@/lib/auth/workspace-access";
 import { mergeCatalogIntoAssetsPayload } from "@/lib/elt/catalog-entries";
@@ -116,7 +117,9 @@ export async function maybeDispatchContractAlerts(runId: string, userId: string)
   if (!tel.contractViolations?.length) {
     await db.eltPipelineRun.update({
       where: { id: runId },
-      data: { telemetry: runTelemetryToJson({ ...tel, contractViolations: violations }) },
+      data: {
+        telemetry: runTelemetryToJson({ ...tel, contractViolations: violations }) as Prisma.InputJsonValue,
+      },
     });
   }
 

@@ -200,7 +200,7 @@ export function applyCanvasGraphEdits(
 
   edges = filterCanvasEdges(nodes, edges);
   const canvas: PipelineCanvasGraph = { nodes, edges, v: 1 };
-  const next = { ...sourceConfiguration, canvas };
+  const next: Record<string, unknown> = { ...sourceConfiguration, canvas };
   const extracted = extractComponentsFromCanvas(nodes, edges, { pipelineName: meta.pipelineName });
   if (extracted.components.length) next.elt_components = extracted.components;
 

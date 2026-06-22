@@ -10,7 +10,7 @@ import { ALL_DLT_SOURCES, getContextSlug, type DltHubSource } from '@/lib/elt/dl
 import { DESTINATION_GROUPS } from '@/lib/elt/catalog';
 import type { DltSourceContext, DltContextEndpoint } from '@/app/api/elt/source-context/[slug]/route';
 import type { CreatePipelineBody } from '@/lib/elt/types';
-import { applyDiscoveryToSourceConfiguration } from '@/lib/elt/source-discover';
+import { applyDiscoveryToSourceConfiguration } from '@/lib/elt/source-discover-catalog';
 import {
   databaseSourceConnectors,
   isDatabaseCatalogSource,

@@ -28,7 +28,7 @@ export async function GET() {
     const resolved = urls
       .map((u) => parseCatalogSource(u))
       .filter(Boolean)
-      .map((s) => ({ input: s!.input, id: s!.id, rawBase: s!.rawBase }));
+      .map((s) => ({ id: s!.id, rawBase: s!.rawBase, branch: s!.branch }));
     return NextResponse.json({ componentCatalogUrls: urls, resolved });
   } catch (e) {
     const drift = prismaSchemaDriftResponse(e);
@@ -94,7 +94,7 @@ export async function PATCH(req: Request) {
     const resolved = urls
       .map((u) => parseCatalogSource(u))
       .filter(Boolean)
-      .map((s) => ({ input: s!.input, id: s!.id, rawBase: s!.rawBase }));
+      .map((s) => ({ id: s!.id, rawBase: s!.rawBase, branch: s!.branch }));
     return NextResponse.json({ componentCatalogUrls: urls, resolved });
   } catch (e) {
     const drift = prismaSchemaDriftResponse(e);

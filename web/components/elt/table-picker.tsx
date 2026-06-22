@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Search, Table2 } from "lucide-react";
-import type { DiscoverItem } from "@/lib/elt/source-discover";
+import type { DiscoverItem } from "@/lib/elt/source-discover-catalog";
 
 export type TablePickerProps = {
   items: DiscoverItem[];

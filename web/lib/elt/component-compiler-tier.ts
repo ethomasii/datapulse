@@ -7,7 +7,7 @@
  */
 import type { ComponentRoute } from "@/lib/elt/component-compile-router";
 import { canCompileGenerically } from "@/lib/elt/generic-catalog-compiler";
-import { isNativeComponent } from "@/lib/elt/native-components";
+import { isNativeComponent } from "@/lib/elt/native-components/registry";
 
 export type ComponentCompilerTier = "native" | "category" | "schema" | "none";
 

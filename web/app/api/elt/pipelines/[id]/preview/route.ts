@@ -29,7 +29,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const user = await getCurrentDbUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const pipelineId = await resolveRouteParamId(ctx.params, "id");
+  const pipelineId = await resolveRouteParamId(ctx.params);
   if (!pipelineId) return NextResponse.json({ error: "Invalid pipeline id" }, { status: 400 });
 
   let body: z.infer<typeof bodySchema>;

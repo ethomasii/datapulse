@@ -524,26 +524,27 @@ function toolBuildTransformSteps(params: {
   user_query?: string;
 }) {
   const rawSteps = Array.isArray(params.steps) ? params.steps : [];
-  const steps: TransformBuildStep[] = rawSteps
-    .map((s) => {
-      if (!s || typeof s !== "object") return null;
-      const o = s as Record<string, unknown>;
-      const op = String(o.op ?? "").trim() as TransformBuildStep["op"];
-      if (!op) return null;
-      return {
-        op,
-        ...(typeof o.condition === "string" ? { condition: o.condition } : {}),
-        ...(Array.isArray(o.columns) ? { columns: o.columns.map(String) } : {}),
-        ...(typeof o.ascending === "boolean" ? { ascending: o.ascending } : {}),
-        ...(Array.isArray(o.group_by) ? { group_by: o.group_by.map(String) } : {}),
-        ...(o.aggregations && typeof o.aggregations === "object"
-          ? { aggregations: o.aggregations as Record<string, string> }
-          : {}),
-        ...(typeof o.limit === "number" ? { limit: o.limit } : {}),
-        ...(typeof o.output_suffix === "string" ? { output_suffix: o.output_suffix } : {}),
-      } satisfies TransformBuildStep;
-    })
-    .filter((x): x is TransformBuildStep => x !== null);
+  const steps: TransformBuildStep[] = rawSteps.flatMap((s) => {
+    if (!s || typeof s !== "object") return [];
+    const o = s as Record<string, unknown>;
+    const op = String(o.op ?? "").trim() as TransformBuildStep["op"];
+    if (!op) return [];
+    const step: TransformBuildStep = {
+      op,
+      ...(typeof o.condition === "string" ? { condition: o.condition } : {}),
+      ...(Array.isArray(o.columns) ? { columns: o.columns.map(String) } : {}),
+      ...(typeof o.ascending === "boolean" || Array.isArray(o.ascending)
+        ? { ascending: o.ascending as boolean | boolean[] }
+        : {}),
+      ...(Array.isArray(o.group_by) ? { group_by: o.group_by.map(String) } : {}),
+      ...(o.aggregations && typeof o.aggregations === "object"
+        ? { aggregations: o.aggregations as Record<string, string> }
+        : {}),
+      ...(typeof o.limit === "number" ? { limit: o.limit } : {}),
+      ...(typeof o.output_suffix === "string" ? { output_suffix: o.output_suffix } : {}),
+    };
+    return [step];
+  });
 
   const mode = normalizeTransformBuildMode(params.mode, {
     userQuery: params.user_query,
@@ -578,7 +579,8 @@ function toolBuildTransformSteps(params: {
 
 function toolListPipelinePlaybooks(query?: string) {
   const q = query?.trim().toLowerCase();
-  const matched = q ? matchPlaybook(q) ?? matchLakeStarter(q) : null;
+  const playbookMatch = q ? matchPlaybook(q) : null;
+  const lakeStarterMatch = q ? matchLakeStarter(q) : null;
   const playbooks = q
     ? AI_PIPELINE_PLAYBOOKS.filter(
         (p) =>
@@ -595,7 +597,6 @@ function toolListPipelinePlaybooks(query?: string) {
           s.triggers.some((t) => t.includes(q) || q.includes(t))
       )
     : LAKE_PIPELINE_STARTERS;
-  const lakeMatch = q ? matchLakeStarter(q) : null;
   return {
     playbooks: playbooks.map((p) => ({
       id: p.id,
@@ -611,21 +612,15 @@ function toolListPipelinePlaybooks(query?: string) {
       source_count: s.sourceCount,
       tool: "build_lake_pipeline",
     })),
-    best_match: matched
-      ? "components" in matched
-        ? {
-            id: matched.id,
-            title: matched.title,
-            components: matched.components,
-            graph_edits: matched.graphEdits,
-          }
-        : {
-            id: matched.id,
-            title: matched.title,
-            tool: "build_lake_pipeline",
-          }
-      : lakeMatch
-        ? { id: lakeMatch.id, title: lakeMatch.title, tool: "build_lake_pipeline" }
+    best_match: playbookMatch
+      ? {
+          id: playbookMatch.id,
+          title: playbookMatch.title,
+          components: playbookMatch.components,
+          graph_edits: playbookMatch.graphEdits,
+        }
+      : lakeStarterMatch
+        ? { id: lakeStarterMatch.id, title: lakeStarterMatch.title, tool: "build_lake_pipeline" }
         : null,
     hint: "Apply playbooks with add_pipeline_components (components[]) then edit_pipeline_canvas (graph_edits). Lake starters via build_lake_pipeline.",
   };

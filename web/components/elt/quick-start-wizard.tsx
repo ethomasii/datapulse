@@ -27,7 +27,7 @@ import {
 } from "@/lib/elt/quick-start-credentials";
 import { scenarioById, lakeStarterIdForScenario } from "@/lib/marketing/pipeline-scenarios";
 import { canvasStarterHref } from "@/lib/elt/lake-defaults";
-import { applyDiscoveryToSourceConfiguration } from "@/lib/elt/source-discover";
+import { applyDiscoveryToSourceConfiguration } from "@/lib/elt/source-discover-catalog";
 import { TablePicker, useSourceDiscovery } from "@/components/elt/table-picker";
 
 type Step = "destination" | "source" | "credentials" | "tables" | "name" | "done";
