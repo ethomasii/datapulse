@@ -230,11 +230,15 @@ export async function runManagedWorkerBatchHttp(options: {
     });
   }
   if (mode === "delegate") {
-    const { runManagedWorkerDelegateBatchHttp } = await import("@/lib/elt/managed-worker-delegate");
-    return runManagedWorkerDelegateBatchHttp({
+    const { dispatchManagedWorkerCron } = await import("@/lib/elt/org-managed-compute");
+    const result = await dispatchManagedWorkerCron({
       limit: options.limit,
       deadlineMs: options.deadlineMs,
     });
+    return {
+      processed: result.processed,
+      errors: result.errors,
+    };
   }
   if (mode === "gha") {
     const { runManagedWorkerGithubDispatchHttp } = await import("@/lib/elt/managed-worker-github-dispatch");

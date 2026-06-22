@@ -4,13 +4,11 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import type { BillingInterval } from "@/lib/billing/plan-pricing";
 
-export function BillingUpgradeButton({
-  tier,
+export function BillingDedicatedComputeButton({
   label,
   className = "",
   interval = "monthly",
 }: {
-  tier: "pro" | "team";
   label: string;
   className?: string;
   interval?: BillingInterval;
@@ -22,11 +20,11 @@ export function BillingUpgradeButton({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/billing/checkout", {
+      const res = await fetch("/api/billing/dedicated-compute/checkout", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier, interval }),
+        body: JSON.stringify({ interval }),
       });
       const data = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !data.url) {

@@ -13,6 +13,7 @@ import { pipelineOwnerWhere } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
 import { processManagedRunImmediately } from "@/lib/elt/process-managed-run";
 import { resolveNewRunExecution } from "@/lib/agent/run-execution";
+import { resolveWorkspaceOrganizationId } from "@/lib/elt/resolve-workspace-org";
 import { RunPartitionResolutionError, resolveRunPartitionFields } from "@/lib/elt/run-partition-resolution";
 import { createRunBodySchema } from "@/lib/elt/run-types";
 
@@ -148,6 +149,7 @@ export async function POST(req: Request) {
     data: {
       userId: pipeline.userId,
       pipelineId: pipeline.id,
+      workspaceOrganizationId: await resolveWorkspaceOrganizationId(pipeline.userId, organizationId),
       ingestionExecutor,
       status: body.status,
       environment: body.environment,

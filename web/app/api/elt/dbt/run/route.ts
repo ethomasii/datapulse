@@ -19,6 +19,7 @@ import {
   resolveEffectiveSourceConfiguration,
 } from "@/lib/elt/dbt-projects";
 import { processManagedRunImmediately } from "@/lib/elt/process-managed-run";
+import { resolveWorkspaceOrganizationId } from "@/lib/elt/resolve-workspace-org";
 
 const bodySchema = z
   .object({
@@ -109,11 +110,16 @@ export async function POST(req: Request) {
       }
 
       const triggeredBy = `ui:dbt_${action}`;
+      const workspaceOrganizationId = await resolveWorkspaceOrganizationId(
+        runUserId,
+        actor?.organizationId ?? null
+      );
       const run = await db.eltPipelineRun.create({
         data: {
           userId: runUserId,
           pipelineId: linked?.id ?? null,
           dbtProjectId: project.id,
+          workspaceOrganizationId,
           ingestionExecutor,
           status: "pending",
           environment,
@@ -203,11 +209,16 @@ export async function POST(req: Request) {
     }
 
     const triggeredBy = `ui:dbt_${action}`;
+    const workspaceOrganizationId = await resolveWorkspaceOrganizationId(
+      pipeline.userId,
+      actor?.organizationId ?? null
+    );
     const run = await db.eltPipelineRun.create({
       data: {
         userId: pipeline.userId,
         pipelineId: pipeline.id,
         dbtProjectId: linkedProject?.id ?? dbtProjectId ?? null,
+        workspaceOrganizationId,
         ingestionExecutor,
         status: "pending",
         environment,

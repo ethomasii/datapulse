@@ -9,6 +9,7 @@ type SetupResponse = {
   isStub: boolean;
   readyForRealRuns: boolean;
   customerMessage: string;
+  orgCompute?: { mode: string; label: string; isolatedQueue: boolean } | null;
 };
 
 export function ManagedExecutionSetup() {
@@ -50,7 +51,11 @@ export function ManagedExecutionSetup() {
           <Cloud className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" aria-hidden />
           <div>
             <p className="text-sm font-semibold text-slate-900 dark:text-white">Managed compute</p>
-            <p className="text-xs text-slate-600 dark:text-slate-400">{data.customerMessage}</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              {data.orgCompute?.isolatedQueue
+                ? `${data.orgCompute.label}. Your organization’s runs are isolated from other customers.`
+                : data.customerMessage}
+            </p>
           </div>
         </div>
         {data.computeTier === "active" ? (

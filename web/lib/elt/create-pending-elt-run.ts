@@ -1,5 +1,6 @@
 import type { RunIngestionExecutor } from "@prisma/client";
 import { db } from "@/lib/db/client";
+import { resolveWorkspaceOrganizationId } from "@/lib/elt/resolve-workspace-org";
 
 export type CreatePendingEltRunInput = {
   userId: string;
@@ -13,6 +14,9 @@ export type CreatePendingEltRunInput = {
   ingestionExecutor: RunIngestionExecutor;
   /** When set, must be unique; otherwise a new id is generated. */
   correlationId?: string | null;
+  /** Org workspace at enqueue time (for dedicated managed compute routing). */
+  workspaceOrganizationId?: string | null;
+  sessionOrganizationId?: string | null;
 };
 
 export async function createPendingEltRun(input: CreatePendingEltRunInput): Promise<{ id: string }> {
@@ -23,11 +27,16 @@ export async function createPendingEltRun(input: CreatePendingEltRunInput): Prom
     typeof input.correlationId === "string" && input.correlationId.trim()
       ? input.correlationId.trim()
       : crypto.randomUUID();
+  const workspaceOrganizationId =
+    input.workspaceOrganizationId !== undefined
+      ? input.workspaceOrganizationId
+      : await resolveWorkspaceOrganizationId(input.userId, input.sessionOrganizationId);
   const run = await db.eltPipelineRun.create({
     data: {
       userId: input.userId,
       pipelineId: input.pipelineId ?? null,
       dbtProjectId: input.dbtProjectId ?? null,
+      workspaceOrganizationId,
       status: "pending",
       environment: input.environment,
       correlationId,

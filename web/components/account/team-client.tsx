@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Building2, Loader2, Mail, UserPlus, Users, X } from "lucide-react";
+import { Building2, Cloud, Loader2, Mail, Server, UserPlus, Users, X } from "lucide-react";
 import { BillingUpgradeButton } from "@/components/account/billing-upgrade-button";
+import { BillingDedicatedComputeButton } from "@/components/account/billing-dedicated-compute-button";
+import { BillingIntervalToggle } from "@/components/account/billing-interval-toggle";
+import { BillingPortalButton } from "@/components/account/billing-portal-button";
+import { formatUsd, PLAN_PRICES_USD, type BillingInterval } from "@/lib/billing/plan-pricing";
 
 type Member = { id: string; email: string; name: string | null; createdAt: string };
 type Invite = { id: string; email: string; role: string; invitedAt: string };
@@ -14,6 +18,30 @@ type TeamPayload = {
   owner?: Member;
   members: Member[];
   pendingInvites: Invite[];
+};
+
+type ManagedComputePayload = {
+  organizationId: string | null;
+  canPurchaseDedicated: boolean;
+  canEnableDedicated: boolean;
+  planTier: string;
+  billing: {
+    subscribed: boolean;
+    status: string | null;
+    currentPeriodEnd: string | null;
+  } | null;
+  pricing: {
+    platformFeeLabel: string;
+    summary: string;
+    checkoutConfigured: boolean;
+  };
+  status: {
+    mode: "shared" | "dedicated";
+    batchUrl: string | null;
+    provisioned: boolean;
+    isolatedQueue: boolean;
+  } | null;
+  label: string | null;
 };
 
 type InviteRole = "member" | "viewer" | "catalog_editor" | "catalog_browser";
@@ -27,6 +55,8 @@ const INVITE_ROLE_LABELS: Record<InviteRole, string> = {
 
 export function TeamClient() {
   const [data, setData] = useState<TeamPayload | null>(null);
+  const [compute, setCompute] = useState<ManagedComputePayload | null>(null);
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>("monthly");
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<InviteRole>("member");
@@ -36,9 +66,15 @@ export function TeamClient() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/organization/members", { credentials: "same-origin" });
-      const json = (await res.json()) as TeamPayload;
+      const [teamRes, computeRes] = await Promise.all([
+        fetch("/api/organization/members", { credentials: "same-origin" }),
+        fetch("/api/organization/managed-compute", { credentials: "same-origin" }),
+      ]);
+      const json = (await teamRes.json()) as TeamPayload;
       setData(json);
+      if (computeRes.ok) {
+        setCompute((await computeRes.json()) as ManagedComputePayload);
+      }
     } finally {
       setLoading(false);
     }
@@ -138,6 +174,73 @@ export function TeamClient() {
           ))}
         </ul>
       </section>
+
+      {isOwner ? (
+        <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+            <Server className="h-4 w-4" /> Managed compute
+          </h3>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+            Shared managed compute is included on all plans — eltPulse runs your pipelines with zero gateway setup.
+            <strong className="font-medium text-slate-800 dark:text-slate-200"> Dedicated compute</strong> is a paid
+            add-on for Team workspaces: an isolated worker queue so other organizations never share or throttle your
+            runs.
+          </p>
+          {compute?.pricing ? (
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              Dedicated pricing:{" "}
+              <strong className="font-medium text-slate-700 dark:text-slate-300">
+                {billingInterval === "annual"
+                  ? `${formatUsd(PLAN_PRICES_USD.dedicatedCompute.annual)}/year + usage`
+                  : compute.pricing.summary}
+              </strong>
+            </p>
+          ) : null}
+          {compute?.status ? (
+            <div className="mt-4 space-y-3">
+              {!compute.billing?.subscribed ? (
+                <BillingIntervalToggle value={billingInterval} onChange={setBillingInterval} />
+              ) : null}
+              <div className="flex flex-wrap items-center gap-3">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    compute.status.mode === "dedicated"
+                      ? "bg-violet-100 text-violet-900 dark:bg-violet-900/40 dark:text-violet-100"
+                      : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  }`}
+                >
+                  <Cloud className="h-3.5 w-3.5" />
+                  {compute.label ?? compute.status.mode}
+                </span>
+                {compute.billing?.subscribed && compute.billing.currentPeriodEnd ? (
+                  <span className="text-xs text-slate-500">
+                    Renews {new Date(compute.billing.currentPeriodEnd).toLocaleDateString()}
+                  </span>
+                ) : null}
+              </div>
+              {compute.billing?.subscribed ? (
+                <div className="flex flex-wrap gap-2">
+                  <BillingPortalButton className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800" />
+                </div>
+              ) : null}
+              {!compute.billing?.subscribed && compute.canPurchaseDedicated && compute.pricing.checkoutConfigured ? (
+                <BillingDedicatedComputeButton
+                  interval={billingInterval}
+                  label={`Add dedicated compute — ${formatUsd(billingInterval === "annual" ? PLAN_PRICES_USD.dedicatedCompute.annual : PLAN_PRICES_USD.dedicatedCompute.monthly)}/${billingInterval === "annual" ? "yr" : "mo"} + usage`}
+                  className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-500 disabled:opacity-50"
+                />
+              ) : null}
+              {!compute.canPurchaseDedicated && !compute.billing?.subscribed ? (
+                <BillingUpgradeButton
+                  tier="team"
+                  label="Upgrade to Team to purchase dedicated compute"
+                  className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-500 disabled:opacity-50"
+                />
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {isOwner ? (
         <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">

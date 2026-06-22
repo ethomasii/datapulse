@@ -1,7 +1,17 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { appBaseUrl, getStripe } from "@/lib/billing/stripe";
+import {
+  parseBillingInterval,
+  resolveWorkspacePlanStripePriceId,
+} from "@/lib/billing/plan-pricing";
 import { db } from "@/lib/db/client";
+
+const bodySchema = z.object({
+  tier: z.enum(["pro", "team"]).default("pro"),
+  interval: z.enum(["monthly", "annual"]).optional(),
+});
 
 export async function POST(req: Request) {
   const user = await getCurrentDbUser();
@@ -12,21 +22,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Stripe is not configured" }, { status: 503 });
   }
 
-  let tier: "pro" | "team" = "pro";
+  let json: unknown;
   try {
-    const body = (await req.json()) as { tier?: string };
-    if (body.tier === "team") tier = "team";
+    json = await req.json();
   } catch {
-    /* default pro */
+    json = {};
+  }
+  const parsed = bodySchema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const priceId =
-    tier === "team"
-      ? process.env.STRIPE_TEAM_MONTHLY_PRICE_ID
-      : process.env.STRIPE_PRO_MONTHLY_PRICE_ID;
+  const { tier } = parsed.data;
+  const interval = parseBillingInterval(parsed.data.interval);
+  const priceId = resolveWorkspacePlanStripePriceId(tier, interval);
 
   if (!priceId) {
-    return NextResponse.json({ error: "Price not configured for this tier" }, { status: 503 });
+    return NextResponse.json(
+      { error: `Price not configured for ${tier} (${interval})` },
+      { status: 503 }
+    );
   }
 
   let customerId = user.subscription?.stripeCustomerId ?? null;
@@ -51,8 +66,18 @@ export async function POST(req: Request) {
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${base}/account/billing?checkout=success`,
     cancel_url: `${base}/account/billing?checkout=cancel`,
+    metadata: {
+      product: "eltpulse",
+      tier,
+      billing_interval: interval,
+    },
     subscription_data: {
       trial_period_days: 14,
+      metadata: {
+        product: "eltpulse",
+        tier,
+        billing_interval: interval,
+      },
     },
   });
 

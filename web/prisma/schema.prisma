@@ -59,6 +59,14 @@ enum PipelineExecutionHost {
   customer_gateway
 }
 
+/// eltPulse-managed compute placement for an organization workspace.
+enum ManagedComputeMode {
+  /// Shared multi-tenant worker pool (default).
+  shared
+  /// Isolated worker fleet — no other org’s runs on the same queue/compute.
+  dedicated
+}
+
 model User {
   id        String   @id @default(cuid())
   clerkId   String   @unique
@@ -176,16 +184,26 @@ model Organization {
   sensorPollIntervalSecondsOverride Int? @map("sensor_poll_interval_seconds_override")
   /// Org-wide BYO component catalog repos (`owner/repo` or GitHub raw URL).
   componentCatalogUrls Json @default("[]") @map("component_catalog_urls")
+  /// Shared vs dedicated eltPulse-managed worker fleet for this org.
+  managedComputeMode ManagedComputeMode @default(shared) @map("managed_compute_mode")
+  /// When `dedicated`: POST target for org-only worker batch (provisioned by eltPulse ops).
+  managedWorkerBatchUrl String? @map("managed_worker_batch_url") @db.Text
+  /// Stripe subscription for dedicated managed compute add-on (separate from workspace plan tier).
+  dedicatedComputeStripeSubscriptionId String? @unique @map("dedicated_compute_stripe_subscription_id")
+  dedicatedComputeSubscriptionStatus SubscriptionStatus? @map("dedicated_compute_subscription_status")
+  dedicatedComputeCurrentPeriodEnd DateTime? @map("dedicated_compute_current_period_end")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   members User[] @relation("OrganizationMembers")
   orgScopedAgentTokens AgentToken[] @relation("OrgScopedAgentTokens")
   invites OrganizationInvite[]
+  workspaceRuns EltPipelineRun[] @relation("RunWorkspaceOrganization")
 
   @@index([ownerUserId])
   @@index([defaultAgentTokenId])
   @@index([defaultDestinationConnectionId])
+  @@index([managedComputeMode])
   @@map("Organization")
 }
 
@@ -536,6 +554,9 @@ model EltPipelineRun {
   /// When set, only this named gateway (Bearer on `AgentToken`) may poll and PATCH this run; null = any gateway for this user.
   targetAgentTokenId String?    @map("target_agent_token_id")
   targetAgentToken   AgentToken? @relation(fields: [targetAgentTokenId], references: [id], onDelete: SetNull)
+  /// Org workspace active when the run was enqueued (for dedicated managed compute routing).
+  workspaceOrganizationId String? @map("workspace_organization_id")
+  workspaceOrganization Organization? @relation("RunWorkspaceOrganization", fields: [workspaceOrganizationId], references: [id], onDelete: SetNull)
   triggeredBy   String?
   /// Slice / partition value for the executor (e.g. dlt `sys.argv[1]` / `partition_key`). Populated by API, monitors, or Run slices.
   partitionValue  String? @map("partition_value") @db.Text
@@ -555,6 +576,7 @@ model EltPipelineRun {
   updatedAt     DateTime  @updatedAt
 
   @@index([userId, startedAt(sort: Desc)])
+  @@index([workspaceOrganizationId, status])
   @@index([pipelineId, startedAt(sort: Desc)])
   @@index([dbtProjectId, startedAt(sort: Desc)])
   @@index([userId, status])

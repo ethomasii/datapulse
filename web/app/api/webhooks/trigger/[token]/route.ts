@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveNewRunExecution } from "@/lib/agent/run-execution";
 import { db } from "@/lib/db/client";
+import { resolveWorkspaceOrganizationId } from "@/lib/elt/resolve-workspace-org";
 
 type Ctx = { params: { token: string } };
 
@@ -83,6 +84,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     data: {
       userId: user.id,
       pipelineId: pipeline.id,
+      workspaceOrganizationId: await resolveWorkspaceOrganizationId(user.id, user.organizationId),
       status: "pending",
       environment,
       correlationId,

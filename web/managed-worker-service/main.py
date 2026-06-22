@@ -96,6 +96,8 @@ def _require_trigger(request: Request) -> None:
 class BatchBody(BaseModel):
     limit: int = Field(default=5, ge=1, le=20)
     deadline_ms: int = Field(default=_MAX_WALL_MS, alias="deadlineMs", ge=5_000, le=_MAX_WALL_MS)
+    organization_id: str | None = Field(default=None, alias="organizationId")
+    pool: str | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -123,9 +125,21 @@ async def _get_json(client: httpx.AsyncClient, base: str, internal: str, path: s
 
 
 async def _fetch_pending_ids(
-    client: httpx.AsyncClient, base: str, internal: str, limit: int
+    client: httpx.AsyncClient,
+    base: str,
+    internal: str,
+    limit: int,
+    *,
+    organization_id: str | None = None,
+    pool: str | None = None,
 ) -> list[str]:
-    data = await _get_json(client, base, internal, f"/api/internal/managed-runs?limit={limit}")
+    params = [f"limit={limit}"]
+    if organization_id:
+        params.append(f"organizationId={organization_id}")
+    elif pool == "shared":
+        params.append("pool=shared")
+    path = f"/api/internal/managed-runs?{'&'.join(params)}"
+    data = await _get_json(client, base, internal, path)
     runs = data.get("runs") or []
     if not isinstance(runs, list):
         return []
@@ -586,7 +600,14 @@ async def health() -> dict[str, Any]:
     return {"ok": True, "service": "eltpulse-managed-worker", "python": sys.version}
 
 
-async def run_managed_batch(limit: int, deadline_ms: int, run_id: str | None = None) -> dict[str, Any]:
+async def run_managed_batch(
+    limit: int,
+    deadline_ms: int,
+    run_id: str | None = None,
+    *,
+    organization_id: str | None = None,
+    pool: str | None = None,
+) -> dict[str, Any]:
     """Core batch loop (CLI, GitHub Actions, or HTTP after auth)."""
     internal = (os.environ.get("ELTPULSE_INTERNAL_API_SECRET") or "").strip()
     if not internal:
@@ -610,7 +631,9 @@ async def run_managed_batch(limit: int, deadline_ms: int, run_id: str | None = N
         if specific:
             ids = [specific]
         else:
-            ids = await _fetch_pending_ids(client, base, internal, limit)
+            ids = await _fetch_pending_ids(
+                client, base, internal, limit, organization_id=organization_id, pool=pool
+            )
         for run_id in ids:
             if time.monotonic() >= wall_deadline:
                 break
@@ -645,7 +668,12 @@ async def batch(request: Request, body: BatchBody | None = None) -> dict[str, An
     _require_trigger(request)
     b = body or BatchBody()
     try:
-        return await run_managed_batch(b.limit, b.deadline_ms)
+        return await run_managed_batch(
+            b.limit,
+            b.deadline_ms,
+            organization_id=b.organization_id,
+            pool=b.pool,
+        )
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 

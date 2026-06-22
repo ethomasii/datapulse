@@ -47,9 +47,18 @@ class handler(BaseHTTPRequestHandler):  # noqa: N801 — Vercel Python entrypoin
 
         limit = int(body.get("limit", 5))
         deadline_ms = int(body.get("deadlineMs", body.get("deadline_ms", 900_000)))
+        organization_id = body.get("organizationId") or body.get("organization_id")
+        pool = body.get("pool")
 
         try:
-            result = asyncio.run(run_managed_batch(limit, deadline_ms))
+            result = asyncio.run(
+                run_managed_batch(
+                    limit,
+                    deadline_ms,
+                    organization_id=str(organization_id).strip() if organization_id else None,
+                    pool=str(pool).strip() if pool else None,
+                )
+            )
             payload = json.dumps(result).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-type", "application/json")
