@@ -115,6 +115,17 @@ export async function stubCompleteManagedRunInProcess(runId: string): Promise<vo
       appendTelemetrySample: { progress: 80, rows: 100, bytes: 50_000, phase: "load" },
     });
   }
+  if (phases.includes("transform")) {
+    await patchManagedRunInProcess(runId, {
+      status: "running",
+      appendLog: {
+        level: "info",
+        message: "Running warehouse transform steps (no extract/load)…",
+      },
+      telemetrySummary: { currentPhase: "transform", progress: 85, rowsLoaded: 100, bytesLoaded: 50_000 },
+      appendTelemetrySample: { progress: 85, rows: 100, bytes: 50_000, phase: "transform" },
+    });
+  }
   if (phases.includes("dbt") && hasDbt) {
     const dbtMessage =
       dbtAction === "compile"

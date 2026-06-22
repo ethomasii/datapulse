@@ -1,4 +1,4 @@
-/** Run phase helpers for load → dbt transform orchestration (v2+). */
+import { isTransformOnlyPipeline } from "./pipeline-mode";
 
 export function readDbtTransformConfig(sourceConfiguration: unknown): Record<string, unknown> | null {
   if (!sourceConfiguration || typeof sourceConfiguration !== "object") return null;
@@ -21,7 +21,7 @@ export const RUN_PHASE_LABELS: Record<string, string> = {
   extract: "Sync",
   load: "Load",
   dbt: "dbt transform",
-  transform: "dbt transform",
+  transform: "Warehouse transform",
   done: "Complete",
   failed: "Failed",
 };
@@ -93,7 +93,7 @@ export function readDbtScheduleInfo(sourceConfiguration: unknown): DbtScheduleIn
   return { enabled, cron, timezone, mode };
 }
 
-export type ScheduleRunPhase = "extract" | "load" | "dbt";
+export type ScheduleRunPhase = "extract" | "load" | "dbt" | "transform";
 
 /** Phases executed for a run based on how it was triggered. */
 export function resolveRunPhasesForTrigger(
@@ -101,6 +101,11 @@ export function resolveRunPhasesForTrigger(
   triggeredBy: string | null | undefined
 ): ScheduleRunPhase[] {
   const tb = triggeredBy?.trim() ?? "";
+  if (isTransformOnlyPipeline(sourceConfiguration)) {
+    if (isDbtOnlyTriggeredBy(tb)) return ["dbt"];
+    if (pipelineHasDbtEnabled(sourceConfiguration)) return ["transform", "dbt"];
+    return ["transform"];
+  }
   if (isDbtOnlyTriggeredBy(tb)) return ["dbt"];
   if (tb.startsWith("ui:dbt_compile")) return ["dbt"];
   if (pipelineHasDbtEnabled(sourceConfiguration)) return ["extract", "load", "dbt"];

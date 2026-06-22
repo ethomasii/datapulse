@@ -140,6 +140,8 @@ export type PipelineCanvasProps = {
   showEmptyStateOverlay?: boolean;
   /** Lakeflow fullscreen designer — fill parent height, chrome at top, hide help blurb. */
   variant?: "default" | "designer";
+  /** Warehouse-native pipeline — no extract source required. */
+  transformOnly?: boolean;
 };
 
 function FlowCanvas({
@@ -162,6 +164,7 @@ function FlowCanvas({
   emptyStateOverlay,
   showEmptyStateOverlay = false,
   variant = "default",
+  transformOnly = false,
 }: PipelineCanvasProps) {
   const isDesigner = variant === "designer";
   const { resolvedTheme } = useTheme();
@@ -449,8 +452,9 @@ function FlowCanvas({
       requireConnectorTypes: Boolean(pipelineId),
       pipelineSourceType,
       pipelineDestinationType,
+      transformOnly,
     }),
-    [pipelineId, pipelineSourceType, pipelineDestinationType]
+    [pipelineId, pipelineSourceType, pipelineDestinationType, transformOnly]
   );
 
   const exportJson = useCallback(() => {
@@ -621,6 +625,7 @@ function FlowCanvas({
     <div className={isDesigner ? "flex h-full min-h-0 flex-col" : "flex h-full min-h-[420px] flex-col"}>
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50/90 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/80">
         <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Add</span>
+        {!transformOnly ? (
         <button
           type="button"
           onClick={() => addNode("sourceNode")}
@@ -629,13 +634,14 @@ function FlowCanvas({
           <Plus className="h-3.5 w-3.5" />
           Source
         </button>
+        ) : null}
         <button
           type="button"
           onClick={() => addNode("destNode")}
           className="inline-flex items-center gap-1 rounded-lg border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-medium text-sky-900 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100 dark:hover:bg-sky-900/40"
         >
           <Plus className="h-3.5 w-3.5" />
-          Destination
+          {transformOnly ? "Warehouse" : "Destination"}
         </button>
         <AddTransformMenu onAddNative={addNativeTransformNode} onAddCode={addCodeTransformNode} />
         <div className="mx-1 h-4 w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
@@ -798,7 +804,7 @@ function FlowCanvas({
   );
 }
 
-export function PipelineCanvas({ variant = "default", ...props }: PipelineCanvasProps) {
+export function PipelineCanvas({ variant = "default", transformOnly = false, ...props }: PipelineCanvasProps) {
   const isDesigner = variant === "designer";
   return (
     <ReactFlowProvider>
@@ -809,7 +815,7 @@ export function PipelineCanvas({ variant = "default", ...props }: PipelineCanvas
             : "h-[max(28rem,min(calc(100dvh-9rem),56rem))] w-full min-h-[28rem] overflow-hidden rounded-xl border border-slate-200 shadow-inner dark:border-slate-700"
         }
       >
-        <FlowCanvas variant={variant} {...props} />
+        <FlowCanvas variant={variant} transformOnly={transformOnly} {...props} />
       </div>
     </ReactFlowProvider>
   );

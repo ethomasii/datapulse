@@ -18,6 +18,7 @@ type Props = {
   onPipelineChange: (id: string) => void;
   onNewPipeline: () => void;
   loading?: boolean;
+  transformOnly?: boolean;
   children: ReactNode;
 };
 
@@ -31,6 +32,7 @@ export function DesignerFullscreenShell({
   onPipelineChange,
   onNewPipeline,
   loading = false,
+  transformOnly = false,
   children,
 }: Props) {
   return (
@@ -45,6 +47,11 @@ export function DesignerFullscreenShell({
           </p>
           <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
             {selectedName ?? "Pipeline designer"}
+            {transformOnly ? (
+              <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800 dark:bg-violet-950 dark:text-violet-200">
+                Transform only
+              </span>
+            ) : null}
           </p>
         </div>
 

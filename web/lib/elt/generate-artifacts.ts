@@ -5,7 +5,9 @@ import { applyDestinationCodegenHints } from "./destination-codegen-hints";
 import { compilePipelineComponentsAsync } from "./native-components/compile-pipeline-components";
 import { generateDltPipeline } from "./generate-dlt";
 import { generateSlingReplication, slingReplicationToYaml } from "./generate-sling";
+import { generateTransformOnlyPipeline } from "./generate-transform-only";
 import { generateEltpulseWorkspaceYaml } from "./generate-eltpulse-workspace";
+import { isTransformOnlyPipeline } from "./pipeline-mode";
 import { normalizeSourceConfigurationForCodegen } from "./normalize-source-configuration";
 import type { CreatePipelineBody, PipelineRequest } from "./types";
 
@@ -80,8 +82,22 @@ export async function generatePipelineArtifacts(
   body: CreatePipelineBody,
   options?: { workspaceCatalogUrls?: string[] | null }
 ) {
-  const tool = resolveTool(body);
   const req = await bodyToRequest(body, options);
+
+  if (isTransformOnlyPipeline(body.sourceConfiguration)) {
+    const pipelineCode = generateTransformOnlyPipeline(req);
+    const configData: Record<string, unknown> = {
+      source_type: req.sourceType,
+      destination_type: req.destinationType,
+      tool: "transform_only",
+      configuration: req.sourceConfiguration,
+    };
+    const configYaml = YAML.stringify(configData);
+    const workspaceYaml = generateEltpulseWorkspaceYaml(req);
+    return { tool: "dlt" as const, pipelineCode, configYaml, workspaceYaml };
+  }
+
+  const tool = resolveTool(body);
 
   if (tool === "dlt") {
     const pipelineCode = generateDltPipeline(req);

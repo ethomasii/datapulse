@@ -53,6 +53,12 @@ import { enrichTransformNodesFromDltDbt, enrichPostTransformNodes } from "@/lib/
 import { readDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
 import { attachCanvasToSourceConfiguration } from "@/lib/elt/merge-canvas-into-source-config";
 import { minimalSourceConfigurationForNewPipeline } from "@/lib/elt/minimal-source-configuration";
+import {
+  isTransformOnlyPipeline,
+  minimalTransformOnlySourceConfiguration,
+  readTransformOnlySourceTable,
+  transformOnlyCanvasGraph,
+} from "@/lib/elt/pipeline-mode";
 import { ensureGithubReposForForm } from "@/lib/elt/normalize-source-configuration";
 import clsx from "clsx";
 import { hydrateCanvasFromSourceConfiguration, extractSpecComponents } from "@/lib/elt/spec-components-to-canvas";
@@ -104,12 +110,15 @@ export function CanvasPageClient() {
   const [advancedJsonDirty, setAdvancedJsonDirty] = useState(false);
   const [showNewPipelineForm, setShowNewPipelineForm] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newPipelineKind, setNewPipelineKind] = useState<"elt" | "transform_only">("elt");
+  const [newSourceTable, setNewSourceTable] = useState("staging.events");
   const [newSourceType, setNewSourceType] = useState("github");
   const [newDestinationType, setNewDestinationType] = useState("duckdb");
   const [newDestConnectionId, setNewDestConnectionId] = useState<string | null>(null);
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [linkedDbtProjectId, setLinkedDbtProjectId] = useState<string | null>(null);
+  const [transformOnlyMode, setTransformOnlyMode] = useState(false);
   const [canvasView, setCanvasView] = useState<"designer" | "dag" | "ingest">("designer");
   const [starterNotice, setStarterNotice] = useState<string | null>(null);
   const [componentNodeCount, setComponentNodeCount] = useState(0);
@@ -403,6 +412,7 @@ export function CanvasPageClient() {
       setPipelineTool(t === "dlt" || t === "sling" ? t : chooseTool(st0, dt0));
       const cfg = (data.pipeline.sourceConfiguration ?? {}) as Record<string, unknown>;
       lastFullSourceConfigRef.current = { ...cfg };
+      setTransformOnlyMode(isTransformOnlyPipeline(cfg));
       const st = typeof row.sourceType === "string" ? row.sourceType : "github";
       const dt = typeof row.destinationType === "string" ? row.destinationType : "duckdb";
       hydrateFormFromSourceConfig(cfg, st, dt);
@@ -538,6 +548,48 @@ export function CanvasPageClient() {
     setCreateBusy(true);
     setCreateError(null);
     try {
+      if (newPipelineKind === "transform_only") {
+        const destType = (workspaceDefault.connector ?? newDestinationType).toLowerCase();
+        const destConnId = workspaceDefault.connectionId ?? newDestConnectionId;
+        if (!destConnId) {
+          throw new Error(
+            "Set a workspace default warehouse under Connections (recommended), or create a destination connection first."
+          );
+        }
+        const sourceTable = newSourceTable.trim() || "staging.events";
+        const warehouseLabel = workspaceDefault.name
+          ? `${workspaceDefault.name} (${destType})`
+          : `Default warehouse · ${destType}`;
+        const canvas = transformOnlyCanvasGraph({ warehouseLabel, sourceTable });
+        const sourceConfiguration = minimalTransformOnlySourceConfiguration(sourceTable, canvas);
+        const res = await fetch("/api/elt/pipelines", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            sourceType: destType,
+            destinationType: destType,
+            tool: "auto",
+            sourceConfiguration,
+            destinationConnectionId: destConnId,
+          }),
+        });
+        const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        if (!res.ok) throw new Error(formatCreateApiError(data));
+        const pipeline = data.pipeline as { id?: string } | undefined;
+        const newId = pipeline?.id;
+        setShowNewPipelineForm(false);
+        setNewName("");
+        setNewPipelineKind("elt");
+        await loadPipelines();
+        if (newId) {
+          setSelectedId(newId);
+          setCanvasView("designer");
+        }
+        return;
+      }
+
       const sourceConfiguration = minimalSourceConfigurationForNewPipeline(newSourceType);
       const res = await fetch("/api/elt/pipelines", {
         method: "POST",
@@ -986,13 +1038,15 @@ export function CanvasPageClient() {
   const selectedName = pipelines.find((p) => p.id === selectedId)?.name;
   const lakeDefaultSourceTable = useMemo(
     () =>
-      defaultSourceTable({
-        pipelineName: selectedName,
-        schemaOverride:
-          typeof sourceCfg.schema_override === "string" ? sourceCfg.schema_override : undefined,
-        fallback: sourceTableFromUrl,
-      }),
-    [selectedName, sourceCfg.schema_override, sourceTableFromUrl]
+      transformOnlyMode
+        ? readTransformOnlySourceTable(lastFullSourceConfigRef.current)
+        : defaultSourceTable({
+            pipelineName: selectedName,
+            schemaOverride:
+              typeof sourceCfg.schema_override === "string" ? sourceCfg.schema_override : undefined,
+            fallback: sourceTableFromUrl,
+          }),
+    [selectedName, sourceCfg.schema_override, sourceTableFromUrl, transformOnlyMode, loadedSig]
   );
 
   const lineageSourceConfig = useMemo(
@@ -1028,6 +1082,7 @@ export function CanvasPageClient() {
               saveDisabled={!canWrite}
               pipelineSourceType={pipelineSourceType}
               pipelineDestinationType={pipelineDestinationType}
+              transformOnly={transformOnlyMode}
               onPickSourceType={(t) => void patchPipelineBindings({ sourceType: t })}
               onPickDestinationType={(t) => void patchPipelineBindings({ destinationType: t })}
               bindingsBusy={bindingsBusy}
@@ -1141,12 +1196,47 @@ export function CanvasPageClient() {
                 <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
                   {pipelines.length === 0 ? "Create your first pipeline" : "New pipeline"}
                 </p>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      ["elt", "Extract & load (EL+T)", "Connect a source and load into your warehouse"],
+                      [
+                        "transform_only",
+                        "Transform only (warehouse)",
+                        "Data already in your default warehouse — build native transform steps",
+                      ],
+                    ] as const
+                  ).map(([id, label, hint]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setNewPipelineKind(id)}
+                      className={clsx(
+                        "rounded-lg border px-3 py-2 text-left text-xs transition",
+                        newPipelineKind === id
+                          ? "border-violet-400 bg-violet-50 text-violet-950 dark:border-violet-600 dark:bg-violet-950/40 dark:text-violet-100"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                      )}
+                    >
+                      <span className="block font-semibold">{label}</span>
+                      <span className="mt-0.5 block text-[10px] opacity-80">{hint}</span>
+                    </button>
+                  ))}
+                </div>
                 {workspaceDefault.connector ? (
                   <WorkspaceLakeBanner
                     connector={workspaceDefault.connector}
                     name={workspaceDefault.name}
                     variant="compact"
                   />
+                ) : newPipelineKind === "transform_only" ? (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+                    No default warehouse yet — set one under{" "}
+                    <Link href="/connections" className="font-medium underline">
+                      Connections
+                    </Link>{" "}
+                    for a one-click transform pipeline.
+                  </p>
                 ) : null}
                 <label className="flex flex-col gap-1 text-sm">
                   <span className="font-medium text-slate-700 dark:text-slate-300">Name</span>
@@ -1161,6 +1251,22 @@ export function CanvasPageClient() {
                   />
                   <span className="text-xs text-slate-500">Letters, numbers, underscore; start with a letter.</span>
                 </label>
+                {newPipelineKind === "transform_only" ? (
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium text-slate-700 dark:text-slate-300">Input table</span>
+                    <input
+                      type="text"
+                      value={newSourceTable}
+                      onChange={(e) => setNewSourceTable(e.target.value)}
+                      placeholder="staging.events"
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                      disabled={createBusy}
+                    />
+                    <span className="text-xs text-slate-500">
+                      Existing warehouse table this pipeline reads from (schema.table).
+                    </span>
+                  </label>
+                ) : (
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="flex flex-col gap-1 text-sm">
                     <span className="font-medium text-slate-700 dark:text-slate-300">Source</span>
@@ -1201,6 +1307,7 @@ export function CanvasPageClient() {
                     </select>
                   </label>
                 </div>
+                )}
                 {createError ? (
                   <p className="text-sm text-red-600 dark:text-red-400" role="alert">
                     {createError}
@@ -1450,6 +1557,7 @@ export function CanvasPageClient() {
             setCanvasView("ingest");
           }}
           loading={detailLoading}
+          transformOnly={transformOnlyMode}
         >
           {renderDesignerWorkspace()}
         </DesignerFullscreenShell>

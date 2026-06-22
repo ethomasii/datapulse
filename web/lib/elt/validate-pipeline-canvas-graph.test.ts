@@ -23,6 +23,16 @@ describe("validatePipelineCanvasGraph", () => {
     expect(r.errors.some((e) => e.includes("source"))).toBe(true);
   });
 
+  it("passes transform-only with warehouse node and no source", () => {
+    const nodes = [node("w", "destNode", { transformOnly: true })];
+    const r = validatePipelineCanvasGraph(nodes, [], {
+      transformOnly: true,
+      requireConnectorTypes: true,
+      pipelineDestinationType: "snowflake",
+    });
+    expect(r.ok).toBe(true);
+  });
+
   it("fails when connector types required but missing", () => {
     const nodes = [node("s", "sourceNode"), node("d", "destNode")];
     const edges: Edge[] = [{ id: "e1", source: "s", target: "d" }];

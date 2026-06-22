@@ -20,6 +20,7 @@ import {
 } from "@/lib/elt/ai-pipeline-canvas-build";
 import { applyCanvasGraphEdits, type CanvasGraphEditAction } from "@/lib/elt/canvas-graph-edit";
 import { isAdditiveCanvasPatch } from "@/lib/elt/canvas-patch-safety";
+import { isTransformOnlyPipeline } from "@/lib/elt/pipeline-mode";
 import { AI_PIPELINE_PLAYBOOKS, listPlaybooksForPrompt, matchPlaybook } from "@/lib/elt/ai-pipeline-playbook";
 import {
   buildLakePipeline,
@@ -1109,6 +1110,7 @@ async function toolEditPipelineCanvas(
       requireConnectorTypes: true,
       pipelineSourceType: pipeline.sourceType,
       pipelineDestinationType: pipeline.destinationType,
+      transformOnly: isTransformOnlyPipeline(base),
     }
   );
   if (!validation.ok) {
@@ -1200,6 +1202,7 @@ async function toolAddPipelineComponents(
       requireConnectorTypes: true,
       pipelineSourceType: pipeline.sourceType,
       pipelineDestinationType: pipeline.destinationType,
+      transformOnly: isTransformOnlyPipeline(base),
     }
   );
   if (!validation.ok) {

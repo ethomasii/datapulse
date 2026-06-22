@@ -19,6 +19,7 @@ import {
   stripLegacyPipelineConnectionKeys,
 } from "@/lib/elt/pipeline-connection-fks";
 import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-graph";
+import { isTransformOnlyPipeline } from "@/lib/elt/pipeline-mode";
 import { normalizeRunWebhookUrl } from "@/lib/elt/validate-run-webhook-url";
 import { mergeSourceConfigurationForSourceTypeChange } from "@/lib/elt/merge-source-config-on-type-change";
 import { syncDltDbtWithCanvas } from "@/lib/elt/dbt-canvas";
@@ -467,6 +468,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
         requireConnectorTypes: true,
         pipelineSourceType: sourceType,
         pipelineDestinationType: destinationType,
+        transformOnly: isTransformOnlyPipeline(base),
       });
       if (!canvasValidation.ok) {
         return NextResponse.json(
