@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
+import {
+  resolveUserPlanTier,
+  tierAllowsWebhookTriggers,
+  upgradeMessageForFeature,
+} from "@/lib/plans/tier-features";
 
 /** Read whether the user has an active incoming webhook token (never returns the full token). */
 export async function GET() {
@@ -19,6 +24,14 @@ export async function GET() {
 export async function POST() {
   const user = await getCurrentDbUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const tier = await resolveUserPlanTier(user.id);
+  if (!tierAllowsWebhookTriggers(tier)) {
+    return NextResponse.json(
+      { error: upgradeMessageForFeature("Incoming webhook triggers", "pro") },
+      { status: 403 }
+    );
+  }
 
   // 32 bytes → 64 hex chars
   const array = new Uint8Array(32);

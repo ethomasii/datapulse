@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireDbUser } from "@/lib/auth/server";
-import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
+import { getWorkspacePermissions, workspaceResourceUserId } from "@/lib/auth/org-permissions";
 import { getMonthlyRowsSynced } from "@/lib/billing/report-usage";
 import { pipelineOwnerWhere } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
@@ -11,6 +11,7 @@ import { OnboardingChecklist } from "@/components/onboarding/checklist";
 import { ExecutionStatusBanner } from "@/components/elt/execution-status-banner";
 import { BarChart } from "@/components/ui/bar-chart";
 import { getManagedExecutionStatus } from "@/lib/elt/managed-execution-status";
+import { resolveUserPlanTier, runHistoryPrismaFilter } from "@/lib/plans/tier-features";
 
 function dayKey(d: Date): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -41,6 +42,9 @@ export default async function DashboardPage() {
   const perms = await getWorkspacePermissions(user.id);
   const ownerIds = perms.resourceOwnerIds;
   const ownerWhere = pipelineOwnerWhere(ownerIds);
+  const resourceOwnerId = workspaceResourceUserId(perms, user.id);
+  const tier = await resolveUserPlanTier(resourceOwnerId);
+  const historyFilter = runHistoryPrismaFilter(tier);
 
   const CHART_DAYS = 14;
   const chartCutoff = new Date();
@@ -59,13 +63,21 @@ export default async function DashboardPage() {
         select: DASHBOARD_RUN_LIST,
       }),
       db.eltPipelineRun.findMany({
-        where: { userId: { in: ownerIds }, status: { in: ["succeeded", "failed", "cancelled"] } },
+        where: {
+          userId: { in: ownerIds },
+          status: { in: ["succeeded", "failed", "cancelled"] },
+          ...(historyFilter ? { AND: [historyFilter] } : {}),
+        },
         orderBy: { startedAt: "desc" },
         take: 5,
         select: DASHBOARD_RUN_LIST,
       }),
       db.eltPipelineRun.findMany({
-        where: { userId: { in: ownerIds }, startedAt: { gte: chartCutoff } },
+        where: {
+          userId: { in: ownerIds },
+          startedAt: { gte: chartCutoff },
+          ...(historyFilter ? { AND: [historyFilter] } : {}),
+        },
         orderBy: { startedAt: "asc" },
         select: { startedAt: true, status: true, telemetry: true, logEntries: true },
       }),

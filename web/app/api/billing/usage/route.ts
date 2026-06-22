@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { getMonthlyRowsSynced } from "@/lib/billing/report-usage";
 import { PLAN_PIPELINE_LIMITS, countUserPipelines } from "@/lib/plans/limits";
+import {
+  API_KEY_LIMITS,
+  RUN_HISTORY_DAYS,
+  tierAllowsColumnLineage,
+  tierAllowsGitArtifactExport,
+  tierAllowsOrgInvites,
+  tierAllowsRunsApi,
+  tierAllowsWebhookTriggers,
+} from "@/lib/plans/tier-features";
 
 export async function GET() {
   const user = await getCurrentDbUser();
@@ -28,6 +37,13 @@ export async function GET() {
     features: {
       portal: Boolean(user.subscription?.stripeCustomerId),
       usageMeter: Boolean(process.env.STRIPE_USAGE_METER_EVENT_NAME),
+      webhookTriggers: tierAllowsWebhookTriggers(tier),
+      gitArtifactExport: tierAllowsGitArtifactExport(tier),
+      columnLineage: tierAllowsColumnLineage(tier),
+      runsApi: tierAllowsRunsApi(tier),
+      orgInvites: tierAllowsOrgInvites(tier),
+      runHistoryDays: RUN_HISTORY_DAYS[tier],
+      apiKeyLimit: API_KEY_LIMITS[tier],
     },
   });
 }

@@ -3,6 +3,7 @@ import { getCurrentDbUser } from "@/lib/auth/server";
 import { API_SCOPES } from "@/lib/auth/api-user";
 import { generateApiKey } from "@/lib/auth/workspace-api-key";
 import { db } from "@/lib/db/client";
+import { assertApiKeyLimit, resolveUserPlanTier } from "@/lib/plans/tier-features";
 
 export async function GET() {
   const user = await getCurrentDbUser();
@@ -39,6 +40,12 @@ export async function POST(req: Request) {
     }
   } catch {
     /* optional body */
+  }
+
+  const tier = await resolveUserPlanTier(user.id);
+  const limitMsg = await assertApiKeyLimit(user.id, tier);
+  if (limitMsg) {
+    return NextResponse.json({ error: limitMsg }, { status: 403 });
   }
 
   const { raw, prefix, hash } = generateApiKey();

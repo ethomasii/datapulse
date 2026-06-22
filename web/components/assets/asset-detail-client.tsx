@@ -71,8 +71,18 @@ export function AssetDetailClient({ assetKey }: { assetKey: string }) {
   const [data, setData] = useState<AssetDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [columnLineageAllowed, setColumnLineageAllowed] = useState(false);
 
   const [loadingColumns, setLoadingColumns] = useState(false);
+
+  useEffect(() => {
+    void fetch("/api/billing/usage", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body: { features?: { columnLineage?: boolean } } | null) => {
+        setColumnLineageAllowed(Boolean(body?.features?.columnLineage));
+      })
+      .catch(() => setColumnLineageAllowed(false));
+  }, []);
 
   const load = useCallback(async (withColumns = false) => {
     setLoading(true);
@@ -129,7 +139,9 @@ export function AssetDetailClient({ assetKey }: { assetKey: string }) {
   const lineage = buildAssetLineageGraph(bundle);
   const columnLineage = bundle.lastRun?.dbtManifest?.columnLineage;
   const showColumnLineage =
-    (asset.kind === "transform" || asset.kind === "post_transform") && Boolean(columnLineage);
+    columnLineageAllowed &&
+    (asset.kind === "transform" || asset.kind === "post_transform") &&
+    Boolean(columnLineage);
   const siblings = [bundle.source, ...bundle.rawAssets, ...bundle.transforms, ...bundle.postTransforms].filter(
     (a) => a.id !== asset.id
   );

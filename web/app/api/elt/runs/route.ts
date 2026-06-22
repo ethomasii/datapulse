@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Prisma, RunIngestionExecutor, RunStatus } from "@prisma/client";
 import { getActiveOrganizationForSession } from "@/lib/auth/active-org";
-import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
+import { getWorkspacePermissions, workspaceResourceUserId } from "@/lib/auth/org-permissions";
 import {
   API_SCOPES,
   hasScope,
@@ -16,6 +16,12 @@ import { resolveNewRunExecution } from "@/lib/agent/run-execution";
 import { resolveWorkspaceOrganizationId } from "@/lib/elt/resolve-workspace-org";
 import { RunPartitionResolutionError, resolveRunPartitionFields } from "@/lib/elt/run-partition-resolution";
 import { createRunBodySchema } from "@/lib/elt/run-types";
+import {
+  resolveUserPlanTier,
+  runHistoryPrismaFilter,
+  tierAllowsRunsApi,
+  upgradeMessageForFeature,
+} from "@/lib/plans/tier-features";
 
 export async function GET(req: Request) {
   const auth = await resolveApiUser(req);
@@ -24,6 +30,12 @@ export async function GET(req: Request) {
 
   const perms = await getWorkspacePermissions(auth.user.id);
   const ownerIds = perms.resourceOwnerIds;
+  const resourceOwnerId = workspaceResourceUserId(perms, auth.user.id);
+  const tier = await resolveUserPlanTier(resourceOwnerId);
+
+  if (auth.via === "api_key" && !tierAllowsRunsApi(tier)) {
+    return NextResponse.json({ error: upgradeMessageForFeature("Runs API", "pro") }, { status: 403 });
+  }
 
   const url = new URL(req.url);
   const pipelineId = url.searchParams.get("pipelineId") ?? undefined;
@@ -41,6 +53,11 @@ export async function GET(req: Request) {
     ...(statuses?.length ? { status: { in: statuses } } : {}),
     ...(environment ? { environment } : {}),
   };
+
+  const historyFilter = runHistoryPrismaFilter(tier);
+  if (historyFilter) {
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : []), historyFilter];
+  }
 
   const runs = await db.eltPipelineRun.findMany({
     where,
@@ -65,6 +82,13 @@ export async function POST(req: Request) {
   if (!perms.canWrite) {
     return NextResponse.json({ error: "View-only access — ask an org admin to upgrade your role." }, { status: 403 });
   }
+
+  const resourceOwnerId = workspaceResourceUserId(perms, auth.user.id);
+  const tier = await resolveUserPlanTier(resourceOwnerId);
+  if (auth.via === "api_key" && !tierAllowsRunsApi(tier)) {
+    return NextResponse.json({ error: upgradeMessageForFeature("Runs API", "pro") }, { status: 403 });
+  }
+
   const ownerIds = perms.resourceOwnerIds;
 
   let json: unknown;

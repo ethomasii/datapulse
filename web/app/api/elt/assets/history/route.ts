@@ -17,6 +17,7 @@ import { mergeCatalogIntoAssetsPayload } from "@/lib/elt/catalog-entries";
 import { buildWorkspaceAssets } from "@/lib/elt/pipeline-assets";
 import { getGithubAccessTokenForUser } from "@/lib/integrations/github-access-token";
 import { fetchPipelineGithubHistory } from "@/lib/elt/asset-pipeline-github-history";
+import { resolveUserPlanTier, runHistoryCutoff } from "@/lib/plans/tier-features";
 
 export async function GET(req: Request) {
   const auth = await resolveApiUser(req);
@@ -31,7 +32,11 @@ export async function GET(req: Request) {
 
   const windowDays = Math.min(90, Math.max(7, Number(url.searchParams.get("days") ?? 30) || 30));
   const ownerIds = await getAccessibleResourceOwnerIds(auth.user.id);
-  const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+  const tier = await resolveUserPlanTier(ownerIds[0] ?? auth.user.id);
+  const tierCutoff = runHistoryCutoff(tier);
+  const windowSince = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+  const since =
+    tierCutoff && tierCutoff > windowSince ? tierCutoff : windowSince;
 
   const pipelines = await db.eltPipeline.findMany({
     where: pipelineOwnerWhere(ownerIds),

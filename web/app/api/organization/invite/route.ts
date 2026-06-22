@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
 import { sendOrganizationInviteEmail } from "@/lib/organization/invites";
+import {
+  resolveUserPlanTier,
+  tierAllowsAdvancedWorkspaceRoles,
+  tierAllowsOrgInvites,
+  upgradeMessageForFeature,
+} from "@/lib/plans/tier-features";
 
 async function getOwnedOrg(userId: string) {
   return db.organization.findUnique({
@@ -52,6 +58,20 @@ export async function POST(req: Request) {
 
   if (!email || !email.includes("@")) {
     return NextResponse.json({ error: "Valid email required" }, { status: 400 });
+  }
+
+  const tier = await resolveUserPlanTier(user.id);
+  if (!tierAllowsOrgInvites(tier)) {
+    return NextResponse.json(
+      { error: upgradeMessageForFeature("Team invites and shared workspace", "team") },
+      { status: 403 }
+    );
+  }
+  if (role !== "member" && !tierAllowsAdvancedWorkspaceRoles(tier)) {
+    return NextResponse.json(
+      { error: upgradeMessageForFeature("Advanced workspace roles", "team") },
+      { status: 403 }
+    );
   }
 
   try {

@@ -5,6 +5,11 @@ import { eltPipelineToDeclarativeYamlString } from "@/lib/elt/pipeline-spec-expo
 import { getGithubAccessTokenForUser } from "@/lib/integrations/github-access-token";
 import { githubJson, githubRepoContentsApiPath } from "@/lib/integrations/github-rest";
 import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
+import {
+  resolveUserPlanTier,
+  tierAllowsGitArtifactExport,
+  upgradeMessageForFeature,
+} from "@/lib/plans/tier-features";
 
 function repoContext(
   owner: string | null | undefined,
@@ -34,6 +39,15 @@ export async function pushPipelineToGithub(
   userId: string,
   pipelineId: string
 ): Promise<PushPipelineResult> {
+  const tier = await resolveUserPlanTier(userId);
+  if (!tierAllowsGitArtifactExport(tier)) {
+    return {
+      ok: false,
+      skipped: true,
+      error: upgradeMessageForFeature("Git artifact export", "pro"),
+    };
+  }
+
   const token = await getGithubAccessTokenForUser(userId);
   if (!token) {
     return { ok: false, skipped: true, error: "GitHub is not connected" };

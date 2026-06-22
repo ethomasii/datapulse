@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveNewRunExecution } from "@/lib/agent/run-execution";
 import { db } from "@/lib/db/client";
 import { resolveWorkspaceOrganizationId } from "@/lib/elt/resolve-workspace-org";
+import { resolveUserPlanTier, tierAllowsWebhookTriggers } from "@/lib/plans/tier-features";
 
 type Ctx = { params: { token: string } };
 
@@ -30,6 +31,11 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
   if (!user) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+  }
+
+  const tier = await resolveUserPlanTier(user.id);
+  if (!tierAllowsWebhookTriggers(tier)) {
+    return NextResponse.json({ error: "Webhook triggers require Pro or above" }, { status: 403 });
   }
 
   let body: { pipeline?: string; environment?: string; correlationId?: string } = {};
