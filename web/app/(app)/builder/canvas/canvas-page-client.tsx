@@ -1050,6 +1050,9 @@ export function CanvasPageClient() {
             pipelineId={selectedId}
             selectedLabel={selectedStepLabel}
             canvasNode={canvasGenieNode}
+            getCanvasSnapshot={() => canvasControlRef.current?.getGraph() ?? null}
+            onPatchNode={(nodeId, patch) => canvasControlRef.current?.patchNodeData(nodeId, patch)}
+            onReplaceGraph={(nodes, edges) => canvasControlRef.current?.replaceGraph(nodes, edges)}
             onPipelinePatched={() => void loadPipelineGraph(selectedId)}
           />
           <CanvasPreviewPanel

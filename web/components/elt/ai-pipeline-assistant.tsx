@@ -7,6 +7,7 @@ import {
   Bot, X, Send, Sparkles, Maximize2, Minimize2,
   Zap, CheckCircle, Loader2, ChevronRight, ExternalLink, PenLine, Code2, ChevronDown,
 } from 'lucide-react';
+import type { Edge, Node } from '@xyflow/react';
 import type { CreatePipelineBody } from '@/lib/elt/types';
 import type { InlineField, PatchPipelinePayload } from '@/app/api/elt/ai-assistant/route';
 import { useWorkspacePermissions } from '@/lib/hooks/use-workspace-permissions';
@@ -377,6 +378,9 @@ export function AiPipelineAssistant({
   pipelineId,
   canvasMode = false,
   canvasNodeContext,
+  getCanvasSnapshot,
+  onPatchNode,
+  onReplaceGraph,
 }: {
   onPipelineSaved?: (name: string) => void;
   onPipelinePatched?: () => void;
@@ -392,6 +396,9 @@ export function AiPipelineAssistant({
     label?: string;
     config?: Record<string, unknown>;
   };
+  getCanvasSnapshot?: () => { nodes: Node[]; edges: Edge[] } | null;
+  onPatchNode?: (nodeId: string, patch: Record<string, unknown>) => void;
+  onReplaceGraph?: (nodes: Node[], edges: Edge[]) => void;
 }) {
   const router = useRouter();
   const { permissions, loading: permsLoading } = useWorkspacePermissions();
@@ -430,6 +437,7 @@ export function AiPipelineAssistant({
     setInput('');
     setLoading(true);
     try {
+      const snapshot = getCanvasSnapshot?.();
       const res = await fetch('/api/elt/ai-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -437,6 +445,9 @@ export function AiPipelineAssistant({
           messages: next.map((m) => ({ role: m.role, content: m.content })),
           ...(pipelineId ? { pipelineId } : {}),
           ...(canvasNodeContext ? { canvasNodeContext } : {}),
+          ...(snapshot
+            ? { canvasSnapshot: { nodes: snapshot.nodes, edges: snapshot.edges, v: 1 } }
+            : {}),
         }),
       });
       if (!res.ok) throw new Error('Assistant request failed');
@@ -445,16 +456,31 @@ export function AiPipelineAssistant({
         savePayload?: CreatePipelineBody;
         patchPayload?: PatchPipelinePayload;
         patchPipelineId?: string;
+        patchMode?: "canvas_local" | "pipeline";
+        nodePatch?: { nodeId: string; config: Record<string, unknown> };
         requiredFields?: InlineField[];
         codePreview?: string;
         componentSummary?: string[];
       };
+      if (data.nodePatch && onPatchNode) {
+        onPatchNode(data.nodePatch.nodeId, { config: data.nodePatch.config });
+      }
+      if (data.patchPayload && data.patchMode === "canvas_local" && onReplaceGraph) {
+        onReplaceGraph(
+          data.patchPayload.canvas.nodes as Node[],
+          data.patchPayload.canvas.edges as Edge[]
+        );
+      }
       setMessages((prev) => [...prev, {
         role: 'assistant',
-        content: data.message,
+        content: data.nodePatch
+          ? `${data.message} (Step config updated on canvas — save pipeline to persist.)`
+          : data.patchMode === "canvas_local"
+            ? `${data.message} (Step added on canvas — save pipeline to persist.)`
+            : data.message,
         savePayload: data.savePayload,
-        patchPayload: data.patchPayload,
-        patchPipelineId: data.patchPipelineId,
+        patchPayload: data.nodePatch || data.patchMode === "canvas_local" ? undefined : data.patchPayload,
+        patchPipelineId: data.nodePatch || data.patchMode === "canvas_local" ? undefined : data.patchPipelineId,
         requiredFields: data.requiredFields,
         codePreview: data.codePreview,
         componentSummary: data.componentSummary,
@@ -464,7 +490,7 @@ export function AiPipelineAssistant({
     } finally {
       setLoading(false);
     }
-  }, [messages, loading, canWrite, pipelineId, canvasNodeContext, canvasMode]);
+  }, [messages, loading, canWrite, pipelineId, canvasNodeContext, canvasMode, getCanvasSnapshot, onPatchNode, onReplaceGraph]);
 
   const patchPipeline = useCallback(async (id: string, patch: PatchPipelinePayload, key: string) => {
     if (!canWrite) return;

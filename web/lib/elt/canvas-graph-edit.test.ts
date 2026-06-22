@@ -39,6 +39,26 @@ describe("canvas-graph-edit", () => {
     expect(edgePairs).toContain("n3->n4");
   });
 
+  it("merges config on update_node_config", () => {
+    const r = applyCanvasGraphEdits(
+      baseConfig,
+      [
+        {
+          op: "update_node_config",
+          node: "n4",
+          config: { condition: "status = 'active'", columns: ["id", "status"] },
+        },
+      ],
+      { sourceType: "github", destinationType: "snowflake" }
+    );
+    expect(r.errors).toHaveLength(0);
+    const filter = (r.canvas.nodes as { id: string; data: { config?: Record<string, unknown> } }[]).find(
+      (n) => n.id === "n4"
+    );
+    expect(filter?.data.config?.condition).toBe("status = 'active'");
+    expect(r.canvas.nodes).toHaveLength(4);
+  });
+
   it("adds dbt transform after dest", () => {
     const r = applyCanvasGraphEdits(
       baseConfig,

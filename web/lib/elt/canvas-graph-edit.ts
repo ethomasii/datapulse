@@ -39,6 +39,14 @@ export type CanvasGraphEditAction =
       package_path?: string;
       selector?: string;
       code?: string;
+    }
+  | {
+      op: "update_node_config";
+      /** Node id or label — prefer exact node id from Genie context. */
+      node: string;
+      config: Record<string, unknown>;
+      /** When true (default), shallow-merge into existing config. */
+      merge?: boolean;
     };
 
 function nodeLabel(node: Node): string {
@@ -177,7 +185,24 @@ export function applyCanvasGraphEdits(
       if (afterRef) {
         const afterNode = findNodeByRef(nodes, afterRef);
         if (afterNode && isValidPipelineCanvasEdge(afterNode, node)) {
-          edges.push(makeEdge(afterNode.id, node.id));
+          const outgoing = edges.filter((e) => e.source === afterNode.id);
+          if (outgoing.length === 1) {
+            const nextNode = nodes.find((n) => n.id === outgoing[0]!.target);
+            if (nextNode && isValidPipelineCanvasEdge(node, nextNode)) {
+              edges = edges.filter(
+                (e) => !(e.source === afterNode.id && e.target === nextNode.id)
+              );
+              edges.push(makeEdge(afterNode.id, node.id), makeEdge(node.id, nextNode.id));
+              node.position = {
+                x: (afterNode.position.x + nextNode.position.x) / 2,
+                y: (afterNode.position.y + nextNode.position.y) / 2,
+              };
+            } else {
+              edges.push(makeEdge(afterNode.id, node.id));
+            }
+          } else {
+            edges.push(makeEdge(afterNode.id, node.id));
+          }
         }
       } else {
         const dest = findNodeByRef(nodes, "dest");
@@ -195,6 +220,19 @@ export function applyCanvasGraphEdits(
         edges.push(makeEdge(afterNode.id, node.id));
       }
       messages.push(`Added ${action.tool} transform`);
+    } else if (action.op === "update_node_config") {
+      const target = findNodeByRef(nodes, action.node);
+      if (!target) {
+        errors.push(`update_node_config: could not resolve node "${action.node}"`);
+        continue;
+      }
+      const data = target.data as Record<string, unknown>;
+      const prev = (data.config as Record<string, unknown> | undefined) ?? {};
+      const nextConfig = action.merge === false ? { ...action.config } : { ...prev, ...action.config };
+      nodes = nodes.map((n) =>
+        n.id === target.id ? { ...n, data: { ...data, config: nextConfig } } : n
+      );
+      messages.push(`Updated config on ${nodeLabel(target)}`);
     }
   }
 
