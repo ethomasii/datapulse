@@ -73,6 +73,13 @@ export function getConnectorIconUrl(slug: string, size = 24): string | null {
   return base;
 }
 
+/** jsDelivr fallback when cdn.simpleicons.org lacks a slug (e.g. amazonredshift). */
+export function getConnectorIconFallbackUrl(slug: string): string | null {
+  const icon = getConnectorIconSlug(slug);
+  if (!icon) return null;
+  return `https://cdn.jsdelivr.net/npm/simple-icons@v14/icons/${icon}.svg`;
+}
+
 export function hasConnectorIcon(slug: string): boolean {
   return getConnectorIconSlug(slug) !== null;
 }

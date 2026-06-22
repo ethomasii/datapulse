@@ -5,6 +5,7 @@
 
 import { readDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
 import { dbtHubPackageDisplayName, resolveDbtHubPackage } from "@/lib/elt/dbt-hub-packages";
+import type { ModelColumnLineageMap } from "@/lib/elt/dbt-manifest-lineage";
 
 export type DbtModelRunResult = {
   name: string;
@@ -32,6 +33,8 @@ export type DbtRunManifest = {
   source?: "config" | "runner";
   /** model name → parent model/source short names (from manifest parent_map) */
   modelDependencies?: Record<string, string[]>;
+  /** model name → column name → upstream column refs (from manifest column nodes) */
+  columnLineage?: ModelColumnLineageMap;
 };
 
 function str(v: unknown, max: number): string | undefined {
@@ -124,6 +127,36 @@ export function sanitizeDbtRunManifest(raw: unknown): DbtRunManifest | null {
     if (Object.keys(modelDependencies).length === 0) modelDependencies = undefined;
   }
 
+  const columnLineageRaw = o.columnLineage;
+  let columnLineage: ModelColumnLineageMap | undefined;
+  if (columnLineageRaw && typeof columnLineageRaw === "object" && !Array.isArray(columnLineageRaw)) {
+    columnLineage = {};
+    for (const [modelName, cols] of Object.entries(columnLineageRaw as Record<string, unknown>)) {
+      if (!modelName.trim() || !cols || typeof cols !== "object" || Array.isArray(cols)) continue;
+      const colMap: Record<string, { model?: string; column?: string; source?: string }[]> = {};
+      for (const [colName, refs] of Object.entries(cols as Record<string, unknown>)) {
+        if (!colName.trim() || !Array.isArray(refs)) continue;
+        const parsed = refs
+          .map((r) => {
+            if (!r || typeof r !== "object") return null;
+            const o = r as Record<string, unknown>;
+            const ref: { model?: string; column?: string; source?: string } = {};
+            const model = str(o.model, 256);
+            const column = str(o.column, 256);
+            const source = str(o.source, 256);
+            if (model) ref.model = model;
+            if (column) ref.column = column;
+            if (source) ref.source = source;
+            return Object.keys(ref).length ? ref : null;
+          })
+          .filter(Boolean) as { model?: string; column?: string; source?: string }[];
+        if (parsed.length) colMap[colName.trim()] = parsed;
+      }
+      if (Object.keys(colMap).length) columnLineage[modelName.trim()] = colMap;
+    }
+    if (Object.keys(columnLineage).length === 0) columnLineage = undefined;
+  }
+
   const sourceRaw = str(o.source, 16);
   const source = sourceRaw === "runner" ? "runner" : sourceRaw === "config" ? "config" : undefined;
 
@@ -135,6 +168,7 @@ export function sanitizeDbtRunManifest(raw: unknown): DbtRunManifest | null {
     ...(str(o.recordedAt, 64) ? { recordedAt: str(o.recordedAt, 64) } : {}),
     ...(source ? { source } : {}),
     ...(modelDependencies ? { modelDependencies } : {}),
+    ...(columnLineage ? { columnLineage } : {}),
   };
 }
 

@@ -24,6 +24,23 @@ describe("parseDbtRunArtifacts", () => {
     expect(out?.models[0]?.description).toContain("Staging customers");
     expect(out?.models[0]?.columns?.[0]?.name).toBe("id");
   });
+
+  it("includes column lineage from manifest parent_map", () => {
+    const runResults = {
+      results: [{ unique_id: "model.my_project.dim_customers", status: "success" }],
+    };
+    const manifest = {
+      parent_map: {
+        "column.model.my_project.dim_customers.email": [
+          "column.model.my_project.stg_customers.email",
+        ],
+      },
+    };
+    const out = parseDbtRunArtifacts(runResults, manifest);
+    expect(out?.columnLineage?.dim_customers?.email).toEqual([
+      { model: "stg_customers", column: "email" },
+    ]);
+  });
 });
 
 describe("enrichDbtManifestFromArtifact", () => {

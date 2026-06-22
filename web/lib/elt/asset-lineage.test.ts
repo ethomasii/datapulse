@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseDbtManifestDependencies } from "./dbt-manifest-lineage";
+import { parseDbtManifestDependencies, parseDbtManifestColumnLineage } from "./dbt-manifest-lineage";
 import { buildAssetLineageGraph, buildManifestLineageGraph } from "./asset-lineage";
 import type { PipelineAssetBundle } from "./pipeline-assets";
 
@@ -16,6 +16,23 @@ describe("parseDbtManifestDependencies", () => {
     });
     expect(deps.dim_customers).toEqual(["stg_customers", "customers"]);
     expect(deps.stg_customers).toEqual(["customers"]);
+  });
+});
+
+describe("parseDbtManifestColumnLineage", () => {
+  it("parses column parent_map into model column upstreams", () => {
+    const cols = parseDbtManifestColumnLineage({
+      parent_map: {
+        "column.model.my_project.dim_customers.email": [
+          "column.model.my_project.stg_customers.email",
+        ],
+        "column.model.my_project.stg_customers.id": [
+          "column.source.my_project.raw.customers.id",
+        ],
+      },
+    });
+    expect(cols.dim_customers?.email).toEqual([{ model: "stg_customers", column: "email" }]);
+    expect(cols.stg_customers?.id).toEqual([{ source: "raw.customers", column: "id" }]);
   });
 });
 

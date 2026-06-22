@@ -15,6 +15,7 @@ import {
 import { AssetCatalogMetaEditor } from "@/components/assets/asset-catalog-meta-editor";
 import { AssetCatalogAiPanel } from "@/components/assets/asset-catalog-ai-panel";
 import { AssetColumnsTable } from "@/components/assets/asset-columns-table";
+import { AssetColumnLineagePanel } from "@/components/assets/asset-column-lineage";
 import { AssetConversationPanel } from "@/components/assets/asset-conversation-panel";
 import { AssetContractPanel } from "@/components/assets/asset-contract-panel";
 import { AssetHistoryPanel } from "@/components/assets/asset-history-panel";
@@ -126,6 +127,9 @@ export function AssetDetailClient({ assetKey }: { assetKey: string }) {
   const canEdit = data.permissions?.canEditCatalog ?? canEditCatalog;
   const freshness = computePipelineFreshness(bundle.lastRun, bundle.enabled);
   const lineage = buildAssetLineageGraph(bundle);
+  const columnLineage = bundle.lastRun?.dbtManifest?.columnLineage;
+  const showColumnLineage =
+    (asset.kind === "transform" || asset.kind === "post_transform") && Boolean(columnLineage);
   const siblings = [bundle.source, ...bundle.rawAssets, ...bundle.transforms, ...bundle.postTransforms].filter(
     (a) => a.id !== asset.id
   );
@@ -239,6 +243,10 @@ export function AssetDetailClient({ assetKey }: { assetKey: string }) {
               />
             </div>
           </section>
+
+          {showColumnLineage ? (
+            <AssetColumnLineagePanel modelName={asset.name} columnLineage={columnLineage} />
+          ) : null}
 
           <AssetCatalogAiPanel
             assetKey={asset.id}

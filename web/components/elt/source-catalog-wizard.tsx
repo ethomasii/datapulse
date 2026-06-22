@@ -16,6 +16,13 @@ import {
   isDatabaseCatalogSource,
   pipelineSourceTypeFromConnector,
 } from '@/lib/elt/catalog-wizard-database';
+import {
+  isSaasDiscoverSource,
+  pipelineSourceTypeFromCatalogSlug,
+  saasDiscoverConnector,
+  saasSourceConnectors,
+} from '@/lib/elt/catalog-wizard-saas';
+import { minimalSourceConfigurationForNewPipeline } from '@/lib/elt/minimal-source-configuration';
 import { TablePicker, useSourceDiscovery } from '@/components/elt/table-picker';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -39,6 +46,7 @@ type WizardState = {
   contextError: string | null;
   selectedEndpoints: Set<string>;
   selectedTables: Set<string>;
+  selectedResources: Set<string>;
   sourceConnector: string | null;
   authValues: Record<string, string>;
   sourceConnectionId: string | null;
@@ -394,6 +402,145 @@ function DatabaseConfigureStep({
   );
 }
 
+// ── SaaS configure (GitHub, Stripe, HubSpot, Shopify + TablePicker) ─────────
+
+function SaasConfigureStep({
+  source,
+  sourceConnectionId,
+  onSourceConnectionSelect,
+  selectedResources,
+  onSelectedResourcesChange,
+  destination,
+  onDestinationChange,
+  destinationConnectionId,
+  onDestinationConnectionSelect,
+  pipelineName,
+  onNameChange,
+  onBack,
+  onNext,
+}: {
+  source: DltHubSource;
+  sourceConnectionId: string | null;
+  onSourceConnectionSelect: (id: string | null) => void;
+  selectedResources: Set<string>;
+  onSelectedResourcesChange: (next: Set<string>) => void;
+  destination: string;
+  onDestinationChange: (d: string) => void;
+  destinationConnectionId: string | null;
+  onDestinationConnectionSelect: (id: string | null) => void;
+  pipelineName: string;
+  onNameChange: (n: string) => void;
+  onBack: () => void;
+  onNext: () => void;
+}) {
+  const discoverConnector = saasDiscoverConnector(source);
+  const discovery = useSourceDiscovery({
+    connector: discoverConnector,
+    connectionId: sourceConnectionId,
+    enabled: true,
+  });
+
+  const canProceed =
+    Boolean(sourceConnectionId) &&
+    (selectedResources.size > 0 || discovery.selected.size > 0) &&
+    pipelineName.trim().length > 0;
+
+  const effectiveSelected = selectedResources.size > 0 ? selectedResources : discovery.selected;
+
+  useEffect(() => {
+    if (selectedResources.size === 0 && discovery.selected.size > 0 && !discovery.loading) {
+      onSelectedResourcesChange(new Set(discovery.selected));
+    }
+  }, [discovery.selected, discovery.loading, selectedResources.size, onSelectedResourcesChange]);
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
+          <ChevronLeft className="h-4 w-4" /> Back
+        </button>
+        <div className="flex-1">
+          <h3 className="font-semibold text-slate-900 dark:text-white">{source.name}</h3>
+          <p className="text-xs text-slate-500">SaaS connector — pick resources to sync with dlt</p>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-4">
+        <p className="text-sm font-semibold text-slate-800 dark:text-white">Source connection</p>
+        <InlineConnectionPicker
+          connectionType="source"
+          connector={discoverConnector}
+          connectors={saasSourceConnectors(source)}
+          selectedId={sourceConnectionId}
+          onSelect={(id) => onSourceConnectionSelect(id)}
+          label="Saved API / OAuth connection"
+        />
+      </div>
+
+      <div>
+        <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block mb-2">
+          Resources to sync ({effectiveSelected.size} selected)
+        </label>
+        <TablePicker
+          items={discovery.items}
+          selected={effectiveSelected}
+          onChange={onSelectedResourcesChange}
+          loading={discovery.loading}
+          message={discovery.message}
+          emptyHint="No resources listed for this connector."
+        />
+        {discovery.error ? (
+          <p className="mt-2 text-xs text-amber-600">{discovery.error}</p>
+        ) : null}
+        {!sourceConnectionId ? (
+          <p className="mt-2 text-xs text-slate-500">Select a source connection before saving the pipeline.</p>
+        ) : null}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-4">
+        <p className="text-sm font-semibold text-slate-800 dark:text-white">Destination warehouse</p>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Destination type</label>
+        <select
+          value={destination}
+          onChange={(e) => onDestinationChange(e.target.value)}
+          className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm dark:text-white"
+        >
+          {DESTINATION_GROUPS.flatMap((g) => g.destinations).map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+        <InlineConnectionPicker
+          connectionType="destination"
+          connector={destination}
+          selectedId={destinationConnectionId}
+          onSelect={(id) => onDestinationConnectionSelect(id)}
+          label="Saved destination connection"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Pipeline name</label>
+        <input
+          type="text"
+          value={pipelineName}
+          onChange={(e) => onNameChange(e.target.value.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase())}
+          className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm font-mono dark:text-white"
+        />
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          onClick={onNext}
+          disabled={!canProceed}
+          className="flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-40 transition-colors"
+        >
+          Review <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Configure step ────────────────────────────────────────────────────────────
 
 function ConfigureStep({
@@ -603,7 +750,7 @@ function ConfigureStep({
 // ── Review step ───────────────────────────────────────────────────────────────
 
 function ReviewStep({
-  source, context, selectedEndpoints, selectedTables, isDatabase,
+  source, context, selectedEndpoints, selectedTables, selectedResources, isDatabase, isSaas,
   destination,
   destinationConnectionId, sourceConnectionId,
   pipelineName, saving, saved, savedId, saveError, onBack, onSave,
@@ -612,7 +759,9 @@ function ReviewStep({
   context: DltSourceContext | null;
   selectedEndpoints: Set<string>;
   selectedTables: Set<string>;
+  selectedResources: Set<string>;
   isDatabase: boolean;
+  isSaas: boolean;
   destination: string;
   destinationConnectionId: string | null;
   sourceConnectionId: string | null;
@@ -627,6 +776,7 @@ function ReviewStep({
   const router = useRouter();
   const endpoints = context?.endpoints.filter((ep) => selectedEndpoints.has(ep.name)) ?? [];
   const tables = Array.from(selectedTables);
+  const resources = Array.from(selectedResources);
 
   return (
     <div className="flex flex-col gap-5">
@@ -659,7 +809,7 @@ function ReviewStep({
         </div>
         <div className="px-4 py-3">
           <span className="text-xs font-medium text-slate-500 uppercase tracking-wide block mb-2">
-            {isDatabase ? `Tables (${tables.length})` : `Resources (${endpoints.length})`}
+            {isDatabase ? `Tables (${tables.length})` : isSaas ? `Resources (${resources.length})` : `Resources (${endpoints.length})`}
           </span>
           <div className="flex flex-wrap gap-1.5">
             {isDatabase
@@ -668,7 +818,13 @@ function ReviewStep({
                     {t}
                   </span>
                 ))
-              : endpoints.map((ep) => (
+              : isSaas
+                ? resources.map((r) => (
+                    <span key={r} className="inline-flex items-center gap-1 rounded-full bg-teal-50 dark:bg-teal-900/20 px-2.5 py-0.5 text-xs font-medium text-teal-700 dark:text-teal-300">
+                      {r}
+                    </span>
+                  ))
+                : endpoints.map((ep) => (
                   <span key={ep.name} className="inline-flex items-center gap-1 rounded-full bg-teal-50 dark:bg-teal-900/20 px-2.5 py-0.5 text-xs font-medium text-teal-700 dark:text-teal-300">
                     {ep.name}
                   </span>
@@ -736,6 +892,7 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
     contextError: null,
     selectedEndpoints: new Set(),
     selectedTables: new Set(),
+    selectedResources: new Set(),
     sourceConnector: null,
     authValues: {},
     sourceConnectionId: null,
@@ -761,6 +918,28 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
         contextError: null,
         selectedEndpoints: new Set(),
         selectedTables: new Set(),
+        selectedResources: new Set(),
+        sourceConnector: null,
+        sourceConnectionId: null,
+        pipelineName: defaultName,
+        saved: false,
+        savedId: null,
+        saveError: null,
+      }));
+      return;
+    }
+
+    if (isSaasDiscoverSource(source)) {
+      setState((prev) => ({
+        ...prev,
+        step: 'configure',
+        source,
+        context: null,
+        contextLoading: false,
+        contextError: null,
+        selectedEndpoints: new Set(),
+        selectedTables: new Set(),
+        selectedResources: new Set(),
         sourceConnector: null,
         sourceConnectionId: null,
         pipelineName: defaultName,
@@ -782,6 +961,7 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
       contextError: null,
       selectedEndpoints: new Set(),
       selectedTables: new Set(),
+      selectedResources: new Set(),
       sourceConnectionId: null,
       pipelineName: defaultName,
       saved: false,
@@ -825,6 +1005,7 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
       context,
       selectedEndpoints,
       selectedTables,
+      selectedResources,
       sourceConnector,
       authValues,
       sourceConnectionId,
@@ -852,6 +1033,25 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
         tool: "sling",
         description: `${source.name} → ${destination} (${selectedTables.size} tables)`,
         sourceConfiguration: baseConfig,
+        sourceConnectionId,
+        ...(destinationConnectionId ? { destinationConnectionId } : {}),
+      };
+    } else if (isSaasDiscoverSource(source)) {
+      if (!sourceConnectionId || selectedResources.size === 0) return;
+      const sourceType = pipelineSourceTypeFromCatalogSlug(source.slug);
+      const baseConfig = minimalSourceConfigurationForNewPipeline(sourceType);
+      const sourceConfiguration = applyDiscoveryToSourceConfiguration(
+        sourceType,
+        baseConfig,
+        Array.from(selectedResources)
+      );
+      body = {
+        name: pipelineName,
+        sourceType,
+        destinationType: destination,
+        tool: "auto",
+        description: `${source.name} → ${destination} (${selectedResources.size} resources)`,
+        sourceConfiguration,
         sourceConnectionId,
         ...(destinationConnectionId ? { destinationConnectionId } : {}),
       };
@@ -906,8 +1106,9 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
     }
   }, [state, onPipelineSaved]);
 
-  const { step, source, context, contextLoading, contextError, selectedEndpoints, selectedTables, sourceConnector, authValues, sourceConnectionId, destination, destinationConnectionId, pipelineName, saving, saved, savedId, saveError } = state;
+  const { step, source, context, contextLoading, contextError, selectedEndpoints, selectedTables, selectedResources, sourceConnector, authValues, sourceConnectionId, destination, destinationConnectionId, pipelineName, saving, saved, savedId, saveError } = state;
   const isDatabase = source ? isDatabaseCatalogSource(source) : false;
+  const isSaas = source ? isSaasDiscoverSource(source) : false;
 
   return (
     <div className="min-h-0">
@@ -949,7 +1150,31 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
         />
       )}
 
-      {step === 'configure' && source && !isDatabase && (
+      {step === 'configure' && source && isSaas && (
+        <SaasConfigureStep
+          source={source}
+          sourceConnectionId={sourceConnectionId}
+          onSourceConnectionSelect={(id) =>
+            setState((prev) => ({
+              ...prev,
+              sourceConnectionId: id,
+              selectedResources: new Set(),
+            }))
+          }
+          selectedResources={selectedResources}
+          onSelectedResourcesChange={(next) => setState((prev) => ({ ...prev, selectedResources: next }))}
+          destination={destination}
+          onDestinationChange={(d) => setState((prev) => ({ ...prev, destination: d }))}
+          destinationConnectionId={destinationConnectionId}
+          onDestinationConnectionSelect={(id) => setState((prev) => ({ ...prev, destinationConnectionId: id }))}
+          pipelineName={pipelineName}
+          onNameChange={(n) => setState((prev) => ({ ...prev, pipelineName: n }))}
+          onBack={() => setState((prev) => ({ ...prev, step: 'browse' }))}
+          onNext={() => setState((prev) => ({ ...prev, step: 'review' }))}
+        />
+      )}
+
+      {step === 'configure' && source && !isDatabase && !isSaas && (
         <ConfigureStep
           source={source}
           context={context}
@@ -979,7 +1204,9 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
           context={context}
           selectedEndpoints={selectedEndpoints}
           selectedTables={selectedTables}
+          selectedResources={selectedResources}
           isDatabase={isDatabase}
+          isSaas={isSaas}
           destination={destination}
           destinationConnectionId={destinationConnectionId}
           sourceConnectionId={sourceConnectionId}

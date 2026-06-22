@@ -269,6 +269,11 @@ async function discoverS3Prefixes(
   }
 }
 
+/** Whether a connector has a static dlt resource catalog (GitHub, Stripe, etc.). */
+export function hasDiscoverCatalog(connector: string): boolean {
+  return Boolean(DLT_RESOURCE_CATALOG[connector.toLowerCase()]?.length);
+}
+
 function catalogResources(connector: string): DiscoverResult | null {
   const key = connector.toLowerCase();
   const items = DLT_RESOURCE_CATALOG[key];

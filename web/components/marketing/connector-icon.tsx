@@ -1,5 +1,6 @@
 import { Database } from "lucide-react";
-import { getConnectorIconUrl } from "@/lib/marketing/connector-icons";
+import { useEffect, useState } from "react";
+import { getConnectorIconFallbackUrl, getConnectorIconUrl } from "@/lib/marketing/connector-icons";
 
 type Props = {
   slug: string;
@@ -9,7 +10,14 @@ type Props = {
 };
 
 export function ConnectorIcon({ slug, name, size = 24, className = "" }: Props) {
-  const src = getConnectorIconUrl(slug, size);
+  const primary = getConnectorIconUrl(slug, size);
+  const fallback = getConnectorIconFallbackUrl(slug);
+  const [src, setSrc] = useState(primary ?? fallback);
+
+  useEffect(() => {
+    setSrc(primary ?? fallback);
+  }, [slug, primary, fallback]);
+
   if (src) {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- third-party brand icons via Simple Icons CDN
@@ -21,6 +29,9 @@ export function ConnectorIcon({ slug, name, size = 24, className = "" }: Props) 
         className={`shrink-0 rounded-sm ${className}`}
         loading="lazy"
         decoding="async"
+        onError={() => {
+          if (fallback && src !== fallback) setSrc(fallback);
+        }}
       />
     );
   }
