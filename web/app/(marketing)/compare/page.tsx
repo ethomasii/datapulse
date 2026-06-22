@@ -6,7 +6,7 @@ import { COMPETITORS } from "@/lib/marketing/competitors";
 export const metadata: Metadata = {
   title: "Compare — eltPulse vs Fivetran, Matillion, Informatica, Meltano & other ELT tools",
   description:
-    "Honest, respectful comparisons: eltPulse vs Fivetran, Airbyte, Matillion, Informatica, Talend, Rivery, Meltano, Estuary, AWS Glue, dbt Cloud, and more.",
+    "Honest comparisons: eltPulse vs Databricks Lakeflow, Fivetran, Snowflake, Matillion, Informatica, Hightouch (reverse ETL), and 15+ more.",
 };
 
 const HIGHLIGHTS = [
@@ -44,8 +44,9 @@ export default function ComparePage() {
             eltPulse vs. the alternatives
           </h1>
           <p className="mt-6 text-lg text-slate-600 dark:text-slate-400">
-            Buyers compare Fivetran, Airbyte, Matillion, Informatica, Talend, Rivery, Meltano, Estuary, AWS Glue, and
-            many others. Each excels in its lane — we explain where eltPulse fits for git-native platform teams.
+            Buyers compare Fivetran, Databricks Lakeflow, Snowflake native EL, Matillion, Informatica,
+            and many others — plus activation tools like Hightouch (a different layer). Each excels in its
+            lane; we explain where eltPulse fits for git-native platform teams.
           </p>
         </div>
       </section>
@@ -71,7 +72,8 @@ export default function ComparePage() {
       <section className="mx-auto max-w-5xl px-6 py-20">
         <h2 className="mb-2 text-center text-2xl font-bold text-slate-900 dark:text-white">Pick your comparison</h2>
         <p className="mb-12 text-center text-slate-500 dark:text-slate-400">
-          Detailed, honest feature-by-feature breakdowns.
+          Detailed, honest feature-by-feature breakdowns. Orchestration tools (Prefect, Airflow, Dagster) are
+          partners — we focus on EL+T control planes and adjacent categories like reverse ETL.
         </p>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {COMPETITORS.map((c) => (

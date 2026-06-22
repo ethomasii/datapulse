@@ -776,6 +776,185 @@ export const COMPETITORS: Competitor[] = [
       },
     ],
   },
+  {
+    slug: "vs-databricks-lakeflow",
+    name: "Databricks Lakeflow",
+    tagline: "eltPulse vs. Databricks Lakeflow",
+    heroSubtitle:
+      "Lakeflow is Databricks’ unified ingest, transform, and orchestration stack — deeply native to the lakehouse. eltPulse offers a similar control-plane experience with vendor-neutral engines and Git-owned artifacts.",
+    description:
+      "Lakeflow (Connect, Spark Declarative Pipelines, Jobs) brings ingestion connectors, SDP/declarative transforms, and orchestration into the Databricks Data Intelligence Platform — with Unity Catalog governance and serverless compute.",
+    theyreGoodAt: [
+      "End-to-end data engineering inside Databricks — no third-party EL license",
+      "Lakeflow Connect managed ingestion (Salesforce, SQL Server, SaaS, Zerobus streaming)",
+      "Declarative pipelines (SDP) with incremental processing and data quality built in",
+      "Unity Catalog lineage, governance, and AI-assisted pipeline authoring",
+    ],
+    whereTheyFallShort: [
+      "Optimized for Databricks — multi-cloud portability of pipeline definitions is not the goal",
+      "Git-native export to open engines (dlt, Sling) outside Databricks is limited",
+      "Teams not on Databricks need a separate control plane for EL+T",
+      "Self-hosted or air-gapped control plane outside Databricks cloud is not the model",
+    ],
+    bestFor:
+      "Organizations committed to Databricks as the primary lakehouse who want one vendor for ingest, transform, orchestration, and AI on that platform.",
+    closingNote:
+      "If Databricks is your center of gravity, Lakeflow is a strong default. eltPulse fits when you want Lakeflow-style UX with portable Git artifacts, customer gateways on any cloud, optional self-hosted Enterprise control plane, and freedom to land data in Snowflake, BigQuery, or Postgres — not only Delta.",
+    categories: [
+      {
+        category: "Platform scope",
+        rows: [
+          { feature: "Unified ingest + transform + jobs", eltpulse: true, competitor: true },
+          { feature: "Native to one lakehouse vendor", eltpulse: "Multi-destination", competitor: "Databricks" },
+          { feature: "Unity Catalog / governance", eltpulse: "Catalog + RBAC", competitor: true },
+          { feature: "AI-assisted pipeline authoring", eltpulse: "AI builder", competitor: true },
+        ],
+      },
+      {
+        category: "Portability & BYOC",
+        rows: [
+          { feature: "Git export (dlt, Sling, YAML)", eltpulse: "Pro+", competitor: "Bundles / SDP" },
+          { feature: "Customer gateway (any cloud)", eltpulse: "All tiers", competitor: "DBUs on Databricks" },
+          { feature: "Self-hosted control plane", eltpulse: "Enterprise", competitor: false },
+          { feature: "dbt project runs", eltpulse: true, competitor: "SQL/Python SDP" },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "vs-microsoft-fabric",
+    name: "Microsoft Fabric",
+    tagline: "eltPulse vs. Microsoft Fabric",
+    heroSubtitle:
+      "Fabric unifies analytics, warehousing, and data factory pipelines in the Microsoft cloud. eltPulse is for teams who want git-native ELT that runs anywhere — including Fabric as a destination.",
+    description:
+      "Microsoft Fabric combines OneLake, Data Factory Gen2, Power BI, and warehouse workloads under one SaaS umbrella — a natural choice for Microsoft 365 and Azure-centric enterprises.",
+    theyreGoodAt: [
+      "Tight integration with Azure, Entra ID, Purview, and Power BI",
+      "OneLake shortener for copying data across Fabric items without duplicate storage",
+      "Data Factory pipelines and notebooks for EL+T inside Fabric capacity",
+      "Enterprise procurement and admin controls Microsoft shops expect",
+    ],
+    whereTheyFallShort: [
+      "Center of gravity is Microsoft — multi-cloud EL definitions are not portable by default",
+      "Git-native, developer-first ELT with open engines is secondary to Fabric-native assets",
+      "Capacity-based Fabric pricing differs from usage-metered EL SaaS models",
+      "Customer-owned sync compute outside Fabric is not the primary pattern",
+    ],
+    bestFor:
+      "Enterprises standardizing on Microsoft Fabric and Azure who want analytics, BI, and pipelines in one Microsoft bill.",
+    closingNote:
+      "Fabric is often the right platform bet for Microsoft shops. eltPulse can still be your EL control plane — define pipelines in Git, run on a gateway, and load into Fabric OneLake or warehouse alongside other destinations.",
+    categories: [
+      {
+        category: "Microsoft ecosystem",
+        rows: [
+          { feature: "Entra ID / SSO", eltpulse: "Team+ (Clerk)", competitor: true },
+          { feature: "Power BI & OneLake integration", eltpulse: "Via destination", competitor: true },
+          { feature: "Purview governance", eltpulse: "Catalog + lineage", competitor: true },
+          { feature: "Fabric capacity model", eltpulse: "Sub + usage", competitor: true },
+        ],
+      },
+      {
+        category: "ELT workflow",
+        rows: [
+          { feature: "Visual pipeline builder", eltpulse: true, competitor: "Data Factory" },
+          { feature: "Git-native artifact export", eltpulse: "Pro+", competitor: "Fabric Git API" },
+          { feature: "dbt transforms", eltpulse: true, competitor: "Notebooks / SQL" },
+          { feature: "Multi-destination (non-Fabric)", eltpulse: true, competitor: "Fabric-first" },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "vs-hightouch",
+    name: "Hightouch",
+    tagline: "eltPulse vs. Hightouch — different jobs",
+    heroSubtitle:
+      "Hightouch is reverse ETL: sync modeled warehouse data to SaaS tools (CRM, ads, support). eltPulse is EL+T into the warehouse. They complement each other more than they compete.",
+    description:
+      "Hightouch (and peers like Census) sit on the “activation” layer — getting trusted tables out to operational systems. eltPulse focuses on getting data in, transforming it with dbt, and operating pipelines. Most mature stacks use both layers.",
+    theyreGoodAt: [
+      "Best-in-class reverse ETL to Salesforce, HubSpot, ad platforms, and support tools",
+      "Audience building and campaign sync from warehouse segments",
+      "Strong governance for what leaves the warehouse to operational systems",
+      "Composable CDP narrative without replacing your warehouse",
+    ],
+    whereTheyFallShort: [
+      "Not an extract/load platform — you need EL elsewhere (Fivetran, Airbyte, eltPulse, etc.)",
+      "Does not replace dbt modeling or ingest observability",
+      "Different buying center (growth/ops vs data platform)",
+      "Not comparable on connector catalog for sources or Git-native EL artifacts",
+    ],
+    bestFor:
+      "Teams with a mature warehouse who need to activate modeled data in business tools — not teams looking for ingestion.",
+    closingNote:
+      "Use eltPulse (or similar) for EL+T and pipeline control plane; use Hightouch when modeled data is ready to push to Salesforce, Braze, or Google Ads. We compare them only so buyers do not confuse activation with ingestion.",
+    categories: [
+      {
+        category: "Layer in the stack",
+        rows: [
+          { feature: "Extract & load (EL)", eltpulse: true, competitor: false },
+          { feature: "Transform in warehouse (dbt)", eltpulse: true, competitor: false },
+          { feature: "Reverse ETL / activation", eltpulse: "Not core", competitor: true },
+          { feature: "Audience / campaign sync", eltpulse: false, competitor: true },
+        ],
+      },
+      {
+        category: "Typical together",
+        rows: [
+          { feature: "Warehouse → business tools", eltpulse: "Loads warehouse", competitor: "Syncs out" },
+          { feature: "Pipeline runs & catalog", eltpulse: true, competitor: "Sync logs" },
+          { feature: "Git-native EL definitions", eltpulse: "Pro+", competitor: "N/A" },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "vs-snowflake",
+    name: "Snowflake (native EL)",
+    tagline: "eltPulse vs. Snowflake native pipelines",
+    heroSubtitle:
+      "Snowflake keeps adding native ingest, dynamic tables, and tasks — excellent when Snowflake is the hub. eltPulse adds vendor-neutral EL+T and Git portability across Snowflake and other targets.",
+    description:
+      "Snowflake Openflow, Snowpipe, Tasks, and Dynamic Tables let teams build pipelines entirely inside Snowflake. For Snowflake-only estates, native features reduce moving parts.",
+    theyreGoodAt: [
+      "Pipelines run where data lives — minimal data movement outside Snowflake",
+      "Snowpipe streaming ingest and Openflow for connector-style loads",
+      "Dynamic Tables for declarative transformations in SQL",
+      "Tasks & Streams for orchestration with strong RBAC and governance",
+    ],
+    whereTheyFallShort: [
+      "Snowflake-centric — source systems and non-Snowflake targets need other tools",
+      "Git-native EL artifact export to dlt/Sling is not the native model",
+      "Cross-vendor catalog and multi-destination EL control plane is DIY",
+      "Cost model mixes Snowflake credits with pipeline design complexity",
+    ],
+    bestFor:
+      "Teams all-in on Snowflake who want ingest, transform, and schedule inside the warehouse boundary.",
+    closingNote:
+      "Snowflake native EL is a great choice for Snowflake-first architectures. eltPulse fits when you also load BigQuery or Postgres, want open-engine Git export, customer gateways, or a self-hosted control plane — with Snowflake as one destination among many.",
+    categories: [
+      {
+        category: "Snowflake-native",
+        rows: [
+          { feature: "In-warehouse transforms", eltpulse: "dbt + SQL", competitor: "Dynamic Tables" },
+          { feature: "Streaming / Snowpipe ingest", eltpulse: "Via engines", competitor: true },
+          { feature: "Task orchestration", eltpulse: "Schedules + monitors", competitor: "Tasks" },
+          { feature: "Openflow / managed connectors", eltpulse: "Catalog", competitor: true },
+        ],
+      },
+      {
+        category: "Multi-platform EL",
+        rows: [
+          { feature: "Multiple warehouse targets", eltpulse: true, competitor: "Snowflake-first" },
+          { feature: "Git export (dlt, Sling)", eltpulse: "Pro+", competitor: "SQL/scripts" },
+          { feature: "Customer gateway compute", eltpulse: "All tiers", competitor: "Snowflake credits" },
+          { feature: "Self-hosted control plane", eltpulse: "Enterprise", competitor: false },
+        ],
+      },
+    ],
+  },
 ];
 
 export const COMPETITOR_MAP: Record<string, Competitor> = Object.fromEntries(
