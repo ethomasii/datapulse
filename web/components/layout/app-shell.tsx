@@ -159,6 +159,7 @@ function NavSection({
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const hideFloatingAi = pathname?.startsWith("/builder/canvas");
   const [collapsed, setCollapsed] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [catalogOpen, setCatalogOpen] = useState(false);
@@ -366,7 +367,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
         <main className="min-h-0 min-w-0 w-full flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
       </div>
-      <AiPipelineAssistant />
+      {!hideFloatingAi ? <AiPipelineAssistant /> : null}
     </div>
   );
 }

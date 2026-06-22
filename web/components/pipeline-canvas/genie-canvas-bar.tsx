@@ -65,7 +65,7 @@ export function GenieCanvasBar({ pipelineId, onPipelinePatched, selectedLabel, c
   }, [expanded, selectedLabel]);
 
   return (
-    <div className="shrink-0 border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+    <div className="relative z-30 shrink-0 isolate border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
       <div className="flex items-end gap-2 px-3 py-2">
         <Bot className="mb-2 h-4 w-4 shrink-0 text-teal-600" aria-hidden />
         <div className="min-w-0 flex-1">

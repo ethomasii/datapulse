@@ -136,6 +136,8 @@ export type PipelineCanvasProps = {
   /** Overlay when graph has no transform components (e.g. recipe chips). */
   emptyStateOverlay?: ReactNode;
   showEmptyStateOverlay?: boolean;
+  /** Lakeflow fullscreen designer — fill parent height, chrome at top, hide help blurb. */
+  variant?: "default" | "designer";
 };
 
 function FlowCanvas({
@@ -157,7 +159,9 @@ function FlowCanvas({
   onGraphStatsChange,
   emptyStateOverlay,
   showEmptyStateOverlay = false,
+  variant = "default",
 }: PipelineCanvasProps) {
+  const isDesigner = variant === "designer";
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const useLocalDraft = !pipelineId;
@@ -598,12 +602,20 @@ function FlowCanvas({
   ]);
 
   if (!mounted) {
-    return <div className="h-full min-h-[420px] animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />;
+    return (
+      <div
+        className={
+          isDesigner
+            ? "h-full min-h-0 animate-pulse bg-slate-100 dark:bg-slate-800"
+            : "h-full min-h-[420px] animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800"
+        }
+      />
+    );
   }
 
   return (
     <CanvasBindingsProvider value={bindingsContext}>
-    <div className="flex h-full min-h-[420px] flex-col">
+    <div className={isDesigner ? "flex h-full min-h-0 flex-col" : "flex h-full min-h-[420px] flex-col"}>
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50/90 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/80">
         <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Add</span>
         <button
@@ -683,41 +695,43 @@ function FlowCanvas({
         ) : null}
         <input ref={fileRef} type="file" accept="application/json" className="hidden" onChange={onImportFile} />
       </div>
-      <p className="border-b border-slate-200 bg-slate-50/70 px-3 py-2 text-[11px] leading-snug text-slate-600 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
-        <span className="font-medium text-slate-700 dark:text-slate-300">Runnable pipeline</span> — This editor is the
-        pipeline: extract → load (add a <strong className="font-medium text-slate-700 dark:text-slate-300">transform</strong>{" "}
-        node if you model in the warehouse). Stored with your connection in{" "}
-        <code className="rounded bg-slate-200/80 px-1 text-[10px] dark:bg-slate-800">source_configuration</code>{" "}
-        (including{" "}
-        <code className="rounded bg-slate-200/80 px-1 text-[10px] dark:bg-slate-800">canvas</code> for the graph).
-        Select a node to edit its settings in the side panel; the same fields exist in the{" "}
-        {pipelineId ? (
-          <a
-            href={`/builder?pipeline=${encodeURIComponent(pipelineId)}`}
-            className="font-medium text-sky-600 hover:underline dark:text-sky-400"
-          >
-            form builder
-          </a>
-        ) : (
-          "form builder"
-        )}
-        .{" "}
-        {pipelineId && onSave ? (
-          <>
-            <strong className="font-medium text-slate-700 dark:text-slate-300">Save to pipeline</strong> and{" "}
-            <strong className="font-medium text-slate-700 dark:text-slate-300">Export JSON</strong> run a quick
-            validation (connected graph, connector types when a pipeline is open, transform approach). Wiring: extract →
-            load → optional transform chain. After a transform, only another transform may follow. Remove nodes with the
-            toolbar, or Backspace / Delete.
-          </>
-        ) : (
-          <>
-            Scratch canvas: export or rely on local draft until you attach a pipeline. Export checks the same rules as
-            save (graph connectivity and transform setup). Wiring: extract → load → optional transforms. Remove nodes
-            with the toolbar, or Backspace / Delete.
-          </>
-        )}
-      </p>
+      {!isDesigner ? (
+        <p className="border-b border-slate-200 bg-slate-50/70 px-3 py-2 text-[11px] leading-snug text-slate-600 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
+          <span className="font-medium text-slate-700 dark:text-slate-300">Runnable pipeline</span> — This editor is the
+          pipeline: extract → load (add a <strong className="font-medium text-slate-700 dark:text-slate-300">transform</strong>{" "}
+          node if you model in the warehouse). Stored with your connection in{" "}
+          <code className="rounded bg-slate-200/80 px-1 text-[10px] dark:bg-slate-800">source_configuration</code>{" "}
+          (including{" "}
+          <code className="rounded bg-slate-200/80 px-1 text-[10px] dark:bg-slate-800">canvas</code> for the graph).
+          Select a node to edit its settings in the side panel; the same fields exist in the{" "}
+          {pipelineId ? (
+            <a
+              href={`/builder?pipeline=${encodeURIComponent(pipelineId)}`}
+              className="font-medium text-sky-600 hover:underline dark:text-sky-400"
+            >
+              form builder
+            </a>
+          ) : (
+            "form builder"
+          )}
+          .{" "}
+          {pipelineId && onSave ? (
+            <>
+              <strong className="font-medium text-slate-700 dark:text-slate-300">Save to pipeline</strong> and{" "}
+              <strong className="font-medium text-slate-700 dark:text-slate-300">Export JSON</strong> run a quick
+              validation (connected graph, connector types when a pipeline is open, transform approach). Wiring: extract →
+              load → optional transform chain. After a transform, only another transform may follow. Remove nodes with the
+              toolbar, or Backspace / Delete.
+            </>
+          ) : (
+            <>
+              Scratch canvas: export or rely on local draft until you attach a pipeline. Export checks the same rules as
+              save (graph connectivity and transform setup). Wiring: extract → load → optional transforms. Remove nodes
+              with the toolbar, or Backspace / Delete.
+            </>
+          )}
+        </p>
+      ) : null}
       {bindingsError ? (
         <p className="border-b border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
           {bindingsError}
@@ -760,11 +774,14 @@ function FlowCanvas({
           className="bg-slate-50 dark:bg-slate-950"
         >
           <Background gap={20} size={1} />
-          <Controls />
+          <Controls position={isDesigner ? "top-left" : "bottom-left"} />
           <MiniMap
+            position={isDesigner ? "top-right" : "bottom-right"}
             className="!bg-white/90 dark:!bg-slate-900/90"
             maskColor="rgba(0,0,0,0.12)"
             nodeStrokeWidth={2}
+            pannable={!isDesigner}
+            zoomable={!isDesigner}
           />
         </ReactFlow>
         {showEmptyStateOverlay && emptyStateOverlay ? (
@@ -778,11 +795,18 @@ function FlowCanvas({
   );
 }
 
-export function PipelineCanvas(props: PipelineCanvasProps) {
+export function PipelineCanvas({ variant = "default", ...props }: PipelineCanvasProps) {
+  const isDesigner = variant === "designer";
   return (
     <ReactFlowProvider>
-      <div className="h-[max(28rem,min(calc(100dvh-9rem),56rem))] w-full min-h-[28rem] overflow-hidden rounded-xl border border-slate-200 shadow-inner dark:border-slate-700">
-        <FlowCanvas {...props} />
+      <div
+        className={
+          isDesigner
+            ? "h-full min-h-0 w-full overflow-hidden border-0"
+            : "h-[max(28rem,min(calc(100dvh-9rem),56rem))] w-full min-h-[28rem] overflow-hidden rounded-xl border border-slate-200 shadow-inner dark:border-slate-700"
+        }
+      >
+        <FlowCanvas variant={variant} {...props} />
       </div>
     </ReactFlowProvider>
   );

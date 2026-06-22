@@ -1015,9 +1015,10 @@ export function CanvasPageClient() {
           onAddDestination={() => canvasControlRef.current?.addDestinationNode()}
         />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1">
+          <div className="min-h-0 flex-1 overflow-hidden">
             <PipelineCanvas
               key={selectedId}
+              variant="designer"
               pipelineId={selectedId}
               loadedGraph={loadedGraph}
               graphRevision={loadedSig}
