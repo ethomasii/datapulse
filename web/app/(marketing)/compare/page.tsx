@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CheckCircle, Code2, GitBranch, Server, Wallet, XCircle } from "lucide-react";
+import { ArrowRight, CheckCircle, Code2, GitBranch, Server, Wallet } from "lucide-react";
 import { COMPETITORS } from "@/lib/marketing/competitors";
 
 export const metadata: Metadata = {
