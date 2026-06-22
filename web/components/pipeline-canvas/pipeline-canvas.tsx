@@ -26,6 +26,8 @@ import {
 } from "@xyflow/react";
 import { useTheme } from "next-themes";
 import { Download, Loader2, Plus, RotateCcw, Save, Trash2, Upload } from "lucide-react";
+import { AddTransformMenu } from "./add-transform-menu";
+import type { ComponentListItem } from "@/components/elt/component-palette";
 import { CanvasBindingsProvider, type CanvasBindingsContextValue } from "./canvas-bindings-context";
 import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-graph";
 import { isValidPipelineCanvasEdge } from "@/lib/elt/canvas-component-sync";
@@ -311,6 +313,23 @@ function FlowCanvas({
     [setNodes]
   );
 
+  const addCodeTransformNode = useCallback(
+    (tool: "dbt" | "sql" | "python") => {
+      const presets: Record<typeof tool, { label: string; hint: string }> = {
+        dbt: { label: "dbt transform", hint: "Link a dbt project — models run after load" },
+        sql: { label: "Warehouse SQL", hint: "CTAS / views against the destination after load" },
+        python: { label: "Python transform", hint: "Legacy dataframe on the worker" },
+      };
+      const preset = presets[tool];
+      addNode("transformNode", {
+        label: preset.label,
+        hint: preset.hint,
+        transformTool: tool,
+      });
+    },
+    [addNode]
+  );
+
   const addComponentNode = useCallback(
     (
       component: {
@@ -342,6 +361,13 @@ function FlowCanvas({
       );
     },
     [addNode]
+  );
+
+  const addNativeTransformNode = useCallback(
+    (component: ComponentListItem) => {
+      addComponentNode(component);
+    },
+    [addComponentNode]
   );
 
   const onDrop = useCallback(
@@ -573,14 +599,7 @@ function FlowCanvas({
           <Plus className="h-3.5 w-3.5" />
           Destination
         </button>
-        <button
-          type="button"
-          onClick={() => addNode("transformNode")}
-          className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-950 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-900/40"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Transform
-        </button>
+        <AddTransformMenu onAddNative={addNativeTransformNode} onAddCode={addCodeTransformNode} />
         <div className="mx-1 h-4 w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
         <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Selection</span>
         <button

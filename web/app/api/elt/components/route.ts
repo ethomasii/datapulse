@@ -23,6 +23,7 @@ export async function GET(req: Request) {
   const category = url.searchParams.get("category") ?? undefined;
   const compileTarget = url.searchParams.get("compileTarget") as ComponentCompileTarget | null;
   const executableOnly = url.searchParams.get("executableOnly") === "1";
+  const nativeOnly = url.searchParams.get("nativeOnly") === "1";
   const includePackages = url.searchParams.get("includePackages") === "1";
   const limit = Number(url.searchParams.get("limit") ?? "50");
   const offset = Number(url.searchParams.get("offset") ?? "0");
@@ -32,6 +33,7 @@ export async function GET(req: Request) {
     category,
     compileTarget: compileTarget ?? undefined,
     executableOnly,
+    nativeOnly,
     limit: Number.isFinite(limit) ? limit : 50,
     offset: Number.isFinite(offset) ? offset : 0,
   });
@@ -75,6 +77,9 @@ export async function GET(req: Request) {
   if (executableOnly) {
     merged = merged.filter((c) => c.isExecutable);
   }
+  if (nativeOnly) {
+    merged = merged.filter((c) => c.isNative);
+  }
 
   const executableCatalogCount = listComponents({ executableOnly: true, limit: 1 }).total;
 
@@ -89,7 +94,7 @@ export async function GET(req: Request) {
       ...(await loadWorkspaceCatalogUrls(user.id)),
     ],
     categories: listComponentCategories(),
-    total: executableOnly ? merged.length : total + packageAsList.length,
+    total: executableOnly || nativeOnly ? merged.length : total + packageAsList.length,
     components: merged.slice(0, Number.isFinite(limit) ? limit : 50),
   });
 }

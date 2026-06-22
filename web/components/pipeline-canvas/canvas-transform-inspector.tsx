@@ -66,8 +66,9 @@ export function CanvasTransformInspector({
   return (
     <div className="space-y-4">
       <p className="text-xs text-slate-600 dark:text-slate-400">
-        Transform step for this pipeline — use <strong className="font-medium text-slate-800 dark:text-slate-200">Save to pipeline</strong>{" "}
-        on the toolbar to persist the graph.
+        Code transform — dbt, warehouse SQL, or legacy Python. For{" "}
+        <strong className="font-medium text-violet-800 dark:text-violet-200">native</strong> steps (cleanse, join,
+        aggregate), use <strong className="font-medium">Native</strong> on the canvas toolbar or the catalog below.
       </p>
       <label className="block text-xs font-medium text-amber-900 dark:text-amber-100">
         Approach

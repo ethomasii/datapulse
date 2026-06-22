@@ -70,6 +70,8 @@ export function listComponents(filters?: {
   compileTarget?: ComponentCompileTarget;
   /** When true, only native catalog ids + caller merges package components separately. */
   executableOnly?: boolean;
+  /** When true, only components with an eltPulse native compiler. */
+  nativeOnly?: boolean;
   limit?: number;
   offset?: number;
 }): { items: ComponentListItem[]; total: number } {
@@ -95,6 +97,10 @@ export function listComponents(filters?: {
 
   if (filters?.executableOnly) {
     items = items.filter((c) => c.isExecutable);
+  }
+
+  if (filters?.nativeOnly) {
+    items = items.filter((c) => c.isNative);
   }
 
   if (filters?.compileTarget) {

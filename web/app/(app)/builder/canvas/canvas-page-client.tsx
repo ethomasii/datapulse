@@ -756,8 +756,9 @@ export function CanvasPageClient() {
           <div className={stickyHeaderClass}>
             <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Transform</h2>
             <p className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-400">
-              Transform step for this pipeline. Use <strong className="font-medium">Save to pipeline</strong> on the canvas
-              toolbar to persist the graph.
+              Code transform (dbt / SQL / Python). Native steps — cleanse, join, aggregate — use{" "}
+              <strong className="font-medium text-violet-800 dark:text-violet-200">Native</strong> on the toolbar or the
+              catalog below.
             </p>
           </div>
           <CanvasTransformInspector
@@ -1354,14 +1355,20 @@ export function CanvasPageClient() {
                         onPipelinePatched={() => void loadPipelineGraph(selectedId)}
                       />
                     </div>
-                    <ComponentPalette
-                      className="mb-4 h-[280px] lg:h-[320px]"
-                      transformDesigner
-                      onSelect={(c) => canvasControlRef.current?.addComponentNode(c)}
-                    />
                   </>
                 ) : null}
-                {renderCanvasInspectorPanel(inspectorFocus)}
+                {canvasView === "designer" ? renderCanvasInspectorPanel(inspectorFocus) : null}
+                {canvasView === "designer" ? (
+                  <ComponentPalette
+                    id="canvas-component-palette"
+                    className={clsx(
+                      "mt-4",
+                      inspectorFocus.kind === "none" ? "h-[280px] lg:h-[320px]" : "h-[240px]"
+                    )}
+                    transformDesigner
+                    onSelect={(c) => canvasControlRef.current?.addComponentNode(c)}
+                  />
+                ) : null}
               </aside>
             </>
           )}

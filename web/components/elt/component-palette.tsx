@@ -31,8 +31,11 @@ type Props = {
   categoryFilter?: string;
   compileTargetFilter?: string;
   className?: string;
+  id?: string;
   /** Default to transform + quality tabs (canvas designer). */
   transformDesigner?: boolean;
+  /** When true, only show components with a native eltPulse compiler. */
+  nativeOnly?: boolean;
 };
 
 const ALL_PALETTE_TABS = [
@@ -55,7 +58,9 @@ export function ComponentPalette({
   categoryFilter,
   compileTargetFilter,
   className,
+  id,
   transformDesigner = false,
+  nativeOnly = false,
 }: Props) {
   const tabs = transformDesigner ? TRANSFORM_PALETTE_TABS : ALL_PALETTE_TABS;
   const initialCategory = categoryFilter ?? (transformDesigner ? "transformation" : "");
@@ -70,8 +75,12 @@ export function ComponentPalette({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ limit: "60", includePackages: "1" });
+      const params = new URLSearchParams({
+        limit: nativeOnly ? "120" : "60",
+        includePackages: nativeOnly ? "0" : "1",
+      });
       if (executableOnly) params.set("executableOnly", "1");
+      if (nativeOnly) params.set("nativeOnly", "1");
       if (q.trim()) params.set("q", q.trim());
       if (category) params.set("category", category);
       if (compileTargetFilter) params.set("compileTarget", compileTargetFilter);
@@ -82,13 +91,14 @@ export function ComponentPalette({
         total: number;
         categories: { category: string; count: number }[];
       };
-      setItems(data.components ?? []);
-      setTotal(data.total ?? 0);
+      let components = data.components ?? [];
+      setItems(components);
+      setTotal(data.total ?? components.length);
       setCategories(data.categories ?? []);
     } finally {
       setLoading(false);
     }
-  }, [q, category, compileTargetFilter, executableOnly]);
+  }, [q, category, compileTargetFilter, executableOnly, nativeOnly]);
 
   useEffect(() => {
     const t = setTimeout(() => void load(), 200);
@@ -111,15 +121,22 @@ export function ComponentPalette({
   );
 
   return (
-    <div className={className ?? "flex h-full flex-col rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"}>
+    <div
+      id={id}
+      className={className ?? "flex h-full flex-col rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"}
+    >
       <div className="border-b border-slate-200 p-3 dark:border-slate-700">
-        <p className="text-sm font-semibold text-slate-900 dark:text-white">Component catalog</p>
+        <p className="text-sm font-semibold text-slate-900 dark:text-white">
+          {nativeOnly ? "Native transforms" : "Component catalog"}
+        </p>
         <p className="mt-0.5 text-xs text-slate-500">
-          {transformDesigner
-            ? `${total} transform components — warehouse SQL default; legacy dataframe optional`
-            : executableOnly
-              ? `${total} executable components — faithful compilers only`
-              : `${total} templates — drag onto canvas or click to add`}
+          {nativeOnly
+            ? `${total} native compilers — cleanse, join, aggregate, checks, …`
+            : transformDesigner
+              ? `${total} transform components — click native (violet) or code (amber) on toolbar`
+              : executableOnly
+                ? `${total} executable components — faithful compilers only`
+                : `${total} templates — drag onto canvas or click to add`}
         </p>
         <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
           <input
