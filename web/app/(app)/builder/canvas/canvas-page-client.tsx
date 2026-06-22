@@ -7,6 +7,7 @@ import type { Edge, Node } from "@xyflow/react";
 import { Loader2, Plus } from "lucide-react";
 import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 import { CanvasPreviewPanel } from "@/components/pipeline-canvas/canvas-preview-panel";
+import { DesignerFullscreenShell } from "@/components/pipeline-canvas/designer-fullscreen-shell";
 import { DesignerMobileChrome } from "@/components/pipeline-canvas/designer-mobile-chrome";
 import { GenieCanvasBar } from "@/components/pipeline-canvas/genie-canvas-bar";
 import { OperatorsSidebar } from "@/components/pipeline-canvas/operators-sidebar";
@@ -1001,15 +1002,123 @@ export function CanvasPageClient() {
   );
   const showDockedInspector =
     pipelines.length > 0 && Boolean(selectedId) && !detailLoading && canvasView === "ingest";
+  const isDesignerFullscreen =
+    canvasView === "designer" && pipelines.length > 0 && Boolean(selectedId);
+
+  function renderDesignerWorkspace() {
+    return (
+      <div className="flex h-full min-h-0 flex-col overflow-hidden lg:flex-row">
+        <OperatorsSidebar
+          className="hidden h-full w-[220px] shrink-0 xl:w-[260px] 2xl:w-[300px] lg:flex"
+          onSelect={(c) => canvasControlRef.current?.addComponentNode(c)}
+          onAddSource={() => canvasControlRef.current?.addSourceNode()}
+          onAddDestination={() => canvasControlRef.current?.addDestinationNode()}
+        />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1">
+            <PipelineCanvas
+              key={selectedId}
+              pipelineId={selectedId}
+              loadedGraph={loadedGraph}
+              graphRevision={loadedSig}
+              onSave={handleSave}
+              saving={saving}
+              saveError={saveError}
+              saveDisabled={!canWrite}
+              pipelineSourceType={pipelineSourceType}
+              pipelineDestinationType={pipelineDestinationType}
+              onPickSourceType={(t) => void patchPipelineBindings({ sourceType: t })}
+              onPickDestinationType={(t) => void patchPipelineBindings({ destinationType: t })}
+              bindingsBusy={bindingsBusy}
+              bindingsError={bindingsError}
+              canvasControlRef={canvasControlRef}
+              onInspectorFocusChange={setInspectorFocus}
+              onGraphStatsChange={({ componentNodeCount: count }) => setComponentNodeCount(count)}
+              showEmptyStateOverlay={componentNodeCount === 0}
+              emptyStateOverlay={
+                <LakeStarterChips
+                  variant="overlay"
+                  defaultSourceTable={lakeDefaultSourceTable}
+                  existingCanvas={existingCanvasGraph}
+                  onApply={handleLakeStarterApply}
+                />
+              }
+            />
+          </div>
+          <GenieCanvasBar
+            pipelineId={selectedId}
+            selectedLabel={selectedStepLabel}
+            canvasNode={canvasGenieNode}
+            onPipelinePatched={() => void loadPipelineGraph(selectedId)}
+          />
+          <CanvasPreviewPanel
+            pipelineId={selectedId}
+            focus={inspectorFocus}
+            liveConfig={liveStepConfig}
+            className="h-48 shrink-0 xl:h-56 2xl:h-64"
+          />
+          <DesignerMobileChrome
+            operators={
+              <OperatorsSidebar
+                className="h-full border-0"
+                onSelect={(c) => canvasControlRef.current?.addComponentNode(c)}
+                onAddSource={() => canvasControlRef.current?.addSourceNode()}
+                onAddDestination={() => canvasControlRef.current?.addDestinationNode()}
+              />
+            }
+            config={
+              <div className="p-4">
+                {starterNotice ? (
+                  <div className="mb-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-100">
+                    <p>{starterNotice}</p>
+                  </div>
+                ) : null}
+                {renderCanvasInspectorPanel(inspectorFocus)}
+                {inspectorFocus.kind === "none" ? (
+                  <LakeStarterGallery
+                    compact
+                    className="mt-4"
+                    defaultSourceTable={lakeDefaultSourceTable}
+                    existingCanvas={existingCanvasGraph}
+                    onApplyToCanvas={handleLakeStarterApply}
+                  />
+                ) : null}
+              </div>
+            }
+          />
+        </div>
+        <aside
+          className="hidden h-full w-[320px] shrink-0 overflow-y-auto overscroll-contain border-l border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/95 xl:w-[360px] 2xl:w-[420px] lg:block"
+          aria-label="Operator configuration"
+        >
+          {starterNotice ? (
+            <div className="mb-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-100">
+              <p>{starterNotice}</p>
+            </div>
+          ) : null}
+          {renderCanvasInspectorPanel(inspectorFocus)}
+          {inspectorFocus.kind === "none" ? (
+            <LakeStarterGallery
+              compact
+              className="mt-4"
+              defaultSourceTable={lakeDefaultSourceTable}
+              existingCanvas={existingCanvasGraph}
+              onApplyToCanvas={handleLakeStarterApply}
+            />
+          ) : null}
+        </aside>
+      </div>
+    );
+  }
 
   return (
     <AppPage
       width="full"
       className={clsx("space-y-6", showDockedInspector && "lg:pr-[380px]")}
     >
-      <AppPageHeader title="Visual pipeline canvas" />
+      {!isDesignerFullscreen ? <AppPageHeader title="Visual pipeline canvas" /> : null}
 
-      {!canWrite && permissions ? (
+      {!isDesignerFullscreen && !canWrite && permissions ? (
         <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
           Read-only workspace role ({permissions.role}) — you can browse the canvas but cannot save pipeline changes.
         </p>
@@ -1118,7 +1227,7 @@ export function CanvasPageClient() {
               </form>
             )}
 
-            {pipelines.length > 0 ? (
+            {pipelines.length > 0 && !isDesignerFullscreen ? (
               <div className="mt-4 flex max-w-2xl flex-col gap-3 sm:flex-row sm:items-end sm:flex-wrap">
                 <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-sm">
                   <span className="font-medium text-slate-700 dark:text-slate-300">Pipeline</span>
@@ -1164,7 +1273,7 @@ export function CanvasPageClient() {
         )}
       </div>
 
-      {pipelines.length > 0 && selectedId ? (
+      {pipelines.length > 0 && selectedId && !isDesignerFullscreen ? (
         <div className="w-full min-w-0">
           {detailLoading ? (
             <div className="flex h-[max(28rem,min(calc(100dvh-8rem),56rem))] items-center justify-center rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50">
@@ -1214,114 +1323,10 @@ export function CanvasPageClient() {
                 <span className="text-xs text-slate-500">
                   {canvasView === "ingest"
                     ? "Source → landing tables · configure extract in the sidebar"
-                    : canvasView === "dag"
-                      ? "Transform dependency graph from component edges → after[]"
-                      : "Lakeflow-style designer — operators left · canvas center · config right · preview below"}
+                    : "Transform dependency graph from component edges → after[]"}
                 </span>
               </div>
-              {canvasView === "designer" ? (
-              <div className="-mx-4 flex min-h-[calc(100dvh-13rem)] w-[calc(100%+2rem)] flex-col overflow-hidden rounded-none border-y border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950 sm:-mx-6 sm:w-[calc(100%+3rem)] lg:-mx-8 lg:h-[calc(100dvh-12rem)] lg:min-h-[calc(100dvh-12rem)] lg:w-[calc(100%+4rem)] lg:flex-row lg:rounded-xl lg:border">
-                <OperatorsSidebar
-                  className="hidden h-full w-[220px] shrink-0 xl:w-[260px] 2xl:w-[300px] lg:flex"
-                  onSelect={(c) => canvasControlRef.current?.addComponentNode(c)}
-                  onAddSource={() => canvasControlRef.current?.addSourceNode()}
-                  onAddDestination={() => canvasControlRef.current?.addDestinationNode()}
-                />
-                <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                  <div className="min-h-0 flex-1">
-                    <PipelineCanvas
-                      key={selectedId}
-                      pipelineId={selectedId}
-                      loadedGraph={loadedGraph}
-                      graphRevision={loadedSig}
-                      onSave={handleSave}
-                      saving={saving}
-                      saveError={saveError}
-                      saveDisabled={!canWrite}
-                      pipelineSourceType={pipelineSourceType}
-                      pipelineDestinationType={pipelineDestinationType}
-                      onPickSourceType={(t) => void patchPipelineBindings({ sourceType: t })}
-                      onPickDestinationType={(t) => void patchPipelineBindings({ destinationType: t })}
-                      bindingsBusy={bindingsBusy}
-                      bindingsError={bindingsError}
-                      canvasControlRef={canvasControlRef}
-                      onInspectorFocusChange={setInspectorFocus}
-                      onGraphStatsChange={({ componentNodeCount: count }) => setComponentNodeCount(count)}
-                      showEmptyStateOverlay={componentNodeCount === 0}
-                      emptyStateOverlay={
-                        <LakeStarterChips
-                          variant="overlay"
-                          defaultSourceTable={lakeDefaultSourceTable}
-                          existingCanvas={existingCanvasGraph}
-                          onApply={handleLakeStarterApply}
-                        />
-                      }
-                    />
-                  </div>
-                  <GenieCanvasBar
-                    pipelineId={selectedId}
-                    selectedLabel={selectedStepLabel}
-                    canvasNode={canvasGenieNode}
-                    onPipelinePatched={() => void loadPipelineGraph(selectedId)}
-                  />
-                  <CanvasPreviewPanel
-                    pipelineId={selectedId}
-                    focus={inspectorFocus}
-                    liveConfig={liveStepConfig}
-                    className="h-48 shrink-0 xl:h-56 2xl:h-64"
-                  />
-                  <DesignerMobileChrome
-                    operators={
-                      <OperatorsSidebar
-                        className="h-full border-0"
-                        onSelect={(c) => canvasControlRef.current?.addComponentNode(c)}
-                        onAddSource={() => canvasControlRef.current?.addSourceNode()}
-                        onAddDestination={() => canvasControlRef.current?.addDestinationNode()}
-                      />
-                    }
-                    config={
-                      <div className="p-4">
-                        {starterNotice ? (
-                          <div className="mb-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-100">
-                            <p>{starterNotice}</p>
-                          </div>
-                        ) : null}
-                        {renderCanvasInspectorPanel(inspectorFocus)}
-                        {inspectorFocus.kind === "none" ? (
-                          <LakeStarterGallery
-                            compact
-                            className="mt-4"
-                            defaultSourceTable={lakeDefaultSourceTable}
-                            existingCanvas={existingCanvasGraph}
-                            onApplyToCanvas={handleLakeStarterApply}
-                          />
-                        ) : null}
-                      </div>
-                    }
-                  />
-                </div>
-                <aside
-                  className="hidden h-full w-[320px] shrink-0 overflow-y-auto overscroll-contain border-l border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/95 xl:w-[360px] 2xl:w-[420px] lg:block"
-                  aria-label="Operator configuration"
-                >
-                  {starterNotice ? (
-                    <div className="mb-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-100">
-                      <p>{starterNotice}</p>
-                    </div>
-                  ) : null}
-                  {renderCanvasInspectorPanel(inspectorFocus)}
-                  {inspectorFocus.kind === "none" ? (
-                    <LakeStarterGallery
-                      compact
-                      className="mt-4"
-                      defaultSourceTable={lakeDefaultSourceTable}
-                      existingCanvas={existingCanvasGraph}
-                      onApplyToCanvas={handleLakeStarterApply}
-                    />
-                  ) : null}
-                </aside>
-              </div>
-              ) : canvasView === "ingest" ? (
+              {canvasView === "ingest" ? (
               <>
               <IngestPanel
                 pipelineId={selectedId}
@@ -1425,6 +1430,25 @@ export function CanvasPageClient() {
             </>
           )}
         </div>
+      ) : null}
+
+      {isDesignerFullscreen ? (
+        <DesignerFullscreenShell
+          pipelines={pipelines}
+          selectedId={selectedId}
+          selectedName={selectedName}
+          canvasView={canvasView}
+          onCanvasViewChange={setCanvasView}
+          onPipelineChange={setSelectedId}
+          onNewPipeline={() => {
+            setShowNewPipelineForm(true);
+            setCreateError(null);
+            setCanvasView("ingest");
+          }}
+          loading={detailLoading}
+        >
+          {renderDesignerWorkspace()}
+        </DesignerFullscreenShell>
       ) : null}
     </AppPage>
   );
