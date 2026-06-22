@@ -4,9 +4,9 @@ import { ArrowRight, CheckCircle, Code2, GitBranch, Server, Wallet, XCircle } fr
 import { COMPETITORS } from "@/lib/marketing/competitors";
 
 export const metadata: Metadata = {
-  title: "Compare — eltPulse vs Fivetran, Airbyte, Hevo & other ELT tools",
+  title: "Compare — eltPulse vs Fivetran, Airbyte, Matillion, Meltano & other ELT tools",
   description:
-    "Honest comparisons: how eltPulse relates to Fivetran, Airbyte, Hevo, and other managed ELT approaches — git-native control plane, BYO compute, and transparent pricing.",
+    "Honest comparisons: eltPulse vs Fivetran, Airbyte, Hevo, Matillion, Maia, Meltano, Stitch, Portable, dbt Cloud, and more — git-native control plane, BYO compute, transparent pricing.",
 };
 
 const HIGHLIGHTS = [
@@ -44,9 +44,9 @@ export default function ComparePage() {
             eltPulse vs. the alternatives
           </h1>
           <p className="mt-6 text-lg text-slate-600 dark:text-slate-400">
-            Buyers compare Fivetran, Airbyte, Hevo, Matillion, Meltano, and dozens of others. None are wrong — they
-            optimize for different constraints. This page situates eltPulse honestly: a git-native control plane with
-            transparent usage economics and BYO execution.
+            Buyers compare Fivetran, Airbyte, Hevo, Matillion, Maia, Meltano, Stitch, Portable, dbt Cloud, and dozens
+            of others. None are wrong — they optimize for different constraints. This page situates eltPulse honestly: a
+            git-native control plane with transparent usage economics and BYO execution.
           </p>
         </div>
       </section>
