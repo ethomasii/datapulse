@@ -19,6 +19,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "pipeline.created": "Pipeline created",
   "pipeline.updated": "Pipeline updated",
   "pipeline.deleted": "Pipeline deleted",
+  "billing.payment_failed": "Billing payment failed",
+  "security.new_device_sign_in": "New device sign-in",
 };
 
 export function formatAuditAction(action: string): string {

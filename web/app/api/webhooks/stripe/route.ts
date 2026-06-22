@@ -10,6 +10,8 @@ import {
   clearDedicatedComputeBilling,
   syncDedicatedComputeFromStripeSubscription,
 } from "@/lib/billing/dedicated-compute-subscription";
+import { emitBillingPaymentFailed } from "@/lib/notifications/emit";
+import { recordWorkspaceAuditForUser } from "@/lib/audit/workspace-audit";
 
 function getStripe(): Stripe | null {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -77,10 +79,12 @@ function isDedicatedComputeSubscription(sub: Stripe.Subscription): boolean {
 async function syncWorkspacePlanSubscription(
   sub: Stripe.Subscription,
   customerId: string,
-  eventType: string
+  eventType: string,
+  previousStatus?: Stripe.Subscription.Status | null
 ): Promise<void> {
   const userSub = await db.subscription.findFirst({
     where: { stripeCustomerId: customerId },
+    include: { user: { select: { id: true } } },
   });
   if (!userSub) return;
 
@@ -109,15 +113,32 @@ async function syncWorkspacePlanSubscription(
   }
   if (tier === null) return;
 
+  const mappedStatus = mapSubscriptionStatus(sub.status);
+
   await db.subscription.update({
     where: { id: userSub.id },
     data: {
       stripeSubscriptionId: sub.id,
-      status: mapSubscriptionStatus(sub.status),
+      status: mappedStatus,
       tier,
       currentPeriodEnd: subscriptionPeriodEnd(sub),
     },
   });
+
+  if (
+    mappedStatus === "past_due" &&
+    previousStatus &&
+    previousStatus !== "past_due" &&
+    previousStatus !== "unpaid"
+  ) {
+    const details = `Your eltPulse ${tier} subscription payment failed — update your payment method to avoid service interruption.`;
+    void emitBillingPaymentFailed(userSub.user.id, details);
+    void recordWorkspaceAuditForUser({
+      userId: userSub.user.id,
+      action: "billing.payment_failed",
+      detail: { tier, stripeStatus: sub.status },
+    });
+  }
 }
 
 async function syncDedicatedComputeSubscription(
@@ -164,14 +185,36 @@ export async function POST(request: Request) {
     case "customer.subscription.updated":
     case "customer.subscription.deleted": {
       const sub = event.data.object as Stripe.Subscription;
+      const previous = (event.data as { previous_attributes?: { status?: Stripe.Subscription.Status } })
+        .previous_attributes?.status;
       const customerId =
         typeof sub.customer === "string" ? sub.customer : sub.customer.id;
 
       if (isDedicatedComputeSubscription(sub)) {
         await syncDedicatedComputeSubscription(sub, event.type);
       } else {
-        await syncWorkspacePlanSubscription(sub, customerId, event.type);
+        await syncWorkspacePlanSubscription(sub, customerId, event.type, previous ?? null);
       }
+      break;
+    }
+    case "invoice.payment_failed": {
+      const invoice = event.data.object as Stripe.Invoice;
+      const customerId =
+        typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+      if (!customerId) break;
+      const userSub = await db.subscription.findFirst({
+        where: { stripeCustomerId: customerId },
+        include: { user: { select: { id: true } } },
+      });
+      if (!userSub?.user) break;
+      const amount = invoice.amount_due ? `$${(invoice.amount_due / 100).toFixed(2)}` : "your invoice";
+      const details = `Payment failed for ${amount}. Update your payment method in billing settings.`;
+      void emitBillingPaymentFailed(userSub.user.id, details);
+      void recordWorkspaceAuditForUser({
+        userId: userSub.user.id,
+        action: "billing.payment_failed",
+        detail: { invoiceId: invoice.id, amountDue: invoice.amount_due },
+      });
       break;
     }
     case "checkout.session.completed": {

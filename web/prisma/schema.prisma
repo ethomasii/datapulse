@@ -98,6 +98,10 @@ enum NotificationTrigger {
   pipeline_deleted
   billing_payment_failed
   security_new_device
+  sla_at_risk
+  sla_breached
+  contract_expiring
+  catalog_contract_violated
 }
 
 model User {
@@ -128,6 +132,8 @@ model User {
   notificationQuietStart        String? @map("notification_quiet_start")
   notificationQuietEnd          String? @map("notification_quiet_end")
   notificationQuietTimezone     String? @map("notification_quiet_timezone")
+  /// Clerk session client_ids seen before — used for new-device sign-in alerts.
+  knownSignInClientIds Json @default("[]") @map("known_sign_in_client_ids")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -446,6 +452,12 @@ model DataContract {
   status            String   @default("draft")
   /// Max hours since last successful pipeline run before contract is "stale".
   freshnessSlaHours Int?     @map("freshness_sla_hours")
+  /// Optional contract review / renewal date for expiry reminders.
+  expiresAt         DateTime? @map("expires_at")
+  /// Days-before-expiry reminders already sent (e.g. 60, 30, 14).
+  expiryRemindersSent Int[]  @default([]) @map("expiry_reminders_sent")
+  /// Last evaluated freshness SLA health: ok | at_risk | breached
+  lastSlaStatus     String?  @map("last_sla_status")
   /// Expected columns: [{ name, type?, required?, description? }]
   schemaSpec        Json     @default("[]") @map("schema_spec")
   createdAt         DateTime @default(now()) @map("created_at")
@@ -773,6 +785,7 @@ model NotificationEvent {
   user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   runId         String?             @map("run_id")
   pipelineId    String?             @map("pipeline_id")
+  contractId    String?             @map("contract_id")
   channel       NotificationChannel
   trigger       NotificationTrigger
   subject       String

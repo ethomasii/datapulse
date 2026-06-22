@@ -9,6 +9,10 @@ export const TRIGGER_LABELS: Record<NotificationTrigger, string> = {
   pipeline_deleted: "Pipeline deleted",
   billing_payment_failed: "Billing payment failed",
   security_new_device: "Security — new device sign-in",
+  sla_at_risk: "Data contract SLA at risk",
+  sla_breached: "Data contract SLA breached",
+  contract_expiring: "Data contract expiring",
+  catalog_contract_violated: "Data contract violated",
 };
 
 export const TRIGGER_GROUPS: Array<{
@@ -26,6 +30,15 @@ export const TRIGGER_GROUPS: Array<{
   {
     title: "Observability",
     items: [{ value: "alert_rule_fired", label: TRIGGER_LABELS.alert_rule_fired }],
+  },
+  {
+    title: "Data contracts & SLA",
+    items: [
+      { value: "sla_at_risk", label: TRIGGER_LABELS.sla_at_risk },
+      { value: "sla_breached", label: TRIGGER_LABELS.sla_breached },
+      { value: "contract_expiring", label: TRIGGER_LABELS.contract_expiring },
+      { value: "catalog_contract_violated", label: TRIGGER_LABELS.catalog_contract_violated },
+    ],
   },
   {
     title: "Workspace",

@@ -12,6 +12,7 @@ import { evaluateContractCompliance } from "@/lib/elt/data-contract";
 import { buildWorkspaceAssets } from "@/lib/elt/pipeline-assets";
 import { parseRunTelemetry, runTelemetryToJson } from "@/lib/elt/run-telemetry";
 import { deliverRunWebhook } from "@/lib/elt/run-webhook";
+import { emitContractSlaEvent } from "@/lib/notifications/emit";
 
 export type ContractViolation = {
   contractSlug: string;
@@ -120,6 +121,24 @@ export async function maybeDispatchContractAlerts(runId: string, userId: string)
       data: {
         telemetry: runTelemetryToJson({ ...tel, contractViolations: violations }) as Prisma.InputJsonValue,
       },
+    });
+  }
+
+  const summary = violations
+    .slice(0, 3)
+    .map((v) => `${v.contractName}: ${v.issues[0]}`)
+    .join("; ");
+  const primary = violations[0];
+  const contractRow = contracts.find((c) => c.slug === primary.contractSlug);
+  if (contractRow) {
+    await emitContractSlaEvent({
+      userId,
+      contractId: contractRow.id,
+      contractName: contractRow.name,
+      trigger: "catalog_contract_violated",
+      details: summary,
+      pipelineId: run.pipelineId,
+      runId: run.id,
     });
   }
 

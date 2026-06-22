@@ -7,7 +7,8 @@ export type RunNotificationPayload = {
   trigger: NotificationTrigger;
   pipelineName: string;
   pipelineId: string | null;
-  runId: string;
+  runId: string | null;
+  contractId?: string | null;
   environment: string;
   status: string;
   errorSummary: string | null;
