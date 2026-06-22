@@ -2,36 +2,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown } from "lucide-react";
+import { Activity, ChevronDown, Github, Menu, X } from "lucide-react";
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { isClerkConfigured } from "@/lib/clerk/is-configured";
+import { ELTPULSE_GITHUB_URL } from "@/lib/marketing/github-repo";
+import { ELT_COMPARE_COMPETITORS } from "@/lib/marketing/compare-competitors";
 
-const PRODUCT_LINKS = [
-  { href: "/connectors", label: "Connectors" },
-  { href: "/scenarios", label: "Scenarios" },
-  { href: "/dbt", label: "dbt transforms" },
-  { href: "/features", label: "Features" },
-  { href: "/compare", label: "Compare" },
-] as const;
-
-function NavDropdown({
-  label,
-  links,
-  active,
-}: {
-  label: string;
-  links: readonly { href: string; label: string }[];
-  active: boolean;
-}) {
+function CompareDropdown({ linkClass }: { linkClass: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const pathname = usePathname() ?? "";
+  const active = pathname === "/compare" || pathname.startsWith("/compare/");
 
   useEffect(() => {
-    function onDoc(e: MouseEvent) {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   return (
@@ -40,29 +31,39 @@ function NavDropdown({
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={clsx(
-          "inline-flex items-center gap-1 hover:text-slate-900 dark:hover:text-white",
+          "inline-flex items-center gap-1",
+          linkClass,
           active && "text-slate-900 dark:text-white"
         )}
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        {label}
-        <ChevronDown className={clsx("h-3.5 w-3.5 transition", open && "rotate-180")} />
+        Compare
+        <ChevronDown className={clsx("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
       </button>
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-2 min-w-[11rem] rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"
+          className="absolute left-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white py-2 shadow-xl dark:border-slate-800 dark:bg-slate-900"
         >
-          {links.map((link) => (
+          <Link
+            href="/compare"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+          >
+            All comparisons →
+          </Link>
+          <div className="my-1 border-t border-slate-200 dark:border-slate-800" />
+          {ELT_COMPARE_COMPETITORS.map((c) => (
             <Link
-              key={link.href}
-              href={link.href}
+              key={c.slug}
+              href="/compare"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+              className="block px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
             >
-              {link.label}
+              vs. {c.name}
             </Link>
           ))}
         </div>
@@ -71,25 +72,259 @@ function NavDropdown({
   );
 }
 
-export function MarketingNavLinks() {
-  const pathname = usePathname() ?? "";
-  const productActive = PRODUCT_LINKS.some((l) => pathname === l.href || pathname.startsWith(`${l.href}/`));
+function NavLink({
+  href,
+  children,
+  linkClass,
+  active,
+  onNavigate,
+}: {
+  href: string;
+  children: React.ReactNode;
+  linkClass: string;
+  active: boolean;
+  onNavigate?: () => void;
+}) {
+  return (
+    <Link href={href} onClick={onNavigate} className={clsx(linkClass, active && "text-slate-900 dark:text-white")}>
+      {children}
+    </Link>
+  );
+}
 
-  const linkClass = "hover:text-slate-900 dark:hover:text-white";
-  const activeClass = "text-slate-900 dark:text-white";
+export function MarketingNavLinks({ mobile = false, onNavigate }: { mobile?: boolean; onNavigate?: () => void }) {
+  const pathname = usePathname() ?? "";
+
+  const linkClass = mobile
+    ? "text-slate-600 dark:text-slate-400"
+    : "text-sm text-slate-600 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-white";
+
+  const isActive = (href: string, prefix = false) =>
+    prefix ? pathname === href || pathname.startsWith(`${href}/`) : pathname === href;
+
+  if (mobile) {
+    return (
+      <>
+        <NavLink href="/features" linkClass={linkClass} active={isActive("/features")} onNavigate={onNavigate}>
+          Features
+        </NavLink>
+        <NavLink href="/docs" linkClass={linkClass} active={isActive("/docs", true)} onNavigate={onNavigate}>
+          Docs
+        </NavLink>
+        <NavLink
+          href="/orchestrators"
+          linkClass={linkClass}
+          active={isActive("/orchestrators") || isActive("/docs/orchestration")}
+          onNavigate={onNavigate}
+        >
+          Orchestrators
+        </NavLink>
+        <NavLink href="/compare" linkClass={`${linkClass} font-medium`} active={isActive("/compare")} onNavigate={onNavigate}>
+          Compare
+        </NavLink>
+        {ELT_COMPARE_COMPETITORS.map((c) => (
+          <Link
+            key={c.slug}
+            href="/compare"
+            onClick={onNavigate}
+            className="pl-4 text-sm text-slate-500 dark:text-slate-500"
+          >
+            vs. {c.name}
+          </Link>
+        ))}
+        <NavLink href="/changelog" linkClass={linkClass} active={isActive("/changelog")} onNavigate={onNavigate}>
+          Changelog
+        </NavLink>
+        <NavLink
+          href="/security"
+          linkClass={linkClass}
+          active={isActive("/security") || isActive("/docs/security")}
+          onNavigate={onNavigate}
+        >
+          Security
+        </NavLink>
+        <NavLink href="/pricing" linkClass={linkClass} active={isActive("/pricing")} onNavigate={onNavigate}>
+          Pricing
+        </NavLink>
+        <a
+          href={ELTPULSE_GITHUB_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={onNavigate}
+          className={`inline-flex items-center gap-2 ${linkClass}`}
+        >
+          <Github className="h-4 w-4" />
+          GitHub
+        </a>
+      </>
+    );
+  }
 
   return (
     <>
-      <NavDropdown label="Product" links={PRODUCT_LINKS} active={productActive} />
-      <Link href="/docs" className={clsx(linkClass, pathname.startsWith("/docs") && activeClass)}>
+      <NavLink href="/features" linkClass={linkClass} active={isActive("/features")}>
+        Features
+      </NavLink>
+      <NavLink href="/docs" linkClass={linkClass} active={isActive("/docs", true)}>
         Docs
-      </Link>
-      <Link href="/pricing" className={clsx(linkClass, pathname === "/pricing" && activeClass)}>
+      </NavLink>
+      <NavLink
+        href="/orchestrators"
+        linkClass={linkClass}
+        active={isActive("/orchestrators") || isActive("/docs/orchestration")}
+      >
+        Orchestrators
+      </NavLink>
+      <CompareDropdown linkClass={linkClass} />
+      <NavLink href="/changelog" linkClass={linkClass} active={isActive("/changelog")}>
+        Changelog
+      </NavLink>
+      <NavLink
+        href="/security"
+        linkClass={linkClass}
+        active={isActive("/security") || isActive("/docs/security")}
+      >
+        Security
+      </NavLink>
+      <NavLink href="/pricing" linkClass={linkClass} active={isActive("/pricing")}>
         Pricing
-      </Link>
-      <Link href="/roadmap" className={clsx(linkClass, pathname === "/roadmap" && activeClass)}>
-        Roadmap
-      </Link>
+      </NavLink>
+      <a
+        href={ELTPULSE_GITHUB_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`inline-flex items-center gap-1.5 ${linkClass}`}
+        title="Open source on GitHub"
+      >
+        <Github className="h-4 w-4" />
+        <span className="hidden lg:inline">GitHub</span>
+      </a>
     </>
+  );
+}
+
+export function MarketingHeader() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const clerkReady = isClerkConfigured();
+
+  const linkClass =
+    "text-sm text-slate-600 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-white";
+
+  const closeMenu = () => setMenuOpen(false);
+
+  return (
+    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top,0px)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
+        <Link
+          href="/"
+          className="flex shrink-0 items-center gap-2 font-bold text-slate-900 dark:text-white"
+        >
+          <Activity className="h-5 w-5 text-sky-600 dark:text-sky-400" aria-hidden />
+          eltPulse
+        </Link>
+
+        {/* Desktop */}
+        <div className="hidden items-center gap-3 md:flex">
+          <nav className="flex items-center gap-5 lg:gap-6">
+            <MarketingNavLinks />
+          </nav>
+          <ThemeToggle />
+          {clerkReady ? (
+            <>
+              <SignedOut>
+                <Link href="/sign-in" className={linkClass}>
+                  Sign in
+                </Link>
+                <Link
+                  href="/sign-up"
+                  className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500"
+                >
+                  Start free
+                </Link>
+              </SignedOut>
+              <SignedIn>
+                <Link
+                  href="/dashboard"
+                  className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500"
+                >
+                  Dashboard
+                </Link>
+                <UserButton afterSignOutUrl="/" />
+              </SignedIn>
+            </>
+          ) : (
+            <>
+              <Link href="/dev-setup" className={linkClass}>
+                Local setup
+              </Link>
+              <Link
+                href="/dev-setup"
+                className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500"
+              >
+                Configure env
+              </Link>
+            </>
+          )}
+        </div>
+
+        {/* Mobile toggle */}
+        <div className="flex items-center gap-2 md:hidden">
+          <ThemeToggle />
+          <button
+            type="button"
+            className="text-slate-600 dark:text-slate-400"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+          >
+            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile menu */}
+      {menuOpen ? (
+        <div className="border-t border-slate-200 bg-white px-6 py-4 dark:border-slate-800 dark:bg-slate-950 md:hidden">
+          <nav className="flex flex-col gap-4">
+            <MarketingNavLinks mobile onNavigate={closeMenu} />
+            {clerkReady ? (
+              <>
+                <SignedOut>
+                  <Link href="/sign-in" className="text-slate-600 dark:text-slate-400" onClick={closeMenu}>
+                    Sign in
+                  </Link>
+                  <Link
+                    href="/sign-up"
+                    className="rounded-lg bg-sky-600 px-4 py-2 text-center text-sm font-semibold text-white"
+                    onClick={closeMenu}
+                  >
+                    Start free
+                  </Link>
+                </SignedOut>
+                <SignedIn>
+                  <Link href="/dashboard" className="text-slate-600 dark:text-slate-400" onClick={closeMenu}>
+                    Dashboard
+                  </Link>
+                  <UserButton afterSignOutUrl="/" />
+                </SignedIn>
+              </>
+            ) : (
+              <>
+                <Link href="/dev-setup" className="text-slate-600 dark:text-slate-400" onClick={closeMenu}>
+                  Local setup
+                </Link>
+                <Link
+                  href="/dev-setup"
+                  className="rounded-lg bg-sky-600 px-4 py-2 text-center text-sm font-semibold text-white"
+                  onClick={closeMenu}
+                >
+                  Configure env
+                </Link>
+              </>
+            )}
+          </nav>
+        </div>
+      ) : null}
+    </header>
   );
 }

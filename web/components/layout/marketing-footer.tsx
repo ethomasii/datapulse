@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Activity } from "lucide-react";
 
-const repo = "https://github.com/eltpulsehq/eltpulse";
+import { ELTPULSE_GITHUB_URL } from "@/lib/marketing/github-repo";
+
+const repo = ELTPULSE_GITHUB_URL;
 
 const columns = [
   {
@@ -14,15 +16,16 @@ const columns = [
       { href: "/quick-start", label: "Quick start" },
       { href: "/pricing", label: "Pricing" },
       { href: "/compare", label: "Compare" },
-      { href: "/roadmap", label: "Roadmap" },
       { href: "/changelog", label: "Changelog" },
+      { href: "/security", label: "Security" },
+      { href: "/roadmap", label: "Roadmap" },
     ],
   },
   {
     title: "Resources",
     links: [
       { href: "/docs", label: "Documentation" },
-      { href: "/docs/connectors", label: "Connectors" },
+      { href: "/docs/orchestration", label: "Orchestration" },
       { href: "/docs/getting-started", label: "Getting started" },
       { href: "/docs/pipelines", label: "Pipelines" },
       { href: "/docs/gateway", label: "Gateway" },
