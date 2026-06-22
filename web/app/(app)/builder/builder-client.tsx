@@ -22,6 +22,7 @@ import {
   Layers,
 } from "lucide-react";
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
+import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 import { ExecutionStatusBanner } from "@/components/elt/execution-status-banner";
 import { DbtConfigFields } from "@/components/dbt/dbt-config-fields";
 import { applyDbtProjectToForm, DbtProjectPicker } from "@/components/dbt/dbt-project-picker";
@@ -717,19 +718,21 @@ export function BuilderClient({
   }
 
   return (
-    <div className="w-full min-w-0 max-w-7xl mx-auto space-y-10">
-      <div>
-        <h1 className="text-left text-2xl font-bold text-slate-900 dark:text-white">Pipelines</h1>
-        <p className="mt-2 max-w-3xl text-slate-600 dark:text-slate-300">
-          Define connections from sources to destinations. eltPulse handles the sync mechanics, stores your definitions
-          in your workspace, and generates a deployment package you can run anywhere — on eltPulse infrastructure or
-          your own. Logs and run metadata flow back to eltPulse either way so you keep full observability.
-        </p>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+    <AppPage width="wide" className="space-y-10">
+      <AppPageHeader
+        title="Pipelines"
+        description={
+          <>
+            Define connections from sources to destinations. eltPulse handles the sync mechanics, stores your definitions
+            in your workspace, and generates a deployment package you can run anywhere — on eltPulse infrastructure or
+            your own. Logs and run metadata flow back to eltPulse either way so you keep full observability.
+          </>
+        }
+      />
+      <p className="-mt-4 max-w-3xl text-sm text-slate-500 dark:text-slate-400">
           When you edit a pipeline, use <strong className="font-medium text-slate-600 dark:text-slate-300">Visual canvas</strong>{" "}
           next to Guided / JSON for the diagram, or open Canvas from the table row — same record as this form.
         </p>
-      </div>
 
       <ExecutionStatusBanner />
 
@@ -1734,6 +1737,6 @@ export function BuilderClient({
         { href: "/gateway", icon: Waypoints, label: "Gateway & execution", desc: "Configure where pipelines run" },
         { href: "/webhooks", icon: Webhook, label: "Webhooks", desc: "Get notified when runs reach a terminal state" },
       ]} />
-    </div>
+    </AppPage>
   );
 }

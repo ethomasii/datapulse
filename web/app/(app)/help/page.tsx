@@ -3,7 +3,6 @@ import {
   BookOpen,
   CircleHelp,
   Layers,
-  LifeBuoy,
   Mail,
   Play,
   Rocket,
@@ -11,6 +10,7 @@ import {
   Zap,
 } from "lucide-react";
 import { RelatedLinks } from "@/components/ui/related-links";
+import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 
 const FAQ = [
   {
@@ -42,17 +42,13 @@ const FAQ = [
 
 export default function HelpPage() {
   return (
-    <div className="w-full min-w-0 max-w-3xl mx-auto">
-      <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/40 dark:text-sky-100">
-        <LifeBuoy className="h-3.5 w-3.5" aria-hidden />
-        Help center
-      </div>
-      <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Help</h1>
-      <p className="mt-3 text-lg text-slate-600 dark:text-slate-300">
-        Answers, runbooks, and links to get unstuck fast.
-      </p>
-
-      <section className="mt-10">
+    <AppPage width="narrow">
+      <AppPageHeader
+        eyebrow="Help center"
+        title="Help"
+        description="Answers, runbooks, and links to get unstuck fast."
+      />
+      <section>
         <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Start here</h2>
         <ul className="mt-4 grid gap-3 sm:grid-cols-2">
           {[
@@ -122,6 +118,6 @@ export default function HelpPage() {
           ]}
         />
       </div>
-    </div>
+    </AppPage>
   );
 }

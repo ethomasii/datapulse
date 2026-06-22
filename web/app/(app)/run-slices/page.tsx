@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { RelatedLinks } from "@/components/ui/related-links";
 import { SliceCoveragePanel } from "@/components/elt/slice-coverage-panel";
+import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 import {
   EMPTY_PARTITION,
   PartitionConfigEditor,
@@ -83,20 +84,21 @@ export default function RunSlicesPage() {
   const selected = pipelines.find((p) => p.id === selectedId) ?? null;
 
   return (
-    <div className="w-full min-w-0 max-w-5xl mx-auto space-y-8">
-      {/* Header */}
-      <div>
-        <div className="inline-flex items-center gap-2 text-teal-600 dark:text-teal-400">
-          <TableProperties className="h-6 w-6" aria-hidden />
-          <span className="text-sm font-semibold uppercase tracking-wide">Run slicing</span>
-        </div>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Run slices & backfills</h1>
-        <p className="mt-3 text-slate-600 dark:text-slate-300">
-          Pick a pipeline below to configure its slice type and launch targeted backfills.
-          Each slice launches an independent run you can monitor in{" "}
-          <Link href="/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">Runs</Link>.
-        </p>
-      </div>
+    <AppPage width="default">
+      <AppPageHeader
+        eyebrow="Run slicing"
+        title="Run slices & backfills"
+        description={
+          <>
+            Pick a pipeline below to configure its slice type and launch targeted backfills.
+            Each slice launches an independent run you can monitor in{" "}
+            <Link href="/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+              Runs
+            </Link>
+            .
+          </>
+        }
+      />
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
@@ -214,7 +216,7 @@ export default function RunSlicesPage() {
           { href: "/gateway", icon: Waypoints, label: "Gateway & execution", desc: "Configure where backfill runs execute" },
         ]} />
       )}
-    </div>
+    </AppPage>
   );
 }
 

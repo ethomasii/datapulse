@@ -5,6 +5,7 @@ import { FileJson, Layers, PlayCircle, Split, Plus, Trash2, CheckCircle, AlertCi
 import Link from "next/link";
 import { RelatedLinks } from "@/components/ui/related-links";
 import { PipelineSinglePicker } from "@/components/elt/pipeline-pickers";
+import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 
 interface MonitorRow {
   name: string;
@@ -158,18 +159,12 @@ export default function OrchestrationPage() {
   };
 
   return (
-    <div className="w-full min-w-0 max-w-6xl mx-auto space-y-8">
-      <div>
-        <div className="inline-flex items-center gap-2 text-sky-600 dark:text-sky-400">
-          <Split className="h-6 w-6" aria-hidden />
-          <span className="text-sm font-semibold uppercase tracking-wide">Event-Driven Orchestration</span>
-        </div>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Monitor management</h1>
-        <p className="mt-3 text-slate-600 dark:text-slate-300">
-          Watch external systems and automatically trigger pipelines when conditions are met.
-          Configure monitors for cloud storage, messaging queues, and file systems.
-        </p>
-      </div>
+    <AppPage width="default">
+      <AppPageHeader
+        eyebrow="Event-driven orchestration"
+        title="Monitor management"
+        description="Watch external systems and automatically trigger pipelines when conditions are met. Configure monitors for cloud storage, messaging queues, and file systems."
+      />
 
       {/* Action Bar */}
       <div className="flex items-center justify-between">
@@ -431,7 +426,7 @@ export default function OrchestrationPage() {
         { href: "/run-slices", icon: Split, label: "Run slices", desc: "Configure partition column and values that monitors queue per trigger" },
         { href: "/gateway", icon: Waypoints, label: "Gateway & execution", desc: "Connect your runner or use eltPulse-managed workers" },
       ]} />
-    </div>
+    </AppPage>
   );
 }
 

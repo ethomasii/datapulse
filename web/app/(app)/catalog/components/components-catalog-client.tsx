@@ -7,30 +7,29 @@ import { ComponentCatalogSettings } from "@/components/elt/component-catalog-set
 import { LakeStarterGallery } from "@/components/elt/lake-starter-gallery";
 import { TransformJourneyStrip } from "@/components/elt/transform-journey-strip";
 import { TransformPathsPanel } from "@/components/elt/transform-paths-panel";
+import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 
 export function ComponentCatalogClient() {
   const [selected, setSelected] = useState<ComponentListItem | null>(null);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-10">
-      <header className="space-y-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-violet-600 dark:text-violet-400">
-            After ingest
-          </p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">Transforms</h1>
-          <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+    <AppPage width="default" className="space-y-10">
+      <AppPageHeader
+        eyebrow="After ingest"
+        title="Transforms"
+        description={
+          <>
             Prototype with recipes on the canvas — link a <strong className="font-medium">dbt project</strong> for
             production. Dataframe is legacy when SQL cannot do the job.
-          </p>
-        </div>
-        <TransformJourneyStrip />
-        <p className="text-sm">
-          <Link href="/catalog/dbt/new" className="font-semibold text-indigo-600 hover:underline dark:text-indigo-400">
-            Promote canvas recipes to a dbt project →
-          </Link>
-        </p>
-      </header>
+          </>
+        }
+      />
+      <TransformJourneyStrip />
+      <p className="text-sm">
+        <Link href="/catalog/dbt/new" className="font-semibold text-indigo-600 hover:underline dark:text-indigo-400">
+          Promote canvas recipes to a dbt project →
+        </Link>
+      </p>
 
       <LakeStarterGallery />
 
@@ -89,6 +88,6 @@ export function ComponentCatalogClient() {
           <ComponentCatalogSettings />
         </div>
       </details>
-    </div>
+    </AppPage>
   );
 }

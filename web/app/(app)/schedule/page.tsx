@@ -16,6 +16,7 @@ import {
 import { pipelineToolLabel } from '@/lib/elt/pipeline-tool-labels';
 import Link from 'next/link';
 import { RelatedLinks } from '@/components/ui/related-links';
+import { AppPage, AppPageHeader } from '@/components/layout/app-page';
 import { nextCronRun } from '@/lib/elt/cron-match';
 import { formatRunPhaseLabel } from '@/lib/elt/dbt-run-phases';
 
@@ -86,19 +87,12 @@ export default function SchedulePage() {
   });
 
   return (
-    <div className="w-full min-w-0 max-w-6xl mx-auto space-y-8">
-      {/* Header */}
-      <div>
-        <div className="inline-flex items-center gap-2 text-violet-600 dark:text-violet-400">
-          <CalendarClock className="h-6 w-6" aria-hidden />
-          <span className="text-sm font-semibold uppercase tracking-wide">Time-Based Orchestration</span>
-        </div>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Pipeline Schedules</h1>
-        <p className="mt-3 text-slate-600 dark:text-slate-300">
-          Cron schedules are configured per-pipeline inside the pipeline builder. A Vercel Cron job
-          fires every minute and dispatches any pending runs that are due.
-        </p>
-      </div>
+    <AppPage width="default">
+      <AppPageHeader
+        eyebrow="Time-based orchestration"
+        title="Pipeline schedules"
+        description="Cron schedules are configured per-pipeline inside the pipeline builder. A Vercel Cron job fires every minute and dispatches any pending runs that are due."
+      />
 
       {/* Execution model info box */}
       <section className="rounded-2xl border border-violet-200 bg-violet-50 p-6 dark:border-violet-800 dark:bg-violet-900/20">
@@ -415,6 +409,6 @@ export default function SchedulePage() {
           { href: '/webhooks', icon: Webhook, label: 'Webhooks', desc: 'Incoming webhook triggers for on-demand pipeline runs' },
         ]}
       />
-    </div>
+    </AppPage>
   );
 }

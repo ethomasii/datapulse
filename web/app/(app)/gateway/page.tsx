@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, Copy, Eye, EyeOff, Layers, Loader2, Play, Plus, RefreshCw, Star, Trash2, Waypoints, Webhook, Wifi, WifiOff } from "lucide-react";
 import { RelatedLinks } from "@/components/ui/related-links";
 import { ManagedExecutionSetup } from "@/components/elt/managed-execution-setup";
+import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 
 const CONTROL_PLANE_URL =
   process.env.NEXT_PUBLIC_APP_URL ?? "https://app.eltpulse.dev";
@@ -329,42 +330,41 @@ ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
     executionPlane === "customer_agent" || showSelfHostedSetup;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Waypoints className="h-5 w-5 text-sky-600" aria-hidden />
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Gateway &amp; execution</h1>
-          </div>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Choose who runs ingestion below. With <strong className="font-medium text-slate-700 dark:text-slate-300">eltPulse-managed</strong>, we
-            operate connectivity, run ingestion, and collect run metrics in your workspace—the same Runs page, logs,
-            and webhooks you expect from a SaaS product. You do not need a self-hosted gateway for typical paths (for
-            example GitHub or a supported API to a warehouse you connect in the app).
+    <AppPage width="narrow">
+      <AppPageHeader
+        title="Gateway & execution"
+        actions={
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="inline-flex items-center gap-1.5 text-sm text-sky-600 hover:underline dark:text-sky-400"
+          >
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </button>
+        }
+      />
+      <div className="-mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+        <p>
+          Choose who runs ingestion below. With <strong className="font-medium text-slate-700 dark:text-slate-300">eltPulse-managed</strong>, we
+          operate connectivity, run ingestion, and collect run metrics in your workspace—the same Runs page, logs,
+          and webhooks you expect from a SaaS product. You do not need a self-hosted gateway for typical paths (for
+          example GitHub or a supported API to a warehouse you connect in the app).
+        </p>
+        <p>
+          A <strong className="font-medium text-slate-800 dark:text-slate-200">gateway</strong> is only required when
+          execution or credentials must stay on <em>your</em> network—private VPC datastores, air-gapped sources, or
+          policy that forbids eltPulse from touching the data plane. Then use a gateway (Bearer token) so a process
+          you control talks to our API; routes are <code className="text-[11px]">/api/agent/*</code> to match the open-source gateway image.
+        </p>
+        {executionPlane === "customer_agent" ? (
+          <p>
+            Multiple gateways: generate a token per process, then mark one as your{" "}
+            <span className="font-medium text-slate-800 dark:text-slate-200">account default</span> for unrouted runs.
+            Each pipeline can still set its own default gateway on the Pipelines page (or &quot;Any gateway&quot;). Optional{" "}
+            <code className="text-[11px]">targetAgentTokenId</code> on{" "}
+            <code className="text-[11px]">POST /api/elt/runs</code> overrides per run.
           </p>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            A <strong className="font-medium text-slate-800 dark:text-slate-200">gateway</strong> is only required when
-            execution or credentials must stay on <em>your</em> network—private VPC datastores, air-gapped sources, or
-            policy that forbids eltPulse from touching the data plane. Then use a gateway (Bearer token) so a process
-            you control talks to our API; routes are <code className="text-[11px]">/api/agent/*</code> to match the open-source gateway image.
-          </p>
-          {executionPlane === "customer_agent" ? (
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-              Multiple gateways: generate a token per process, then mark one as your{" "}
-              <span className="font-medium text-slate-800 dark:text-slate-200">account default</span> for unrouted runs.
-              Each pipeline can still set its own default gateway on the Pipelines page (or &quot;Any gateway&quot;). Optional{" "}
-              <code className="text-[11px]">targetAgentTokenId</code> on{" "}
-              <code className="text-[11px]">POST /api/elt/runs</code> overrides per run.
-            </p>
-          ) : null}
-        </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="inline-flex items-center gap-1.5 text-sm text-sky-600 hover:underline dark:text-sky-400"
-        >
-          <RefreshCw className="h-4 w-4" /> Refresh
-        </button>
+        ) : null}
       </div>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
@@ -879,6 +879,6 @@ ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
         { href: "/orchestration", icon: Waypoints, label: "Orchestration", desc: "Schedule sensors that trigger runs automatically" },
         { href: "/webhooks", icon: Webhook, label: "Webhooks", desc: "Fire notifications when runs reach a terminal state" },
       ]} />
-    </div>
+    </AppPage>
   );
 }

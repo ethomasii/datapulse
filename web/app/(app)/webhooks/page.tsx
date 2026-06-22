@@ -20,6 +20,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { RelatedLinks } from "@/components/ui/related-links";
+import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 
 type PipelineRow = { id: string; name: string; webhookUrl: string | null };
 
@@ -137,22 +138,19 @@ export default function WebhooksPage() {
   const triggerUrl = newToken ? `${appBase}/api/webhooks/trigger/${newToken}` : null;
 
   return (
-    <div className="w-full min-w-0 max-w-4xl mx-auto space-y-10">
-
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div>
-        <div className="inline-flex items-center gap-2 text-sky-600 dark:text-sky-400">
-          <Webhook className="h-6 w-6" aria-hidden />
-          <span className="text-sm font-semibold uppercase tracking-wide">Webhooks</span>
-        </div>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Webhooks</h1>
-        <p className="mt-3 text-slate-600 dark:text-slate-300">
-          Two-way webhook integration: <strong className="font-medium text-slate-800 dark:text-slate-200">outgoing</strong> webhooks
-          notify your systems when a run finishes, and an{' '}
-          <strong className="font-medium text-slate-800 dark:text-slate-200">incoming</strong> trigger URL lets external
-          systems launch pipeline runs without a Clerk session.
-        </p>
-      </div>
+    <AppPage width="narrow" className="space-y-10">
+      <AppPageHeader
+        eyebrow="Webhooks"
+        title="Webhooks"
+        description={
+          <>
+            Two-way webhook integration: <strong className="font-medium text-slate-800 dark:text-slate-200">outgoing</strong> webhooks
+            notify your systems when a run finishes, and an{" "}
+            <strong className="font-medium text-slate-800 dark:text-slate-200">incoming</strong> trigger URL lets external
+            systems launch pipeline runs without a Clerk session.
+          </>
+        }
+      />
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
@@ -366,6 +364,6 @@ export default function WebhooksPage() {
         { href: "/orchestration", icon: Waypoints, label: "Orchestration", desc: "Sensors and schedules that trigger runs" },
         { href: "/gateway", icon: Webhook, label: "Gateway & execution", desc: "Configure where ingestion runs" },
       ]} />
-    </div>
+    </AppPage>
   );
 }

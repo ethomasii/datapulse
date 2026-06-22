@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { WorkflowDagEditor } from "@/components/elt/workflow-dag-editor";
+import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 import type { WorkflowDefinition } from "@/lib/elt/elt-workflow-runner";
 
 type WorkflowRow = {
@@ -116,21 +117,19 @@ export function WorkflowsClient() {
   const editingWorkflow = workflows.find((w) => w.id === editingId);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Workflows</h1>
-        <p className="mt-2 text-slate-600 dark:text-slate-300">
-          Chain pipelines after success. Monitor triggers fan out via workflow runner.
-        </p>
-        <p className="mt-1 text-sm text-slate-500">
-          See{" "}
-          <Link href="/docs/pipelines" className="text-sky-600 underline dark:text-sky-400">
-            declarative pipelines
-          </Link>{" "}
-          and{" "}
-          <code className="text-xs">examples/component-routing-table.md</code>.
-        </p>
-      </div>
+    <AppPage width="narrow">
+      <AppPageHeader
+        title="Workflows"
+        description={
+          <>
+            Chain pipelines after success. Monitor triggers fan out via workflow runner. See{" "}
+            <Link href="/docs/pipelines" className="text-sky-600 underline dark:text-sky-400">
+              declarative pipelines
+            </Link>{" "}
+            and <code className="text-xs">examples/component-routing-table.md</code>.
+          </>
+        }
+      />
 
       {loading ? (
         <Loader2 className="h-6 w-6 animate-spin text-slate-400" aria-hidden />
@@ -245,6 +244,6 @@ export function WorkflowsClient() {
           </form>
         </>
       )}
-    </div>
+    </AppPage>
   );
 }

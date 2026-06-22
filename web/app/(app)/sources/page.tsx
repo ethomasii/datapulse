@@ -14,6 +14,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { RelatedLinks } from '@/components/ui/related-links';
+import { AppPage, AppPageHeader } from '@/components/layout/app-page';
 import { DLT_HUB_SOURCES, getDltHubSourcesByCategory, type DltHubSource } from '@/lib/elt/dlt-hub-registry';
 
 const CATEGORY_ORDER = [
@@ -115,24 +116,22 @@ export default function SourcesPage() {
   const categories = CATEGORY_ORDER.filter((c) => byCategory[c]?.length);
 
   return (
-    <div className="w-full min-w-0 max-w-6xl mx-auto space-y-8">
-      {/* Header */}
-      <div>
-        <div className="inline-flex items-center gap-2 text-teal-600 dark:text-teal-400">
-          <BookOpen className="h-6 w-6" aria-hidden />
-          <span className="text-sm font-semibold uppercase tracking-wide">Source Registry</span>
-        </div>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Verified Sources</h1>
-        <p className="mt-3 text-slate-600 dark:text-slate-300">
-          {DLT_HUB_SOURCES.length} pre-built, verified connectors — each with auth, pagination, schema inference,
-          and incremental loading built in. Click any source to open the pipeline builder pre-configured for it,
-          or use the{' '}
-          <span className="inline-flex items-center gap-1 font-medium text-teal-700 dark:text-teal-400">
-            <Sparkles className="h-3.5 w-3.5" /> AI Builder
-          </span>{' '}
-          to describe what you want in plain English.
-        </p>
-      </div>
+    <AppPage width="default">
+      <AppPageHeader
+        eyebrow="Source registry"
+        title="Verified sources"
+        description={
+          <>
+            {DLT_HUB_SOURCES.length} pre-built, verified connectors — each with auth, pagination, schema inference,
+            and incremental loading built in. Click any source to open the pipeline builder pre-configured for it,
+            or use the{" "}
+            <span className="inline-flex items-center gap-1 font-medium text-teal-700 dark:text-teal-400">
+              <Sparkles className="h-3.5 w-3.5" /> AI Builder
+            </span>{" "}
+            to describe what you want in plain English.
+          </>
+        }
+      />
 
       {/* Stats bar */}
       <div className="flex flex-wrap gap-4 rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-800 dark:bg-slate-900/40">
@@ -248,6 +247,6 @@ export default function SourcesPage() {
         { href: '/run-slices', icon: Zap, label: 'Run Slices', desc: 'Configure incremental loading and backfills' },
         { href: '/runs', icon: CheckCircle, label: 'Runs', desc: 'Monitor pipeline execution and telemetry' },
       ]} />
-    </div>
+    </AppPage>
   );
 }

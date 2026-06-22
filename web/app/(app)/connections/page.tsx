@@ -19,6 +19,7 @@ import {
 import { ConnectorCombobox } from "@/components/elt/connector-combobox";
 import { ConnectorOAuthButton, supportsConnectorOAuth } from "@/components/elt/connector-oauth-button";
 import { ComponentCatalogSettings } from "@/components/elt/component-catalog-settings";
+import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 
 function connectorsByCategory(connectionType: "source" | "destination"): { category: string; slugs: string[] }[] {
   const grouped = new Map<string, string[]>();
@@ -708,27 +709,29 @@ export default function ConnectionsPage() {
   const destCount = connections.filter((c) => c.connectionType === "destination").length;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Cable className="h-5 w-5 text-sky-600" aria-hidden />
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Connections</h1>
-          </div>
-          {migrationPending && (
-            <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
-              Database migration pending. Stop the dev server, run{" "}
-              <code className="text-[11px]">npx prisma generate</code> then apply{" "}
-              <code className="text-[11px]">prisma/add-connections.sql</code> to your database, and restart.
-            </div>
-          )}
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Define sources and destinations once, then attach them to pipelines from the builder (stored as foreign keys).
-            Non-secret config only — passwords and tokens stay in your environment.
-          </p>
+    <AppPage width="narrow" className="space-y-6">
+      <AppPageHeader
+        title="Connections"
+        description="Define sources and destinations once, then attach them to pipelines from the builder (stored as foreign keys). Non-secret config only — passwords and tokens stay in your environment."
+        actions={
+          <Link
+            href="/builder"
+            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500"
+          >
+            <Layers className="h-4 w-4" aria-hidden />
+            Open pipelines
+          </Link>
+        }
+      />
+      {migrationPending ? (
+        <div className="-mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+          Database migration pending. Stop the dev server, run{" "}
+          <code className="text-[11px]">npx prisma generate</code> then apply{" "}
+          <code className="text-[11px]">prisma/add-connections.sql</code> to your database, and restart.
         </div>
-        <CreateConnectionForm onCreated={onCreated} />
-      </div>
+      ) : null}
+
+      <CreateConnectionForm onCreated={onCreated} />
 
       {defaultDestinationName ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
@@ -881,6 +884,6 @@ export default function ConnectionsPage() {
         { href: "/runs", icon: Play, label: "Runs", desc: "View executions that used these credentials" },
         { href: "/gateway", icon: Waypoints, label: "Gateway & execution", desc: "Configure where pipelines run" },
       ]} />
-    </div>
+    </AppPage>
   );
 }

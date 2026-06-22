@@ -27,6 +27,7 @@ import { RelatedLinks } from "@/components/ui/related-links";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BarChart } from "@/components/ui/bar-chart";
 import { parseSliceFromTriggeredBy } from "@/lib/elt/slice-trigger";
+import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 import { ExecutionStatusBanner } from "@/components/elt/execution-status-banner";
 import { AddTransformsCta } from "@/components/elt/add-transforms-cta";
 import { RunContractViolationsPanel } from "@/components/elt/run-contract-violations-panel";
@@ -591,30 +592,32 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
   });
 
   return (
-    <div className="w-full min-w-0 max-w-7xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Runs</h1>
-        <p className="mt-2 max-w-none text-pretty text-slate-600 dark:text-slate-300">
-          Filter and inspect pipeline executions. Jump from{" "}
-          <Link href="/builder" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-            Pipelines
-          </Link>{" "}
-          with <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">?pipeline=…</code> for one
-          line&apos;s history. Open <strong className="font-medium text-slate-800 dark:text-slate-200">Details</strong>{" "}
-          for correlation ID, full telemetry, and logs. Schedules live under{" "}
-          <Link href="/orchestration" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-            Orchestration
-          </Link>
-          ; webhooks under{" "}
-          <Link href="/webhooks" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-            Webhooks
-          </Link>
-          .{" "}
-          <Link href="/docs/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-            Runs docs →
-          </Link>
-        </p>
-      </div>
+    <AppPage width="wide">
+      <AppPageHeader
+        title="Runs"
+        description={
+          <>
+            Filter and inspect pipeline executions. Jump from{" "}
+            <Link href="/builder" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+              Pipelines
+            </Link>{" "}
+            with <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">?pipeline=…</code> for one
+            line&apos;s history. Open <strong className="font-medium text-slate-800 dark:text-slate-200">Details</strong>{" "}
+            for correlation ID, full telemetry, and logs. Schedules live under{" "}
+            <Link href="/orchestration" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+              Orchestration
+            </Link>
+            ; webhooks under{" "}
+            <Link href="/webhooks" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+              Webhooks
+            </Link>
+            .{" "}
+            <Link href="/docs/runs" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+              Runs docs →
+            </Link>
+          </>
+        }
+      />
 
       <ExecutionStatusBanner />
 
@@ -1275,6 +1278,6 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
           </div>
         </div>
       )}
-    </div>
+    </AppPage>
   );
 }

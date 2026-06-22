@@ -21,6 +21,7 @@ import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 import { TransformJourneyStrip } from "@/components/elt/transform-journey-strip";
 import { assetDetailHref } from "@/lib/elt/asset-path";
 import type { PipelineHealthSummary } from "@/lib/elt/pipeline-health";
+import { AppPage } from "@/components/layout/app-page";
 
 type Overview = {
   summary: {
@@ -135,7 +136,7 @@ export function CatalogHubClient() {
   }, [searchQ]);
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-6xl space-y-8">
+    <AppPage width="default">
       <div>
         <div className="inline-flex items-center gap-2 text-sky-600 dark:text-sky-400">
           <Database className="h-6 w-6" aria-hidden />
@@ -324,6 +325,6 @@ export function CatalogHubClient() {
           { href: "/builder/canvas", icon: LayoutGrid, label: "Canvas", desc: "Visual ingest + transform graph" },
         ]}
       />
-    </div>
+    </AppPage>
   );
 }

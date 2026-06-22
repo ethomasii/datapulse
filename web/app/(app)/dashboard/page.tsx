@@ -9,6 +9,7 @@ import { runSubjectLabel } from "@/lib/elt/run-display";
 import { ONBOARDING_STEPS } from "@/lib/onboarding/config";
 import { OnboardingChecklist } from "@/components/onboarding/checklist";
 import { ExecutionStatusBanner } from "@/components/elt/execution-status-banner";
+import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 import { BarChart } from "@/components/ui/bar-chart";
 import { getManagedExecutionStatus } from "@/lib/elt/managed-execution-status";
 import { resolveUserPlanTier, runHistoryPrismaFilter } from "@/lib/plans/tier-features";
@@ -122,14 +123,16 @@ export default async function DashboardPage() {
   const hasChartData = chartRuns.length > 0;
 
   return (
-    <div className="w-full min-w-0 max-w-7xl mx-auto space-y-10">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Dashboard</h1>
-        <p className="mt-2 text-slate-600 dark:text-slate-300">
-          Overview of your workspace. Signed in as{" "}
-          <span className="font-medium text-slate-800 dark:text-slate-200">{user.email}</span>
-        </p>
-      </div>
+    <AppPage width="wide" className="space-y-10">
+      <AppPageHeader
+        title="Dashboard"
+        description={
+          <>
+            Overview of your workspace. Signed in as{" "}
+            <span className="font-medium text-slate-800 dark:text-slate-200">{user.email}</span>
+          </>
+        }
+      />
 
       {showOnboarding && <OnboardingChecklist completedIds={completedIds} />}
 
@@ -262,6 +265,6 @@ export default async function DashboardPage() {
           </div>
         </div>
       </section>
-    </div>
+    </AppPage>
   );
 }

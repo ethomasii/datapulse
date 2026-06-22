@@ -15,6 +15,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { BarChart } from "@/components/ui/bar-chart";
+import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 import type { PipelineMetricsResponse } from "@/lib/elt/pipeline-metrics";
 import { formatBytes, formatDurationMs, formatRows } from "@/lib/elt/run-telemetry";
 import { ObservabilityAlertRulesPanel } from "@/components/elt/observability-alert-rules";
@@ -96,28 +97,22 @@ export function ObservabilityClient() {
   );
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-7xl space-y-8 px-1">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 text-sky-600 dark:text-sky-400">
-            <Activity className="h-6 w-6" aria-hidden />
-            <span className="text-sm font-semibold uppercase tracking-wide">EL observability</span>
-          </div>
-          <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Pipeline metrics</h1>
-          <p className="mt-2 max-w-3xl text-slate-600 dark:text-slate-300">
-            Slice ingestion by pipeline, environment, connector, and time. No black box — rows, bytes, duration,
-            success rate, and per-table stats from run telemetry and structured log markers.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden />
-          Refresh
-        </button>
-      </div>
+    <AppPage width="wide">
+      <AppPageHeader
+        eyebrow="EL observability"
+        title="Pipeline metrics"
+        description="Slice ingestion by pipeline, environment, connector, and time. No black box — rows, bytes, duration, success rate, and per-table stats from run telemetry and structured log markers."
+        actions={
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden />
+            Refresh
+          </button>
+        }
+      />
 
       <section className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-950/30">
         <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -418,6 +413,6 @@ export function ObservabilityClient() {
       ) : null}
 
       <ObservabilityAlertRulesPanel />
-    </div>
+    </AppPage>
   );
 }

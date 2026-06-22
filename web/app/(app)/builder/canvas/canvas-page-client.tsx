@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import type { Edge, Node } from "@xyflow/react";
 import { Loader2, Plus } from "lucide-react";
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
+import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 import { ComponentPalette } from "@/components/elt/component-palette";
 import { LakeStarterGallery } from "@/components/elt/lake-starter-gallery";
 import { LakeStarterChips } from "@/components/elt/lake-starter-chips";
@@ -972,8 +973,11 @@ export function CanvasPageClient() {
   const showDockedInspector = pipelines.length > 0 && Boolean(selectedId) && !detailLoading;
 
   return (
-    <div className={clsx("w-full min-w-0 max-w-7xl mx-auto space-y-6", showDockedInspector && "lg:pr-[380px]")}>
-      <h1 className="text-left text-2xl font-bold text-slate-900 dark:text-white">Visual pipeline canvas</h1>
+    <AppPage
+      width="wide"
+      className={clsx("space-y-6", showDockedInspector && "lg:pr-[380px]")}
+    >
+      <AppPageHeader title="Visual pipeline canvas" />
 
       {!canWrite && permissions ? (
         <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
@@ -1363,6 +1367,6 @@ export function CanvasPageClient() {
           )}
         </div>
       ) : null}
-    </div>
+    </AppPage>
   );
 }
