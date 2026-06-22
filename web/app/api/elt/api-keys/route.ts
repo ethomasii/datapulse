@@ -4,6 +4,7 @@ import { API_SCOPES } from "@/lib/auth/api-user";
 import { generateApiKey } from "@/lib/auth/workspace-api-key";
 import { db } from "@/lib/db/client";
 import { assertApiKeyLimit, resolveUserPlanTier } from "@/lib/plans/tier-features";
+import { recordWorkspaceAuditEvent } from "@/lib/audit/workspace-audit";
 
 export async function GET() {
   const user = await getCurrentDbUser();
@@ -60,6 +61,12 @@ export async function POST(req: Request) {
         scopes: Object.values(API_SCOPES),
       },
       select: { id: true, name: true, keyPrefix: true, createdAt: true },
+    });
+    await recordWorkspaceAuditEvent({
+      userId: user.id,
+      actorEmail: user.email,
+      action: "api_key.created",
+      detail: { name, keyPrefix: prefix },
     });
     return NextResponse.json({
       key,

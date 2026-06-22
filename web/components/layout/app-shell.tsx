@@ -25,7 +25,6 @@ import {
   Table2,
   TableProperties,
   UserCircle,
-  Users,
   Waypoints,
   Webhook,
   Workflow,
@@ -77,9 +76,7 @@ const ADVANCED_NAV: NavItem[] = [
   { href: "/webhooks", label: "Webhooks", icon: Webhook },
   { href: "/gateway", label: "Gateway", icon: Waypoints },
   { href: "/repos", label: "Repositories", icon: FolderGit2 },
-  { href: "/integrations", label: "Integrations", icon: Plug },
   { href: "/help", label: "Help", icon: CircleHelp },
-  { href: "/team", label: "Team", icon: Users },
 ];
 
 const ACCOUNT_NAV: NavItem[] = [

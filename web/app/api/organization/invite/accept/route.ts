@@ -25,6 +25,6 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     organizationName: result.organizationName,
-    redirectTo: "/team",
+    redirectTo: "/account/team",
   });
 }

@@ -86,7 +86,7 @@ export default async function BillingPage() {
         <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
           Shared managed compute is included on all plans. Dedicated compute (Team add-on) is configured above or on
           the{" "}
-          <Link href="/team" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+          <Link href="/account/team" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
             Team
           </Link>{" "}
           page. Gateway preference:{" "}

@@ -80,7 +80,7 @@ export function BillingPlansClient({
         ) : (
           <p className="mt-3 text-xs text-blue-800/70 dark:text-blue-200/70">
             Requires Team plan.{" "}
-            <Link href="/team" className="font-medium underline">
+            <Link href="/account/team" className="font-medium underline">
               Manage on Team page
             </Link>
             .

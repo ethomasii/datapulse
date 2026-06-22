@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
 import { sendOrganizationInviteEmail } from "@/lib/organization/invites";
+import { recordWorkspaceAuditEvent } from "@/lib/audit/workspace-audit";
 import {
   resolveUserPlanTier,
   tierAllowsAdvancedWorkspaceRoles,
@@ -91,6 +92,14 @@ export async function POST(req: Request) {
       email: invite.email,
       organizationName: orgDetails?.name ?? "your team",
       inviterName: user.name,
+    });
+
+    await recordWorkspaceAuditEvent({
+      userId: user.id,
+      organizationId: org.id,
+      actorEmail: user.email,
+      action: "team.invite_sent",
+      detail: { email: invite.email, role },
     });
 
     return NextResponse.json({ invite, emailed });

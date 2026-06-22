@@ -18,6 +18,8 @@ type TeamPayload = {
   owner?: Member;
   members: Member[];
   pendingInvites: Invite[];
+  planTier?: string;
+  canInvite?: boolean;
 };
 
 type ManagedComputePayload = {
@@ -244,63 +246,82 @@ export function TeamClient() {
 
       {isOwner ? (
         <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-          <form onSubmit={(e) => void sendInvite(e)} className="space-y-3">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-              <UserPlus className="h-4 w-4" /> Invite teammates
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              <input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="colleague@company.com"
-                required
-                className="min-w-[220px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
+          {!data.canInvite ? (
+            <div className="space-y-3">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+                <UserPlus className="h-4 w-4" /> Invite teammates
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Team invites require the Team plan. Upgrade to invite colleagues and share pipelines, runs, and
+                connections.
+              </p>
+              <BillingUpgradeButton
+                tier="team"
+                label="Upgrade to Team"
+                className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50"
               />
-              <select
-                value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value as InviteRole)}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
-              >
-                {(Object.keys(INVITE_ROLE_LABELS) as InviteRole[]).map((r) => (
-                  <option key={r} value={r}>
-                    {INVITE_ROLE_LABELS[r]}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="submit"
-                disabled={inviting}
-                className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
-              >
-                {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                Send invite
-              </button>
             </div>
-          </form>
-          {data.pendingInvites.length > 0 ? (
-            <ul className="mt-4 space-y-2">
-              {data.pendingInvites.map((i) => (
-                <li
-                  key={i.id}
-                  className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs dark:bg-slate-950"
-                >
-                  <span>
-                    {i.email} — {INVITE_ROLE_LABELS[i.role as InviteRole] ?? i.role} — pending since{" "}
-                    {new Date(i.invitedAt).toLocaleDateString()}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => void revokeInvite(i.id)}
-                    className="text-slate-500 hover:text-red-600"
-                    aria-label={`Revoke invite for ${i.email}`}
+          ) : (
+            <>
+              <form onSubmit={(e) => void sendInvite(e)} className="space-y-3">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+                  <UserPlus className="h-4 w-4" /> Invite teammates
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="colleague@company.com"
+                    required
+                    className="min-w-[220px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
+                  />
+                  <select
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value as InviteRole)}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
                   >
-                    <X className="h-4 w-4" />
+                    {(Object.keys(INVITE_ROLE_LABELS) as InviteRole[]).map((r) => (
+                      <option key={r} value={r}>
+                        {INVITE_ROLE_LABELS[r]}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="submit"
+                    disabled={inviting}
+                    className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
+                  >
+                    {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                    Send invite
                   </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+                </div>
+              </form>
+              {data.pendingInvites.length > 0 ? (
+                <ul className="mt-4 space-y-2">
+                  {data.pendingInvites.map((i) => (
+                    <li
+                      key={i.id}
+                      className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs dark:bg-slate-950"
+                    >
+                      <span>
+                        {i.email} — {INVITE_ROLE_LABELS[i.role as InviteRole] ?? i.role} — pending since{" "}
+                        {new Date(i.invitedAt).toLocaleDateString()}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void revokeInvite(i.id)}
+                        className="text-slate-500 hover:text-red-600"
+                        aria-label={`Revoke invite for ${i.email}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </>
+          )}
         </section>
       ) : null}
 

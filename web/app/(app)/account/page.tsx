@@ -57,7 +57,7 @@ export default async function AccountProfilePage() {
           { href: "/account/billing", icon: CreditCard, label: "Billing", desc: "Invoices, payment methods, and plan management" },
           { href: "/account/notifications", icon: Bell, label: "Notifications", desc: "Configure email and channel alert preferences" },
           { href: "/account/developers", icon: Code2, label: "Developers", desc: "API tokens, webhook secrets, and audit log" },
-          { href: "/team", icon: Users, label: "Team", desc: "Invite members and manage organization access" },
+          { href: "/account/team", icon: Users, label: "Team", desc: "Invite members and manage organization access" },
         ]} />
       </div>
     </>

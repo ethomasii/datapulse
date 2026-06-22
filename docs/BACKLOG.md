@@ -14,6 +14,10 @@ Tracked gaps and enhancements identified during pricing, tier-gating, and enterp
 - [x] **Team+ entitlement** — air-gap and SSO included by plan tier (no `ELTPULSE_AIRGAP_*` env flags)
 - [x] **SSO wiring** — Security UI + `/api/account/sso` + Clerk Dashboard setup docs
 
+- [x] **Team under Account & Settings** — `/account/team`, tier-gated invites, redirects from `/team`
+- [x] **Integrations under Account** — `/account/integrations`, redirect from `/integrations`
+- [x] **Audit log v1** — workspace events for org, invites, API keys + CSV export
+
 ## In progress
 
 - [ ] **Enterprise Stripe / invoicing** — optional self-serve annual invoice for Enterprise floor (currently sales-assisted)
@@ -47,7 +51,7 @@ Tracked gaps and enhancements identified during pricing, tier-gating, and enterp
 - [ ] Team page: surface gateway limit + upgrade CTA when at cap
 - [ ] Gateway page: show `personalGatewayLimit` from `/api/elt/agent-status`
 - [ ] OpenAPI reference for public API (roadmap item)
-- [ ] Audit log backend (page exists, data not wired)
+- [ ] **Audit log v2** — pipeline CRUD, billing changes, sign-in events, immutable retention policy
 - [ ] Managed Git commits (in progress on roadmap)
 
 ## Security & compliance

@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
+import { recordWorkspaceAuditEvent } from "@/lib/audit/workspace-audit";
 
 function generateAgentToken(): string {
   const buf = new Uint8Array(48);
@@ -84,6 +85,14 @@ export async function POST(req: Request) {
       agentToken,
     },
     select: { id: true, name: true },
+  });
+
+  await recordWorkspaceAuditEvent({
+    userId: user.id,
+    organizationId: org.id,
+    actorEmail: user.email,
+    action: "organization.created",
+    detail: { name: org.name },
   });
 
   return NextResponse.json({

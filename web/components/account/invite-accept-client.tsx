@@ -80,7 +80,7 @@ export function InviteAcceptClient({
     return (
       <div className="mx-auto max-w-md rounded-2xl border border-red-200 bg-red-50 p-6 text-center dark:border-red-900 dark:bg-red-950/40">
         <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-        <Link href="/team" className="mt-4 inline-block text-sm font-medium text-sky-600 hover:underline">
+        <Link href="/account/team" className="mt-4 inline-block text-sm font-medium text-sky-600 hover:underline">
           Go to team
         </Link>
       </div>
@@ -95,7 +95,7 @@ export function InviteAcceptClient({
         Welcome to <strong>{organizationName}</strong>.
       </p>
       <Link
-        href="/team"
+        href="/account/team"
         className="mt-6 inline-block rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500"
       >
         Open team workspace

@@ -50,7 +50,7 @@ export default function CatalogDocsPage() {
 
       <h2>Team roles (RBAC)</h2>
       <p>
-        Organization owners invite teammates from <Link href="/team">Team</Link> with one of these roles:
+        Organization owners invite teammates from <Link href="/account/team">Team</Link> with one of these roles:
       </p>
       <table>
         <thead>

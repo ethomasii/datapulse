@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AppPage width="narrow">
+    <AppPage width="default">
       <AppPageHeader
         title="Account & Settings"
         description="Profile, billing, notifications, developers, organization, and compliance — in one place."

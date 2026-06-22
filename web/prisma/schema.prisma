@@ -136,6 +136,7 @@ model User {
   workspaceApiKeys WorkspaceApiKey[]
   observabilityAlertRules ObservabilityAlertRule[]
   eltWorkflows EltWorkflow[]
+  auditEvents WorkspaceAuditEvent[]
 }
 
 /// Per-user agent API token (multiple connectors: one per cloud, on-prem, etc.).
@@ -685,4 +686,20 @@ model OrganizationInvite {
   @@unique([organizationId, email])
   @@index([organizationId])
   @@map("organization_invite")
+}
+
+/// Security-relevant workspace actions for compliance export (Account → Audit log).
+model WorkspaceAuditEvent {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String?  @map("organization_id")
+  actorEmail     String   @map("actor_email")
+  action         String
+  detail         Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("workspace_audit_event")
 }

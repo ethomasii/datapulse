@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
+import { resolveUserPlanTier, tierAllowsOrgInvites } from "@/lib/plans/tier-features";
 
 export async function GET() {
   const user = await getCurrentDbUser();
@@ -24,11 +25,14 @@ export async function GET() {
   });
 
   if (ownedOrg) {
+    const tier = await resolveUserPlanTier(user.id);
     return NextResponse.json({
       role: "owner" as const,
       organization: { id: ownedOrg.id, name: ownedOrg.name },
       members: ownedOrg.members,
       pendingInvites: ownedOrg.invites,
+      planTier: tier,
+      canInvite: tierAllowsOrgInvites(tier),
     });
   }
 

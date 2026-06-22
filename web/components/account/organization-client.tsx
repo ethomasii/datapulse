@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Building2, Loader2, Mail, UserPlus } from "lucide-react";
+import { Building2, Loader2, Users } from "lucide-react";
 import { BillingUpgradeButton } from "@/components/account/billing-upgrade-button";
 import { ComponentCatalogSettings } from "@/components/elt/component-catalog-settings";
 
@@ -11,35 +12,20 @@ type Org = {
   hasAgentToken: boolean;
 };
 
-type Invite = {
-  id: string;
-  email: string;
-  role: string;
-  invitedAt: string;
-};
-
 export function OrganizationClient() {
   const [org, setOrg] = useState<Org | null>(null);
-  const [invites, setInvites] = useState<Invite[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [orgName, setOrgName] = useState("");
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviting, setInviting] = useState(false);
   const [agentToken, setAgentToken] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [orgRes, invRes] = await Promise.all([
-        fetch("/api/organization", { credentials: "same-origin" }),
-        fetch("/api/organization/invite", { credentials: "same-origin" }),
-      ]);
+      const orgRes = await fetch("/api/organization", { credentials: "same-origin" });
       const orgData = (await orgRes.json()) as { organization?: Org | null };
       setOrg(orgData.organization ?? null);
-      const invData = (await invRes.json()) as { invites?: Invite[] };
-      setInvites(invData.invites ?? []);
     } finally {
       setLoading(false);
     }
@@ -72,37 +58,18 @@ export function OrganizationClient() {
     }
   }
 
-  async function sendInvite(e: React.FormEvent) {
-    e.preventDefault();
-    if (!inviteEmail.trim()) return;
-    setInviting(true);
-    setMessage(null);
-    try {
-      const res = await fetch("/api/organization/invite", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail.trim() }),
-      });
-      const data = (await res.json()) as { error?: string; emailed?: boolean };
-      if (!res.ok) throw new Error(data.error ?? "Failed to invite");
-      setInviteEmail("");
-      setMessage(data.emailed ? "Invite sent by email." : "Invite recorded — share the invite link from Team.");
-      await load();
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Failed");
-    } finally {
-      setInviting(false);
-    }
-  }
-
   if (loading) return <p className="text-sm text-slate-500">Loading…</p>;
 
   if (!org) {
     return (
       <form onSubmit={(e) => void createOrg(e)} className="space-y-4">
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Create a team workspace to share pipelines, org-scoped gateway tokens, and billing.
+          Create an organization workspace to share pipelines, org-scoped gateway tokens, and Team-tier billing. After
+          setup, invite colleagues from the{" "}
+          <Link href="/account/team" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+            Team
+          </Link>{" "}
+          tab.
         </p>
         <label className="block">
           <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Organization name</span>
@@ -137,9 +104,20 @@ export function OrganizationClient() {
       <div>
         <h3 className="font-semibold text-slate-900 dark:text-white">{org.name}</h3>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-          Org gateway: {org.hasAgentToken ? "configured" : "not set"} · Team plan unlocks shared RBAC (coming soon).
+          Org gateway token: {org.hasAgentToken ? "configured" : "not set"} · Members and invites live on{" "}
+          <Link href="/account/team" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+            Team
+          </Link>
+          .
         </p>
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href="/account/team"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            <Users className="h-4 w-4" aria-hidden />
+            Manage team
+          </Link>
           <BillingUpgradeButton
             tier="team"
             label="Upgrade to Team"
@@ -148,40 +126,7 @@ export function OrganizationClient() {
         </div>
       </div>
 
-      <form onSubmit={(e) => void sendInvite(e)} className="space-y-3">
-        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-          <UserPlus className="h-4 w-4" /> Invite teammates
-        </h3>
-        <div className="flex flex-wrap gap-2">
-          <input
-            type="email"
-            value={inviteEmail}
-            onChange={(e) => setInviteEmail(e.target.value)}
-            placeholder="colleague@company.com"
-            required
-            className="min-w-[220px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
-          />
-          <button
-            type="submit"
-            disabled={inviting}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
-          >
-            {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-            Send invite
-          </button>
-        </div>
-        {invites.length > 0 ? (
-          <ul className="text-xs text-slate-500">
-            {invites.map((i) => (
-              <li key={i.id}>
-                {i.email} — invited {new Date(i.invitedAt).toLocaleDateString()}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </form>
-
-      <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950">
+      <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950">
         <ComponentCatalogSettings />
       </div>
 
