@@ -96,7 +96,7 @@ export default function VsPage({ params }: { params: { slug: string } }) {
             </div>
             <div className="rounded-2xl border border-red-100 bg-white p-6 dark:border-red-900/30 dark:bg-slate-950">
               <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-red-900 dark:text-red-200">
-                Where {c.name} falls short for git-native teams
+                Where {c.name} and eltPulse differ
               </h2>
               <ul className="space-y-3">
                 {c.whereTheyFallShort.map((item) => (

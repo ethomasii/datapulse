@@ -4,9 +4,9 @@ import { ArrowRight, CheckCircle, Code2, GitBranch, Server, Wallet, XCircle } fr
 import { COMPETITORS } from "@/lib/marketing/competitors";
 
 export const metadata: Metadata = {
-  title: "Compare — eltPulse vs Fivetran, Airbyte, Matillion, Meltano & other ELT tools",
+  title: "Compare — eltPulse vs Fivetran, Matillion, Informatica, Meltano & other ELT tools",
   description:
-    "Honest comparisons: eltPulse vs Fivetran, Airbyte, Hevo, Matillion, Maia, Meltano, Stitch, Portable, dbt Cloud, and more — git-native control plane, BYO compute, transparent pricing.",
+    "Honest, respectful comparisons: eltPulse vs Fivetran, Airbyte, Matillion, Informatica, Talend, Rivery, Meltano, Estuary, AWS Glue, dbt Cloud, and more.",
 };
 
 const HIGHLIGHTS = [
@@ -44,9 +44,8 @@ export default function ComparePage() {
             eltPulse vs. the alternatives
           </h1>
           <p className="mt-6 text-lg text-slate-600 dark:text-slate-400">
-            Buyers compare Fivetran, Airbyte, Hevo, Matillion, Maia, Meltano, Stitch, Portable, dbt Cloud, and dozens
-            of others. None are wrong — they optimize for different constraints. This page situates eltPulse honestly: a
-            git-native control plane with transparent usage economics and BYO execution.
+            Buyers compare Fivetran, Airbyte, Matillion, Informatica, Talend, Rivery, Meltano, Estuary, AWS Glue, and
+            many others. Each excels in its lane — we explain where eltPulse fits for git-native platform teams.
           </p>
         </div>
       </section>
@@ -89,15 +88,15 @@ export default function ComparePage() {
               </div>
               <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">{c.description}</p>
               <div className="mt-4 space-y-1.5">
-                {c.whereTheyFallShort.slice(0, 2).map((w) => (
-                  <div key={w} className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" />
-                    {w}
+                {c.theyreGoodAt.slice(0, 2).map((strength) => (
+                  <div key={strength} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
+                    <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-500" />
+                    {strength}
                   </div>
                 ))}
                 <div className="flex items-start gap-2 text-xs font-medium text-blue-600 dark:text-blue-400">
                   <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
-                  eltPulse covers git-native control + BYO compute
+                  Strong fit for their core use case — see how eltPulse differs
                 </div>
               </div>
             </Link>

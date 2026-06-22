@@ -506,6 +506,276 @@ export const COMPETITORS: Competitor[] = [
       },
     ],
   },
+  {
+    slug: "vs-talend",
+    name: "Talend",
+    tagline: "eltPulse vs. Talend",
+    heroSubtitle:
+      "Talend is a proven enterprise data integration suite — iPaaS, quality, and governance at global scale. eltPulse is a lighter, Git-native ELT control plane for modern analytics platform teams.",
+    description:
+      "Talend (Qlik) spans batch and real-time integration, data quality, and API management — with decades of enterprise deployments. Stitch (acquired by Talend) covers simpler SaaS-to-warehouse loading for smaller teams.",
+    theyreGoodAt: [
+      "Deep enterprise feature set: quality, masking, MDM, and governance",
+      "Mature iPaaS and API integration alongside batch pipelines",
+      "Global support, compliance narratives, and procurement-friendly packaging",
+      "Stitch product line for straightforward managed SaaS ingestion",
+    ],
+    whereTheyFallShort: [
+      "Implementation timelines and TCO often reflect enterprise suite complexity",
+      "Git-native, developer-first ELT is not the primary center of gravity",
+      "Lean data platform teams may prefer self-serve tiers over sales-led rollouts",
+      "BYO compute gateways and air-gapped metadata are not the default story",
+    ],
+    bestFor:
+      "Large enterprises standardizing data integration, quality, and governance across many systems with dedicated integration teams.",
+    closingNote:
+      "Talend earns its place in Fortune 500 stacks. eltPulse complements that world when analytics engineers want Lakeflow-style EL+T, transparent usage pricing, and artifacts in Git — without a full iPaaS footprint.",
+    categories: [
+      {
+        category: "Enterprise fit",
+        rows: [
+          { feature: "Data quality & governance suite", eltpulse: "Catalog + contracts", competitor: true },
+          { feature: "iPaaS / API integration", eltpulse: "Webhook + API focus", competitor: true },
+          { feature: "Global enterprise support", eltpulse: "Team / Enterprise", competitor: true },
+          { feature: "Self-serve signup & free tier", eltpulse: true, competitor: "Stitch tier / sales" },
+        ],
+      },
+      {
+        category: "Modern analytics ELT",
+        rows: [
+          { feature: "Git-native pipeline export", eltpulse: "Pro+", competitor: "Limited" },
+          { feature: "dbt-first transform workflow", eltpulse: true, competitor: "Varies" },
+          { feature: "Customer gateway (BYO compute)", eltpulse: "All tiers", competitor: false },
+          { feature: "Open engines (dlt, Sling)", eltpulse: true, competitor: "Talend-native" },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "vs-informatica",
+    name: "Informatica",
+    tagline: "eltPulse vs. Informatica",
+    heroSubtitle:
+      "Informatica IDMC sets the bar for enterprise data management — catalog, quality, MDM, and integration in one portfolio. eltPulse focuses narrowly on git-native ELT for analytics platform teams.",
+    description:
+      "Informatica Intelligent Data Management Cloud (IDMC) is the incumbent choice when CDOs need catalog, lineage, quality, governance, and integration under one vendor with enterprise SLAs.",
+    theyreGoodAt: [
+      "Comprehensive IDMC portfolio: integration, quality, catalog, MDM, governance",
+      "Strong metadata, lineage, and compliance story for regulated industries",
+      "Decades of enterprise trust and partner ecosystem",
+      "Scalable batch and cloud-native integration patterns",
+    ],
+    whereTheyFallShort: [
+      "Breadth and enterprise packaging can mean long evaluations and heavy ops teams",
+      "Analytics engineers seeking Git-first EL+T may find the UX oriented to broader IT",
+      "Self-serve experimentation and startup-friendly pricing are not the sweet spot",
+      "Customer-owned sync compute and OSS engine portability are secondary",
+    ],
+    bestFor:
+      "Enterprises consolidating data management under a single strategic vendor with governance, MDM, and integration requirements.",
+    closingNote:
+      "Informatica is often the right answer for enterprise-wide data management programs. eltPulse is the right answer when a platform team wants fast iteration, Git-owned ELT, BYO gateways, and optional self-hosted control plane — alongside tools you already use.",
+    categories: [
+      {
+        category: "Data management breadth",
+        rows: [
+          { feature: "MDM & enterprise governance", eltpulse: "RBAC + catalog", competitor: true },
+          { feature: "Enterprise catalog & lineage", eltpulse: "Pro+ lineage", competitor: true },
+          { feature: "Data quality & profiling", eltpulse: "Checks + contracts", competitor: true },
+          { feature: "Single-vendor IDMC suite", eltpulse: "ELT-focused CP", competitor: true },
+        ],
+      },
+      {
+        category: "Analytics engineering",
+        rows: [
+          { feature: "Git-native EL artifacts", eltpulse: true, competitor: "Limited" },
+          { feature: "dbt project runs in workspace", eltpulse: true, competitor: "Via integration" },
+          { feature: "Free tier / self-serve start", eltpulse: true, competitor: "Enterprise-led" },
+          { feature: "Air-gapped metadata export", eltpulse: "Team+", competitor: "Enterprise programs" },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "vs-rivery",
+    name: "Rivery",
+    tagline: "eltPulse vs. Rivery",
+    heroSubtitle:
+      "Rivery delivers approachable SaaS ELT with reverse ETL and activation built in — a strong all-in-one for teams that want speed without running infrastructure.",
+    description:
+      "Rivery (now part of the Boomi family) combines managed pipelines, reverse ETL, and data activation in a unified cloud product — popular with lean data teams moving fast on Snowflake, BigQuery, and Redshift.",
+    theyreGoodAt: [
+      "Fast time-to-value: sources, transforms, and activation in one UI",
+      "Reverse ETL and data activation without a separate CDP",
+      "Pre-built logic blocks and templates for common patterns",
+      "Managed SaaS — no workers or gateways to maintain",
+    ],
+    whereTheyFallShort: [
+      "Pipeline definitions are product-native — Git as source of truth is secondary",
+      "Platform teams outgrowing UI-only workflows may want repo-based SDLC",
+      "Customer gateway and self-hosted control plane paths are limited",
+      "Pricing scales with platform usage — verify fit at high row volumes",
+    ],
+    bestFor:
+      "Growth-stage data teams that want managed EL+activation quickly without assembling Fivetran + Hightouch + orchestration.",
+    closingNote:
+      "Rivery is a capable managed platform for speed. eltPulse suits teams graduating to Git-native definitions, BYO compute, open sync engines, and an Enterprise self-hosted option — while keeping a product UI for day-to-day work.",
+    categories: [
+      {
+        category: "Product scope",
+        rows: [
+          { feature: "Managed EL pipelines", eltpulse: true, competitor: true },
+          { feature: "Reverse ETL / activation", eltpulse: "Roadmap / partners", competitor: true },
+          { feature: "dbt integration", eltpulse: true, competitor: true },
+          { feature: "Logic templates & kits", eltpulse: "Scenarios", competitor: true },
+        ],
+      },
+      {
+        category: "Platform engineering",
+        rows: [
+          { feature: "Git artifact export", eltpulse: "Pro+", competitor: false },
+          { feature: "Customer gateway", eltpulse: "All tiers", competitor: false },
+          { feature: "Runs API & webhooks", eltpulse: "Pro+", competitor: true },
+          { feature: "Self-hosted control plane", eltpulse: "Enterprise", competitor: false },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "vs-integrateio",
+    name: "Integrate.io",
+    tagline: "eltPulse vs. Integrate.io",
+    heroSubtitle:
+      "Integrate.io (formerly Xplenty) offers low-code ETL/ELT with a broad connector library — excellent for teams prioritizing visual integration over repo workflows.",
+    description:
+      "Integrate.io targets mid-market teams with drag-and-drop pipelines, API connectivity, and reverse ETL — a practical choice when analysts and integrators outnumber platform engineers.",
+    theyreGoodAt: [
+      "Low-code pipeline designer with short learning curve",
+      "Broad connector set including databases, SaaS, and APIs",
+      "Reverse ETL and operational analytics use cases",
+      "Transparent mid-market pricing relative to enterprise suites",
+    ],
+    whereTheyFallShort: [
+      "Less emphasis on Git-native definitions and PR-based promotion",
+      "Limited customer-owned execution plane (gateways / air-gap)",
+      "Platform engineering teams may want exportable dlt/Sling/dbt artifacts",
+      "Not positioned as self-hosted Enterprise control plane",
+    ],
+    bestFor:
+      "Mid-market teams wanting visual ETL/ELT and reverse ETL without hiring a dedicated platform engineering function.",
+    closingNote:
+      "Integrate.io is a sensible choice for low-code integration. eltPulse fits when you are building a data platform practice — Git export, dbt runs, catalog, tier gates, and BYO compute from day one.",
+    categories: [
+      {
+        category: "Usability",
+        rows: [
+          { feature: "Low-code visual designer", eltpulse: true, competitor: true },
+          { feature: "API & REST connectors", eltpulse: true, competitor: true },
+          { feature: "Reverse ETL", eltpulse: "Partners", competitor: true },
+          { feature: "Analyst-friendly onboarding", eltpulse: "Canvas + docs", competitor: true },
+        ],
+      },
+      {
+        category: "Platform depth",
+        rows: [
+          { feature: "Git-native export (dlt, YAML)", eltpulse: "Pro+", competitor: false },
+          { feature: "Column lineage (dbt)", eltpulse: "Pro+", competitor: "Limited" },
+          { feature: "Customer gateway tokens", eltpulse: "All tiers", competitor: false },
+          { feature: "Enterprise self-hosted CP", eltpulse: "From $24k/yr", competitor: false },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "vs-estuary",
+    name: "Estuary",
+    tagline: "eltPulse vs. Estuary",
+    heroSubtitle:
+      "Estuary Flow excels at real-time CDC and streaming ingest with an open, developer-friendly model. eltPulse adds a broader EL+T control plane — batch and near-real-time — with catalog and dbt.",
+    description:
+      "Estuary (Flow) combines change-data-capture, streaming, and batch in a modern platform built on Gazette — strong for teams that need low-latency replication and open-source flexibility.",
+    theyreGoodAt: [
+      "Real-time CDC and streaming-first architecture",
+      "Open-source components and developer-friendly deployment",
+      "Efficient handling of high-churn, near-real-time sources",
+      "Clear pricing narrative for streaming vs batch workloads",
+    ],
+    whereTheyFallShort: [
+      "Full analytics control plane (dbt hub, canvas, Git export) is not the core focus",
+      "Teams wanting all-in-one batch EL+T+orchestration may layer more tools",
+      "Enterprise RBAC, air-gap metadata, and multi-tenant SaaS shell vary by deployment",
+      "Less emphasis on managed “sign up and run” for non-engineers",
+    ],
+    bestFor:
+      "Engineering teams prioritizing real-time replication and CDC who value open architecture and streaming performance.",
+    closingNote:
+      "Estuary is an excellent choice for streaming ingest. eltPulse complements or overlaps depending on need — batch EL, dbt transforms, visual builder, managed SaaS tiers, and Git-native artifacts for the whole pipeline lifecycle.",
+    categories: [
+      {
+        category: "Ingest model",
+        rows: [
+          { feature: "Real-time CDC / streaming", eltpulse: "Monitors + slices", competitor: true },
+          { feature: "Batch EL connectors", eltpulse: true, competitor: true },
+          { feature: "Open-source engine", eltpulse: "dlt, Sling", competitor: "Flow / Gazette" },
+          { feature: "Low-latency replication", eltpulse: "Gateway-dependent", competitor: true },
+        ],
+      },
+      {
+        category: "Downstream platform",
+        rows: [
+          { feature: "dbt runs & manifest lineage", eltpulse: true, competitor: "Partner / DIY" },
+          { feature: "Visual pipeline canvas", eltpulse: true, competitor: "Flow UI" },
+          { feature: "Workspace catalog & assets", eltpulse: true, competitor: "Limited" },
+          { feature: "Managed multi-tenant SaaS", eltpulse: true, competitor: "Cloud + self-serve" },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "vs-aws-glue",
+    name: "AWS Glue",
+    tagline: "eltPulse vs. AWS Glue",
+    heroSubtitle:
+      "AWS Glue is the native serverless ETL/ELT choice inside AWS — deep IAM, Lake Formation, and pay-per-DPU economics. eltPulse adds a vendor-neutral control plane that can run on your gateway or managed workers.",
+    description:
+      "Glue provides crawlers, Spark jobs, Data Catalog integration, and Studio notebooks for teams all-in on AWS. It is often the default when data already lives in S3, Redshift, and the AWS security perimeter.",
+    theyreGoodAt: [
+      "Native AWS integration: IAM, VPC, Lake Formation, Redshift, S3",
+      "Serverless Spark without managing clusters (DPUs)",
+      "Glue Data Catalog as a Hive-compatible metastore",
+      "Pay for job runtime — no always-on cluster for batch",
+    ],
+    whereTheyFallShort: [
+      "AWS-centric — multi-cloud and portable Git artifacts are DIY",
+      "Developer UX and connector catalog differ from productized ELT SaaS",
+      "Orchestration, dbt, and business-user UI often require adjacent services",
+      "Cost forecasting requires DPU tuning and job optimization discipline",
+    ],
+    bestFor:
+      "Teams standardized on AWS who want serverless Spark ETL inside the AWS ecosystem with existing cloud engineering skills.",
+    closingNote:
+      "Glue is a strong AWS primitive. eltPulse runs pipelines on your AWS gateway or managed workers with open engines, Git export, and a product layer for catalog and dbt — portable if you add Azure or GCP later.",
+    categories: [
+      {
+        category: "Cloud fit",
+        rows: [
+          { feature: "Native AWS IAM & VPC", eltpulse: "Via gateway", competitor: true },
+          { feature: "Serverless Spark transforms", eltpulse: "dbt + engines", competitor: true },
+          { feature: "Multi-cloud portability", eltpulse: true, competitor: "AWS-first" },
+          { feature: "Glue Data Catalog", eltpulse: "Workspace catalog", competitor: true },
+        ],
+      },
+      {
+        category: "Product experience",
+        rows: [
+          { feature: "Connector catalog UI", eltpulse: true, competitor: "Crawlers + custom" },
+          { feature: "Git-native pipeline export", eltpulse: "Pro+", competitor: "Scripts in repo" },
+          { feature: "Non-engineer pipeline builder", eltpulse: true, competitor: "Glue Studio" },
+          { feature: "Runs history & observability SaaS", eltpulse: true, competitor: "CloudWatch" },
+        ],
+      },
+    ],
+  },
 ];
 
 export const COMPETITOR_MAP: Record<string, Competitor> = Object.fromEntries(
