@@ -132,13 +132,13 @@ const ITEMS: {
   },
   {
     status: "shipped",
-    title: "Air-gapped metadata export (v1)",
-    desc: "Org webhook mirror for redacted run summaries on terminal runs — Security → Air-gapped metadata export; HMAC signing optional.",
+    title: "Air-gapped metadata export (v1 + v2 redaction)",
+    desc: "Team+ org webhook mirror on terminal runs; cloud logs redacted after successful export. Security → Air-gapped metadata export.",
   },
   {
-    status: "in-progress",
+    status: "shipped",
     title: "SSO / SAML (Team+)",
-    desc: "Clerk SAML for Team workspaces — contact sales to enable; set ELTPULSE_SSO_ENABLED when IdP is configured.",
+    desc: "Included on Team — configure IdP in Clerk Dashboard; Security page has setup steps; sign-in shows Continue with SSO when wired.",
   },
   {
     status: "in-progress",
@@ -147,8 +147,8 @@ const ITEMS: {
   },
   {
     status: "planned",
-    title: "Air-gap v2 — minimize cloud retention",
-    desc: "Optional stop persisting full run logs in Neon when customer_export mode; S3/GCS vault destinations.",
+    title: "Air-gap v3 — object storage vaults",
+    desc: "S3/GCS push destinations and batch re-export for compliance audits.",
   },
   {
     status: "planned",

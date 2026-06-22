@@ -60,6 +60,27 @@ export default function SecurityDocsPage() {
         .
       </p>
 
+      <h2>SSO / SAML (Team+)</h2>
+      <p>
+        SSO/SAML is included on Team and Enterprise. Configure your identity provider as an Enterprise connection in
+        the Clerk Dashboard — the sign-in page shows <strong>Continue with SSO</strong> automatically when connections
+        are active. Setup instructions live on{" "}
+        <Link href="/account/security">Account → Security</Link>.
+      </p>
+
+      <h2 id="air-gap-metadata">Air-gapped metadata export (Team+)</h2>
+      <p>
+        Team and Enterprise workspaces can mirror redacted run metadata to an HTTPS webhook on every terminal run.
+        Configure export URL and optional HMAC signing secret on{" "}
+        <Link href="/account/security">Account → Security</Link>. Payload schema:{" "}
+        <code>schemaVersion: 1</code>, <code>exportKind: run.metadata</code> — status, row counts, error summary, and
+        telemetry rollup (no raw log lines).
+      </p>
+      <p>
+        After a successful export (v2), verbose run logs and telemetry samples are redacted in eltPulse Cloud; only the
+        summary rollup and an informational notice remain in the run record.
+      </p>
+
       <h2>Billing</h2>
       <p>
         Stripe identifiers and plan tier are stored for subscription management. See{" "}

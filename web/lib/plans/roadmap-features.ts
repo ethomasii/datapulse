@@ -13,14 +13,9 @@ function envIdList(name: string): string[] {
     .filter(Boolean);
 }
 
-/** Clerk SAML / SSO wired for this deployment. */
-export function ssoFeatureEnabled(): boolean {
-  return envFlag("ELTPULSE_SSO_ENABLED");
-}
-
-/** Restrict metadata sync to customer-controlled storage only. */
-export function airGappedMetadataEnabled(): boolean {
-  return envFlag("ELTPULSE_AIRGAP_METADATA_ENABLED");
+/** Ops kill-switch only — Team+ customers get air-gap by default. */
+export function airGapMetadataKillSwitchActive(): boolean {
+  return envFlag("ELTPULSE_AIRGAP_DISABLED");
 }
 
 /** Org ids with Enterprise contract (self-hosted control plane, custom SLAs). */
@@ -33,18 +28,32 @@ export function isEnterpriseOrganization(orgId: string | null | undefined): bool
   return enterpriseOrgIds().includes(orgId);
 }
 
-/** Team+ when SSO is enabled; otherwise preview-only for Team sales conversations. */
+/** SSO / SAML included on Team and Enterprise plans. */
 export function tierEligibleForSso(tier: PlanTier): boolean {
   return tierAtLeast(tier, "team");
 }
 
+/** Alias — entitlement is plan tier; IdP is configured in Clerk Dashboard. */
 export function tierCanUseSso(tier: PlanTier): boolean {
-  return ssoFeatureEnabled() && tierEligibleForSso(tier);
+  return tierEligibleForSso(tier);
 }
 
-/** Enterprise orgs (or global flag) for air-gapped metadata routing. */
+/**
+ * Air-gapped metadata export — included with Team+ (what they buy).
+ * Enterprise org flag also qualifies. No per-customer env vars required.
+ */
 export function orgCanUseAirGappedMetadata(orgId: string | null | undefined, tier: PlanTier): boolean {
-  if (!airGappedMetadataEnabled()) return false;
+  if (airGapMetadataKillSwitchActive()) return false;
   if (isEnterpriseOrganization(orgId)) return true;
-  return tierAtLeast(tier, "team") && envFlag("ELTPULSE_AIRGAP_TEAM_PREVIEW");
+  return tierAtLeast(tier, "team");
+}
+
+/** @deprecated Use orgCanUseAirGappedMetadata — no global enable flag needed. */
+export function airGappedMetadataEnabled(): boolean {
+  return !airGapMetadataKillSwitchActive();
+}
+
+/** @deprecated SSO is tier-gated; configure SAML connections in Clerk Dashboard. */
+export function ssoFeatureEnabled(): boolean {
+  return true;
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildAirgapRunExportPayload } from "./airgap-metadata-export";
 
+import { cloudStorageAfterSuccessfulAirgapExport } from "./airgap-metadata-export";
+
 describe("airgap-metadata-export", () => {
   it("builds redacted terminal run payload", () => {
     const payload = buildAirgapRunExportPayload({
@@ -30,6 +32,20 @@ describe("airgap-metadata-export", () => {
       telemetrySummary: { rowsLoaded: 1000 },
     });
     expect(payload).not.toHaveProperty("logEntries");
+  });
+
+  it("redacts cloud storage after successful export (v2)", () => {
+    const redacted = cloudStorageAfterSuccessfulAirgapExport({
+      summary: { rowsLoaded: 500, bytesLoaded: 12000 },
+      samples: [{ at: "2026-01-01T00:00:00Z", rowsLoaded: 100 }],
+      dbt: { models: [{ name: "dim_users" }] },
+    });
+    expect(redacted.logEntries).toHaveLength(1);
+    expect(redacted.telemetry).toMatchObject({
+      summary: { rowsLoaded: 500, bytesLoaded: 12000 },
+      samples: [],
+    });
+    expect(redacted.telemetry).not.toHaveProperty("dbt");
   });
 
   it("returns null for non-terminal runs", () => {

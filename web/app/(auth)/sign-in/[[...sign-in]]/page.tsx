@@ -15,6 +15,13 @@ export default function SignInPage() {
       </div>
       <div className="w-full max-w-md sm:max-w-lg">
         <ThemedSignIn />
+        <p className="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
+          Team workspaces: use SSO when your admin has configured it in Clerk — see{" "}
+          <Link href="/account/security" className="font-medium text-blue-600 hover:underline dark:text-blue-400">
+            Security
+          </Link>
+          .
+        </p>
       </div>
     </div>
   );

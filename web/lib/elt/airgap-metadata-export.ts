@@ -1,11 +1,36 @@
 import { createHmac } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
-import { parseRunTelemetry } from "@/lib/elt/run-telemetry";
+import { parseRunTelemetry, runTelemetryToJson } from "@/lib/elt/run-telemetry";
 import { dbtFailedTests } from "@/lib/elt/dbt-run-manifest";
 import { runSubjectLabel } from "@/lib/elt/run-display";
 import type { MetadataStorageMode } from "@prisma/client";
 
 const UA = "eltPulse-Airgap/1";
+
+export const AIRGAP_CLOUD_REDACTION_LOG_MESSAGE =
+  "Full run logs exported to your metadata vault; not retained in eltPulse Cloud.";
+
+/** v2 — after successful export, keep summary rollup only in cloud DB. */
+export function cloudStorageAfterSuccessfulAirgapExport(telemetry: unknown): {
+  logEntries: Prisma.InputJsonValue;
+  telemetry: Prisma.InputJsonValue;
+} {
+  const tel = parseRunTelemetry(telemetry);
+  return {
+    logEntries: [
+      {
+        at: new Date().toISOString(),
+        level: "info" as const,
+        message: AIRGAP_CLOUD_REDACTION_LOG_MESSAGE,
+      },
+    ],
+    telemetry: runTelemetryToJson({
+      summary: tel.summary,
+      samples: [],
+    }) as Prisma.InputJsonValue,
+  };
+}
 
 export type AirgapRunExportPayload = {
   source: "eltpulse";
@@ -161,11 +186,17 @@ export async function maybeDispatchAirgapMetadataExport(runId: string): Promise<
     org.metadataExportWebhookSecret
   );
 
+  const redacted =
+    result.ok ? cloudStorageAfterSuccessfulAirgapExport(run.telemetry) : null;
+
   await db.eltPipelineRun.update({
     where: { id: run.id },
     data: {
       airgapExportedAt: new Date(),
       airgapExportStatus: result.ok ? "ok" : `http_${result.httpStatus ?? "error"}`,
+      ...(redacted
+        ? { logEntries: redacted.logEntries, telemetry: redacted.telemetry }
+        : {}),
     },
   });
 }

@@ -14,18 +14,20 @@ import {
   tierAllowsRunsApi,
   tierAllowsWebhookTriggers,
 } from "@/lib/plans/tier-features";
+import { getActiveOrganizationForSession } from "@/lib/auth/active-org";
 import {
-  airGappedMetadataEnabled,
-  ssoFeatureEnabled,
+  orgCanUseAirGappedMetadata,
   tierCanUseSso,
   tierEligibleForSso,
 } from "@/lib/plans/roadmap-features";
+import { clerkEnterpriseConnectionConfigured } from "@/lib/clerk/sso";
 
 export async function GET() {
   const user = await getCurrentDbUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const tier = user.subscription?.tier ?? "free";
+  const sessionOrg = await getActiveOrganizationForSession();
   const [pipelineCount, rowsThisMonth] = await Promise.all([
     countUserPipelines(user.id),
     getMonthlyRowsSynced(user.id),
@@ -58,8 +60,8 @@ export async function GET() {
       personalGatewayLimit: PERSONAL_GATEWAY_LIMITS[tier],
       ssoEligible: tierEligibleForSso(tier),
       ssoActive: tierCanUseSso(tier),
-      ssoConfigured: ssoFeatureEnabled(),
-      airGappedMetadataConfigured: airGappedMetadataEnabled(),
+      ssoConfigured: clerkEnterpriseConnectionConfigured(),
+      airGappedMetadataEligible: orgCanUseAirGappedMetadata(sessionOrg?.id, tier),
     },
   });
 }

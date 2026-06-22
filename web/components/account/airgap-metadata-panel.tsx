@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Loader2, Send } from "lucide-react";
+import type { PlanTier } from "@prisma/client";
 
 type ExportSettings = {
   organizationId: string | null;
@@ -12,7 +14,7 @@ type ExportSettings = {
   webhookUrlPreview: string | null;
 };
 
-export function AirgapMetadataPanel() {
+export function AirgapMetadataPanel({ tier }: { tier?: PlanTier }) {
   const [settings, setSettings] = useState<ExportSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -100,11 +102,16 @@ export function AirgapMetadataPanel() {
   if (!settings.allowed) {
     return (
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        Air-gapped metadata export is available on Team (preview) and Enterprise. Contact{" "}
+        Air-gapped metadata export is included on Team and Enterprise
+        {tier ? ` (current plan: ${tier})` : ""}.{" "}
+        <Link href="/account/billing" className="font-medium text-blue-600 hover:underline dark:text-blue-400">
+          Upgrade to Team
+        </Link>{" "}
+        or contact{" "}
         <a href="mailto:hello@eltpulse.dev" className="font-medium text-blue-600 hover:underline">
           hello@eltpulse.dev
         </a>{" "}
-        to enable, or set <code className="text-xs">ELTPULSE_AIRGAP_TEAM_PREVIEW=true</code> in staging.
+        for Enterprise.
       </p>
     );
   }
@@ -112,8 +119,8 @@ export function AirgapMetadataPanel() {
   return (
     <form onSubmit={(e) => void save(e)} className="mt-4 space-y-4">
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        v1 mirrors redacted run summaries (status, row counts, errors — no raw logs) to your HTTPS endpoint on
-        every terminal run. Cloud retention still applies until v2.
+        Mirrors redacted run summaries (status, row counts, errors — no raw logs) to your HTTPS endpoint on every
+        terminal run. After a successful export, verbose logs and telemetry samples are redacted in eltPulse Cloud (v2).
       </p>
 
       <div>

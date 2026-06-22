@@ -1,6 +1,6 @@
 /**
  * GET /api/organization/metadata-export — org owner: air-gap metadata export settings
- * PATCH — update mode + webhook URL (Team preview / Enterprise)
+ * PATCH — update mode + webhook URL (Team+ / Enterprise)
  * POST { action: "test" } — send connectivity test payload
  */
 import { NextResponse } from "next/server";
@@ -72,7 +72,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json(
       {
         error:
-          "Air-gapped metadata export requires Team (preview) or Enterprise. Contact hello@eltpulse.dev to enable.",
+          "Air-gapped metadata export is included on Team and Enterprise. Upgrade at Billing or contact hello@eltpulse.dev.",
       },
       { status: 403 }
     );

@@ -47,6 +47,8 @@ type RunRow = {
   finishedAt: string | null;
   errorSummary: string | null;
   webhookStatus: string | null;
+  airgapExportedAt?: string | null;
+  airgapExportStatus?: string | null;
   telemetry?: unknown;
   pipeline: { id: string; name: string; sourceType?: string; sourceConfiguration?: unknown } | null;
   dbtProject?: { id: string; name: string } | null;
@@ -1243,6 +1245,29 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                 {detail.run.webhookStatus && (
                   <p className="text-xs text-slate-500">
                     Webhook delivery: <span className="font-mono">{detail.run.webhookStatus}</span>
+                  </p>
+                )}
+                {detail.run.airgapExportStatus && (
+                  <p className="text-xs text-slate-500">
+                    Air-gap metadata export:{" "}
+                    <span
+                      className={
+                        detail.run.airgapExportStatus === "ok"
+                          ? "font-mono text-emerald-600 dark:text-emerald-400"
+                          : "font-mono text-amber-600 dark:text-amber-400"
+                      }
+                    >
+                      {detail.run.airgapExportStatus}
+                    </span>
+                    {detail.run.airgapExportedAt ? (
+                      <span className="text-slate-400">
+                        {" "}
+                        · {new Date(detail.run.airgapExportedAt).toLocaleString()}
+                      </span>
+                    ) : null}
+                    {detail.run.airgapExportStatus === "ok" ? (
+                      <span className="block text-slate-400">Mirrored to your metadata vault; cloud logs redacted.</span>
+                    ) : null}
                   </p>
                 )}
               </div>
