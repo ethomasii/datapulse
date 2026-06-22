@@ -4,6 +4,7 @@
 
 import type { DbtRunManifest } from "@/lib/elt/dbt-run-manifest";
 import { sanitizeDbtRunManifest } from "@/lib/elt/dbt-run-manifest";
+import { parseDbtManifestDependencies } from "@/lib/elt/dbt-manifest-lineage";
 
 type DbtManifestNode = {
   name?: string;
@@ -42,7 +43,13 @@ export function enrichDbtManifestFromArtifact(
     };
   });
 
-  return { ...manifest, models };
+  const deps = parseDbtManifestDependencies(artifactRaw);
+
+  return {
+    ...manifest,
+    models,
+    ...(Object.keys(deps).length ? { modelDependencies: deps } : {}),
+  };
 }
 
 /** Build manifest from dbt run_results.json + optional manifest.json artifact. */
@@ -85,7 +92,11 @@ export function parseDbtRunArtifacts(
     recordedAt: new Date().toISOString(),
   });
   if (!base) return null;
-  return manifestRaw ? enrichDbtManifestFromArtifact(base, manifestRaw) : base;
+  if (!manifestRaw) return base;
+  const enriched = enrichDbtManifestFromArtifact(base, manifestRaw);
+  const deps = parseDbtManifestDependencies(manifestRaw);
+  if (Object.keys(deps).length === 0) return enriched;
+  return { ...enriched, modelDependencies: deps };
 }
 
 /** Extract catalog column defs for a transform asset from last run dbt manifest. */

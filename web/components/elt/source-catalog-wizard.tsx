@@ -10,6 +10,13 @@ import { ALL_DLT_SOURCES, getContextSlug, type DltHubSource } from '@/lib/elt/dl
 import { DESTINATION_GROUPS } from '@/lib/elt/catalog';
 import type { DltSourceContext, DltContextEndpoint } from '@/app/api/elt/source-context/[slug]/route';
 import type { CreatePipelineBody } from '@/lib/elt/types';
+import { applyDiscoveryToSourceConfiguration } from '@/lib/elt/source-discover';
+import {
+  databaseSourceConnectors,
+  isDatabaseCatalogSource,
+  pipelineSourceTypeFromConnector,
+} from '@/lib/elt/catalog-wizard-database';
+import { TablePicker, useSourceDiscovery } from '@/components/elt/table-picker';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -31,6 +38,8 @@ type WizardState = {
   contextLoading: boolean;
   contextError: string | null;
   selectedEndpoints: Set<string>;
+  selectedTables: Set<string>;
+  sourceConnector: string | null;
   authValues: Record<string, string>;
   sourceConnectionId: string | null;
   destination: string;
@@ -64,14 +73,17 @@ const CATEGORY_COLORS: Record<string, string> = {
 function InlineConnectionPicker({
   connectionType,
   connector,
+  connectors,
   selectedId,
   onSelect,
   label,
 }: {
   connectionType: 'source' | 'destination';
   connector: string;
+  /** When set, match any of these connector slugs (database wizard). */
+  connectors?: string[];
   selectedId: string | null;
-  onSelect: (id: string | null, name: string | null) => void;
+  onSelect: (id: string | null, name: string | null, connector?: string) => void;
   label: string;
 }) {
   const [connections, setConnections] = useState<StoredConnection[]>([]);
@@ -86,8 +98,9 @@ function InlineConnectionPicker({
       .catch(() => {/* ignore */});
   }, [loaded]);
 
+  const allowed = connectors?.map((c) => c.toLowerCase()) ?? [connector.toLowerCase()];
   const matching = connections.filter(
-    (c) => c.connectionType === connectionType && c.connector.toLowerCase() === connector.toLowerCase()
+    (c) => c.connectionType === connectionType && allowed.includes(c.connector.toLowerCase())
   );
   const selected = matching.find((c) => c.id === selectedId);
 
@@ -114,8 +127,8 @@ function InlineConnectionPicker({
           value={selectedId ?? ''}
           onChange={(e) => {
             const id = e.target.value || null;
-            const name = matching.find((c) => c.id === id)?.name ?? null;
-            onSelect(id, name);
+            const row = matching.find((c) => c.id === id);
+            onSelect(id, row?.name ?? null, row?.connector);
           }}
           className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm dark:text-white focus:border-sky-500 outline-none"
         >
@@ -235,6 +248,148 @@ function BrowseStep({ onSelect }: { onSelect: (s: DltHubSource) => void }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Database replication configure (postgres/mysql + TablePicker) ─────────────
+
+function DatabaseConfigureStep({
+  source,
+  sourceConnectionId,
+  sourceConnector,
+  onSourceConnectionSelect,
+  selectedTables,
+  onSelectedTablesChange,
+  destination,
+  onDestinationChange,
+  destinationConnectionId,
+  onDestinationConnectionSelect,
+  pipelineName,
+  onNameChange,
+  onBack,
+  onNext,
+}: {
+  source: DltHubSource;
+  sourceConnectionId: string | null;
+  sourceConnector: string | null;
+  onSourceConnectionSelect: (id: string | null, connector: string | null) => void;
+  selectedTables: Set<string>;
+  onSelectedTablesChange: (next: Set<string>) => void;
+  destination: string;
+  onDestinationChange: (d: string) => void;
+  destinationConnectionId: string | null;
+  onDestinationConnectionSelect: (id: string | null) => void;
+  pipelineName: string;
+  onNameChange: (n: string) => void;
+  onBack: () => void;
+  onNext: () => void;
+}) {
+  const discoverConnector = sourceConnector ?? databaseSourceConnectors(source)[0] ?? "postgres";
+  const discovery = useSourceDiscovery({
+    connector: discoverConnector,
+    connectionId: sourceConnectionId,
+    enabled: Boolean(sourceConnectionId),
+  });
+
+  const canProceed =
+    Boolean(sourceConnectionId) &&
+    (selectedTables.size > 0 || discovery.selected.size > 0) &&
+    pipelineName.trim().length > 0;
+
+  const effectiveSelected = selectedTables.size > 0 ? selectedTables : discovery.selected;
+
+  useEffect(() => {
+    if (selectedTables.size === 0 && discovery.selected.size > 0 && !discovery.loading) {
+      onSelectedTablesChange(new Set(discovery.selected));
+    }
+  }, [discovery.selected, discovery.loading, selectedTables.size, onSelectedTablesChange]);
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
+          <ChevronLeft className="h-4 w-4" /> Back
+        </button>
+        <div className="flex-1">
+          <h3 className="font-semibold text-slate-900 dark:text-white">{source.name}</h3>
+          <p className="text-xs text-slate-500">Database replication — pick tables to sync with Sling</p>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-4">
+        <p className="text-sm font-semibold text-slate-800 dark:text-white">Source database</p>
+        <InlineConnectionPicker
+          connectionType="source"
+          connector={discoverConnector}
+          connectors={databaseSourceConnectors(source)}
+          selectedId={sourceConnectionId}
+          onSelect={(id, _name, connector) => onSourceConnectionSelect(id, connector ?? null)}
+          label="Saved postgres/mysql connection"
+        />
+      </div>
+
+      {sourceConnectionId ? (
+        <div>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block mb-2">
+            Tables to replicate ({selectedTables.size} selected)
+          </label>
+          <TablePicker
+            items={discovery.items}
+            selected={effectiveSelected}
+            onChange={onSelectedTablesChange}
+            loading={discovery.loading}
+            message={discovery.message}
+            emptyHint="Connect a postgres/mysql source with DATABASE_URL or connection string stored."
+          />
+          {discovery.error ? (
+            <p className="mt-2 text-xs text-amber-600">{discovery.error}</p>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-sm text-slate-500">Select a source connection to discover tables.</p>
+      )}
+
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-4">
+        <p className="text-sm font-semibold text-slate-800 dark:text-white">Destination warehouse</p>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Destination type</label>
+        <select
+          value={destination}
+          onChange={(e) => onDestinationChange(e.target.value)}
+          className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm dark:text-white"
+        >
+          {DESTINATION_GROUPS.flatMap((g) => g.destinations).map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+        <InlineConnectionPicker
+          connectionType="destination"
+          connector={destination}
+          selectedId={destinationConnectionId}
+          onSelect={(id) => onDestinationConnectionSelect(id)}
+          label="Saved destination connection"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Pipeline name</label>
+        <input
+          type="text"
+          value={pipelineName}
+          onChange={(e) => onNameChange(e.target.value.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase())}
+          className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm font-mono dark:text-white"
+        />
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          onClick={onNext}
+          disabled={!canProceed}
+          className="flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-40 transition-colors"
+        >
+          Review <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -448,13 +603,16 @@ function ConfigureStep({
 // ── Review step ───────────────────────────────────────────────────────────────
 
 function ReviewStep({
-  source, context, selectedEndpoints, destination,
+  source, context, selectedEndpoints, selectedTables, isDatabase,
+  destination,
   destinationConnectionId, sourceConnectionId,
   pipelineName, saving, saved, savedId, saveError, onBack, onSave,
 }: {
   source: DltHubSource;
-  context: DltSourceContext;
+  context: DltSourceContext | null;
   selectedEndpoints: Set<string>;
+  selectedTables: Set<string>;
+  isDatabase: boolean;
   destination: string;
   destinationConnectionId: string | null;
   sourceConnectionId: string | null;
@@ -467,7 +625,8 @@ function ReviewStep({
   onSave: () => void;
 }) {
   const router = useRouter();
-  const endpoints = context.endpoints.filter((ep) => selectedEndpoints.has(ep.name));
+  const endpoints = context?.endpoints.filter((ep) => selectedEndpoints.has(ep.name)) ?? [];
+  const tables = Array.from(selectedTables);
 
   return (
     <div className="flex flex-col gap-5">
@@ -500,20 +659,26 @@ function ReviewStep({
         </div>
         <div className="px-4 py-3">
           <span className="text-xs font-medium text-slate-500 uppercase tracking-wide block mb-2">
-            Resources ({endpoints.length})
+            {isDatabase ? `Tables (${tables.length})` : `Resources (${endpoints.length})`}
           </span>
           <div className="flex flex-wrap gap-1.5">
-            {endpoints.map((ep) => (
-              <span key={ep.name} className="inline-flex items-center gap-1 rounded-full bg-teal-50 dark:bg-teal-900/20 px-2.5 py-0.5 text-xs font-medium text-teal-700 dark:text-teal-300">
-                {ep.name}
-              </span>
-            ))}
+            {isDatabase
+              ? tables.map((t) => (
+                  <span key={t} className="inline-flex items-center gap-1 rounded-full bg-teal-50 dark:bg-teal-900/20 px-2.5 py-0.5 text-xs font-medium text-teal-700 dark:text-teal-300">
+                    {t}
+                  </span>
+                ))
+              : endpoints.map((ep) => (
+                  <span key={ep.name} className="inline-flex items-center gap-1 rounded-full bg-teal-50 dark:bg-teal-900/20 px-2.5 py-0.5 text-xs font-medium text-teal-700 dark:text-teal-300">
+                    {ep.name}
+                  </span>
+                ))}
           </div>
         </div>
         <div className="px-4 py-3 flex items-center justify-between">
           <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Credentials</span>
           <span className="text-sm text-slate-600 dark:text-slate-400">
-            {sourceConnectionId ? 'Saved connection' : context.authType === 'none' ? 'None' : 'Inline / env var'}
+            {sourceConnectionId ? 'Saved connection' : context?.authType === 'none' ? 'None' : 'Inline / env var'}
           </span>
         </div>
       </div>
@@ -570,6 +735,8 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
     contextLoading: false,
     contextError: null,
     selectedEndpoints: new Set(),
+    selectedTables: new Set(),
+    sourceConnector: null,
     authValues: {},
     sourceConnectionId: null,
     destination: 'duckdb',
@@ -582,8 +749,29 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
   });
 
   const fetchContext = useCallback(async (source: DltHubSource) => {
-    const contextSlug = getContextSlug(source);
     const defaultName = `${source.slug.replace(/-/g, '_')}_pipeline`;
+
+    if (isDatabaseCatalogSource(source)) {
+      setState((prev) => ({
+        ...prev,
+        step: 'configure',
+        source,
+        context: null,
+        contextLoading: false,
+        contextError: null,
+        selectedEndpoints: new Set(),
+        selectedTables: new Set(),
+        sourceConnector: null,
+        sourceConnectionId: null,
+        pipelineName: defaultName,
+        saved: false,
+        savedId: null,
+        saveError: null,
+      }));
+      return;
+    }
+
+    const contextSlug = getContextSlug(source);
 
     setState((prev) => ({
       ...prev,
@@ -593,6 +781,7 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
       contextLoading: true,
       contextError: null,
       selectedEndpoints: new Set(),
+      selectedTables: new Set(),
       sourceConnectionId: null,
       pipelineName: defaultName,
       saved: false,
@@ -631,38 +820,74 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
   }, []);
 
   const savePipeline = useCallback(async () => {
-    const { source, context, selectedEndpoints, authValues, sourceConnectionId, destination, destinationConnectionId, pipelineName } = state;
-    if (!source || !context) return;
+    const {
+      source,
+      context,
+      selectedEndpoints,
+      selectedTables,
+      sourceConnector,
+      authValues,
+      sourceConnectionId,
+      destination,
+      destinationConnectionId,
+      pipelineName,
+    } = state;
+    if (!source) return;
 
-    const filteredResources = (context.restApiConfig.resources as unknown[])?.filter((r) => {
-      const name = (r as { name?: string }).name;
-      return name && selectedEndpoints.has(name);
-    }) ?? [];
+    let body: CreatePipelineBody;
 
-    const advancedConfig: Record<string, unknown> = { ...context.restApiConfig, resources: filteredResources };
+    if (isDatabaseCatalogSource(source)) {
+      if (!sourceConnectionId || selectedTables.size === 0) return;
+      const connector = sourceConnector ?? "postgres";
+      const sourceType = pipelineSourceTypeFromConnector(connector);
+      const baseConfig = applyDiscoveryToSourceConfiguration(
+        sourceType,
+        { schema: "public" },
+        Array.from(selectedTables)
+      );
+      body = {
+        name: pipelineName,
+        sourceType,
+        destinationType: destination,
+        tool: "sling",
+        description: `${source.name} → ${destination} (${selectedTables.size} tables)`,
+        sourceConfiguration: baseConfig,
+        sourceConnectionId,
+        ...(destinationConnectionId ? { destinationConnectionId } : {}),
+      };
+    } else {
+      if (!context) return;
 
-    if (!sourceConnectionId && context.authType !== 'none' && authValues[context.authParam]) {
-      const client = advancedConfig.client as Record<string, unknown>;
-      const auth = client?.auth as Record<string, unknown> | undefined;
-      if (auth) auth[context.authParam] = `ENV:${context.authEnvHint}`;
+      const filteredResources = (context.restApiConfig.resources as unknown[])?.filter((r) => {
+        const name = (r as { name?: string }).name;
+        return name && selectedEndpoints.has(name);
+      }) ?? [];
+
+      const advancedConfig: Record<string, unknown> = { ...context.restApiConfig, resources: filteredResources };
+
+      if (!sourceConnectionId && context.authType !== 'none' && authValues[context.authParam]) {
+        const client = advancedConfig.client as Record<string, unknown>;
+        const auth = client?.auth as Record<string, unknown> | undefined;
+        if (auth) auth[context.authParam] = `ENV:${context.authEnvHint}`;
+      }
+
+      body = {
+        name: pipelineName,
+        sourceType: 'rest_api',
+        destinationType: destination,
+        tool: 'dlt',
+        description: `${source.name} → ${destination} (${filteredResources.length} resources)`,
+        sourceConfiguration: {
+          advanced_config: JSON.stringify(advancedConfig),
+          resource_name: filteredResources[0] ? (filteredResources[0] as { name: string }).name : 'data',
+          base_url: context.baseUrl,
+          _context_slug: context.slug,
+          _context_url: context.contextUrl,
+        },
+        ...(sourceConnectionId ? { sourceConnectionId } : {}),
+        ...(destinationConnectionId ? { destinationConnectionId } : {}),
+      };
     }
-
-    const body: CreatePipelineBody = {
-      name: pipelineName,
-      sourceType: 'rest_api',
-      destinationType: destination,
-      tool: 'dlt',
-      description: `${source.name} → ${destination} (${filteredResources.length} resources)`,
-      sourceConfiguration: {
-        advanced_config: JSON.stringify(advancedConfig),
-        resource_name: filteredResources[0] ? (filteredResources[0] as { name: string }).name : 'data',
-        base_url: context.baseUrl,
-        _context_slug: context.slug,
-        _context_url: context.contextUrl,
-      },
-      ...(sourceConnectionId ? { sourceConnectionId } : {}),
-      ...(destinationConnectionId ? { destinationConnectionId } : {}),
-    };
 
     setState((prev) => ({ ...prev, step: 'review', saving: true, saveError: null }));
 
@@ -681,7 +906,8 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
     }
   }, [state, onPipelineSaved]);
 
-  const { step, source, context, contextLoading, contextError, selectedEndpoints, authValues, sourceConnectionId, destination, destinationConnectionId, pipelineName, saving, saved, savedId, saveError } = state;
+  const { step, source, context, contextLoading, contextError, selectedEndpoints, selectedTables, sourceConnector, authValues, sourceConnectionId, destination, destinationConnectionId, pipelineName, saving, saved, savedId, saveError } = state;
+  const isDatabase = source ? isDatabaseCatalogSource(source) : false;
 
   return (
     <div className="min-h-0">
@@ -697,7 +923,33 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
 
       {step === 'browse' && <BrowseStep onSelect={fetchContext} />}
 
-      {step === 'configure' && source && (
+      {step === 'configure' && source && isDatabase && (
+        <DatabaseConfigureStep
+          source={source}
+          sourceConnectionId={sourceConnectionId}
+          sourceConnector={sourceConnector}
+          onSourceConnectionSelect={(id, connector) =>
+            setState((prev) => ({
+              ...prev,
+              sourceConnectionId: id,
+              sourceConnector: connector,
+              selectedTables: new Set(),
+            }))
+          }
+          selectedTables={selectedTables}
+          onSelectedTablesChange={(next) => setState((prev) => ({ ...prev, selectedTables: next }))}
+          destination={destination}
+          onDestinationChange={(d) => setState((prev) => ({ ...prev, destination: d }))}
+          destinationConnectionId={destinationConnectionId}
+          onDestinationConnectionSelect={(id) => setState((prev) => ({ ...prev, destinationConnectionId: id }))}
+          pipelineName={pipelineName}
+          onNameChange={(n) => setState((prev) => ({ ...prev, pipelineName: n }))}
+          onBack={() => setState((prev) => ({ ...prev, step: 'browse' }))}
+          onNext={() => setState((prev) => ({ ...prev, step: 'review' }))}
+        />
+      )}
+
+      {step === 'configure' && source && !isDatabase && (
         <ConfigureStep
           source={source}
           context={context}
@@ -721,11 +973,13 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
         />
       )}
 
-      {step === 'review' && source && context && (
+      {step === 'review' && source && (
         <ReviewStep
           source={source}
           context={context}
           selectedEndpoints={selectedEndpoints}
+          selectedTables={selectedTables}
+          isDatabase={isDatabase}
           destination={destination}
           destinationConnectionId={destinationConnectionId}
           sourceConnectionId={sourceConnectionId}

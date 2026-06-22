@@ -73,7 +73,14 @@ export function AssetLineageGraph({
 
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-950/30">
-      <p className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Lineage</p>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Lineage</p>
+        {graph.fromManifest ? (
+          <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-800 dark:bg-violet-950/50 dark:text-violet-200">
+            dbt manifest
+          </span>
+        ) : null}
+      </div>
       <div className="space-y-1">
         {roots.map((r) => (
           <NodeCard key={r.id} id={r.id} depth={0} />

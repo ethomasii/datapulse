@@ -30,6 +30,8 @@ export type DbtRunManifest = {
   recordedAt?: string;
   /** config = inferred from pipeline; runner = reported by executor */
   source?: "config" | "runner";
+  /** model name → parent model/source short names (from manifest parent_map) */
+  modelDependencies?: Record<string, string[]>;
 };
 
 function str(v: unknown, max: number): string | undefined {
@@ -110,6 +112,18 @@ export function sanitizeDbtRunManifest(raw: unknown): DbtRunManifest | null {
 
   if (models.length === 0 && tests.length === 0 && !str(o.packagePath, 512)) return null;
 
+  const modelDependenciesRaw = o.modelDependencies;
+  let modelDependencies: Record<string, string[]> | undefined;
+  if (modelDependenciesRaw && typeof modelDependenciesRaw === "object" && !Array.isArray(modelDependenciesRaw)) {
+    modelDependencies = {};
+    for (const [k, v] of Object.entries(modelDependenciesRaw as Record<string, unknown>)) {
+      if (!k.trim() || !Array.isArray(v)) continue;
+      const parents = v.map((p) => String(p).trim()).filter(Boolean);
+      if (parents.length) modelDependencies[k.trim()] = parents;
+    }
+    if (Object.keys(modelDependencies).length === 0) modelDependencies = undefined;
+  }
+
   const sourceRaw = str(o.source, 16);
   const source = sourceRaw === "runner" ? "runner" : sourceRaw === "config" ? "config" : undefined;
 
@@ -120,6 +134,7 @@ export function sanitizeDbtRunManifest(raw: unknown): DbtRunManifest | null {
     tests,
     ...(str(o.recordedAt, 64) ? { recordedAt: str(o.recordedAt, 64) } : {}),
     ...(source ? { source } : {}),
+    ...(modelDependencies ? { modelDependencies } : {}),
   };
 }
 
