@@ -187,6 +187,14 @@ function resolveConnectorResources(sourceType: string, config: Record<string, un
   const fromConfig = stringList(config.resources);
   if (fromConfig.length) return fromConfig;
 
+  if (typeof config.tables === "string" && config.tables.trim()) {
+    const tables = config.tables
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (tables.length) return tables;
+  }
+
   const st = sourceType.toLowerCase().trim();
   if (DEFAULT_RESOURCES[st]?.length) return DEFAULT_RESOURCES[st];
 

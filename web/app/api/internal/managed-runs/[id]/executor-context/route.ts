@@ -134,8 +134,11 @@ export async function GET(req: Request, ctx: Ctx) {
       partitionValue: run.partitionValue,
       partitionColumn: run.partitionColumn,
       correlationId: run.correlationId,
+      triggeredBy: run.triggeredBy,
+      dbtProjectId: run.dbtProjectId,
     },
     pipeline: pipelinePayload,
+    dbtProject: run.dbtProject ?? null,
     connections: { source, destination },
   });
 }

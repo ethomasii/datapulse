@@ -17,6 +17,7 @@ import {
   connectorLabel,
 } from "@/lib/elt/connectors-registry";
 import { ConnectorCombobox } from "@/components/elt/connector-combobox";
+import { ConnectorOAuthButton, supportsConnectorOAuth } from "@/components/elt/connector-oauth-button";
 import { ComponentCatalogSettings } from "@/components/elt/component-catalog-settings";
 
 function connectorsByCategory(connectionType: "source" | "destination"): { category: string; slugs: string[] }[] {
@@ -542,6 +543,16 @@ function CreateConnectionForm({ onCreated }: { onCreated: (c: Connection) => voi
           </div>
         </label>
       </div>
+
+      {connector && type === "source" && supportsConnectorOAuth(connector) ? (
+        <div className="mt-4 rounded-lg border border-violet-200 bg-violet-50/50 p-4 dark:border-violet-900/50 dark:bg-violet-950/20">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-violet-800 dark:text-violet-200">
+            Connect with OAuth
+          </p>
+          <ConnectorOAuthButton connector={connector} connectionName={name.trim() || undefined} />
+          <p className="mt-3 text-[11px] text-slate-500">Or enter API keys manually below.</p>
+        </div>
+      ) : null}
 
       {connector && (
         <div className="mt-4">

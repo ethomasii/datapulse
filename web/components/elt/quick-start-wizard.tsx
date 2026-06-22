@@ -27,10 +27,12 @@ import {
 } from "@/lib/elt/quick-start-credentials";
 import { scenarioById, lakeStarterIdForScenario } from "@/lib/marketing/pipeline-scenarios";
 import { canvasStarterHref } from "@/lib/elt/lake-defaults";
+import { applyDiscoveryToSourceConfiguration } from "@/lib/elt/source-discover";
+import { TablePicker, useSourceDiscovery } from "@/components/elt/table-picker";
 
-type Step = "destination" | "source" | "credentials" | "name" | "done";
+type Step = "destination" | "source" | "credentials" | "tables" | "name" | "done";
 
-const STEP_LABELS = ["Destination", "Source", "Credentials", "Run"];
+const STEP_LABELS = ["Destination", "Source", "Credentials", "Tables", "Run"];
 
 export type QuickStartWizardProps = {
   initialSource?: string;
@@ -84,6 +86,13 @@ export function QuickStartWizard({
     return scenario ? lakeStarterIdForScenario(scenario) : undefined;
   }, [scenarioId]);
   const [executionLabel, setExecutionLabel] = useState<string | null>(null);
+  const [discoverEnabled, setDiscoverEnabled] = useState(false);
+
+  const discovery = useSourceDiscovery({
+    connector: source,
+    secrets: sourceSecrets,
+    enabled: discoverEnabled && step === "tables",
+  });
 
   const defaultName = `${source}_to_${destination}`.replace(/[^a-zA-Z0-9_]/g, "_");
   const effectiveName = pipelineName.trim() || defaultName;
@@ -99,7 +108,17 @@ export function QuickStartWizard({
   }, [source]);
 
   const stepIndex =
-    step === "destination" ? 0 : step === "source" ? 1 : step === "credentials" ? 2 : step === "name" ? 3 : 4;
+    step === "destination"
+      ? 0
+      : step === "source"
+        ? 1
+        : step === "credentials"
+          ? 2
+          : step === "tables"
+            ? 3
+            : step === "name"
+              ? 4
+              : 5;
 
   async function testCredentials() {
     setTesting(true);
@@ -143,6 +162,8 @@ export function QuickStartWizard({
         if (!data.ok) throw new Error(data.message ?? "Connection test failed");
       }
       setTestOk(true);
+      setDiscoverEnabled(true);
+      setStep("tables");
     } catch (e) {
       setTestOk(false);
       setError(e instanceof Error ? e.message : "Test failed");
@@ -194,6 +215,13 @@ export function QuickStartWizard({
         sourceConnId = await createConnection("source", source, `qs-${source}`, sourceSecrets);
       }
 
+      const baseConfig = minimalSourceConfigurationForNewPipeline(pipelineSourceType);
+      const sourceConfiguration = applyDiscoveryToSourceConfiguration(
+        pipelineSourceType,
+        baseConfig,
+        Array.from(discovery.selected)
+      );
+
       const res = await fetch("/api/elt/pipelines", {
         method: "POST",
         credentials: "same-origin",
@@ -204,7 +232,7 @@ export function QuickStartWizard({
           destinationType: destination,
           tool: "auto",
           description: `Quick-start pipeline: ${source} → ${destination}`,
-          sourceConfiguration: minimalSourceConfigurationForNewPipeline(pipelineSourceType),
+          sourceConfiguration,
           sourceConnectionId: sourceConnId,
           destinationConnectionId: destConnId,
         }),
@@ -360,7 +388,8 @@ export function QuickStartWizard({
               type="button"
               onClick={() => {
                 setPipelineName(defaultName);
-                setStep(needsCredentials ? "credentials" : "name");
+                setDiscoverEnabled(true);
+                setStep(needsCredentials ? "credentials" : "tables");
               }}
               className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500"
             >
@@ -432,6 +461,43 @@ export function QuickStartWizard({
             </button>
             <button
               type="button"
+              onClick={() => {
+                setDiscoverEnabled(true);
+                setStep("tables");
+              }}
+              className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500"
+            >
+              Continue <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </section>
+      )}
+
+      {step === "tables" && (
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">What should we sync?</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Choose tables or resources from <strong>{source}</strong> — like Fivetran&apos;s schema selection.
+          </p>
+          <TablePicker
+            items={discovery.items}
+            selected={discovery.selected}
+            onChange={discovery.setSelected}
+            loading={discovery.loading}
+            message={discovery.message}
+            emptyHint="No live discovery for this source — recommended defaults will be used."
+          />
+          {discovery.error ? <p className="text-sm text-amber-600">{discovery.error}</p> : null}
+          <div className="flex justify-between">
+            <button
+              type="button"
+              onClick={() => setStep(needsCredentials ? "credentials" : "source")}
+              className="text-sm text-slate-600"
+            >
+              <ArrowLeft className="inline h-4 w-4" /> Back
+            </button>
+            <button
+              type="button"
               onClick={() => setStep("name")}
               className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500"
             >
@@ -460,7 +526,7 @@ export function QuickStartWizard({
           <div className="flex justify-between">
             <button
               type="button"
-              onClick={() => setStep(needsCredentials ? "credentials" : "source")}
+              onClick={() => setStep("tables")}
               className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 dark:text-slate-400"
             >
               <ArrowLeft className="h-4 w-4" /> Back

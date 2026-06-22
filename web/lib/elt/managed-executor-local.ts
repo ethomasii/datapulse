@@ -13,6 +13,7 @@ import { sanitizeForRunStorage } from "@/lib/elt/run-log-sanitize";
 import { startSystemMetricsSampler } from "@/lib/elt/agent-system-metrics";
 import { parseLogLineForTelemetry } from "@/lib/elt/telemetry-log-parser";
 import { pipelineToolLabel } from "@/lib/elt/pipeline-tool-labels";
+import { executeManagedDbtRun } from "@/lib/elt/managed-dbt-executor";
 import {
   fetchPendingManagedRunIds,
   managedInternalGet,
@@ -27,6 +28,8 @@ type ExecutorContextJson = {
     partitionValue: string | null;
     partitionColumn: string | null;
     correlationId: string;
+    triggeredBy?: string | null;
+    dbtProjectId?: string | null;
   };
   pipeline: {
     id: string;
@@ -35,15 +38,22 @@ type ExecutorContextJson = {
     sourceType: string;
     destinationType: string;
     sourceConfiguration: unknown;
-    pipelineCode: string;
+    pipelineCode: string | null;
     configYaml: string | null;
     workspaceYaml: string | null;
     sourceConnectionId: string | null;
     destinationConnectionId: string | null;
   };
+  dbtProject?: {
+    gitUrl: string | null;
+    gitBranch: string | null;
+    gitSubpath: string | null;
+    packagePath: string;
+    targetSchema: string | null;
+  } | null;
   connections: {
-    source: null | { secrets: Record<string, string> };
-    destination: null | { secrets: Record<string, string> };
+    source: null | { connector?: string; secrets: Record<string, string> };
+    destination: null | { connector: string; secrets: Record<string, string> };
   };
 };
 
@@ -95,11 +105,12 @@ function defaultPythonBin(): string {
 }
 
 async function writeWorkspace(dir: string, pipeline: ExecutorContextJson["pipeline"]): Promise<void> {
-  const tool = pipeline.tool === "sling" ? "sling" : "dlt";
+  const tool = pipeline.tool === "sling" ? "sling" : pipeline.tool === "dbt" ? "dbt" : "dlt";
+  if (tool === "dbt") return;
   if (tool === "sling") {
-    await fs.writeFile(path.join(dir, "replication.yaml"), pipeline.pipelineCode, "utf8");
+    await fs.writeFile(path.join(dir, "replication.yaml"), pipeline.pipelineCode ?? "", "utf8");
   } else {
-    await fs.writeFile(path.join(dir, "pipeline.py"), pipeline.pipelineCode, "utf8");
+    await fs.writeFile(path.join(dir, "pipeline.py"), pipeline.pipelineCode ?? "", "utf8");
   }
   if (pipeline.configYaml?.trim()) {
     await fs.writeFile(path.join(dir, "config.yaml"), pipeline.configYaml, "utf8");
@@ -208,10 +219,81 @@ export async function executeManagedRunLocalProcess(options: {
   await throwIfNotOk(ctxRes, `GET executor-context ${runId}`);
   const ctx = (await ctxRes.json()) as ExecutorContextJson;
 
-  const tool = ctx.pipeline.tool === "sling" ? "sling" : "dlt";
+  const tool =
+    ctx.pipeline.tool === "sling" ? "sling" : ctx.pipeline.tool === "dbt" ? "dbt" : "dlt";
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "eltpulse-managed-"));
 
   try {
+    if (tool === "dbt") {
+      await patchOrThrow(baseUrl, secret, runId, {
+        status: "running",
+        appendLog: {
+          level: "info",
+          message: sanitizeForRunStorage(
+            `eltpulse-managed: starting standalone dbt (project "${ctx.pipeline.name}")`,
+            4000
+          ),
+        },
+      });
+
+      const timeoutMs = Math.max(
+        60_000,
+        Number(process.env.ELTPULSE_MANAGED_RUN_TIMEOUT_MS || "") || DEFAULT_TIMEOUT_MS
+      );
+
+      let exitCode = 1;
+      try {
+        exitCode = await executeManagedDbtRun(
+          {
+            runId,
+            baseUrl,
+            secret,
+            triggeredBy: ctx.run.triggeredBy ?? null,
+            pipeline: {
+              name: ctx.pipeline.name,
+              sourceConfiguration: ctx.pipeline.sourceConfiguration,
+            },
+            dbtProject: ctx.dbtProject ?? null,
+            destination: ctx.connections.destination
+              ? {
+                  connector: ctx.connections.destination.connector,
+                  secrets: ctx.connections.destination.secrets,
+                }
+              : null,
+            patch: (body) => patchOrThrow(baseUrl, secret, runId, body),
+            appendLog: (stream, line) => appendLogLine(baseUrl, secret, runId, stream, line),
+          },
+          timeoutMs
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        await patchOrThrow(baseUrl, secret, runId, {
+          status: "failed",
+          errorSummary: sanitizeForRunStorage(msg, 8000),
+          telemetrySummary: { currentPhase: "failed", progress: 100 },
+        });
+        return "ran";
+      }
+
+      if (exitCode === 0) {
+        await patchOrThrow(baseUrl, secret, runId, {
+          status: "succeeded",
+          appendLog: {
+            level: "info",
+            message: sanitizeForRunStorage("eltpulse-managed: dbt completed (exit 0).", 4000),
+          },
+          telemetrySummary: { currentPhase: "done", progress: 100 },
+        });
+      } else {
+        await patchOrThrow(baseUrl, secret, runId, {
+          status: "failed",
+          errorSummary: sanitizeForRunStorage(`dbt exited with code ${exitCode}`, 8000),
+          telemetrySummary: { currentPhase: "failed", progress: 100 },
+        });
+      }
+      return "ran";
+    }
+
     await patchOrThrow(baseUrl, secret, runId, {
       status: "running",
       appendLog: {

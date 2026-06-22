@@ -77,8 +77,11 @@ def _control_plane_base() -> str:
 
 
 def _tool_run_label(tool: str) -> str:
-    if str(tool).lower() == "sling":
+    t = str(tool).lower()
+    if t == "sling":
         return "database replication"
+    if t == "dbt":
+        return "dbt transform"
     return "connector sync"
 
 
@@ -243,6 +246,10 @@ async def _pump_stream(
 
 
 from agent_system_metrics import sample_system_metrics_loop
+from dbt_executor import execute_standalone_dbt
+
+
+async def _execute_one_run(
     client: httpx.AsyncClient,
     base: str,
     internal: str,
@@ -270,7 +277,118 @@ from agent_system_metrics import sample_system_metrics_loop
     run = ctx.get("run") or {}
     pipeline = ctx.get("pipeline") or {}
     connections = ctx.get("connections") or {}
-    tool = "sling" if str(pipeline.get("tool") or "").lower() == "sling" else "dlt"
+    dbt_project = ctx.get("dbtProject")
+    tool_raw = str(pipeline.get("tool") or "").lower()
+    tool = "dbt" if tool_raw == "dbt" else ("sling" if tool_raw == "sling" else "dlt")
+
+    if tool == "dbt":
+        dst = connections.get("destination") or {}
+        secrets_d = dst.get("secrets") if isinstance(dst, dict) else None
+        child_env = _merge_env(
+            {k: str(v) for k, v in os.environ.items() if v is not None and isinstance(v, str)},
+            secrets_d if isinstance(secrets_d, dict) else None,
+            None,
+        )
+        child_env["ELTPULSE_RUN_ID"] = run_id
+        child_env["ELTPULSE_CONTROL_PLANE_URL"] = base
+        if internal:
+            child_env["ELTPULSE_INTERNAL_API_SECRET"] = internal
+
+        async def _dbt_patch(body: dict[str, Any]) -> None:
+            await _patch(client, base, internal, run_id, body)
+
+        async def _pump_out(line: str) -> None:
+            await _append_log(client, base, internal, run_id, "stdout", line)
+
+        async def _pump_err(line: str) -> None:
+            await _append_log(client, base, internal, run_id, "stderr", line)
+
+        pname = str(pipeline.get("name") or run_id)
+        await _patch(
+            client,
+            base,
+            internal,
+            run_id,
+            {
+                "status": "running",
+                "appendLog": {
+                    "level": "info",
+                    "message": _sanitize(
+                        f"eltpulse-managed: starting standalone dbt for project {pname!r}",
+                        4000,
+                    ),
+                },
+            },
+        )
+        try:
+            exit_code = await asyncio.wait_for(
+                execute_standalone_dbt(
+                    pipeline=pipeline,
+                    dbt_project=dbt_project if isinstance(dbt_project, dict) else None,
+                    destination=dst if isinstance(dst, dict) else None,
+                    triggered_by=str(run.get("triggeredBy") or ""),
+                    child_env=child_env,
+                    patch=_dbt_patch,
+                    pump_stdout=_pump_out,
+                    pump_stderr=_pump_err,
+                ),
+                timeout=max(1.0, run_timeout_ms / 1000.0),
+            )
+        except asyncio.TimeoutError:
+            await _patch(
+                client,
+                base,
+                internal,
+                run_id,
+                {
+                    "status": "failed",
+                    "errorSummary": _sanitize("dbt subprocess timed out.", 8000),
+                    "telemetrySummary": {"currentPhase": "failed", "progress": 100},
+                },
+            )
+            return "ran"
+        except Exception as e:  # noqa: BLE001
+            await _patch(
+                client,
+                base,
+                internal,
+                run_id,
+                {
+                    "status": "failed",
+                    "errorSummary": _sanitize(str(e), 8000),
+                    "telemetrySummary": {"currentPhase": "failed", "progress": 100},
+                },
+            )
+            return "ran"
+
+        if exit_code == 0:
+            await _patch(
+                client,
+                base,
+                internal,
+                run_id,
+                {
+                    "status": "succeeded",
+                    "appendLog": {
+                        "level": "info",
+                        "message": _sanitize("eltpulse-managed: dbt completed (exit 0).", 4000),
+                    },
+                    "telemetrySummary": {"currentPhase": "done", "progress": 100},
+                },
+            )
+        else:
+            await _patch(
+                client,
+                base,
+                internal,
+                run_id,
+                {
+                    "status": "failed",
+                    "errorSummary": _sanitize(f"dbt exited with code {exit_code}", 8000),
+                    "telemetrySummary": {"currentPhase": "failed", "progress": 100},
+                },
+            )
+        return "ran"
 
     if tool == "sling" and not shutil.which(os.environ.get("ELTPULSE_MANAGED_SLING_BIN", "sling")):
         await _patch(
@@ -297,6 +415,23 @@ from agent_system_metrics import sample_system_metrics_loop
     tmp = tempfile.mkdtemp(prefix="eltpulse-managed-")
     try:
         code = str(pipeline.get("pipelineCode") or "")
+        if tool == "dlt" and not code.strip():
+            await _patch(
+                client,
+                base,
+                internal,
+                run_id,
+                {
+                    "status": "failed",
+                    "errorSummary": _sanitize(
+                        "Pipeline has no generated code. Re-save the pipeline in the builder.",
+                        8000,
+                    ),
+                    "telemetrySummary": {"currentPhase": "failed", "progress": 100},
+                },
+            )
+            return "ran"
+
         tdir = Path(tmp)
         if tool == "sling":
             (tdir / "replication.yaml").write_text(code, encoding="utf-8")

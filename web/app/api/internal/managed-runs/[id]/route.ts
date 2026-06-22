@@ -130,7 +130,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     include: { pipeline: { select: { name: true } } },
   });
 
-  if (patch.willBeTerminal && !patch.wasTerminal) {
+    if (patch.willBeTerminal && !patch.wasTerminal) {
     await maybeDispatchRunWebhook(run.id, existing.userId);
     if (patch.nextStatus === "succeeded") {
       const telemetry = patch.telemetryJson as { summary?: { rowsLoaded?: number } } | undefined;
@@ -138,12 +138,16 @@ export async function PATCH(req: Request, ctx: Ctx) {
       if (typeof rows === "number") {
         void reportRowsSyncedUsage(existing.userId, rows);
       }
-      if (existing.pipelineId && patch.telemetryJson) {
+      if (patch.telemetryJson) {
         const tel = parseRunTelemetry(patch.telemetryJson);
-        if (tel.dbt) {
-          void syncCatalogFromDbtManifest(existing.userId, existing.pipelineId, tel.dbt).catch(() => undefined);
+        if (tel.dbt && existing.pipelineId) {
+          void syncCatalogFromDbtManifest(existing.userId, existing.pipelineId, tel.dbt).catch(
+            () => undefined
+          );
         }
-        void maybeDispatchContractAlerts(run.id, existing.userId).catch(() => undefined);
+        if (existing.pipelineId) {
+          void maybeDispatchContractAlerts(run.id, existing.userId).catch(() => undefined);
+        }
       }
     }
   }
