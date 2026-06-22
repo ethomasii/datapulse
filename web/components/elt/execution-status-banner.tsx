@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import clsx from "clsx";
 
 type ExecutionMode = {
@@ -37,35 +37,7 @@ export function ExecutionStatusBanner({ className, compact = false }: Props) {
     };
   }, []);
 
-  if (loading) {
-    return compact ? null : (
-      <div className={clsx("flex items-center gap-2 text-xs text-slate-500", className)}>
-        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-        Checking managed compute…
-      </div>
-    );
-  }
-
-  if (!data) return null;
-
-  if (data.readyForRealRuns && !compact) {
-    return (
-      <div
-        className={clsx(
-          "flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm dark:border-emerald-900/50 dark:bg-emerald-950/30",
-          className
-        )}
-      >
-        <span className="inline-flex items-center gap-2 font-medium text-emerald-900 dark:text-emerald-100">
-          <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
-          {data.label} — real extract/load enabled
-        </span>
-        <Link href="/gateway" className="text-xs font-semibold text-emerald-800 hover:underline dark:text-emerald-200">
-          Execution settings →
-        </Link>
-      </div>
-    );
-  }
+  if (loading || !data || data.readyForRealRuns) return null;
 
   if (data.computeTier !== "demo" && data.computeTier !== "unconfigured") return null;
 
@@ -99,7 +71,7 @@ export function ExecutionStatusBanner({ className, compact = false }: Props) {
         <p className="mt-0.5 text-xs text-amber-900/90 dark:text-amber-200/90">
           {data.customerMessage ??
             (data.computeTier === "demo"
-              ? "Pipeline runs complete with sample telemetry. Real data movement requires eltPulse managed workers on this environment."
+              ? "Pipeline runs complete with sample telemetry on this environment. Configure execution to move real data."
               : "This environment has not finished provisioning managed workers yet.")}
         </p>
       </div>
@@ -107,7 +79,7 @@ export function ExecutionStatusBanner({ className, compact = false }: Props) {
         href="/gateway"
         className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500"
       >
-        Learn more
+        Execution settings →
       </Link>
     </div>
   );
