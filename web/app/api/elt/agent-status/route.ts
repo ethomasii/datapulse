@@ -8,7 +8,7 @@ import { getActiveOrganizationForSession } from "@/lib/auth/active-org";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
 import { isManagedExecutionPlane, normalizeExecutionPlane } from "@/lib/elt/execution-plane";
-import { tierAllowsOrgGatewayTokens } from "@/lib/plans/org-gateway-tier";
+import { personalGatewayLimit, resolveUserPlanTier, tierAllowsOrgGatewayTokens } from "@/lib/plans/tier-features";
 
 export const dynamic = "force-dynamic";
 
@@ -147,6 +147,7 @@ export async function GET() {
   const summaryHeartbeat = candidates[0]?.hb ?? null;
 
   const managedComputeReady = isManagedExecutionPlane(user.executionPlane);
+  const tier = await resolveUserPlanTier(user.id);
 
   const orgConnectorCount = organizationPayload?.connectors.length ?? 0;
   const hasNamedConnectors = connectors.length > 0 || orgConnectorCount > 0;
@@ -155,6 +156,9 @@ export async function GET() {
   return NextResponse.json({
     executionPlane: normalizeExecutionPlane(user.executionPlane),
     managedComputeReady,
+    planTier: tier,
+    personalGatewayLimit: personalGatewayLimit(tier),
+    customerGatewayAllowed: true,
     hasAccountToken: Boolean(user.agentToken),
     hasNamedConnectors,
     hasAnyToken,

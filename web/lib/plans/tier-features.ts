@@ -21,6 +21,32 @@ export const API_KEY_LIMITS: Record<PlanTier, number | null> = {
   team: null,
 };
 
+/** Personal (non-org) gateway connectors per workspace owner. */
+export const PERSONAL_GATEWAY_LIMITS: Record<PlanTier, number | null> = {
+  free: 1,
+  pro: 5,
+  team: null,
+};
+
+/**
+ * Compute model:
+ * - All tiers may run a customer gateway (BYOC) — you pay your infra; eltPulse hosts the control plane.
+ * - Pro/Team subscription + row usage is how we monetize BYOC (platform fee, not managed-compute margin).
+ * - Dedicated managed compute is a separate Team add-on (we run isolated workers).
+ * - Enterprise = self-hosted control plane (sales contract via ELTPULSE_ENTERPRISE_ORG_IDS).
+ */
+export function tierAllowsCustomerGateway(_tier: PlanTier): boolean {
+  return true;
+}
+
+export function tierAllowsOrgGatewayTokens(tier: PlanTier): boolean {
+  return tierAtLeast(tier, "pro");
+}
+
+export function personalGatewayLimit(tier: PlanTier): number | null {
+  return PERSONAL_GATEWAY_LIMITS[tier];
+}
+
 export function tierAtLeast(tier: PlanTier, minimum: PlanTier): boolean {
   return TIER_RANK[tier] >= TIER_RANK[minimum];
 }
@@ -80,6 +106,20 @@ export async function assertApiKeyLimit(userId: string, tier: PlanTier): Promise
     return limit === 1
       ? "Free plan allows 1 API key. Upgrade to Pro for up to 5."
       : `Your plan allows up to ${limit} API keys. Upgrade to Team for unlimited keys.`;
+  }
+  return null;
+}
+
+export async function assertPersonalGatewayLimit(userId: string, tier: PlanTier): Promise<string | null> {
+  const limit = PERSONAL_GATEWAY_LIMITS[tier];
+  if (limit == null) return null;
+  const count = await db.agentToken.count({
+    where: { userId, organizationId: null, revokedAt: null },
+  });
+  if (count >= limit) {
+    return limit === 1
+      ? "Free plan allows 1 personal gateway. Upgrade to Pro for up to 5."
+      : `Your plan allows up to ${limit} personal gateways. Upgrade to Team for unlimited.`;
   }
   return null;
 }

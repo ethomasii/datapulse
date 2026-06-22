@@ -8,6 +8,7 @@ export const ACCOUNT_SETTINGS_TABS = [
   { href: "/account", label: "Profile", match: "exact" as const },
   { href: "/gateway", label: "Gateway", match: "prefix" as const },
   { href: "/account/billing", label: "Billing", match: "prefix" as const },
+  { href: "/account/security", label: "Security", match: "prefix" as const },
   { href: "/account/notifications", label: "Notifications", match: "prefix" as const },
   { href: "/account/notification-history", label: "Notification history", match: "prefix" as const },
   { href: "/account/developers", label: "Developers", match: "prefix" as const },

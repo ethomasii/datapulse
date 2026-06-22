@@ -35,7 +35,7 @@ const TIERS: TierDef[] = [
     features: [
       "Up to 3 pipelines",
       "Full pipeline builder & catalog",
-      "Managed compute (shared pool)",
+      "Managed compute (shared pool) or 1 personal gateway",
       "Monitors, schedules & run slices",
       "14-day run history",
       "Community support",
@@ -55,7 +55,7 @@ const TIERS: TierDef[] = [
       "90-day run history & telemetry",
       "Webhook triggers & API keys",
       "Git-native artifact export",
-      "Customer gateway support",
+      "Customer gateway in your VPC (5 gateways)",
       "Email support",
     ],
     cta: { href: "/sign-up", label: "Start Pro — 14 days free", primary: true },

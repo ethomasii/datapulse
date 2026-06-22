@@ -72,9 +72,12 @@ export const PRICING_COMPARISON_SECTIONS: ComparisonSection[] = [
     title: "Execution & compute",
     rows: [
       { label: "eltPulse-managed workers (default)", free: true, pro: true, team: true, enterprise: "Optional" },
-      { label: "Customer gateway (VPC)", free: false, pro: true, team: true, enterprise: true },
-      { label: "Self-hosted control plane + gateway", free: false, pro: false, team: false, enterprise: "Contact sales" },
-      { label: "Air-gapped metadata option", free: false, pro: false, team: false, enterprise: "Roadmap" },
+      { label: "Personal gateway (your compute)", free: "1", pro: "5", team: "Unlimited", enterprise: "Unlimited" },
+      { label: "Org-scoped gateways", free: false, pro: true, team: true, enterprise: true },
+      { label: "Dedicated managed compute add-on", free: false, pro: false, team: "Optional", enterprise: "Optional" },
+      { label: "Control plane subscription (BYOC)", free: "Free tier", pro: "Included", team: "Included", enterprise: "Annual license" },
+      { label: "Self-hosted control plane", free: false, pro: false, team: false, enterprise: "Contact sales" },
+      { label: "Air-gapped metadata option", free: false, pro: false, team: "Roadmap", enterprise: "Roadmap" },
       { label: "Included row volume / month", free: "Trial", pro: "Included", team: "Custom", enterprise: "Custom" },
       { label: "Metered rows & egress beyond included", free: false, pro: true, team: true, enterprise: "Contract" },
     ],
@@ -125,6 +128,10 @@ export const PRICING_FAQ = [
   },
   {
     q: "Can I run pipelines on my own infrastructure?",
-    a: "Yes. Use a customer gateway in your VPC on Pro+, or talk to us about a fully self-hosted Enterprise deployment. Your data never has to leave your network.",
+    a: "Yes — on any plan. Connect a personal gateway (1 on Free, 5 on Pro, unlimited on Team) and run ingestion in your VPC. You pay your compute; Pro and Team subscriptions cover the eltPulse control plane, catalog, and usage metering. Enterprise adds a self-hosted control plane with an annual platform license.",
+  },
+  {
+    q: "Do you charge when I self-host compute?",
+    a: "Managed compute margin only applies when eltPulse runs your workers (shared or dedicated add-on). With a customer gateway, you pay your own infra plus your Pro/Team platform subscription and any metered row volume — same model as Fivetran Hybrid or Airbyte Cloud vs self-managed.",
   },
 ];

@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   API_KEY_LIMITS,
+  PERSONAL_GATEWAY_LIMITS,
   RUN_HISTORY_DAYS,
   runHistoryCutoff,
+  tierAllowsCustomerGateway,
+  tierAllowsOrgGatewayTokens,
   tierAllowsOrgInvites,
   tierAllowsRunsApi,
   tierAllowsWebhookTriggers,
@@ -14,6 +17,22 @@ describe("tier-features", () => {
     expect(tierAtLeast("pro", "free")).toBe(true);
     expect(tierAtLeast("free", "pro")).toBe(false);
     expect(tierAtLeast("team", "team")).toBe(true);
+  });
+
+  it("allows customer gateway on all tiers", () => {
+    expect(tierAllowsCustomerGateway("free")).toBe(true);
+    expect(tierAllowsCustomerGateway("pro")).toBe(true);
+  });
+
+  it("limits personal gateways by tier", () => {
+    expect(PERSONAL_GATEWAY_LIMITS.free).toBe(1);
+    expect(PERSONAL_GATEWAY_LIMITS.pro).toBe(5);
+    expect(PERSONAL_GATEWAY_LIMITS.team).toBeNull();
+  });
+
+  it("org gateways require pro+", () => {
+    expect(tierAllowsOrgGatewayTokens("free")).toBe(false);
+    expect(tierAllowsOrgGatewayTokens("pro")).toBe(true);
   });
 
   it("gates pro-only automation features", () => {

@@ -121,9 +121,29 @@ const ITEMS: {
     desc: "eltPulse-owned worker fleet (delegate) is the production path — stub until workers.eltpulse.dev is wired on prod.",
   },
   {
+    status: "shipped",
+    title: "Team RBAC & workspace roles",
+    desc: "Viewer, catalog editor, catalog browser, and member roles with API enforcement on pipelines and catalog.",
+  },
+  {
+    status: "shipped",
+    title: "Tier gates & honest pricing comparison",
+    desc: "Run-history retention, API key limits, webhook/Git/lineage gates, personal gateway limits, and BYOC on all plans.",
+  },
+  {
+    status: "in-progress",
+    title: "SSO / SAML (Team+)",
+    desc: "Clerk SAML for Team workspaces — contact sales to enable; set ELTPULSE_SSO_ENABLED when IdP is configured.",
+  },
+  {
+    status: "in-progress",
+    title: "Enterprise self-hosted control plane",
+    desc: "Annual platform license for Docker/K8s control plane + gateway — ELTPULSE_ENTERPRISE_ORG_IDS for contracted orgs.",
+  },
+  {
     status: "planned",
-    title: "Team RBAC & editor roles",
-    desc: "Admin vs member vs viewer; pipeline edit permissions beyond shared read access.",
+    title: "Air-gapped metadata routing",
+    desc: "Keep run metadata in customer storage with optional sync to eltPulse Cloud — Enterprise and Team preview.",
   },
   {
     status: "planned",

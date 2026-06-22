@@ -9,7 +9,11 @@ import type { Prisma } from "@prisma/client";
 import { getActiveOrganizationForSession } from "@/lib/auth/active-org";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
-import { tierAllowsOrgGatewayTokens } from "@/lib/plans/org-gateway-tier";
+import {
+  assertPersonalGatewayLimit,
+  resolveUserPlanTier,
+  tierAllowsOrgGatewayTokens,
+} from "@/lib/plans/tier-features";
 
 export const dynamic = "force-dynamic";
 
@@ -106,6 +110,12 @@ export async function POST(req: Request) {
     }
     ownerUserId = org.ownerUserId;
     organizationId = org.id;
+  } else {
+    const tier = await resolveUserPlanTier(user.id);
+    const limitMsg = await assertPersonalGatewayLimit(user.id, tier);
+    if (limitMsg) {
+      return NextResponse.json({ error: limitMsg }, { status: 403 });
+    }
   }
 
   const token = generateToken();
