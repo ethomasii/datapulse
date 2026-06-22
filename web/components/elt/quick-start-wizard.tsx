@@ -12,14 +12,22 @@ import {
   Zap,
 } from "lucide-react";
 import { ConnectorIcon } from "@/components/marketing/connector-icon";
+import { ConnectorCombobox } from "@/components/elt/connector-combobox";
 import { minimalSourceConfigurationForNewPipeline } from "@/lib/elt/minimal-source-configuration";
 import {
   QUICK_START_DESTINATIONS,
   QUICK_START_SOURCES,
+  allQuickStartDestinationComboboxOptions,
+  allQuickStartSourceComboboxOptions,
+  allQuickStartSourceOptions,
+  isFeaturedQuickStartSource,
   isQuickStartDestination,
   isQuickStartSource,
   normalizeQuickStartDestination,
   normalizeQuickStartSource,
+  quickStartConnectionConnector,
+  quickStartDiscoverConnector,
+  quickStartPipelineSourceType,
 } from "@/lib/elt/quick-start-catalog";
 import {
   duckdbDestinationConfig,
@@ -65,12 +73,14 @@ export function QuickStartWizard({
     ? normalizeQuickStartDestination(initialDestination)
     : "duckdb";
   const normSource = initialSource ? normalizeQuickStartSource(initialSource) : "github";
+  const resolvedInitialSource = isQuickStartSource(normSource) ? normSource : "github";
 
   const [step, setStep] = useState<Step>(() => initialStep(initialSource, initialDestination));
   const [destination, setDestination] = useState(
     isQuickStartDestination(normDest) ? normDest : "duckdb"
   );
-  const [source, setSource] = useState(isQuickStartSource(normSource) ? normSource : "github");
+  const [source, setSource] = useState(resolvedInitialSource);
+  const [sourceSearch, setSourceSearch] = useState("");
   const [pipelineName, setPipelineName] = useState("");
   const [destSecrets, setDestSecrets] = useState<Record<string, string>>({});
   const [sourceSecrets, setSourceSecrets] = useState<Record<string, string>>({});
@@ -108,18 +118,37 @@ export function QuickStartWizard({
   ]);
 
   const discovery = useSourceDiscovery({
-    connector: source,
+    connector: quickStartDiscoverConnector(source),
     secrets: sourceSecrets,
     enabled: discoverEnabled && step === "tables",
   });
 
+  const allSourceOptions = useMemo(() => allQuickStartSourceOptions(), []);
+  const sourceComboboxOptions = useMemo(() => allQuickStartSourceComboboxOptions(), []);
+  const destComboboxOptions = useMemo(() => allQuickStartDestinationComboboxOptions(), []);
+
+  const filteredBrowseSources = useMemo(() => {
+    const q = sourceSearch.trim().toLowerCase();
+    const nonFeatured = allSourceOptions.filter((s) => !isFeaturedQuickStartSource(s.slug));
+    if (!q) return nonFeatured;
+    return nonFeatured.filter(
+      (s) =>
+        s.label.toLowerCase().includes(q) ||
+        s.slug.toLowerCase().includes(q) ||
+        s.hint.toLowerCase().includes(q)
+    );
+  }, [allSourceOptions, sourceSearch]);
+
   const defaultName = `${source}_to_${destination}`.replace(/[^a-zA-Z0-9_]/g, "_");
   const effectiveName = pipelineName.trim() || defaultName;
+
+  const pipelineSourceType = useMemo(() => quickStartPipelineSourceType(source), [source]);
+  const connectionSourceConnector = useMemo(() => quickStartConnectionConnector(source), [source]);
 
   const destFields = usingWorkspaceDest
     ? []
     : quickStartSecretFields("destination", destination);
-  const sourceFields = quickStartSecretFields("source", source);
+  const sourceFields = quickStartSecretFields("source", connectionSourceConnector);
   const needsCredentials = destFields.length > 0 || sourceFields.length > 0;
 
   const effectiveDestination =
@@ -143,12 +172,6 @@ export function QuickStartWizard({
     const idx = order.indexOf(step);
     return idx >= 0 ? idx : order.length - 1;
   }, [step, skipDestinationStep, needsCredentials]);
-
-  const pipelineSourceType = useMemo(() => {
-    if (source === "stripe") return "stripe_analytics";
-    if (source === "shopify") return "shopify_dlt";
-    return source;
-  }, [source]);
 
   async function testCredentials() {
     setTesting(true);
@@ -179,7 +202,7 @@ export function QuickStartWizard({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               connectionType: "source",
-              connector: source,
+              connector: connectionSourceConnector,
               config: {},
               secrets: sourceSecrets,
             }),
@@ -236,7 +259,7 @@ export function QuickStartWizard({
       let sourceConnId: string | null = null;
 
       if (sourceFields.length > 0) {
-        sourceConnId = await createConnection("source", source, `qs-${source}`, sourceSecrets);
+        sourceConnId = await createConnection("source", connectionSourceConnector, `qs-${source}`, sourceSecrets);
       }
       if (destFields.length > 0) {
         destConnId = await createConnection(
@@ -357,6 +380,9 @@ export function QuickStartWizard({
             />
           ) : null}
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">What are you syncing?</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Popular picks below — or search all {allSourceOptions.length}+ sources from the pipeline catalog.
+          </p>
           <ul className="grid gap-3 sm:grid-cols-2">
             {QUICK_START_SOURCES.map((s) => (
               <li key={s.slug}>
@@ -378,6 +404,57 @@ export function QuickStartWizard({
               </li>
             ))}
           </ul>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">All sources</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Same registry as the pipeline builder — type to filter, or pick from the list.
+            </p>
+            <div className="mt-3">
+              <ConnectorCombobox
+                options={sourceComboboxOptions}
+                value={source}
+                onChange={setSource}
+                placeholder={`Search ${allSourceOptions.length} sources…`}
+              />
+            </div>
+            {source && !isFeaturedQuickStartSource(source) ? (
+              <p className="mt-2 text-xs text-sky-700 dark:text-sky-400">
+                Selected: <span className="font-medium">{sourceComboboxOptions.find((o) => o.slug === source)?.label ?? source}</span>
+              </p>
+            ) : null}
+            <details className="mt-3">
+              <summary className="cursor-pointer text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200">
+                Browse by name ({filteredBrowseSources.length} more)
+              </summary>
+              <div className="mt-2">
+                <input
+                  type="search"
+                  value={sourceSearch}
+                  onChange={(e) => setSourceSearch(e.target.value)}
+                  placeholder="Filter list…"
+                  className="mb-2 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-900"
+                />
+                <ul className="max-h-48 space-y-1 overflow-y-auto text-sm">
+                  {filteredBrowseSources.slice(0, 80).map((s) => (
+                    <li key={s.slug}>
+                      <button
+                        type="button"
+                        onClick={() => setSource(s.slug)}
+                        className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left hover:bg-white dark:hover:bg-slate-900 ${
+                          source === s.slug ? "bg-sky-100 dark:bg-sky-950/40" : ""
+                        }`}
+                      >
+                        <span className="font-medium text-slate-800 dark:text-slate-200">{s.label}</span>
+                        <span className="text-xs text-slate-400">{s.slug}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </details>
+          </div>
+
           <div className="flex justify-end">
             <button
               type="button"
@@ -429,6 +506,17 @@ export function QuickStartWizard({
               </li>
             ))}
           </ul>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">All destinations</p>
+            <div className="mt-2">
+              <ConnectorCombobox
+                options={destComboboxOptions}
+                value={destination}
+                onChange={setDestination}
+                placeholder={`Search ${destComboboxOptions.length} destinations…`}
+              />
+            </div>
+          </div>
           <div className="flex justify-between">
             <button
               type="button"
