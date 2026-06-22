@@ -124,8 +124,8 @@ export function CanvasPreviewPanel({ pipelineId, focus, liveConfig, className }:
     return (
       <section
         className={clsx(
-          "flex h-44 shrink-0 items-center justify-center border-t border-slate-200 bg-slate-50 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/80",
-          className
+          "flex shrink-0 items-center justify-center border-t border-slate-200 bg-slate-50 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/80",
+          className ?? "h-44"
         )}
         aria-label="Data preview"
       >
@@ -142,8 +142,8 @@ export function CanvasPreviewPanel({ pipelineId, focus, liveConfig, className }:
   return (
     <section
       className={clsx(
-        "flex h-44 shrink-0 border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950",
-        className
+        "flex shrink-0 border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950",
+        className ?? "h-44"
       )}
       aria-label="Data preview"
     >

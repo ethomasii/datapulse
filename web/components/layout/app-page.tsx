@@ -1,7 +1,7 @@
 import clsx from "clsx";
 import type { ReactNode } from "react";
 
-export type AppPageWidth = "narrow" | "default" | "wide";
+export type AppPageWidth = "narrow" | "default" | "wide" | "full";
 
 const WIDTH_CLASS: Record<AppPageWidth, string> = {
   /** Settings, help, integrations, repos, webhooks, gateway */
@@ -10,6 +10,8 @@ const WIDTH_CLASS: Record<AppPageWidth, string> = {
   default: "max-w-6xl",
   /** Dashboard, pipelines, runs, observability */
   wide: "max-w-7xl",
+  /** Visual canvas / full-bleed builders — use full main column width */
+  full: "max-w-none",
 };
 
 type AppPageProps = {

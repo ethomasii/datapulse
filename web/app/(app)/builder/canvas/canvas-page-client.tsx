@@ -999,11 +999,12 @@ export function CanvasPageClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadedSig bumps when pipeline config is reloaded
     [sourceCfg, loadedSig, selectedId]
   );
-  const showDockedInspector = pipelines.length > 0 && Boolean(selectedId) && !detailLoading;
+  const showDockedInspector =
+    pipelines.length > 0 && Boolean(selectedId) && !detailLoading && canvasView === "ingest";
 
   return (
     <AppPage
-      width="wide"
+      width="full"
       className={clsx("space-y-6", showDockedInspector && "lg:pr-[380px]")}
     >
       <AppPageHeader title="Visual pipeline canvas" />
@@ -1219,9 +1220,9 @@ export function CanvasPageClient() {
                 </span>
               </div>
               {canvasView === "designer" ? (
-              <div className="flex h-[max(36rem,min(calc(100dvh-11rem),56rem))] min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950 lg:h-[max(36rem,min(calc(100dvh-11rem),56rem))] lg:flex-row">
+              <div className="-mx-4 flex min-h-[calc(100dvh-13rem)] w-[calc(100%+2rem)] flex-col overflow-hidden rounded-none border-y border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950 sm:-mx-6 sm:w-[calc(100%+3rem)] lg:-mx-8 lg:h-[calc(100dvh-12rem)] lg:min-h-[calc(100dvh-12rem)] lg:w-[calc(100%+4rem)] lg:flex-row lg:rounded-xl lg:border">
                 <OperatorsSidebar
-                  className="hidden h-full w-[220px] shrink-0 lg:flex lg:w-[240px]"
+                  className="hidden h-full w-[220px] shrink-0 xl:w-[260px] 2xl:w-[300px] lg:flex"
                   onSelect={(c) => canvasControlRef.current?.addComponentNode(c)}
                   onAddSource={() => canvasControlRef.current?.addSourceNode()}
                   onAddDestination={() => canvasControlRef.current?.addDestinationNode()}
@@ -1267,6 +1268,7 @@ export function CanvasPageClient() {
                     pipelineId={selectedId}
                     focus={inspectorFocus}
                     liveConfig={liveStepConfig}
+                    className="h-48 shrink-0 xl:h-56 2xl:h-64"
                   />
                   <DesignerMobileChrome
                     operators={
@@ -1299,7 +1301,7 @@ export function CanvasPageClient() {
                   />
                 </div>
                 <aside
-                  className="hidden h-full w-[300px] shrink-0 overflow-y-auto overscroll-contain border-l border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/95 lg:block lg:w-[340px]"
+                  className="hidden h-full w-[320px] shrink-0 overflow-y-auto overscroll-contain border-l border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/95 xl:w-[360px] 2xl:w-[420px] lg:block"
                   aria-label="Operator configuration"
                 >
                   {starterNotice ? (
