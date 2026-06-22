@@ -7,7 +7,14 @@ export const PLAN_PRICES_USD = {
   pro: { monthly: 29, annual: 29 * ANNUAL_MONTHS_CHARGED },
   team: { monthly: 149, annual: 149 * ANNUAL_MONTHS_CHARGED },
   dedicatedCompute: { monthly: 399, annual: 399 * ANNUAL_MONTHS_CHARGED },
+  /**
+   * Self-hosted control plane + gateway (Enterprise sales).
+   * Floor aligned with mid-market data platforms (~13× Team annual self-serve).
+   */
+  enterprise: { monthly: 2400, annual: 2400 * ANNUAL_MONTHS_CHARGED },
 } as const;
+
+export const ENTERPRISE_PLATFORM_FLOOR_USD = PLAN_PRICES_USD.enterprise;
 
 export function annualPriceFromMonthly(monthlyUsd: number): number {
   return monthlyUsd * ANNUAL_MONTHS_CHARGED;

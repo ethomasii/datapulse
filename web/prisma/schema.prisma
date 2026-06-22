@@ -67,6 +67,14 @@ enum ManagedComputeMode {
   dedicated
 }
 
+/// Where run metadata is primarily retained (air-gap v1 exports to customer webhook).
+enum MetadataStorageMode {
+  /// Default — run history and telemetry in eltPulse Cloud (Neon).
+  cloud
+  /// Mirror redacted run summaries to customer-controlled webhook; cloud retention still applies in v1.
+  customer_export
+}
+
 model User {
   id        String   @id @default(cuid())
   clerkId   String   @unique
@@ -192,6 +200,11 @@ model Organization {
   dedicatedComputeStripeSubscriptionId String? @unique @map("dedicated_compute_stripe_subscription_id")
   dedicatedComputeSubscriptionStatus SubscriptionStatus? @map("dedicated_compute_subscription_status")
   dedicatedComputeCurrentPeriodEnd DateTime? @map("dedicated_compute_current_period_end")
+  /// Air-gap v1 — export redacted run metadata to customer-controlled endpoint.
+  metadataStorageMode MetadataStorageMode @default(cloud) @map("metadata_storage_mode")
+  metadataExportWebhookUrl String? @map("metadata_export_webhook_url") @db.Text
+  /// Optional shared secret — sent as `X-eltPulse-Signature` (HMAC-SHA256 hex of body).
+  metadataExportWebhookSecret String? @map("metadata_export_webhook_secret") @db.Text
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -572,6 +585,8 @@ model EltPipelineRun {
   errorSummary  String?   @db.Text
   webhookSentAt DateTime?
   webhookStatus String?
+  airgapExportedAt DateTime? @map("airgap_exported_at")
+  airgapExportStatus String? @map("airgap_export_status")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

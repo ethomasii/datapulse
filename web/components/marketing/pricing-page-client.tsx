@@ -78,18 +78,21 @@ const TIERS: TierDef[] = [
   },
   {
     key: "enterprise",
-    subtitle: "Self-hosted in your VPC or on-prem",
-    monthlyUsd: null,
+    subtitle: "Self-hosted control plane in your VPC",
+    monthlyUsd: PLAN_PRICES_USD.enterprise.monthly,
     features: [
       "Everything in Team",
-      "Self-hosted eltPulse gateway (Docker)",
-      "Metadata & logs to control plane",
-      "Air-gapped option available",
+      "Self-hosted eltPulse control plane (Docker)",
+      "Unlimited gateways & air-gapped metadata",
+      "Annual platform license from $24k/yr",
       "SLA-backed uptime commitment",
       "Dedicated onboarding & security review",
       "Custom connector development",
     ],
-    cta: { href: "mailto:hello@eltpulse.dev", label: "Contact enterprise sales" },
+    cta: {
+      href: "mailto:hello@eltpulse.dev?subject=eltPulse%20Enterprise%20—%20self-hosted%20control%20plane",
+      label: "Contact enterprise sales",
+    },
   },
 ];
 
@@ -173,7 +176,9 @@ export function PricingPageClient() {
                   {price !== null ? (
                     <div>
                       <span className="text-4xl font-bold text-slate-900">${price}</span>
-                      <span className="text-slate-500">/month + usage</span>
+                      <span className="text-slate-500">
+                        {plan.key === "enterprise" ? "/month platform" : "/month + usage"}
+                      </span>
                       {billing === "annual" ? (
                         <p className="mt-1 text-xs font-medium text-green-600">
                           billed annually — 2 months free

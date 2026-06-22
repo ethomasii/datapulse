@@ -8,6 +8,10 @@ function appBaseUrl(): string {
   return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 }
 
+function isTerminalStatus(status: string): boolean {
+  return status === "succeeded" || status === "failed" || status === "cancelled";
+}
+
 /** Fire optional webhook when a run reaches a terminal status (pipeline URL overrides account default). */
 export async function maybeDispatchRunWebhook(runId: string, userId: string): Promise<void> {
   const run = await db.eltPipelineRun.findFirst({
@@ -19,7 +23,9 @@ export async function maybeDispatchRunWebhook(runId: string, userId: string): Pr
     },
   });
 
-  if (run?.pipelineId && (run.status === "succeeded" || run.status === "failed")) {
+  if (!run) return;
+
+  if (run.pipelineId && (run.status === "succeeded" || run.status === "failed")) {
     try {
       const { triggerWorkflowsForPipelineRun } = await import("@/lib/elt/elt-workflow-runner");
       await triggerWorkflowsForPipelineRun(
@@ -32,41 +38,49 @@ export async function maybeDispatchRunWebhook(runId: string, userId: string): Pr
     }
   }
 
-  const webhookUrl = run?.pipeline?.runsWebhookUrl ?? run?.user.runsWebhookUrl;
-  if (!run || !webhookUrl) return;
-  if (!["succeeded", "failed", "cancelled"].includes(run.status)) return;
+  if (isTerminalStatus(run.status)) {
+    const webhookUrl = run.pipeline?.runsWebhookUrl ?? run.user.runsWebhookUrl;
+    if (webhookUrl) {
+      const event =
+        run.status === "succeeded" ? "run.succeeded" : run.status === "failed" ? "run.failed" : "run.cancelled";
 
-  const event =
-    run.status === "succeeded" ? "run.succeeded" : run.status === "failed" ? "run.failed" : "run.cancelled";
+      const base = appBaseUrl();
+      const tel = parseRunTelemetry((run as { telemetry?: unknown }).telemetry);
+      const hasSummary = Object.keys(tel.summary).length > 0;
+      const failures = dbtFailedTests(tel.dbt);
+      const payload: RunWebhookPayload = {
+        source: "eltpulse",
+        event,
+        correlationId: run.correlationId,
+        pipelineId: run.pipelineId,
+        dbtProjectId: run.dbtProjectId,
+        pipelineName: runSubjectLabel(run),
+        environment: run.environment,
+        status: run.status,
+        errorSummary: run.errorSummary,
+        startedAt: run.startedAt.toISOString(),
+        finishedAt: run.finishedAt?.toISOString() ?? null,
+        runUrl: `${base}/runs?run=${run.id}`,
+        ...(hasSummary ? { telemetrySummary: tel.summary as Record<string, unknown> } : {}),
+        ...(tel.dbt ? { dbtManifest: tel.dbt } : {}),
+        ...(failures.length > 0 ? { dbtTestFailures: failures } : {}),
+      };
 
-  const base = appBaseUrl();
-  const tel = parseRunTelemetry((run as { telemetry?: unknown }).telemetry);
-  const hasSummary = Object.keys(tel.summary).length > 0;
-  const failures = dbtFailedTests(tel.dbt);
-  const payload: RunWebhookPayload = {
-    source: "eltpulse",
-    event,
-    correlationId: run.correlationId,
-    pipelineId: run.pipelineId,
-    dbtProjectId: run.dbtProjectId,
-    pipelineName: runSubjectLabel(run),
-    environment: run.environment,
-    status: run.status,
-    errorSummary: run.errorSummary,
-    startedAt: run.startedAt.toISOString(),
-    finishedAt: run.finishedAt?.toISOString() ?? null,
-    runUrl: `${base}/runs?run=${run.id}`,
-    ...(hasSummary ? { telemetrySummary: tel.summary as Record<string, unknown> } : {}),
-    ...(tel.dbt ? { dbtManifest: tel.dbt } : {}),
-    ...(failures.length > 0 ? { dbtTestFailures: failures } : {}),
-  };
+      const r = await deliverRunWebhook(webhookUrl, payload);
+      await db.eltPipelineRun.update({
+        where: { id: run.id },
+        data: {
+          webhookSentAt: new Date(),
+          webhookStatus: r.ok ? "ok" : `http_${r.httpStatus ?? "error"}`,
+        },
+      });
+    }
 
-  const r = await deliverRunWebhook(webhookUrl, payload);
-  await db.eltPipelineRun.update({
-    where: { id: run.id },
-    data: {
-      webhookSentAt: new Date(),
-      webhookStatus: r.ok ? "ok" : `http_${r.httpStatus ?? "error"}`,
-    },
-  });
+    try {
+      const { maybeDispatchAirgapMetadataExport } = await import("@/lib/elt/airgap-metadata-export");
+      await maybeDispatchAirgapMetadataExport(run.id);
+    } catch {
+      /* air-gap export is best-effort */
+    }
+  }
 }

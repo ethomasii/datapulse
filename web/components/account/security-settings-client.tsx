@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { Shield, Mail } from "lucide-react";
 import type { PlanTier } from "@prisma/client";
+import { formatUsd, PLAN_PRICES_USD } from "@/lib/billing/plan-pricing";
+import { AirgapMetadataPanel } from "@/components/account/airgap-metadata-panel";
 
 export function SecuritySettingsClient({
   tier,
@@ -75,7 +77,9 @@ export function SecuritySettingsClient({
         </p>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
           <strong className="font-medium text-slate-800 dark:text-slate-200">Enterprise control plane:</strong>{" "}
-          self-hosted eltPulse (Docker) with annual platform license and SLA —{" "}
+          self-hosted eltPulse (Docker) from{" "}
+          {formatUsd(PLAN_PRICES_USD.enterprise.monthly)}/mo (
+          {formatUsd(PLAN_PRICES_USD.enterprise.annual)}/yr billed annually) —{" "}
           <a
             href="mailto:hello@eltpulse.dev?subject=eltPulse%20Enterprise%20self-hosted"
             className="font-medium text-blue-600 hover:underline dark:text-blue-400"
@@ -100,6 +104,11 @@ export function SecuritySettingsClient({
           </Link>
           .
         </p>
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Air-gapped metadata export (v1)</h2>
+        <AirgapMetadataPanel />
       </section>
     </div>
   );

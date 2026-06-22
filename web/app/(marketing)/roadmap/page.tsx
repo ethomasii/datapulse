@@ -131,6 +131,11 @@ const ITEMS: {
     desc: "Run-history retention, API key limits, webhook/Git/lineage gates, personal gateway limits, and BYOC on all plans.",
   },
   {
+    status: "shipped",
+    title: "Air-gapped metadata export (v1)",
+    desc: "Org webhook mirror for redacted run summaries on terminal runs — Security → Air-gapped metadata export; HMAC signing optional.",
+  },
+  {
     status: "in-progress",
     title: "SSO / SAML (Team+)",
     desc: "Clerk SAML for Team workspaces — contact sales to enable; set ELTPULSE_SSO_ENABLED when IdP is configured.",
@@ -142,8 +147,8 @@ const ITEMS: {
   },
   {
     status: "planned",
-    title: "Air-gapped metadata routing",
-    desc: "Keep run metadata in customer storage with optional sync to eltPulse Cloud — Enterprise and Team preview.",
+    title: "Air-gap v2 — minimize cloud retention",
+    desc: "Optional stop persisting full run logs in Neon when customer_export mode; S3/GCS vault destinations.",
   },
   {
     status: "planned",
