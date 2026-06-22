@@ -1335,8 +1335,14 @@ export async function POST(request: Request) {
     messages: Message[];
     lastRunError?: string;
     pipelineId?: string;
+    canvasNodeContext?: {
+      nodeId: string;
+      componentId?: string;
+      label?: string;
+      config?: Record<string, unknown>;
+    };
   };
-  const { messages, lastRunError, pipelineId } = body;
+  const { messages, lastRunError, pipelineId, canvasNodeContext } = body;
   if (!Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: "messages required" }, { status: 400 });
   }
@@ -1387,6 +1393,17 @@ export async function POST(request: Request) {
 When the user asks to add checks, sensors, or transforms, call **add_pipeline_components** (omit pipeline_id — context is set).
 When they ask to connect steps, wire join→filter, or add dbt after load, call **edit_pipeline_canvas** with actions[].
 When they describe a brand-new pipeline instead, use **generate_pipeline** without pipeline_id.`;
+      if (canvasNodeContext?.nodeId) {
+        pipelineContextBlock += `
+
+## Genie target step (user selected on canvas)
+- Node ID: ${canvasNodeContext.nodeId}
+- Component: ${canvasNodeContext.componentId ?? "unknown"}
+- Label: ${canvasNodeContext.label ?? "—"}
+- Config JSON: ${JSON.stringify(canvasNodeContext.config ?? {})}
+
+Prefer **edit_pipeline_canvas** to patch this step (connect, add downstream, or replace component config). Reference node_id \`${canvasNodeContext.nodeId}\` in graph_edits when applicable.`;
+      }
     }
     if (!runErrorContext) {
       const lastFail = await db.eltPipelineRun.findFirst({

@@ -97,6 +97,8 @@ export type PipelineCanvasControl = {
     },
     position?: { x: number; y: number }
   ) => void;
+  addSourceNode: () => void;
+  addDestinationNode: () => void;
   replaceGraph: (nodes: Node[], edges: Edge[]) => void;
 };
 
@@ -494,15 +496,60 @@ function FlowCanvas({
     void onSave(nodes, edges);
   }, [onSave, nodes, edges, persistValidationOptions]);
 
+  const selectedNodeIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    selectedNodeIdRef.current = selectedFlowNodes[0]?.id ?? null;
+  }, [selectedFlowNodes]);
+
+  const emitInspectorFocus = useCallback(
+    (node: Node) => {
+      if (!onInspectorFocusChange) return;
+      if (node.type === "sourceNode") {
+        onInspectorFocusChange({ kind: "source", nodeId: node.id });
+        return;
+      }
+      if (node.type === "destNode") {
+        onInspectorFocusChange({ kind: "destination", nodeId: node.id });
+        return;
+      }
+      if (node.type === "transformNode") {
+        onInspectorFocusChange({
+          kind: "transform",
+          nodeId: node.id,
+          data: { ...(node.data as Record<string, unknown>) },
+        });
+        return;
+      }
+      if (node.type === "componentNode") {
+        onInspectorFocusChange({
+          kind: "component",
+          nodeId: node.id,
+          data: { ...(node.data as Record<string, unknown>) },
+        });
+      }
+    },
+    [onInspectorFocusChange]
+  );
+
   useEffect(() => {
     if (!canvasControlRef) return;
     canvasControlRef.current = {
       patchNodeData: (nodeId: string, patch: Record<string, unknown>) => {
-        setNodes((nds) =>
-          nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, ...patch } } : n))
-        );
+        setNodes((nds) => {
+          const next = nds.map((n) =>
+            n.id === nodeId ? { ...n, data: { ...n.data, ...patch } } : n
+          );
+          if (selectedNodeIdRef.current === nodeId) {
+            const updated = next.find((n) => n.id === nodeId);
+            if (updated) queueMicrotask(() => emitInspectorFocus(updated));
+          }
+          return next;
+        });
       },
       addComponentNode,
+      addSourceNode: () => addNode("sourceNode"),
+      addDestinationNode: () => addNode("destNode"),
       replaceGraph: (nextNodes: Node[], nextEdges: Edge[]) => {
         setNodes(nextNodes);
         setEdges(resolveCanvasEdges(nextNodes, nextEdges));
@@ -513,7 +560,7 @@ function FlowCanvas({
     return () => {
       canvasControlRef.current = null;
     };
-  }, [canvasControlRef, setNodes, setEdges, addComponentNode, fit]);
+  }, [canvasControlRef, setNodes, setEdges, addComponentNode, addNode, fit, emitInspectorFocus]);
 
   const onSelectionChange = useCallback(
     ({ nodes: selectedNodes }: { nodes: Node[] }) => {
@@ -524,33 +571,9 @@ function FlowCanvas({
         onInspectorFocusChange({ kind: "none" });
         return;
       }
-      if (n.type === "sourceNode") {
-        onInspectorFocusChange({ kind: "source", nodeId: n.id });
-        return;
-      }
-      if (n.type === "destNode") {
-        onInspectorFocusChange({ kind: "destination", nodeId: n.id });
-        return;
-      }
-      if (n.type === "transformNode") {
-        onInspectorFocusChange({
-          kind: "transform",
-          nodeId: n.id,
-          data: { ...(n.data as Record<string, unknown>) },
-        });
-        return;
-      }
-      if (n.type === "componentNode") {
-        onInspectorFocusChange({
-          kind: "component",
-          nodeId: n.id,
-          data: { ...(n.data as Record<string, unknown>) },
-        });
-        return;
-      }
-      onInspectorFocusChange({ kind: "none" });
+      emitInspectorFocus(n);
     },
-    [onInspectorFocusChange]
+    [emitInspectorFocus, onInspectorFocusChange]
   );
 
   const colorMode = resolvedTheme === "dark" ? "dark" : "light";

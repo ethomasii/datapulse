@@ -5,14 +5,15 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Edge, Node } from "@xyflow/react";
 import { Loader2, Plus } from "lucide-react";
-import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
 import { AppPage, AppPageHeader } from "@/components/layout/app-page";
-import { ComponentPalette } from "@/components/elt/component-palette";
+import { CanvasPreviewPanel } from "@/components/pipeline-canvas/canvas-preview-panel";
+import { DesignerMobileChrome } from "@/components/pipeline-canvas/designer-mobile-chrome";
+import { GenieCanvasBar } from "@/components/pipeline-canvas/genie-canvas-bar";
+import { OperatorsSidebar } from "@/components/pipeline-canvas/operators-sidebar";
 import { LakeStarterGallery } from "@/components/elt/lake-starter-gallery";
 import { LakeStarterChips } from "@/components/elt/lake-starter-chips";
 import type { LakeStarterApplyResult } from "@/components/elt/lake-starter-apply-dialog";
-import { TransformJourneyStrip } from "@/components/elt/transform-journey-strip";
-import { TransformPathsPanel } from "@/components/elt/transform-paths-panel";
+import { ComponentPalette } from "@/components/elt/component-palette";
 import { CopyEnvButton } from "@/components/elt/copy-env-button";
 import { EltLoadingState } from "@/components/elt/elt-loading-state";
 import { FormAccordion } from "@/components/elt/form-accordion";
@@ -153,6 +154,31 @@ export function CanvasPageClient() {
 
   const canvasControlRef = useRef<PipelineCanvasControl | null>(null);
   const [inspectorFocus, setInspectorFocus] = useState<CanvasInspectorFocus>({ kind: "none" });
+
+  const selectedStepLabel = useMemo(() => {
+    if (inspectorFocus.kind === "component") {
+      return String(inspectorFocus.data.label ?? inspectorFocus.data.componentId ?? "");
+    }
+    if (inspectorFocus.kind === "transform") {
+      return String(inspectorFocus.data.label ?? "Transform");
+    }
+    return undefined;
+  }, [inspectorFocus]);
+
+  const liveStepConfig = useMemo(() => {
+    if (inspectorFocus.kind !== "component") return null;
+    return (inspectorFocus.data.config as Record<string, unknown>) ?? {};
+  }, [inspectorFocus]);
+
+  const canvasGenieNode = useMemo(() => {
+    if (inspectorFocus.kind !== "component") return null;
+    return {
+      nodeId: inspectorFocus.nodeId,
+      componentId: String(inspectorFocus.data.componentId ?? ""),
+      label: String(inspectorFocus.data.label ?? ""),
+      config: (inspectorFocus.data.config as Record<string, unknown>) ?? {},
+    };
+  }, [inspectorFocus]);
 
   const existingCanvasGraph = useMemo(
     () => (loadedGraph ? { nodes: loadedGraph.nodes, edges: loadedGraph.edges, v: 1 as const } : null),
@@ -781,9 +807,9 @@ export function CanvasPageClient() {
       return (
         <div className="space-y-4">
           <div className={stickyHeaderClass}>
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Component template</h2>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Operator configuration</h2>
             <p className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-400">
-              Visual pipeline step — compiles to ingest, replicate, transform, monitor, or quality on save.
+              Column mapping, filters, and step settings — same panel as Lakeflow&apos;s operator config.
             </p>
           </div>
           <CanvasComponentInspector
@@ -792,6 +818,8 @@ export function CanvasPageClient() {
             initialData={focus.data}
             pipelineId={selectedId}
             readOnly={!canWrite}
+            hideInlinePreview
+            autoApply
             onPatch={(p) => canvasControlRef.current?.patchNodeData(focus.nodeId, p)}
           />
         </div>
@@ -1187,41 +1215,112 @@ export function CanvasPageClient() {
                     ? "Source → landing tables · configure extract in the sidebar"
                     : canvasView === "dag"
                       ? "Transform dependency graph from component edges → after[]"
-                      : "Drag components onto the canvas · drop on a wire to insert"}
+                      : "Lakeflow-style designer — operators left · canvas center · config right · preview below"}
                 </span>
               </div>
               {canvasView === "designer" ? (
-              <div className="min-w-0">
-                <PipelineCanvas
-                  key={selectedId}
-                  pipelineId={selectedId}
-                  loadedGraph={loadedGraph}
-                  graphRevision={loadedSig}
-                  onSave={handleSave}
-                  saving={saving}
-                  saveError={saveError}
-                  saveDisabled={!canWrite}
-                  pipelineSourceType={pipelineSourceType}
-                  pipelineDestinationType={pipelineDestinationType}
-                  onPickSourceType={(t) => void patchPipelineBindings({ sourceType: t })}
-                  onPickDestinationType={(t) => void patchPipelineBindings({ destinationType: t })}
-                  bindingsBusy={bindingsBusy}
-                  bindingsError={bindingsError}
-                  canvasControlRef={canvasControlRef}
-                  onInspectorFocusChange={setInspectorFocus}
-                  onGraphStatsChange={({ componentNodeCount: count }) => setComponentNodeCount(count)}
-                  showEmptyStateOverlay={componentNodeCount === 0}
-                  emptyStateOverlay={
-                    <LakeStarterChips
-                      variant="overlay"
+              <div className="flex h-[max(36rem,min(calc(100dvh-11rem),56rem))] min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950 lg:h-[max(36rem,min(calc(100dvh-11rem),56rem))] lg:flex-row">
+                <OperatorsSidebar
+                  className="hidden h-full w-[220px] shrink-0 lg:flex lg:w-[240px]"
+                  onSelect={(c) => canvasControlRef.current?.addComponentNode(c)}
+                  onAddSource={() => canvasControlRef.current?.addSourceNode()}
+                  onAddDestination={() => canvasControlRef.current?.addDestinationNode()}
+                />
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                  <div className="min-h-0 flex-1">
+                    <PipelineCanvas
+                      key={selectedId}
+                      pipelineId={selectedId}
+                      loadedGraph={loadedGraph}
+                      graphRevision={loadedSig}
+                      onSave={handleSave}
+                      saving={saving}
+                      saveError={saveError}
+                      saveDisabled={!canWrite}
+                      pipelineSourceType={pipelineSourceType}
+                      pipelineDestinationType={pipelineDestinationType}
+                      onPickSourceType={(t) => void patchPipelineBindings({ sourceType: t })}
+                      onPickDestinationType={(t) => void patchPipelineBindings({ destinationType: t })}
+                      bindingsBusy={bindingsBusy}
+                      bindingsError={bindingsError}
+                      canvasControlRef={canvasControlRef}
+                      onInspectorFocusChange={setInspectorFocus}
+                      onGraphStatsChange={({ componentNodeCount: count }) => setComponentNodeCount(count)}
+                      showEmptyStateOverlay={componentNodeCount === 0}
+                      emptyStateOverlay={
+                        <LakeStarterChips
+                          variant="overlay"
+                          defaultSourceTable={lakeDefaultSourceTable}
+                          existingCanvas={existingCanvasGraph}
+                          onApply={handleLakeStarterApply}
+                        />
+                      }
+                    />
+                  </div>
+                  <GenieCanvasBar
+                    pipelineId={selectedId}
+                    selectedLabel={selectedStepLabel}
+                    canvasNode={canvasGenieNode}
+                    onPipelinePatched={() => void loadPipelineGraph(selectedId)}
+                  />
+                  <CanvasPreviewPanel
+                    pipelineId={selectedId}
+                    focus={inspectorFocus}
+                    liveConfig={liveStepConfig}
+                  />
+                  <DesignerMobileChrome
+                    operators={
+                      <OperatorsSidebar
+                        className="h-full border-0"
+                        onSelect={(c) => canvasControlRef.current?.addComponentNode(c)}
+                        onAddSource={() => canvasControlRef.current?.addSourceNode()}
+                        onAddDestination={() => canvasControlRef.current?.addDestinationNode()}
+                      />
+                    }
+                    config={
+                      <div className="p-4">
+                        {starterNotice ? (
+                          <div className="mb-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-100">
+                            <p>{starterNotice}</p>
+                          </div>
+                        ) : null}
+                        {renderCanvasInspectorPanel(inspectorFocus)}
+                        {inspectorFocus.kind === "none" ? (
+                          <LakeStarterGallery
+                            compact
+                            className="mt-4"
+                            defaultSourceTable={lakeDefaultSourceTable}
+                            existingCanvas={existingCanvasGraph}
+                            onApplyToCanvas={handleLakeStarterApply}
+                          />
+                        ) : null}
+                      </div>
+                    }
+                  />
+                </div>
+                <aside
+                  className="hidden h-full w-[300px] shrink-0 overflow-y-auto overscroll-contain border-l border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/95 lg:block lg:w-[340px]"
+                  aria-label="Operator configuration"
+                >
+                  {starterNotice ? (
+                    <div className="mb-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-100">
+                      <p>{starterNotice}</p>
+                    </div>
+                  ) : null}
+                  {renderCanvasInspectorPanel(inspectorFocus)}
+                  {inspectorFocus.kind === "none" ? (
+                    <LakeStarterGallery
+                      compact
+                      className="mt-4"
                       defaultSourceTable={lakeDefaultSourceTable}
                       existingCanvas={existingCanvasGraph}
-                      onApply={handleLakeStarterApply}
+                      onApplyToCanvas={handleLakeStarterApply}
                     />
-                  }
-                />
+                  ) : null}
+                </aside>
               </div>
               ) : canvasView === "ingest" ? (
+              <>
               <IngestPanel
                 pipelineId={selectedId}
                 pipelineName={selectedName ?? "pipeline"}
@@ -1232,6 +1331,85 @@ export function CanvasPageClient() {
                 canvasNodes={loadedGraph?.nodes ?? []}
                 onSwitchToDesigner={() => setCanvasView("designer")}
               />
+              <aside
+                className={clsx(
+                  "mt-4 w-full border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/95",
+                  "rounded-2xl",
+                  "lg:fixed lg:bottom-0 lg:right-0 lg:top-14 lg:z-20 lg:mt-0 lg:w-[380px] lg:max-w-[380px] lg:overflow-y-auto lg:overscroll-contain lg:rounded-none lg:border-x-0 lg:border-t-0 lg:border-b-0 lg:border-l lg:p-4 lg:shadow-none"
+                )}
+                aria-label="Pipeline settings"
+              >
+                <div className="space-y-4">
+                  <div className="border-b border-slate-200 pb-3 dark:border-slate-600">
+                    <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Ingest configuration</h2>
+                    <p className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-400">
+                      Source connector, credentials, and ingest components.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveSourceConfiguration()}
+                      disabled={sourceConfigSaving || !canWrite}
+                      className="mt-2 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                    >
+                      {sourceConfigSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                      Save ingest config
+                    </button>
+                  </div>
+                  <FormAccordion
+                    id="ingest-inspector-source"
+                    title="Source connector"
+                    subtitle={pipelineSourceType.replace(/_/g, " ")}
+                    defaultOpen
+                  >
+                    <GuidedSourceBlock
+                      sourceType={pipelineSourceType || "github"}
+                      schemaFields={schemaFields}
+                      sourceCfg={sourceCfg}
+                      onSourceCfgChange={setSourceCfg}
+                      connectionValues={connectionValues}
+                      onConnectionPatch={patchConnection}
+                      genericConnectorJson={
+                        schemaFields.length === 0
+                          ? { value: connectorJson, onChange: setConnectorJson }
+                          : undefined
+                      }
+                    />
+                    <div className="mt-3">
+                      <CopyEnvButton values={sourceEnvValues} />
+                    </div>
+                  </FormAccordion>
+                  <FormAccordion
+                    id="ingest-inspector-dest"
+                    title="Destination / warehouse"
+                    subtitle={pipelineDestinationType.replace(/_/g, " ")}
+                  >
+                    <GuidedDestinationBlock
+                      destinationType={pipelineDestinationType || "duckdb"}
+                      sourceCfg={sourceCfg}
+                      onSourceCfgChange={setSourceCfg}
+                      connectionValues={connectionValues}
+                      onConnectionPatch={patchConnection}
+                    />
+                    <div className="mt-3">
+                      <CopyEnvButton values={destinationEnvValues} />
+                    </div>
+                  </FormAccordion>
+                  {sourceConfigError ? (
+                    <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                      {sourceConfigError}
+                    </p>
+                  ) : null}
+                  <ComponentPalette
+                    className="h-[240px]"
+                    categoryFilter="ingestion"
+                    onSelect={(c) => {
+                      setCanvasView("designer");
+                      canvasControlRef.current?.addComponentNode(c);
+                    }}
+                  />
+                </div>
+              </aside>
+              </>
               ) : (
               <div className="min-h-[max(28rem,min(calc(100dvh-8rem),56rem))] rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950">
                 <TransformDagPanel
@@ -1242,134 +1420,6 @@ export function CanvasPageClient() {
                 />
               </div>
               )}
-              <aside
-                className={clsx(
-                  "mt-4 w-full border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/95",
-                  "rounded-2xl",
-                  "lg:fixed lg:bottom-0 lg:right-0 lg:top-14 lg:z-20 lg:mt-0 lg:w-[380px] lg:max-w-[380px] lg:overflow-y-auto lg:overscroll-contain lg:rounded-none lg:border-x-0 lg:border-t-0 lg:border-b-0 lg:border-l lg:p-4 lg:shadow-none"
-                )}
-                aria-label="Pipeline settings"
-              >
-                {canvasView === "ingest" ? (
-                  <div className="space-y-4">
-                    <div className="border-b border-slate-200 pb-3 dark:border-slate-600">
-                      <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Ingest configuration</h2>
-                      <p className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-400">
-                        Source connector, credentials, and ingest components.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => void handleSaveSourceConfiguration()}
-                        disabled={sourceConfigSaving || !canWrite}
-                        className="mt-2 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-                      >
-                        {sourceConfigSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                        Save ingest config
-                      </button>
-                    </div>
-                    <FormAccordion
-                      id="ingest-inspector-source"
-                      title="Source connector"
-                      subtitle={pipelineSourceType.replace(/_/g, " ")}
-                      defaultOpen
-                    >
-                      <GuidedSourceBlock
-                        sourceType={pipelineSourceType || "github"}
-                        schemaFields={schemaFields}
-                        sourceCfg={sourceCfg}
-                        onSourceCfgChange={setSourceCfg}
-                        connectionValues={connectionValues}
-                        onConnectionPatch={patchConnection}
-                        genericConnectorJson={
-                          schemaFields.length === 0
-                            ? { value: connectorJson, onChange: setConnectorJson }
-                            : undefined
-                        }
-                      />
-                      <div className="mt-3">
-                        <CopyEnvButton values={sourceEnvValues} />
-                      </div>
-                    </FormAccordion>
-                    <FormAccordion
-                      id="ingest-inspector-dest"
-                      title="Destination / warehouse"
-                      subtitle={pipelineDestinationType.replace(/_/g, " ")}
-                    >
-                      <GuidedDestinationBlock
-                        destinationType={pipelineDestinationType || "duckdb"}
-                        sourceCfg={sourceCfg}
-                        onSourceCfgChange={setSourceCfg}
-                        connectionValues={connectionValues}
-                        onConnectionPatch={patchConnection}
-                      />
-                      <div className="mt-3">
-                        <CopyEnvButton values={destinationEnvValues} />
-                      </div>
-                    </FormAccordion>
-                    {sourceConfigError ? (
-                      <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-                        {sourceConfigError}
-                      </p>
-                    ) : null}
-                    <ComponentPalette
-                      className="h-[240px]"
-                      categoryFilter="ingestion"
-                      onSelect={(c) => {
-                        setCanvasView("designer");
-                        canvasControlRef.current?.addComponentNode(c);
-                      }}
-                    />
-                  </div>
-                ) : inspectorFocus.kind === "none" ? (
-                  <>
-                    {starterNotice ? (
-                      <div className="mb-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-100">
-                        <p>{starterNotice}</p>
-                        {selectedId ? (
-                          <Link
-                            href={`/catalog/dbt/new?pipeline=${encodeURIComponent(selectedId)}`}
-                            className="mt-2 inline-flex font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
-                          >
-                            Promote to dbt project →
-                          </Link>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    <TransformJourneyStrip compact showRecipeLink={false} className="mb-3" />
-                    <LakeStarterGallery
-                      compact
-                      className="mb-4"
-                      defaultSourceTable={lakeDefaultSourceTable}
-                      existingCanvas={existingCanvasGraph}
-                      onApplyToCanvas={handleLakeStarterApply}
-                    />
-                    <TransformPathsPanel compact className="mb-4" />
-                    <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        AI canvas builder
-                      </p>
-                      <AiPipelineAssistant
-                        inline
-                        canvasMode
-                        pipelineId={selectedId}
-                        onPipelinePatched={() => void loadPipelineGraph(selectedId)}
-                      />
-                    </div>
-                  </>
-                ) : null}
-                {canvasView === "designer" ? renderCanvasInspectorPanel(inspectorFocus) : null}
-                {canvasView === "designer" ? (
-                  <ComponentPalette
-                    id="canvas-component-palette"
-                    className={clsx(
-                      "mt-4",
-                      inspectorFocus.kind === "none" ? "h-[280px] lg:h-[320px]" : "h-[240px]"
-                    )}
-                    transformDesigner
-                    onSelect={(c) => canvasControlRef.current?.addComponentNode(c)}
-                  />
-                ) : null}
-              </aside>
             </>
           )}
         </div>

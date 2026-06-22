@@ -376,6 +376,7 @@ export function AiPipelineAssistant({
   inline = false,
   pipelineId,
   canvasMode = false,
+  canvasNodeContext,
 }: {
   onPipelineSaved?: (name: string) => void;
   onPipelinePatched?: () => void;
@@ -384,6 +385,13 @@ export function AiPipelineAssistant({
   pipelineId?: string;
   /** Canvas sidebar styling and edit-mode starter prompts. */
   canvasMode?: boolean;
+  /** Selected canvas step — Genie edits this node when set. */
+  canvasNodeContext?: {
+    nodeId: string;
+    componentId?: string;
+    label?: string;
+    config?: Record<string, unknown>;
+  };
 }) {
   const router = useRouter();
   const { permissions, loading: permsLoading } = useWorkspacePermissions();
@@ -409,7 +417,14 @@ export function AiPipelineAssistant({
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading || !canWrite) return;
-    const userMsg: Message = { role: 'user', content: text.trim() };
+    const scoped =
+      canvasNodeContext && canvasMode
+        ? `[Selected canvas step: ${canvasNodeContext.label ?? canvasNodeContext.componentId ?? canvasNodeContext.nodeId} (node_id=${canvasNodeContext.nodeId})]\n` +
+          `Component: ${canvasNodeContext.componentId ?? "unknown"}\n` +
+          `Current config: ${JSON.stringify(canvasNodeContext.config ?? {})}\n\n` +
+          `User request: ${text.trim()}`
+        : text.trim();
+    const userMsg: Message = { role: 'user', content: scoped };
     const next = [...messages, userMsg];
     setMessages(next);
     setInput('');
@@ -421,6 +436,7 @@ export function AiPipelineAssistant({
         body: JSON.stringify({
           messages: next.map((m) => ({ role: m.role, content: m.content })),
           ...(pipelineId ? { pipelineId } : {}),
+          ...(canvasNodeContext ? { canvasNodeContext } : {}),
         }),
       });
       if (!res.ok) throw new Error('Assistant request failed');
@@ -448,7 +464,7 @@ export function AiPipelineAssistant({
     } finally {
       setLoading(false);
     }
-  }, [messages, loading, canWrite, pipelineId]);
+  }, [messages, loading, canWrite, pipelineId, canvasNodeContext, canvasMode]);
 
   const patchPipeline = useCallback(async (id: string, patch: PatchPipelinePayload, key: string) => {
     if (!canWrite) return;

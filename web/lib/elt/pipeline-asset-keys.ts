@@ -98,3 +98,11 @@ export function previewTableFromConfig(config: Record<string, unknown>): string 
   ).trim();
   return table || null;
 }
+
+/** Upstream / input table for Lakeflow-style input preview. */
+export function inputTableFromConfig(config: Record<string, unknown>): string | null {
+  const table = String(
+    config.input_table ?? config.table ?? config.left_table ?? config.source_table ?? ""
+  ).trim();
+  return table || null;
+}

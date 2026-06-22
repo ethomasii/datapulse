@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { ComponentCatalogAssetPanel } from "@/components/elt/component-catalog-asset-panel";
 import { ComponentSchemaForm } from "@/components/elt/component-schema-form";
 import { ComponentDataPreview } from "@/components/elt/component-data-preview";
 import { RunStepPanel } from "@/components/elt/run-step-panel";
+import { OperatorColumnGrid } from "@/components/pipeline-canvas/operator-column-grid";
+import { inputTableFromConfig } from "@/lib/elt/pipeline-asset-keys";
 import type { NativeComponentField } from "@/lib/elt/native-components";
 import { compileTargetLabel } from "@/lib/elt/compile-target-labels";
 
@@ -34,6 +36,10 @@ type Props = {
   pipelineId: string;
   readOnly?: boolean;
   onPatch: (patch: Record<string, unknown>) => void;
+  /** When true, preview is shown in the Lakeflow bottom panel instead. */
+  hideInlinePreview?: boolean;
+  /** Debounced auto-apply config patches to the canvas node (live preview). */
+  autoApply?: boolean;
 };
 
 export function CanvasComponentInspector({
@@ -42,6 +48,8 @@ export function CanvasComponentInspector({
   pipelineId,
   readOnly = false,
   onPatch,
+  hideInlinePreview = false,
+  autoApply = false,
 }: Props) {
   const componentId = String(initialData.componentId ?? "");
   const [detail, setDetail] = useState<ComponentDetail | null>(null);
@@ -49,6 +57,7 @@ export function CanvasComponentInspector({
   const [config, setConfig] = useState<Record<string, unknown>>(
     (initialData.config as Record<string, unknown>) ?? {}
   );
+  const applyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showAdvancedJson, setShowAdvancedJson] = useState(false);
   const [configJson, setConfigJson] = useState(
     JSON.stringify(initialData.config ?? {}, null, 2)
@@ -85,12 +94,33 @@ export function CanvasComponentInspector({
     setConfigJson(JSON.stringify(initialData.config ?? {}, null, 2));
   }, [nodeId, initialData.config]);
 
-  function saveConfig(next: Record<string, unknown>) {
+  function saveConfig(next: Record<string, unknown>, silent = false) {
     setConfig(next);
     setConfigJson(JSON.stringify(next, null, 2));
     onPatch({ config: { ...next, template_id: componentId } });
-    setApplyMsg("Config saved on canvas node — save pipeline to compile into runner code.");
+    if (!silent) {
+      setApplyMsg("Config saved on canvas node — save pipeline to compile into runner code.");
+    }
   }
+
+  function queueAutoApply(next: Record<string, unknown>) {
+    setConfig(next);
+    setConfigJson(JSON.stringify(next, null, 2));
+    if (!autoApply || readOnly) return;
+    if (applyTimerRef.current) clearTimeout(applyTimerRef.current);
+    applyTimerRef.current = setTimeout(() => {
+      saveConfig(next, true);
+    }, 350);
+  }
+
+  useEffect(
+    () => () => {
+      if (applyTimerRef.current) clearTimeout(applyTimerRef.current);
+    },
+    []
+  );
+
+  const inputTable = inputTableFromConfig(config);
 
   if (loading) {
     return (
@@ -166,12 +196,14 @@ export function CanvasComponentInspector({
             config={config}
             readOnly={readOnly}
           />
-          <ComponentDataPreview
-            pipelineId={pipelineId}
-            config={config}
-            readOnly={readOnly}
-            autoLoad
-          />
+          {!hideInlinePreview ? (
+            <ComponentDataPreview
+              pipelineId={pipelineId}
+              config={config}
+              readOnly={readOnly}
+              autoLoad
+            />
+          ) : null}
         </>
       ) : null}
 
@@ -187,7 +219,16 @@ export function CanvasComponentInspector({
         pipelineId={pipelineId}
         config={config}
         readOnly={readOnly}
-        onChange={(next) => saveConfig(next)}
+        onChange={(next) => (autoApply ? queueAutoApply(next) : saveConfig(next))}
+      />
+
+      <OperatorColumnGrid
+        pipelineId={pipelineId}
+        inputTable={inputTable}
+        componentId={componentId}
+        config={config}
+        readOnly={readOnly}
+        onChange={(next) => (autoApply ? queueAutoApply(next) : saveConfig(next))}
       />
 
       {formFields.length > 0 && !showAdvancedJson ? (
@@ -197,9 +238,9 @@ export function CanvasComponentInspector({
             values={config}
             readOnly={readOnly}
             pipelineId={pipelineId}
-            onChange={setConfig}
+            onChange={(next) => (autoApply ? queueAutoApply(next) : setConfig(next))}
           />
-          {!readOnly ? (
+          {!readOnly && !autoApply ? (
             <button
               type="button"
               onClick={() => saveConfig(config)}
@@ -207,6 +248,9 @@ export function CanvasComponentInspector({
             >
               Apply config
             </button>
+          ) : null}
+          {autoApply ? (
+            <p className="text-[10px] text-slate-500">Changes apply automatically — preview updates below.</p>
           ) : null}
         </>
       ) : (
