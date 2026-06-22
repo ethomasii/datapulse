@@ -96,8 +96,8 @@ export function MarketingNavLinks({ mobile = false, onNavigate }: { mobile?: boo
   const pathname = usePathname() ?? "";
 
   const linkClass = mobile
-    ? "text-slate-600 dark:text-slate-400"
-    : "text-sm text-slate-600 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-white";
+    ? "text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+    : "hover:text-slate-900 dark:hover:text-white";
 
   const isActive = (href: string, prefix = false) =>
     prefix ? pathname === href || pathname.startsWith(`${href}/`) : pathname === href;
@@ -207,37 +207,37 @@ export function MarketingHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const clerkReady = isClerkConfigured();
 
-  const linkClass =
-    "text-sm text-slate-600 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-white";
-
   const closeMenu = () => setMenuOpen(false);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top,0px)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
+    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 pt-[env(safe-area-inset-top,0px)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link
           href="/"
-          className="flex shrink-0 items-center gap-2 font-bold text-slate-900 dark:text-white"
+          className="flex shrink-0 items-center gap-2 font-semibold text-slate-900 dark:text-slate-100"
         >
-          <Activity className="h-5 w-5 text-sky-600 dark:text-sky-400" aria-hidden />
+          <Activity className="h-6 w-6 text-sky-600" aria-hidden />
           eltPulse
         </Link>
 
         {/* Desktop */}
         <div className="hidden items-center gap-3 md:flex">
-          <nav className="flex items-center gap-5 lg:gap-6">
+          <nav className="flex items-center gap-x-3 text-sm font-medium text-slate-600 dark:text-slate-300 sm:gap-x-5 lg:gap-6">
             <MarketingNavLinks />
           </nav>
           <ThemeToggle />
           {clerkReady ? (
             <>
               <SignedOut>
-                <Link href="/sign-in" className={linkClass}>
+                <Link
+                  href="/sign-in"
+                  className="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                >
                   Sign in
                 </Link>
                 <Link
                   href="/sign-up"
-                  className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500"
+                  className="rounded-lg bg-sky-600 px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-500"
                 >
                   Start free
                 </Link>
@@ -245,7 +245,7 @@ export function MarketingHeader() {
               <SignedIn>
                 <Link
                   href="/dashboard"
-                  className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500"
+                  className="rounded-lg bg-sky-600 px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-500"
                 >
                   Dashboard
                 </Link>
@@ -254,12 +254,15 @@ export function MarketingHeader() {
             </>
           ) : (
             <>
-              <Link href="/dev-setup" className={linkClass}>
+              <Link
+                href="/dev-setup"
+                className="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+              >
                 Local setup
               </Link>
               <Link
                 href="/dev-setup"
-                className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500"
+                className="rounded-lg bg-sky-600 px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-500"
               >
                 Configure env
               </Link>
@@ -290,19 +293,27 @@ export function MarketingHeader() {
             {clerkReady ? (
               <>
                 <SignedOut>
-                  <Link href="/sign-in" className="text-slate-600 dark:text-slate-400" onClick={closeMenu}>
+                  <Link
+                    href="/sign-in"
+                    className="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                    onClick={closeMenu}
+                  >
                     Sign in
                   </Link>
                   <Link
                     href="/sign-up"
-                    className="rounded-lg bg-sky-600 px-4 py-2 text-center text-sm font-semibold text-white"
+                    className="rounded-lg bg-sky-600 px-3.5 py-1.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-sky-500"
                     onClick={closeMenu}
                   >
                     Start free
                   </Link>
                 </SignedOut>
                 <SignedIn>
-                  <Link href="/dashboard" className="text-slate-600 dark:text-slate-400" onClick={closeMenu}>
+                  <Link
+                    href="/dashboard"
+                    className="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                    onClick={closeMenu}
+                  >
                     Dashboard
                   </Link>
                   <UserButton afterSignOutUrl="/" />
@@ -310,12 +321,16 @@ export function MarketingHeader() {
               </>
             ) : (
               <>
-                <Link href="/dev-setup" className="text-slate-600 dark:text-slate-400" onClick={closeMenu}>
+                <Link
+                  href="/dev-setup"
+                  className="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                  onClick={closeMenu}
+                >
                   Local setup
                 </Link>
                 <Link
                   href="/dev-setup"
-                  className="rounded-lg bg-sky-600 px-4 py-2 text-center text-sm font-semibold text-white"
+                  className="rounded-lg bg-sky-600 px-3.5 py-1.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-sky-500"
                   onClick={closeMenu}
                 >
                   Configure env
