@@ -960,3 +960,22 @@ export const COMPETITORS: Competitor[] = [
 export const COMPETITOR_MAP: Record<string, Competitor> = Object.fromEntries(
   COMPETITORS.map((c) => [c.slug, c])
 );
+
+/** Shown on /compare and in the nav dropdown — names buyers actually search for. */
+export const FEATURED_COMPARE_SLUGS = [
+  "vs-fivetran",
+  "vs-airbyte",
+  "vs-databricks-lakeflow",
+  "vs-snowflake",
+  "vs-matillion",
+  "vs-microsoft-fabric",
+  "vs-aws-glue",
+  "vs-dbt-cloud",
+] as const;
+
+export function isFeaturedCompare(slug: string): boolean {
+  return (FEATURED_COMPARE_SLUGS as readonly string[]).includes(slug);
+}
+
+export const FEATURED_COMPETITORS = COMPETITORS.filter((c) => isFeaturedCompare(c.slug));
+export const MORE_COMPETITORS = COMPETITORS.filter((c) => !isFeaturedCompare(c.slug));

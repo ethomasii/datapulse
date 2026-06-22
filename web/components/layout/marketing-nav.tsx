@@ -9,7 +9,7 @@ import clsx from "clsx";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { isClerkConfigured } from "@/lib/clerk/is-configured";
 import { ELTPULSE_GITHUB_URL } from "@/lib/marketing/github-repo";
-import { COMPETITORS } from "@/lib/marketing/competitors";
+import { FEATURED_COMPETITORS } from "@/lib/marketing/competitors";
 
 function CompareDropdown({ linkClass }: { linkClass: string }) {
   const [open, setOpen] = useState(false);
@@ -55,7 +55,7 @@ function CompareDropdown({ linkClass }: { linkClass: string }) {
             All comparisons →
           </Link>
           <div className="my-1 border-t border-slate-200 dark:border-slate-800" />
-          {COMPETITORS.map((c) => (
+          {FEATURED_COMPETITORS.map((c) => (
             <Link
               key={c.slug}
               href={`/compare/${c.slug}`}
@@ -117,16 +117,6 @@ export function MarketingNavLinks({ mobile = false, onNavigate }: { mobile?: boo
         <NavLink href="/compare" linkClass={`${linkClass} font-medium`} active={isActive("/compare")} onNavigate={onNavigate}>
           Compare
         </NavLink>
-        {COMPETITORS.map((c) => (
-          <Link
-            key={c.slug}
-            href={`/compare/${c.slug}`}
-            onClick={onNavigate}
-            className="pl-4 text-sm text-slate-500 dark:text-slate-500"
-          >
-            vs. {c.name}
-          </Link>
-        ))}
         <NavLink href="/changelog" linkClass={linkClass} active={isActive("/changelog")} onNavigate={onNavigate}>
           Changelog
         </NavLink>

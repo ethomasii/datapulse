@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CheckCircle, Code2, GitBranch, Server, Wallet } from "lucide-react";
-import { COMPETITORS } from "@/lib/marketing/competitors";
+import { Code2, GitBranch, Server, Wallet } from "lucide-react";
+import {
+  FEATURED_COMPETITORS,
+  MORE_COMPETITORS,
+} from "@/lib/marketing/competitors";
+import { CompareCompetitorCard } from "@/components/marketing/compare-competitor-card";
 
 export const metadata: Metadata = {
-  title: "Compare — eltPulse vs Fivetran, Matillion, Informatica, Meltano & other ELT tools",
+  title: "Compare — eltPulse vs Fivetran, Airbyte, Lakeflow & other ELT tools",
   description:
-    "Honest comparisons: eltPulse vs Databricks Lakeflow, Fivetran, Snowflake, Matillion, Informatica, Hightouch (reverse ETL), and 15+ more.",
+    "Honest comparisons vs Fivetran, Airbyte, Databricks Lakeflow, Snowflake, Matillion, and more — plus extended write-ups for other tools.",
 };
 
 const HIGHLIGHTS = [
@@ -44,9 +48,8 @@ export default function ComparePage() {
             eltPulse vs. the alternatives
           </h1>
           <p className="mt-6 text-lg text-slate-600 dark:text-slate-400">
-            Buyers compare Fivetran, Databricks Lakeflow, Snowflake native EL, Matillion, Informatica,
-            and many others — plus activation tools like Hightouch (a different layer). Each excels in its
-            lane; we explain where eltPulse fits for git-native platform teams.
+            Start with the comparisons buyers ask about most — Fivetran, Airbyte, Databricks Lakeflow, Snowflake,
+            Matillion, and peers. Every write-up is respectful: we say when another tool is the better fit.
           </p>
         </div>
       </section>
@@ -70,40 +73,43 @@ export default function ComparePage() {
       </section>
 
       <section className="mx-auto max-w-5xl px-6 py-20">
-        <h2 className="mb-2 text-center text-2xl font-bold text-slate-900 dark:text-white">Pick your comparison</h2>
+        <h2 className="mb-2 text-center text-2xl font-bold text-slate-900 dark:text-white">Popular comparisons</h2>
         <p className="mb-12 text-center text-slate-500 dark:text-slate-400">
-          Detailed, honest feature-by-feature breakdowns. Orchestration tools (Prefect, Airflow, Dagster) are
-          partners — we focus on EL+T control planes and adjacent categories like reverse ETL.
+          Feature-by-feature breakdowns for the tools most teams evaluate alongside eltPulse.
         </p>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {COMPETITORS.map((c) => (
-            <Link
-              key={c.slug}
-              href={`/compare/${c.slug}`}
-              className="group rounded-2xl border border-slate-200 bg-white p-6 transition hover:border-blue-300 hover:shadow-md hover:shadow-blue-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-blue-700 dark:hover:shadow-blue-900/20"
-            >
-              <div className="flex items-start justify-between">
-                <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400">
-                  eltPulse vs. {c.name}
-                </h3>
-                <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-1 group-hover:text-blue-500" />
-              </div>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">{c.description}</p>
-              <div className="mt-4 space-y-1.5">
-                {c.theyreGoodAt.slice(0, 2).map((strength) => (
-                  <div key={strength} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
-                    <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-500" />
-                    {strength}
-                  </div>
-                ))}
-                <div className="flex items-start gap-2 text-xs font-medium text-blue-600 dark:text-blue-400">
-                  <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
-                  Strong fit for their core use case — see how eltPulse differs
-                </div>
-              </div>
-            </Link>
+          {FEATURED_COMPETITORS.map((c) => (
+            <CompareCompetitorCard key={c.slug} competitor={c} />
           ))}
         </div>
+
+        {MORE_COMPETITORS.length > 0 ? (
+          <details className="group mx-auto mt-16 max-w-3xl rounded-2xl border border-slate-200 bg-slate-50 open:pb-6 dark:border-slate-800 dark:bg-slate-900/50">
+            <summary className="cursor-pointer list-none px-6 py-4 text-center marker:content-none">
+              <span className="text-sm font-semibold text-blue-600 group-open:hidden dark:text-blue-400">
+                More comparisons ({MORE_COMPETITORS.length}) — Hevo, Meltano, Hightouch, enterprise suites…
+              </span>
+              <span className="hidden text-sm font-semibold text-slate-600 group-open:inline dark:text-slate-300">
+                More comparisons
+              </span>
+            </summary>
+            <p className="px-6 text-center text-xs text-slate-500 dark:text-slate-400">
+              Still indexed for search — just not every vendor belongs in the main nav.
+            </p>
+            <ul className="mt-4 columns-1 gap-x-8 px-6 sm:columns-2 md:columns-3">
+              {MORE_COMPETITORS.map((c) => (
+                <li key={c.slug} className="mb-2 break-inside-avoid">
+                  <Link
+                    href={`/compare/${c.slug}`}
+                    className="text-sm text-slate-700 hover:text-blue-600 hover:underline dark:text-slate-300 dark:hover:text-blue-400"
+                  >
+                    vs. {c.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </section>
 
       <section className="bg-blue-600 py-16 text-center">
