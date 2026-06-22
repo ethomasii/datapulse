@@ -75,6 +75,31 @@ enum MetadataStorageMode {
   customer_export
 }
 
+enum NotificationChannel {
+  email
+  slack
+  teams
+  discord
+  pagerduty
+  webhook
+  googlechat
+  zapier
+  make
+  n8n
+  pipedream
+}
+
+enum NotificationTrigger {
+  run_succeeded
+  run_failed
+  run_cancelled
+  alert_rule_fired
+  pipeline_created
+  pipeline_deleted
+  billing_payment_failed
+  security_new_device
+}
+
 model User {
   id        String   @id @default(cuid())
   clerkId   String   @unique
@@ -97,6 +122,12 @@ model User {
   agentLastSeenSource  String?   @map("agent_last_seen_source")
   /// Set when user clicks "Dismiss" on the dashboard onboarding checklist.
   onboardingDismissedAt DateTime? @map("onboarding_dismissed_at")
+  timezone String @default("UTC")
+  /// When enabled, non-urgent channels skip delivery during the quiet window (PagerDuty exempt).
+  notificationQuietHoursEnabled Boolean @default(false) @map("notification_quiet_hours_enabled")
+  notificationQuietStart        String? @map("notification_quiet_start")
+  notificationQuietEnd          String? @map("notification_quiet_end")
+  notificationQuietTimezone     String? @map("notification_quiet_timezone")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -137,6 +168,8 @@ model User {
   observabilityAlertRules ObservabilityAlertRule[]
   eltWorkflows EltWorkflow[]
   auditEvents WorkspaceAuditEvent[]
+  notificationPrefs  NotificationPreference[]
+  notificationEvents NotificationEvent[]
 }
 
 /// Per-user agent API token (multiple connectors: one per cloud, on-prem, etc.).
@@ -702,4 +735,59 @@ model WorkspaceAuditEvent {
   @@index([userId, createdAt(sort: Desc)])
   @@index([organizationId, createdAt(sort: Desc)])
   @@map("workspace_audit_event")
+}
+
+model NotificationPreference {
+  id                     String              @id @default(cuid())
+  userId                 String              @map("user_id")
+  user                   User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel                NotificationChannel
+  enabled                Boolean             @default(true)
+  emailAddress           String?             @map("email_address")
+  slackWebhookUrl        String?             @map("slack_webhook_url") @db.Text
+  teamsWebhookUrl        String?             @map("teams_webhook_url") @db.Text
+  discordWebhookUrl      String?             @map("discord_webhook_url") @db.Text
+  pagerdutyRoutingKey    String?             @map("pagerduty_routing_key")
+  webhookUrl             String?             @map("webhook_url") @db.Text
+  webhookSecret          String?             @map("webhook_secret")
+  webhookPayloadTemplate String?             @map("webhook_payload_template") @db.Text
+  googlechatWebhookUrl   String?             @map("googlechat_webhook_url") @db.Text
+  zapierWebhookUrl       String?             @map("zapier_webhook_url") @db.Text
+  makeWebhookUrl         String?             @map("make_webhook_url") @db.Text
+  n8nWebhookUrl          String?             @map("n8n_webhook_url") @db.Text
+  pipedreamWebhookUrl    String?             @map("pipedream_webhook_url") @db.Text
+  triggers               NotificationTrigger[]
+  /// Empty = all pipelines; otherwise only notify for listed pipeline IDs.
+  pipelineIds            String[]            @default([]) @map("pipeline_ids")
+  createdAt              DateTime            @default(now()) @map("created_at")
+  updatedAt              DateTime            @updatedAt @map("updated_at")
+
+  @@unique([userId, channel])
+  @@index([userId])
+  @@map("notification_preference")
+}
+
+model NotificationEvent {
+  id            String              @id @default(cuid())
+  userId        String              @map("user_id")
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runId         String?             @map("run_id")
+  pipelineId    String?             @map("pipeline_id")
+  channel       NotificationChannel
+  trigger       NotificationTrigger
+  subject       String
+  body          String              @db.Text
+  sentAt        DateTime?           @map("sent_at")
+  error         String?
+  retryCount    Int                 @default(0) @map("retry_count")
+  nextRetryAt   DateTime?           @map("next_retry_at")
+  lastAttemptAt DateTime?           @map("last_attempt_at")
+  statusCode    Int?                @map("status_code")
+  responseBody  String?             @map("response_body") @db.Text
+  skipReason    String?             @map("skip_reason")
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([runId])
+  @@map("notification_event")
 }

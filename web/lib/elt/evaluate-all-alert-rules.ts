@@ -6,6 +6,7 @@ import { db } from "@/lib/db/client";
 import { fetchPipelineMetricsForUser } from "@/lib/elt/pipeline-metrics";
 import { evaluateAlertRule } from "@/lib/elt/observability-alerts";
 import { deliverRunWebhook } from "@/lib/elt/run-webhook";
+import { dispatchRunNotifications } from "@/lib/notifications/dispatch";
 
 export type AlertCronResult = {
   evaluated: number;
@@ -65,6 +66,29 @@ export async function evaluateAllObservabilityAlertRules(options?: {
       }
 
       let fired = false;
+      const base = (process.env.NEXT_PUBLIC_APP_URL ?? "https://eltpulse.dev").replace(/\/$/, "");
+      try {
+        await dispatchRunNotifications({
+          userId: rule.userId,
+          trigger: "alert_rule_fired",
+          payload: {
+            trigger: "alert_rule_fired",
+            pipelineName: pipelineName ?? rule.name,
+            pipelineId: rule.pipelineId,
+            runId: `alert-${rule.id}`,
+            environment: "production",
+            status: "alert",
+            errorSummary: evaluation.message,
+            runUrl: `${base}/observability`,
+            details: evaluation.message,
+            timestamp: new Date().toISOString(),
+          },
+        });
+        fired = true;
+      } catch {
+        /* multi-channel notify is best-effort */
+      }
+
       if (fireWebhooks && rule.notifyWebhook && rule.user.runsWebhookUrl) {
         const r = await deliverRunWebhook(rule.user.runsWebhookUrl, {
           source: "eltpulse",
@@ -79,7 +103,7 @@ export async function evaluateAllObservabilityAlertRules(options?: {
           finishedAt: new Date().toISOString(),
           runUrl: "/observability",
         });
-        fired = r.ok;
+        fired = r.ok || fired;
         if (fired) {
           await db.observabilityAlertRule.update({
             where: { id: rule.id },

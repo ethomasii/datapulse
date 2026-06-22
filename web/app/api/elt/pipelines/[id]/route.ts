@@ -32,6 +32,7 @@ import { resolveRouteParamId } from "@/lib/server/route-params";
 import { assertUserOwnsGatewayToken } from "@/lib/agent/gateway-routing";
 import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
 import { assertCanWritePipelines } from "@/lib/auth/workspace-auth-helpers";
+import { recordWorkspaceAuditEvent } from "@/lib/audit/workspace-audit";
 
 const canvasPayloadSchema = z.union([
   z.object({
@@ -105,12 +106,22 @@ export async function DELETE(req: Request, ctx: Ctx) {
   if (denied) return denied;
   const pipelineId = await resolveRouteParamId(ctx.params);
   const ownerIds = await getAccessibleResourceOwnerIds(user.id);
-  const res = await db.eltPipeline.deleteMany({
+  const pipeline = await db.eltPipeline.findFirst({
     where: { id: pipelineId, userId: { in: ownerIds } },
+    select: { id: true, name: true, userId: true, tool: true },
   });
-  if (res.count === 0) {
+  if (!pipeline) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  await db.eltPipeline.deleteMany({
+    where: { id: pipelineId, userId: { in: ownerIds } },
+  });
+  await recordWorkspaceAuditEvent({
+    userId: pipeline.userId,
+    actorEmail: user.email,
+    action: "pipeline.deleted",
+    detail: { pipelineId: pipeline.id, name: pipeline.name, tool: pipeline.tool },
+  });
   return NextResponse.json({ ok: true });
 }
 

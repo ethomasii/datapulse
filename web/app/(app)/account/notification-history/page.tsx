@@ -1,20 +1,35 @@
-import type { Metadata } from "next";
+import { requireDbUser } from "@/lib/auth/server";
+import { listNotificationEvents } from "@/lib/notifications/dispatch";
+import { NotificationHistoryClient } from "@/components/account/notification-history-client";
 
-export const metadata: Metadata = {
-  title: "Notification history",
-};
+export const revalidate = 0;
 
-export default function NotificationHistoryPage() {
+export default async function NotificationHistoryPage() {
+  const user = await requireDbUser();
+  const events = await listNotificationEvents(user.id, 100);
+
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Sent notifications</h2>
-      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-        A chronological list of emails and in-app notifications (with status: sent, bounced, opened when available).
-        Pairs with Resend or your mail provider once delivery is instrumented.
+    <div className="space-y-4">
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Delivery log for every channel — sent, failed, skipped (quiet hours), or pending retry.
       </p>
-      <div className="mt-8 rounded-lg border border-dashed border-slate-200 py-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-500">
-        No notifications recorded yet.
-      </div>
+      <NotificationHistoryClient
+        events={events.map((e) => ({
+          id: e.id,
+          createdAt: e.createdAt.toISOString(),
+          channel: e.channel,
+          trigger: e.trigger,
+          subject: e.subject,
+          statusCode: e.statusCode,
+          nextRetryAt: e.nextRetryAt?.toISOString() ?? null,
+          lastAttemptAt: e.lastAttemptAt?.toISOString() ?? null,
+          retryCount: e.retryCount,
+          responseBody: e.responseBody,
+          skipReason: e.skipReason,
+          sentAt: e.sentAt?.toISOString() ?? null,
+          error: e.error,
+        }))}
+      />
     </div>
   );
 }

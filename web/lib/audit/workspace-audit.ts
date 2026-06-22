@@ -9,6 +9,22 @@ export type AuditEventRow = {
   createdAt: string;
 };
 
+export const AUDIT_ACTION_LABELS: Record<string, string> = {
+  "organization.created": "Organization created",
+  "team.invite_sent": "Team invite sent",
+  "team.invite_revoked": "Team invite revoked",
+  "api_key.created": "API key created",
+  "api_key.revoked": "API key revoked",
+  "notifications.settings_saved": "Notification settings updated",
+  "pipeline.created": "Pipeline created",
+  "pipeline.updated": "Pipeline updated",
+  "pipeline.deleted": "Pipeline deleted",
+};
+
+export function formatAuditAction(action: string): string {
+  return AUDIT_ACTION_LABELS[action] ?? action.replace(/[._]/g, " ");
+}
+
 export async function recordWorkspaceAuditEvent(input: {
   userId: string;
   actorEmail: string;
@@ -29,6 +45,28 @@ export async function recordWorkspaceAuditEvent(input: {
   } catch {
     /* table may not be migrated yet */
   }
+}
+
+/** Resolve actor email from userId when callers only have the workspace owner id. */
+export async function recordWorkspaceAuditForUser(input: {
+  userId: string;
+  action: string;
+  organizationId?: string | null;
+  detail?: Record<string, unknown>;
+}): Promise<void> {
+  const user = await db.user.findUnique({
+    where: { id: input.userId },
+    select: { email: true, organizationId: true, ownedOrganization: { select: { id: true } } },
+  });
+  if (!user) return;
+  const orgId = input.organizationId ?? user.ownedOrganization?.id ?? user.organizationId;
+  await recordWorkspaceAuditEvent({
+    userId: input.userId,
+    actorEmail: user.email,
+    organizationId: orgId,
+    action: input.action,
+    detail: input.detail,
+  });
 }
 
 /** Events for workspace owner + org members (shared org audit trail). */

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 import type { AuditEventRow } from "@/lib/audit/workspace-audit";
+import { formatAuditAction } from "@/lib/audit/workspace-audit";
 
 function formatDetail(detail: Record<string, unknown>): string {
   const parts = Object.entries(detail)
@@ -94,7 +95,7 @@ export function AuditLogClient() {
                 <td colSpan={3} className="px-4 py-12 text-center text-slate-500 dark:text-slate-500">
                   {migrationPending
                     ? "No events yet — new workspace actions will appear here after the audit table is migrated."
-                    : "No audit events recorded yet. Organization, invite, and API key actions are logged automatically."}
+                    : "No audit events recorded yet. Organization, pipeline, invite, API key, and notification actions are logged automatically."}
                 </td>
               </tr>
             ) : (
@@ -105,7 +106,8 @@ export function AuditLogClient() {
                   </td>
                   <td className="px-4 py-2 text-slate-800 dark:text-slate-200">{e.actorEmail}</td>
                   <td className="px-4 py-2">
-                    <span className="font-medium text-slate-900 dark:text-white">{e.action}</span>
+                    <span className="font-medium text-slate-900 dark:text-white">{formatAuditAction(e.action)}</span>
+                    <span className="ml-2 text-xs text-slate-400">{e.action}</span>
                     {Object.keys(e.detail).length > 0 ? (
                       <p className="mt-0.5 text-xs text-slate-500">{formatDetail(e.detail)}</p>
                     ) : null}

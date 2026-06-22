@@ -3,6 +3,8 @@ import { parseRunTelemetry } from "@/lib/elt/run-telemetry";
 import { dbtFailedTests } from "@/lib/elt/dbt-run-manifest";
 import { deliverRunWebhook, type RunWebhookPayload } from "@/lib/elt/run-webhook";
 import { runSubjectLabel } from "@/lib/elt/run-display";
+import { dispatchRunNotifications } from "@/lib/notifications/dispatch";
+import { runStatusToTrigger } from "@/lib/notifications/labels";
 
 function appBaseUrl(): string {
   return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -74,6 +76,37 @@ export async function maybeDispatchRunWebhook(runId: string, userId: string): Pr
           webhookStatus: r.ok ? "ok" : `http_${r.httpStatus ?? "error"}`,
         },
       });
+    }
+
+    const trigger = runStatusToTrigger(run.status);
+    if (trigger) {
+      const base = appBaseUrl();
+      const details =
+        run.status === "succeeded"
+          ? `Pipeline run completed successfully (${run.environment})`
+          : run.status === "failed"
+            ? run.errorSummary ?? "Pipeline run failed"
+            : "Pipeline run was cancelled";
+      try {
+        await dispatchRunNotifications({
+          userId,
+          trigger,
+          payload: {
+            trigger,
+            pipelineName: runSubjectLabel(run),
+            pipelineId: run.pipelineId,
+            runId: run.id,
+            environment: run.environment,
+            status: run.status,
+            errorSummary: run.errorSummary,
+            runUrl: `${base}/runs?run=${run.id}`,
+            details,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      } catch {
+        /* multi-channel notify is best-effort */
+      }
     }
 
     try {

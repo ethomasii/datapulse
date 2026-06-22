@@ -11,6 +11,7 @@ import { preparePipelinePersistenceAndArtifacts } from "@/lib/elt/pipeline-conne
 import type { CreatePipelineBody } from "@/lib/elt/types";
 import { normalizeRunWebhookUrl } from "@/lib/elt/validate-run-webhook-url";
 import { maybeAutoPushPipelineToGit } from "@/lib/integrations/github-push-pipeline";
+import { recordWorkspaceAuditForUser } from "@/lib/audit/workspace-audit";
 
 export type PersistPipelineFailure = { ok: false; status: number; message: string };
 
@@ -159,6 +160,11 @@ export async function upsertPipelineDefinition(
       data,
     });
     void maybeAutoPushPipelineToGit(userId, pipeline.id);
+    void recordWorkspaceAuditForUser({
+      userId,
+      action: "pipeline.updated",
+      detail: { pipelineId: pipeline.id, name: pipeline.name, tool: pipeline.tool },
+    });
     return { ok: true, pipeline, created: false };
   }
 
@@ -169,6 +175,11 @@ export async function upsertPipelineDefinition(
     },
   });
   void maybeAutoPushPipelineToGit(userId, pipeline.id);
+  void recordWorkspaceAuditForUser({
+    userId,
+    action: "pipeline.created",
+    detail: { pipelineId: pipeline.id, name: pipeline.name, tool: pipeline.tool },
+  });
   return { ok: true, pipeline, created: true };
 }
 
@@ -248,6 +259,11 @@ export async function createPipelineDefinition(
   });
 
   void maybeAutoPushPipelineToGit(userId, pipeline.id);
+  void recordWorkspaceAuditForUser({
+    userId: resourceUserId,
+    action: "pipeline.created",
+    detail: { pipelineId: pipeline.id, name: pipeline.name, tool: pipeline.tool },
+  });
 
   return { ok: true, pipeline, created: true };
 }
