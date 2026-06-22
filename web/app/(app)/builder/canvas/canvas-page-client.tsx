@@ -20,6 +20,8 @@ import { GuidedSourceBlock } from "@/components/elt/guided-source-block";
 import { CanvasTransformInspector } from "@/components/pipeline-canvas/canvas-transform-inspector";
 import { CanvasComponentInspector } from "@/components/pipeline-canvas/canvas-component-inspector";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
+import { useWorkspaceDefaultDestination } from "@/lib/hooks/use-workspace-default-destination";
+import { WorkspaceLakeBanner } from "@/components/elt/workspace-lake-banner";
 import type { DbtTransformNodeData } from "@/lib/elt/dbt-canvas";
 import { CanvasAssetLineagePanel } from "@/components/pipeline-canvas/canvas-asset-lineage-panel";
 import {
@@ -101,6 +103,7 @@ export function CanvasPageClient() {
   const [newName, setNewName] = useState("");
   const [newSourceType, setNewSourceType] = useState("github");
   const [newDestinationType, setNewDestinationType] = useState("duckdb");
+  const [newDestConnectionId, setNewDestConnectionId] = useState<string | null>(null);
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [linkedDbtProjectId, setLinkedDbtProjectId] = useState<string | null>(null);
@@ -114,6 +117,13 @@ export function CanvasPageClient() {
 
   const { permissions } = useWorkspacePermissions();
   const canWrite = permissions?.canWrite ?? true;
+  const workspaceDefault = useWorkspaceDefaultDestination();
+
+  useEffect(() => {
+    if (!workspaceDefault.loaded || !workspaceDefault.connector) return;
+    setNewDestinationType(workspaceDefault.connector.toLowerCase());
+    setNewDestConnectionId(workspaceDefault.connectionId);
+  }, [workspaceDefault.loaded, workspaceDefault.connector, workspaceDefault.connectionId]);
 
   const graphAbortRef = useRef<AbortController | null>(null);
 
@@ -511,6 +521,7 @@ export function CanvasPageClient() {
           destinationType: newDestinationType,
           tool: "auto",
           sourceConfiguration,
+          ...(newDestConnectionId ? { destinationConnectionId: newDestConnectionId } : {}),
         }),
       });
       const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
@@ -983,6 +994,13 @@ export function CanvasPageClient() {
                 <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
                   {pipelines.length === 0 ? "Create your first pipeline" : "New pipeline"}
                 </p>
+                {workspaceDefault.connector ? (
+                  <WorkspaceLakeBanner
+                    connector={workspaceDefault.connector}
+                    name={workspaceDefault.name}
+                    variant="compact"
+                  />
+                ) : null}
                 <label className="flex flex-col gap-1 text-sm">
                   <span className="font-medium text-slate-700 dark:text-slate-300">Name</span>
                   <input

@@ -114,9 +114,9 @@ export function PipelineRunPanel({ pipelineId }: { pipelineId: string | null }) 
           <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Run this pipeline</h3>
           <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
             Managed execution{execLabel ? ` · ${execLabel}` : ""}.
-            {execLabel === "Demo (stub)" ? (
+            {execLabel === "Demo" || execLabel === "Demo (stub)" ? (
               <Link href="/gateway" className="ml-1 text-sky-600 hover:underline">
-                Enable real runs
+                About managed compute
               </Link>
             ) : null}
           </p>

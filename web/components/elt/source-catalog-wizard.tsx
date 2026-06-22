@@ -2,9 +2,10 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Search, ChevronRight, ChevronLeft, Loader2, CheckCircle,
-  ExternalLink, AlertCircle, Zap, Database, RefreshCw, Cable, Plus,
+  ExternalLink, AlertCircle, Zap, Database, RefreshCw, Cable, Plus, Sparkles,
 } from 'lucide-react';
 import { ALL_DLT_SOURCES, getContextSlug, type DltHubSource } from '@/lib/elt/dlt-hub-registry';
 import { DESTINATION_GROUPS } from '@/lib/elt/catalog';
@@ -23,6 +24,9 @@ import {
   saasSourceConnectors,
 } from '@/lib/elt/catalog-wizard-saas';
 import { minimalSourceConfigurationForNewPipeline } from '@/lib/elt/minimal-source-configuration';
+import { canvasStarterHref } from '@/lib/elt/lake-defaults';
+import { useWorkspaceDefaultDestination } from '@/lib/hooks/use-workspace-default-destination';
+import { WorkspaceLakeBanner } from '@/components/elt/workspace-lake-banner';
 import { TablePicker, useSourceDiscovery } from '@/components/elt/table-picker';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -863,12 +867,20 @@ function ReviewStep({
             <span className="font-semibold">Pipeline saved!</span>
           </div>
           {savedId && (
-            <button
-              onClick={() => router.push(`/builder?pipeline=${encodeURIComponent(savedId)}`)}
-              className="flex items-center gap-2 rounded-lg border border-slate-300 dark:border-slate-600 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-            >
-              <ExternalLink className="h-4 w-4" /> Open in builder
-            </button>
+            <>
+              <Link
+                href={canvasStarterHref({ pipelineId: savedId, pipelineName })}
+                className="flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
+              >
+                <Sparkles className="h-4 w-4" /> Design in canvas
+              </Link>
+              <button
+                onClick={() => router.push(`/builder?pipeline=${encodeURIComponent(savedId)}`)}
+                className="flex items-center gap-2 rounded-lg border border-slate-300 dark:border-slate-600 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              >
+                <ExternalLink className="h-4 w-4" /> YAML builder
+              </button>
+            </>
           )}
         </div>
       ) : (
@@ -888,6 +900,8 @@ function ReviewStep({
 // ── Main wizard ───────────────────────────────────────────────────────────────
 
 export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (name: string) => void }) {
+  const workspaceDefault = useWorkspaceDefaultDestination();
+
   const [state, setState] = useState<WizardState>({
     step: 'browse',
     source: null,
@@ -908,6 +922,22 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
     savedId: null,
     saveError: null,
   });
+
+  useEffect(() => {
+    if (!workspaceDefault.loaded || !workspaceDefault.connector || !workspaceDefault.connectionId) return;
+    setState((prev) => {
+      if (prev.destinationConnectionId) return prev;
+      return {
+        ...prev,
+        destination: workspaceDefault.connector!.toLowerCase(),
+        destinationConnectionId: workspaceDefault.connectionId,
+      };
+    });
+  }, [
+    workspaceDefault.loaded,
+    workspaceDefault.connector,
+    workspaceDefault.connectionId,
+  ]);
 
   const fetchContext = useCallback(async (source: DltHubSource) => {
     const defaultName = `${source.slug.replace(/-/g, '_')}_pipeline`;

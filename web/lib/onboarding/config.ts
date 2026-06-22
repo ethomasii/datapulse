@@ -33,7 +33,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: "execution",
     label: "Enable real execution",
-    description: "GitHub Actions or customer gateway — skip if demo telemetry is enough for now",
+    description: "eltPulse-managed compute runs pipelines for you; use a gateway only for private network access",
     href: "/gateway",
     optional: true,
   },

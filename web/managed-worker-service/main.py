@@ -1,26 +1,20 @@
 """
-eltPulse managed worker — Python batch executor (FastAPI HTTP + CLI + GitHub Actions).
+eltPulse managed worker — Python batch executor (FastAPI HTTP + CLI).
 
-**Deploy options (no Vercel “Services” required):**
+**Production (eltPulse-owned compute):**
 
-1. **GitHub Actions** — workflow runs `python main.py` on `ubuntu-latest` (see repo
-   `.github/workflows/eltpulse-managed-worker.yml`). Set repo secrets `ELTPULSE_CONTROL_PLANE_URL`
-   and `ELTPULSE_INTERNAL_API_SECRET`. Trigger on schedule or via Vercel cron using
-   `ELTPULSE_MANAGED_EXECUTOR=gha` + a fine-grained PAT.
+Deploy this directory as a **separate Vercel/Fly project**. Point the control plane at
+`POST /batch` via `ELTPULSE_MANAGED_DELEGATE_URL` + `ELTPULSE_MANAGED_DELEGATE_SECRET`.
 
-2. **Second Vercel project** — create a new project with Root Directory `web/managed-worker-service`,
-   set env vars, expose `POST /batch`. Point main app at it with `ELTPULSE_MANAGED_EXECUTOR=delegate`.
+See `README.md` in this folder.
 
-3. **Vercel Services** (optional) — polyglot same-domain mount; only if your account has access.
+**Local / CI:**
 
-- **HTTP:** `POST /batch` with `Authorization: Bearer ${ELTPULSE_MANAGED_VERCEL_PYTHON_SECRET}`.
-- **CLI / CI:** `python main.py` (uses `ELTPULSE_CONTROL_PLANE_URL` or `ELTPULSE_CRON_APP_URL` / `VERCEL_URL`).
+- CLI: `python main.py`
+- Dev: `ELTPULSE_MANAGED_EXECUTOR=local` on the control plane
 
-Uses `ELTPULSE_INTERNAL_API_SECRET` to call the control plane internal APIs.
-
-**Wall clock:** cap `deadlineMs` at **900_000 ms (15 minutes)** per invocation by default.
-
-Sling needs a `sling` binary on PATH; dlt uses `sys.executable`.
+Uses `ELTPULSE_INTERNAL_API_SECRET` to call control plane internal APIs.
+Wall clock cap: **900_000 ms (15 minutes)** per invocation by default.
 """
 
 from __future__ import annotations

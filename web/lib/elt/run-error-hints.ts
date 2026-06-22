@@ -52,7 +52,7 @@ export function hintsForRunFailure(errorSummary: string | null | undefined): Run
     hints.push({
       title: "Demo / stub execution",
       message:
-        "This run used demo telemetry. Configure GitHub Actions or a gateway for real pipeline execution.",
+        "This run used demo telemetry. Real extract/load requires eltPulse managed compute on this environment (or a gateway for private networks).",
       href: "/gateway",
       hrefLabel: "Execution settings",
     });

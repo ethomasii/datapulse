@@ -118,7 +118,7 @@ const ITEMS: {
   {
     status: "in-progress",
     title: "Real managed execution at scale",
-    desc: "GHA/local/delegate paths shipped — production default still stub until env is configured on Vercel.",
+    desc: "eltPulse-owned worker fleet (delegate) is the production path — stub until workers.eltpulse.dev is wired on prod.",
   },
   {
     status: "planned",

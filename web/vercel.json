@@ -11,11 +11,28 @@
     },
     {
       "path": "/api/cron/managed-worker",
-      "schedule": "*/15 * * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/observability-alerts",
       "schedule": "*/15 * * * *"
+    }
+  ],
+  "functions": {
+    "api/compute/batch.py": {
+      "maxDuration": 900,
+      "memory": 3008,
+      "excludeFiles": "{.next,*.cache,node_modules,public,app}/**"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/eltpulse-compute/batch",
+      "destination": "/api/compute/batch"
+    },
+    {
+      "source": "/eltpulse-compute/health",
+      "destination": "/api/compute/batch"
     }
   ]
 }

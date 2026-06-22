@@ -375,7 +375,7 @@ ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
         <p className="mt-1 text-xs font-medium text-slate-600 dark:text-slate-300">
           Current preference:{" "}
           <span className="text-sky-700 dark:text-sky-300">
-            {executionPlane === "eltpulse_managed" ? "eltPulse-managed" : "Your infrastructure (gateway / CI / API)"}
+            {executionPlane === "eltpulse_managed" ? "eltPulse-managed" : "Your gateway (private network)"}
           </span>
         </p>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -394,7 +394,7 @@ ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
           >
             <span className="font-medium">You operate execution</span>
             <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
-              Optional gateway, CI, or session API — warehouse traffic stays on infrastructure you control.
+              Gateway in your VPC for private connectivity — when data cannot leave your network.
             </span>
           </button>
           <button
@@ -409,18 +409,16 @@ ELTPULSE_CONTROL_PLANE_URL=${CONTROL_PLANE_URL}
           >
             <span className="font-medium">eltPulse-managed</span>
             <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
-              eltPulse runs pending work on our infrastructure—connectivity, ingestion, and run telemetry in your
-              workspace. The default for SaaS-style pipelines.
+              eltPulse runs ingestion on our compute — connect sources and your warehouse in the app.
             </span>
           </button>
         </div>
         {executionPlane === "eltpulse_managed" ? (
           <div className="mt-4 rounded-lg border border-violet-200/80 bg-violet-50/50 px-3 py-2.5 dark:border-violet-900/50 dark:bg-violet-950/25">
             <p className="text-xs text-violet-950 dark:text-violet-100/95">
-              <span className="font-semibold">While this mode is selected:</span> pending runs use eltPulse-managed workers
-              by default—no Docker or token required. The button below only{" "}
-              <span className="font-medium">reveals</span> gateway setup for hybrid teams; it does not switch you to
-              &quot;You operate execution.&quot;
+              <span className="font-semibold">While this mode is selected:</span> pending runs execute on{" "}
+              <span className="font-medium">eltPulse-managed workers</span> — no gateway or CI setup on your side.
+              Use a gateway below only when sources or warehouses require private network access.
             </p>
             {heartbeat?.source === "eltpulse_managed" || heartbeat?.source === "datapulse_managed" ? (
               <p className="mt-2 text-xs text-violet-900/85 dark:text-violet-200/85">

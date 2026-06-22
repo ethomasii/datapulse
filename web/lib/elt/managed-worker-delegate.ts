@@ -1,33 +1,26 @@
 /**
- * Option #2: managed execution on a **separate** deployment (second Vercel project, Fly, etc.)
- * that exposes the same `POST …/batch` contract as `managed-worker-service/main.py`.
- *
- * Next cron uses `ELTPULSE_MANAGED_EXECUTOR=delegate` and POSTs to `ELTPULSE_MANAGED_DELEGATE_URL`
- * with `ELTPULSE_MANAGED_DELEGATE_SECRET`. The remote worker must call the **control plane** origin
- * with `ELTPULSE_INTERNAL_API_SECRET` (same DB + encryption key as production).
+ * Forwards managed execution to eltPulse-owned workers (`POST …/batch`).
+ * Default on Vercel: co-located Python at `/eltpulse-compute/batch` (same deployment).
  */
-
-function normalizeOrigin(url: string): string {
-  return url.replace(/\/$/, "");
-}
+import {
+  resolveManagedDelegateConfig,
+} from "@/lib/elt/managed-worker-stub-http";
 
 export async function runManagedWorkerDelegateBatchHttp(options: {
   limit: number;
   deadlineMs: number;
 }): Promise<{ processed: number; errors: string[] }> {
-  const url = process.env.ELTPULSE_MANAGED_DELEGATE_URL?.trim();
-  const secret = process.env.ELTPULSE_MANAGED_DELEGATE_SECRET?.trim();
-  if (!url || !secret) {
+  const config = resolveManagedDelegateConfig();
+  if (!config) {
     throw new Error(
-      "Set ELTPULSE_MANAGED_DELEGATE_URL (full URL to POST /batch) and ELTPULSE_MANAGED_DELEGATE_SECRET when ELTPULSE_MANAGED_EXECUTOR=delegate."
+      "Managed compute is not configured (set ELTPULSE_INTERNAL_API_SECRET on the control plane)."
     );
   }
-  const target = normalizeOrigin(url);
   const deadlineMs = Math.min(Math.max(5_000, options.deadlineMs), 900_000);
-  const res = await fetch(target, {
+  const res = await fetch(config.url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${secret}`,
+      Authorization: `Bearer ${config.secret}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -40,10 +33,10 @@ export async function runManagedWorkerDelegateBatchHttp(options: {
   try {
     data = JSON.parse(text) as typeof data;
   } catch {
-    throw new Error(`delegate worker: expected JSON, got ${res.status}: ${text.slice(0, 500)}`);
+    throw new Error(`managed compute: expected JSON, got ${res.status}: ${text.slice(0, 500)}`);
   }
   if (!res.ok) {
-    throw new Error(`delegate worker ${res.status}: ${text.slice(0, 800)}`);
+    throw new Error(`managed compute ${res.status}: ${text.slice(0, 800)}`);
   }
   return {
     processed: Number(data.processed ?? 0),

@@ -6,10 +6,11 @@ import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import clsx from "clsx";
 
 type ExecutionMode = {
-  mode: string;
   label: string;
+  computeTier: "active" | "demo" | "unconfigured";
   isStub: boolean;
   readyForRealRuns: boolean;
+  customerMessage?: string;
 };
 
 type Props = {
@@ -40,12 +41,13 @@ export function ExecutionStatusBanner({ className, compact = false }: Props) {
     return compact ? null : (
       <div className={clsx("flex items-center gap-2 text-xs text-slate-500", className)}>
         <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-        Checking execution mode…
+        Checking managed compute…
       </div>
     );
   }
 
   if (!data) return null;
+
   if (data.readyForRealRuns && !compact) {
     return (
       <div
@@ -56,16 +58,16 @@ export function ExecutionStatusBanner({ className, compact = false }: Props) {
       >
         <span className="inline-flex items-center gap-2 font-medium text-emerald-900 dark:text-emerald-100">
           <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
-          Production execution — {data.label}
+          {data.label} — real extract/load enabled
         </span>
         <Link href="/gateway" className="text-xs font-semibold text-emerald-800 hover:underline dark:text-emerald-200">
-          Gateway →
+          Execution settings →
         </Link>
       </div>
     );
   }
 
-  if (!data.isStub) return null;
+  if (data.computeTier !== "demo" && data.computeTier !== "unconfigured") return null;
 
   if (compact) {
     return (
@@ -77,7 +79,7 @@ export function ExecutionStatusBanner({ className, compact = false }: Props) {
         )}
       >
         <AlertTriangle className="h-3 w-3" aria-hidden />
-        Demo runs
+        {data.computeTier === "demo" ? "Demo runs" : "Compute pending"}
       </Link>
     );
   }
@@ -92,18 +94,20 @@ export function ExecutionStatusBanner({ className, compact = false }: Props) {
       <div className="min-w-0">
         <p className="inline-flex items-center gap-2 font-semibold">
           <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
-          Runs use demo telemetry
+          {data.computeTier === "demo" ? "Demo mode — runs are simulated" : "Managed compute not ready"}
         </p>
         <p className="mt-0.5 text-xs text-amber-900/90 dark:text-amber-200/90">
-          Configure GitHub Actions or a gateway for real extract/load. Demo mode still exercises runs, assets, and
-          transforms.
+          {data.customerMessage ??
+            (data.computeTier === "demo"
+              ? "Pipeline runs complete with sample telemetry. Real data movement requires eltPulse managed workers on this environment."
+              : "This environment has not finished provisioning managed workers yet.")}
         </p>
       </div>
       <Link
         href="/gateway"
         className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500"
       >
-        Enable real execution
+        Learn more
       </Link>
     </div>
   );

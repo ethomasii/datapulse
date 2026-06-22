@@ -15,14 +15,15 @@ export const fetchCache = "force-no-store";
 export const maxDuration = 800;
 
 /**
- * Vercel Cron — schedule in `vercel.json`. Bursts: no always-on worker; each tick pulls pending
- * `eltpulse_managed` runs. Default: stub executor (`ELTPULSE_MANAGED_EXECUTOR=stub`).
- * Set `ELTPULSE_MANAGED_EXECUTOR=local` for real dlt/Sling on the Node host (dev VM / container).
- * Set `ELTPULSE_MANAGED_EXECUTOR=gha` to **dispatch GitHub Actions** (`.github/workflows/eltpulse-managed-worker.yml`)
- *   — real Python on GitHub runners; no Vercel Services. If `ELTPULSE_MANAGED_EXECUTOR` is unset but
- *   `ELTPULSE_GITHUB_DISPATCH_TOKEN` + `ELTPULSE_GITHUB_REPOSITORY` are set, **defaults to gha**.
- * Set `ELTPULSE_MANAGED_EXECUTOR=vercel-python` only if you use Vercel Services + same-domain Python.
- * Set `ELTPULSE_MANAGED_EXECUTOR=delegate` to POST batch to `ELTPULSE_MANAGED_DELEGATE_URL` (second deployment).
+ * Vercel Cron — schedule in `vercel.json`. Each tick forwards pending `eltpulse_managed` runs to
+ * eltPulse-owned workers (`ELTPULSE_MANAGED_EXECUTOR=delegate`, default when delegate URL is set).
+ *
+ * Executors:
+ * - **delegate** (production) — POST `ELTPULSE_MANAGED_DELEGATE_URL` (`web/managed-worker-service`)
+ * - **local** — dev subprocess on same host
+ * - **vercel-python** — same-domain Python (Vercel Services)
+ * - **stub** — demo telemetry when workers are not provisioned
+ * - **gha** — legacy explicit only (`ELTPULSE_MANAGED_EXECUTOR=gha`); not used for SaaS managed compute
  *
  * Auth: `Authorization: Bearer ${CRON_SECRET}` (same as `/api/cron/monitors`).
  *

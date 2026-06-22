@@ -120,18 +120,64 @@ export async function runManagedWorkerStubBatchHttp(options: {
   return { processed, errors };
 }
 
+/** Public path for co-located Python managed compute (see web/vercel.json rewrite). */
+export const MANAGED_COMPUTE_BATCH_PATH = "/eltpulse-compute/batch";
+
+export type ManagedDelegateConfig = {
+  url: string;
+  secret: string;
+};
+
+/**
+ * Resolve worker batch URL + trigger secret. Zero per-customer config:
+ * - Explicit `ELTPULSE_MANAGED_DELEGATE_URL`, or
+ * - Same Vercel deployment: `{APP_URL}/eltpulse-compute/batch`, or
+ * - `ELTPULSE_MANAGED_WORKER_URL` (optional separate worker project).
+ */
+export function resolveManagedDelegateConfig(): ManagedDelegateConfig | null {
+  const secret =
+    process.env.ELTPULSE_MANAGED_DELEGATE_SECRET?.trim() ||
+    process.env.ELTPULSE_MANAGED_VERCEL_PYTHON_SECRET?.trim() ||
+    process.env.ELTPULSE_INTERNAL_API_SECRET?.trim() ||
+    "";
+  if (!secret) return null;
+
+  const explicit = process.env.ELTPULSE_MANAGED_DELEGATE_URL?.trim();
+  if (explicit) {
+    return { url: explicit, secret };
+  }
+
+  const workerProject = process.env.ELTPULSE_MANAGED_WORKER_URL?.trim();
+  if (workerProject) {
+    const base = normalizeControlPlaneBase(workerProject);
+    const url = base.endsWith("/batch") ? base : `${base}/batch`;
+    return { url, secret };
+  }
+
+  const controlPlane = resolveControlPlaneBaseUrl();
+  if (!controlPlane) return null;
+
+  // Co-located Python on the same Vercel deployment (default eltPulse Cloud path).
+  if (process.env.VERCEL === "1" || process.env.VERCEL_URL?.trim()) {
+    return { url: `${controlPlane}${MANAGED_COMPUTE_BATCH_PATH}`, secret };
+  }
+
+  return null;
+}
+
 export type ManagedExecutorMode = "stub" | "local" | "vercel-python" | "delegate" | "gha";
 
 /**
- * `stub` — demo telemetry only.
- * `gha` — Vercel cron triggers **GitHub Actions** (`workflow_dispatch`); real Python runs on GitHub runners.
- * `local` — real dlt/Sling on the **same host** as the Node process.
- * `vercel-python` — same-domain Python service (**requires** Vercel Services if your account has access).
- * `delegate` — POST batch to `ELTPULSE_MANAGED_DELEGATE_URL` (second deployment / long-runner).
+ * How eltPulse-managed runs execute (platform — not per customer):
  *
- * If `ELTPULSE_MANAGED_EXECUTOR` is **unset** and both `ELTPULSE_GITHUB_DISPATCH_TOKEN` and
- * `ELTPULSE_GITHUB_REPOSITORY` are set, defaults to **`gha`** so managed pipelines run without extra config.
- * Set `ELTPULSE_MANAGED_EXECUTOR=stub` to force stub when those GitHub vars exist for other reasons.
+ * - **`delegate`** — eltPulse-owned workers (co-located Python on Vercel, or optional separate URL).
+ * - **`local`** — dev subprocess when secrets are set.
+ * - **`stub`** — demo telemetry when platform secrets are missing.
+ *
+ * Auto-selection when `ELTPULSE_MANAGED_EXECUTOR` is unset:
+ * 1. delegate config + `ELTPULSE_INTERNAL_API_SECRET` → **delegate**
+ * 2. `NODE_ENV=development` + internal secret + encryption key → **local**
+ * 3. otherwise → **stub**
  */
 export function resolveManagedExecutorMode(): ManagedExecutorMode {
   const raw = process.env.ELTPULSE_MANAGED_EXECUTOR;
@@ -143,11 +189,8 @@ export function resolveManagedExecutorMode(): ManagedExecutorMode {
     if (v === "gha") return "gha";
     if (v === "stub") return "stub";
   }
-  if (
-    process.env.ELTPULSE_GITHUB_DISPATCH_TOKEN?.trim() &&
-    process.env.ELTPULSE_GITHUB_REPOSITORY?.trim()
-  ) {
-    return "gha";
+  if (resolveManagedDelegateConfig() && process.env.ELTPULSE_INTERNAL_API_SECRET?.trim()) {
+    return "delegate";
   }
   if (
     process.env.NODE_ENV === "development" &&
@@ -157,6 +200,14 @@ export function resolveManagedExecutorMode(): ManagedExecutorMode {
     return "local";
   }
   return "stub";
+}
+
+/** Customer-facing label for managed compute (never exposes operator backends like gha). */
+export function managedExecutorCustomerLabel(mode: ManagedExecutorMode): string {
+  if (mode === "stub") return "Demo";
+  if (mode === "local") return "Local development";
+  if (mode === "gha") return "Legacy operator";
+  return "eltPulse compute";
 }
 
 export async function runManagedWorkerBatchHttp(options: {

@@ -51,14 +51,27 @@ describe("resolveManagedExecutorMode", () => {
     expect(resolveManagedExecutorMode()).toBe("local");
   });
 
-  it("defaults to stub when no GitHub dispatch env", () => {
+  it("defaults to stub when no worker env is configured", () => {
     expect(resolveManagedExecutorMode()).toBe("stub");
   });
 
-  it("defaults to gha when dispatch token and repository are set and executor unset", () => {
+  it("auto-selects delegate on Vercel when internal secret is set", () => {
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("VERCEL_URL", "app.example.vercel.app");
+    vi.stubEnv("ELTPULSE_INTERNAL_API_SECRET", "platform-secret");
+    expect(resolveManagedExecutorMode()).toBe("delegate");
+  });
+
+  it("auto-selects delegate when explicit delegate URL is set", () => {
+    vi.stubEnv("ELTPULSE_MANAGED_DELEGATE_URL", "https://workers.example.com/batch");
+    vi.stubEnv("ELTPULSE_INTERNAL_API_SECRET", "platform-secret");
+    expect(resolveManagedExecutorMode()).toBe("delegate");
+  });
+
+  it("does not auto-select gha from dispatch token (legacy explicit only)", () => {
     vi.stubEnv("ELTPULSE_GITHUB_DISPATCH_TOKEN", "ghp_test");
     vi.stubEnv("ELTPULSE_GITHUB_REPOSITORY", "acme/app");
-    expect(resolveManagedExecutorMode()).toBe("gha");
+    expect(resolveManagedExecutorMode()).toBe("stub");
   });
 
   it("explicit stub overrides GitHub dispatch env", () => {

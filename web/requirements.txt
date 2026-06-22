@@ -1,0 +1,5 @@
+# Co-located managed compute (Vercel Python). Kept lean — dbt runs via control-plane executor when needed.
+fastapi>=0.115.0
+httpx>=0.27.0
+dlt>=1.5.0
+psutil>=6.0.0

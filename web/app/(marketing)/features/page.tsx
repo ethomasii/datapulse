@@ -34,7 +34,7 @@ const FEATURES = [
     icon: Zap,
     title: "Quick start & managed runs",
     description:
-      "Destination → source → run in under a minute. Managed execution on our stack, your gateway, or GitHub Actions — your choice.",
+      "Destination → source → run in under a minute. eltPulse-managed compute by default — gateway only when you need private network access.",
     preview: "quickstart" as const,
   },
   {

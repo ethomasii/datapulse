@@ -41,6 +41,7 @@ pyproject.toml
 
 # Vercel Python managed worker (polyglot service) — keep dependency manifest
 !web/managed-worker-service/pyproject.toml
+!web/requirements.txt
 
 # eltPulse web (Next.js)
 web/node_modules/
