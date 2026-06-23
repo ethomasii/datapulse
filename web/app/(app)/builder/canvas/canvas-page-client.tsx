@@ -24,7 +24,8 @@ import { CanvasTransformInspector } from "@/components/pipeline-canvas/canvas-tr
 import { CanvasComponentInspector } from "@/components/pipeline-canvas/canvas-component-inspector";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 import { useWorkspaceDefaultDestination } from "@/lib/hooks/use-workspace-default-destination";
-import { WorkspaceLakeBanner } from "@/components/elt/workspace-lake-banner";
+import { NewPipelineForm } from "@/components/elt/new-pipeline-form";
+import { createEltPipeline, createTransformOnlyPipeline } from "@/lib/elt/create-pipeline-client";
 import type { DbtTransformNodeData } from "@/lib/elt/dbt-canvas";
 import { CanvasAssetLineagePanel } from "@/components/pipeline-canvas/canvas-asset-lineage-panel";
 import {
@@ -32,7 +33,6 @@ import {
   type PipelineCanvasControl,
   PipelineCanvas,
 } from "@/components/pipeline-canvas/pipeline-canvas";
-import { DESTINATION_GROUPS, SOURCE_GROUPS } from "@/lib/elt/catalog";
 import {
   emptyConnectionValuesForTypes,
   extractConnectionValues,
@@ -52,7 +52,6 @@ import { chooseTool } from "@/lib/elt/choose-tool";
 import { enrichTransformNodesFromDltDbt, enrichPostTransformNodes } from "@/lib/elt/dbt-canvas";
 import { readDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
 import { attachCanvasToSourceConfiguration } from "@/lib/elt/merge-canvas-into-source-config";
-import { minimalSourceConfigurationForNewPipeline } from "@/lib/elt/minimal-source-configuration";
 import {
   isTransformOnlyPipeline,
   minimalTransformOnlySourceConfiguration,
@@ -524,20 +523,6 @@ export function CanvasPageClient() {
     [selectedId, pipelineSourceType, pipelineDestinationType, hydrateFormFromSourceConfig]
   );
 
-  function formatCreateApiError(data: Record<string, unknown>): string {
-    const err = data.error;
-    if (typeof err === "string") return err;
-    if (err && typeof err === "object" && !Array.isArray(err)) {
-      const parts: string[] = [];
-      for (const [k, v] of Object.entries(err as Record<string, unknown>)) {
-        if (Array.isArray(v)) parts.push(...v.map((x) => `${k}: ${String(x)}`));
-        else parts.push(`${k}: ${String(v)}`);
-      }
-      if (parts.length) return parts.join(" · ");
-    }
-    return "Could not create pipeline";
-  }
-
   async function handleCreatePipeline(e: FormEvent) {
     e.preventDefault();
     const name = newName.trim();
@@ -548,6 +533,7 @@ export function CanvasPageClient() {
     setCreateBusy(true);
     setCreateError(null);
     try {
+      let newId: string | undefined;
       if (newPipelineKind === "transform_only") {
         const destType = (workspaceDefault.connector ?? newDestinationType).toLowerCase();
         const destConnId = workspaceDefault.connectionId ?? newDestConnectionId;
@@ -556,64 +542,29 @@ export function CanvasPageClient() {
             "Set a workspace default warehouse under Connections (recommended), or create a destination connection first."
           );
         }
-        const sourceTable = newSourceTable.trim() || "staging.events";
-        const warehouseLabel = workspaceDefault.name
-          ? `${workspaceDefault.name} (${destType})`
-          : `Default warehouse · ${destType}`;
-        const canvas = transformOnlyCanvasGraph({ warehouseLabel, sourceTable });
-        const sourceConfiguration = minimalTransformOnlySourceConfiguration(sourceTable, canvas);
-        const res = await fetch("/api/elt/pipelines", {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name,
-            sourceType: destType,
-            destinationType: destType,
-            tool: "auto",
-            sourceConfiguration,
-            destinationConnectionId: destConnId,
-          }),
+        newId = await createTransformOnlyPipeline({
+          name,
+          sourceTable: newSourceTable,
+          destinationType: destType,
+          destinationConnectionId: destConnId,
+          warehouseName: workspaceDefault.name,
         });
-        const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-        if (!res.ok) throw new Error(formatCreateApiError(data));
-        const pipeline = data.pipeline as { id?: string } | undefined;
-        const newId = pipeline?.id;
-        setShowNewPipelineForm(false);
-        setNewName("");
         setNewPipelineKind("elt");
-        await loadPipelines();
-        if (newId) {
-          setSelectedId(newId);
-          setCanvasView("designer");
-        }
-        return;
-      }
-
-      const sourceConfiguration = minimalSourceConfigurationForNewPipeline(newSourceType);
-      const res = await fetch("/api/elt/pipelines", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      } else {
+        newId = await createEltPipeline({
           name,
           sourceType: newSourceType,
           destinationType: newDestinationType,
-          tool: "auto",
-          sourceConfiguration,
-          ...(newDestConnectionId ? { destinationConnectionId: newDestConnectionId } : {}),
-        }),
-      });
-      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-      if (!res.ok) {
-        throw new Error(formatCreateApiError(data));
+          destinationConnectionId: newDestConnectionId,
+        });
       }
-      const pipeline = data.pipeline as { id?: string } | undefined;
-      const newId = pipeline?.id;
       setShowNewPipelineForm(false);
       setNewName("");
       await loadPipelines();
-      if (newId) setSelectedId(newId);
+      if (newId) {
+        setSelectedId(newId);
+        setCanvasView("designer");
+      }
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : "Create failed");
     } finally {
@@ -1189,153 +1140,29 @@ export function CanvasPageClient() {
         ) : (
           <>
             {(pipelines.length === 0 || showNewPipelineForm) && (
-              <form
+              <NewPipelineForm
+                className="mt-4 max-w-xl"
+                title={pipelines.length === 0 ? "Create your first pipeline" : "New pipeline"}
+                kind={newPipelineKind}
+                onKindChange={setNewPipelineKind}
+                name={newName}
+                onNameChange={setNewName}
+                sourceTable={newSourceTable}
+                onSourceTableChange={setNewSourceTable}
+                sourceType={newSourceType}
+                onSourceTypeChange={setNewSourceType}
+                destinationType={newDestinationType}
+                onDestinationTypeChange={setNewDestinationType}
+                busy={createBusy}
+                error={createError}
                 onSubmit={handleCreatePipeline}
-                className="mt-4 max-w-xl space-y-3 rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-900/40"
-              >
-                <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                  {pipelines.length === 0 ? "Create your first pipeline" : "New pipeline"}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {(
-                    [
-                      ["elt", "Extract & load (EL+T)", "Connect a source and load into your warehouse"],
-                      [
-                        "transform_only",
-                        "Transform only (warehouse)",
-                        "Data already in your default warehouse — build native transform steps",
-                      ],
-                    ] as const
-                  ).map(([id, label, hint]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setNewPipelineKind(id)}
-                      className={clsx(
-                        "rounded-lg border px-3 py-2 text-left text-xs transition",
-                        newPipelineKind === id
-                          ? "border-violet-400 bg-violet-50 text-violet-950 dark:border-violet-600 dark:bg-violet-950/40 dark:text-violet-100"
-                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
-                      )}
-                    >
-                      <span className="block font-semibold">{label}</span>
-                      <span className="mt-0.5 block text-[10px] opacity-80">{hint}</span>
-                    </button>
-                  ))}
-                </div>
-                {workspaceDefault.connector ? (
-                  <WorkspaceLakeBanner
-                    connector={workspaceDefault.connector}
-                    name={workspaceDefault.name}
-                    variant="compact"
-                  />
-                ) : newPipelineKind === "transform_only" ? (
-                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
-                    No default warehouse yet — set one under{" "}
-                    <Link href="/connections" className="font-medium underline">
-                      Connections
-                    </Link>{" "}
-                    for a one-click transform pipeline.
-                  </p>
-                ) : null}
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className="font-medium text-slate-700 dark:text-slate-300">Name</span>
-                  <input
-                    type="text"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    placeholder="my_pipeline"
-                    autoComplete="off"
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                    disabled={createBusy}
-                  />
-                  <span className="text-xs text-slate-500">Letters, numbers, underscore; start with a letter.</span>
-                </label>
-                {newPipelineKind === "transform_only" ? (
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="font-medium text-slate-700 dark:text-slate-300">Input table</span>
-                    <input
-                      type="text"
-                      value={newSourceTable}
-                      onChange={(e) => setNewSourceTable(e.target.value)}
-                      placeholder="staging.events"
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                      disabled={createBusy}
-                    />
-                    <span className="text-xs text-slate-500">
-                      Existing warehouse table this pipeline reads from (schema.table).
-                    </span>
-                  </label>
-                ) : (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="font-medium text-slate-700 dark:text-slate-300">Source</span>
-                    <select
-                      value={newSourceType}
-                      onChange={(e) => setNewSourceType(e.target.value)}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                      disabled={createBusy}
-                    >
-                      {Object.entries(SOURCE_GROUPS).map(([group, types]) => (
-                        <optgroup key={group} label={group}>
-                          {types.map((t) => (
-                            <option key={t} value={t}>
-                              {t}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="font-medium text-slate-700 dark:text-slate-300">Destination</span>
-                    <select
-                      value={newDestinationType}
-                      onChange={(e) => setNewDestinationType(e.target.value)}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                      disabled={createBusy}
-                    >
-                      {Object.entries(DESTINATION_GROUPS).map(([group, types]) => (
-                        <optgroup key={group} label={group}>
-                          {types.map((t) => (
-                            <option key={t} value={t}>
-                              {t}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                )}
-                {createError ? (
-                  <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-                    {createError}
-                  </p>
-                ) : null}
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="submit"
-                    disabled={createBusy}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50 dark:bg-sky-600 dark:hover:bg-sky-500"
-                  >
-                    {createBusy ? "Creating…" : "Create & open canvas"}
-                  </button>
-                  {pipelines.length > 0 ? (
-                    <button
-                      type="button"
-                      disabled={createBusy}
-                      onClick={() => {
-                        setShowNewPipelineForm(false);
-                        setCreateError(null);
-                      }}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                    >
-                      Cancel
-                    </button>
-                  ) : null}
-                </div>
-              </form>
+                showCancel={pipelines.length > 0}
+                onCancel={() => {
+                  setShowNewPipelineForm(false);
+                  setCreateError(null);
+                }}
+                workspaceDefault={workspaceDefault}
+              />
             )}
 
             {pipelines.length > 0 && !isDesignerFullscreen ? (

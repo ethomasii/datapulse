@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Loader2,
   Play,
@@ -62,6 +62,9 @@ import { getRunSliceCapability } from "@/lib/elt/run-slice-capabilities";
 import { PartitionConfigEditor } from "@/components/elt/partition-config-editor";
 import { PipelineRunPanel } from "@/components/elt/pipeline-run-panel";
 import { EmptyState } from "@/components/ui/empty-state";
+import { NewPipelineForm, PipelineKindPicker, type NewPipelineKind } from "@/components/elt/new-pipeline-form";
+import { createTransformOnlyPipeline } from "@/lib/elt/create-pipeline-client";
+import { useWorkspaceDefaultDestination } from "@/lib/hooks/use-workspace-default-destination";
 
 type PipelineExecutionHost = "inherit" | "eltpulse_managed" | "customer_gateway";
 
@@ -102,6 +105,7 @@ export function BuilderClient({
   initialEditPipelineId?: string | null;
 }) {
   const searchParams = useSearchParams();
+  const router = useRouter();
   /** Client query wins so soft navigation from Canvas / links always opens the right pipeline. */
   const pipelineIdFromUrl = searchParams.get("pipeline");
   const openPipelineIdFromQuery =
@@ -118,6 +122,11 @@ export function BuilderClient({
   const [showCreateForm, setShowCreateForm] = useState(false);
   /** "ai" = inline AI chat, "browse" = source catalog wizard, "manual" = standard form */
   const [createMode, setCreateMode] = useState<"ai" | "browse" | "manual">("browse");
+  const [newPipelineKind, setNewPipelineKind] = useState<NewPipelineKind>("elt");
+  const [newSourceTable, setNewSourceTable] = useState("staging.events");
+  const [transformCreateBusy, setTransformCreateBusy] = useState(false);
+  const [transformCreateError, setTransformCreateError] = useState<string | null>(null);
+  const workspaceDefault = useWorkspaceDefaultDestination();
   const [detail, setDetail] = useState<{
     id: string;
     tool: string;
@@ -184,6 +193,12 @@ export function BuilderClient({
     if (src) setSourceType(src);
     if (wantDbt) setPostTransformType("dbt");
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!workspaceDefault.loaded || !workspaceDefault.connector) return;
+    setDestinationType(workspaceDefault.connector.toLowerCase());
+    setDestinationConnectionId(workspaceDefault.connectionId);
+  }, [workspaceDefault.loaded, workspaceDefault.connector, workspaceDefault.connectionId]);
 
   const wantDbtSetup = searchParams.get("dbt") === "1";
 
@@ -498,6 +513,9 @@ export function BuilderClient({
   function openNewPipeline() {
     setEditingId(null);
     setShowCreateForm(true);
+    setNewPipelineKind("elt");
+    setNewSourceTable("staging.events");
+    setTransformCreateError(null);
     setError(null);
     setName("");
     setDescription("");
@@ -531,7 +549,48 @@ export function BuilderClient({
 
   function cancelCreate() {
     setShowCreateForm(false);
+    setNewPipelineKind("elt");
+    setTransformCreateError(null);
     setError(null);
+  }
+
+  async function handleTransformOnlyCreate(e: React.FormEvent) {
+    e.preventDefault();
+    const pipelineName = name.trim();
+    if (!pipelineName) {
+      setTransformCreateError("Enter a pipeline name (e.g. my_pipeline).");
+      return;
+    }
+    const destType = (workspaceDefault.connector ?? destinationType).toLowerCase();
+    const destConnId = workspaceDefault.connectionId ?? destinationConnectionId;
+    if (!destConnId) {
+      setTransformCreateError(
+        "Set a workspace default warehouse under Connections (recommended), or create a destination connection first."
+      );
+      return;
+    }
+    setTransformCreateBusy(true);
+    setTransformCreateError(null);
+    try {
+      const newId = await createTransformOnlyPipeline({
+        name: pipelineName,
+        sourceTable: newSourceTable,
+        destinationType: destType,
+        destinationConnectionId: destConnId,
+        warehouseName: workspaceDefault.name,
+      });
+      setShowCreateForm(false);
+      setName("");
+      setNewPipelineKind("elt");
+      await load();
+      if (newId) {
+        router.push(`/builder/canvas?pipeline=${encodeURIComponent(newId)}`);
+      }
+    } catch (err) {
+      setTransformCreateError(err instanceof Error ? err.message : "Create failed");
+    } finally {
+      setTransformCreateBusy(false);
+    }
   }
 
   const showPipelineForm = Boolean(editingId) || showCreateForm;
@@ -890,7 +949,7 @@ export function BuilderClient({
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
               {editingId ? "Edit pipeline" : "New pipeline"}
             </h2>
-            {!editingId && (
+            {!editingId && newPipelineKind === "elt" && (
               <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 p-0.5 text-sm dark:border-slate-600">
                 <button
                   type="button"
@@ -917,7 +976,7 @@ export function BuilderClient({
                 </button>
               </div>
             )}
-            {wantDbtSetup && (editingId || createMode === "manual") ? (
+            {wantDbtSetup && (editingId || (newPipelineKind === "elt" && createMode === "manual")) ? (
               <div className="mb-4 w-full rounded-lg border border-violet-200 bg-violet-50 px-4 py-3 text-sm dark:border-violet-900 dark:bg-violet-950/40">
                 <p className="font-medium text-violet-900 dark:text-violet-100">Enable dbt on this pipeline</p>
                 <p className="mt-1 text-violet-800 dark:text-violet-200">
@@ -934,7 +993,7 @@ export function BuilderClient({
               </div>
             ) : null}
             {/* Guided/JSON/Canvas tabs — shown for editing, or when in manual create mode */}
-            {(editingId || createMode === "manual") && (
+            {(editingId || (newPipelineKind === "elt" && createMode === "manual")) && (
             <div className="flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 p-0.5 text-sm dark:border-slate-600">
               <button
                 type="button"
@@ -1017,21 +1076,54 @@ export function BuilderClient({
             )}
           </div>
 
+          {!editingId ? (
+            <PipelineKindPicker
+              kind={newPipelineKind}
+              onKindChange={setNewPipelineKind}
+              className="mb-4"
+            />
+          ) : null}
+
           {editingId ? (
             <div className="mb-6">
               <PipelineRunPanel pipelineId={editingId} />
             </div>
           ) : null}
 
+          {!editingId && newPipelineKind === "transform_only" ? (
+            <NewPipelineForm
+              title="Transform-only pipeline"
+              kind={newPipelineKind}
+              onKindChange={setNewPipelineKind}
+              name={name}
+              onNameChange={setName}
+              sourceTable={newSourceTable}
+              onSourceTableChange={setNewSourceTable}
+              sourceType={sourceType}
+              onSourceTypeChange={setSourceType}
+              destinationType={destinationType}
+              onDestinationTypeChange={setDestinationType}
+              busy={transformCreateBusy}
+              error={transformCreateError}
+              onSubmit={handleTransformOnlyCreate}
+              submitLabel="Create & open canvas"
+              showCancel
+              onCancel={cancelCreate}
+              workspaceDefault={workspaceDefault}
+              showKindPicker={false}
+              showEltSourceDest={false}
+            />
+          ) : null}
+
           {/* Browse sources panel — catalog wizard, default for new pipelines */}
-          {!editingId && createMode === "browse" && (
+          {!editingId && newPipelineKind === "elt" && createMode === "browse" && (
             <SourceCatalogWizard
               onPipelineSaved={() => { void load(); setShowCreateForm(false); }}
             />
           )}
 
           {/* AI Builder panel */}
-          {!editingId && createMode === "ai" && (
+          {!editingId && newPipelineKind === "elt" && createMode === "ai" && (
             <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-4 dark:border-teal-800 dark:bg-teal-900/10">
               <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
                 Describe what you want to load and the AI will generate the pipeline. You can review and edit it before saving.
@@ -1043,7 +1135,7 @@ export function BuilderClient({
             </div>
           )}
 
-          {(editingId || createMode === "manual") && (
+          {(editingId || (newPipelineKind === "elt" && createMode === "manual")) && (
           <>
           {formMode === "json" && schemaFields.length === 0 ? (
             <p className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-600 dark:bg-slate-950/50 dark:text-slate-300">
