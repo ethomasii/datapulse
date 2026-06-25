@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Sparkles, ArrowRight,
+  BookOpen,
   Database,
   GitBranch,
   LayoutGrid,
@@ -42,6 +43,7 @@ const CARDS = [
   { href: "/catalog/products", label: "Data products", icon: Database, desc: "Curated governed asset bundles" },
   { href: "/catalog/contracts", label: "Data contracts", icon: Shield, desc: "Schema and freshness SLAs" },
   { href: "/catalog/connectors", label: "Connectors", icon: LayoutGrid, desc: "What your workspace uses + full registry" },
+  { href: "/sources", label: "Source registry", icon: BookOpen, desc: "Browse 111+ dlt-verified source connectors" },
   { href: "/catalog/scenarios", label: "Scenarios", icon: Route, desc: "Ingest recipes — add transforms after deploy" },
 ] as const;
 
@@ -139,13 +141,17 @@ export function CatalogHubClient() {
     <AppPage width="default">
       <div>
         <div className="inline-flex items-center gap-2 text-sky-600 dark:text-sky-400">
-          <Database className="h-6 w-6" aria-hidden />
-          <span className="text-sm font-semibold uppercase tracking-wide">Catalog</span>
+          <BookOpen className="h-6 w-6" aria-hidden />
+          <span className="text-sm font-semibold uppercase tracking-wide">Library</span>
         </div>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Workspace catalog</h1>
+        <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Recipes &amp; reference</h1>
         <p className="mt-3 max-w-3xl text-slate-600 dark:text-slate-300">
-          Your data inventory on any warehouse — lake recipes, warehouse SQL transforms, connectors, and optional git
-          projects.
+          Scenarios, transform recipes, dbt projects, connectors, data products, and contracts — starting points and
+          reference material separate from your live{" "}
+          <Link href="/assets" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+            asset inventory
+          </Link>
+          .
         </p>
         <div className="mt-4 max-w-3xl">
           <TransformJourneyStrip compact showRecipeLink={false} />

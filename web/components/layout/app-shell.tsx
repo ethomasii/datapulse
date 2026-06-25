@@ -11,26 +11,18 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleHelp,
-  Database,
   FolderGit2,
-  GitBranch,
   LayoutDashboard,
   Layers,
   Network,
   PenLine,
   PlayCircle,
-  Plug,
-  Route,
-  Shield,
   Split,
   Table2,
-  TableProperties,
   UserCircle,
   Waypoints,
   Webhook,
-  Workflow,
   Zap,
-  Sparkles,
 } from "lucide-react";
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
 import clsx from "clsx";
@@ -52,14 +44,11 @@ type NavSection = {
   items: NavItem[];
 };
 
-/** Sidebar IA — flat sections, no hidden “Advanced” bucket. */
+/** Sidebar IA — compact; Library hub covers recipes, dbt, connectors, products, contracts. */
 const NAV_SECTIONS: NavSection[] = [
   {
     label: "Overview",
-    items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/quick-start", label: "Quick start", icon: Zap },
-    ],
+    items: [{ href: "/dashboard", label: "Home", icon: LayoutDashboard }],
   },
   {
     label: "Build",
@@ -76,27 +65,18 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/runs", label: "Runs", icon: PlayCircle },
       { href: "/schedule", label: "Schedules", icon: CalendarClock },
       { href: "/orchestration", label: "Monitors", icon: Split },
-      { href: "/observability", label: "Observability", icon: Activity },
-      { href: "/run-slices", label: "Run slices", icon: TableProperties },
+      { href: "/observability", label: "Metrics", icon: Activity },
     ],
   },
   {
     label: "Data catalog",
-    items: [
-      { href: "/assets", label: "Assets", icon: Table2 },
-      { href: "/catalog/products", label: "Data products", icon: Database },
-      { href: "/catalog/contracts", label: "Data contracts", icon: Shield },
-    ],
+    items: [{ href: "/assets", label: "Assets", icon: Table2 }],
   },
   {
-    label: "Recipes & library",
+    label: "Discover",
     items: [
-      { href: "/catalog/scenarios", label: "Scenarios", icon: Route },
-      { href: "/catalog/components", label: "Transform recipes", icon: Sparkles },
-      { href: "/catalog/dbt", label: "dbt projects", icon: GitBranch },
-      { href: "/catalog/transform-hub", label: "dbt packages", icon: Workflow },
-      { href: "/catalog/connectors", label: "Connectors", icon: Plug },
-      { href: "/sources", label: "Source registry", icon: BookOpen },
+      { href: "/quick-start", label: "Quick start", icon: Zap },
+      { href: "/catalog", label: "Library", icon: BookOpen },
     ],
   },
   {
@@ -128,6 +108,14 @@ function navLinkActive(pathname: string, href: string): boolean {
   if (href === "/builder/canvas") {
     return pathname.startsWith("/builder/canvas");
   }
+  if (href === "/catalog") {
+    return (
+      pathname === "/catalog" ||
+      pathname.startsWith("/catalog/") ||
+      pathname === "/sources" ||
+      pathname.startsWith("/sources/")
+    );
+  }
   return pathname.startsWith(`${href}/`);
 }
 
@@ -146,9 +134,9 @@ function NavLink({
     <Link
       href={href}
       title={collapsed ? label : undefined}
-      className={clsx(
-        "flex w-full items-center rounded-lg text-sm font-medium transition",
-        collapsed ? "justify-center px-2 py-2" : "gap-2 px-3 py-2",
+        className={clsx(
+        "flex w-full items-center rounded-lg text-[13px] font-medium transition",
+        collapsed ? "justify-center px-2 py-1.5" : "gap-2 px-2.5 py-1.5",
         active
           ? "bg-sky-50 text-sky-900 dark:bg-sky-950/50 dark:text-sky-100"
           : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
@@ -181,7 +169,7 @@ function NavSectionBlock({
   return (
     <div className="space-y-0.5">
       {!collapsed && (
-        <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+        <p className="mb-0.5 px-2.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
           {section.label}
         </p>
       )}
@@ -230,7 +218,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     NAV_SECTIONS[1]!.items[1]!,
     NAV_SECTIONS[2]!.items[0]!,
     NAV_SECTIONS[3]!.items[0]!,
-    NAV_SECTIONS[1]!.items[3]!,
+    NAV_SECTIONS[4]!.items[1]!,
     ACCOUNT_NAV[0]!,
   ];
 
@@ -258,7 +246,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )}
           </Link>
         </div>
-        <nav className="flex flex-1 flex-col gap-5 overflow-y-auto p-3" aria-label="App">
+        <nav
+          className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          aria-label="App"
+        >
           {NAV_SECTIONS.map((section) => (
             <NavSectionBlock
               key={section.label}

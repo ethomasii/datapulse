@@ -99,9 +99,9 @@ export function ObservabilityClient() {
   return (
     <AppPage width="wide">
       <AppPageHeader
-        eyebrow="EL observability"
-        title="Pipeline metrics"
-        description="Slice ingestion by pipeline, environment, connector, and time. No black box — rows, bytes, duration, success rate, and per-table stats from run telemetry and structured log markers."
+        eyebrow="Operate"
+        title="Metrics"
+        description="Trends and breakdowns for pipeline runs — filter by pipeline, environment, connector, and time window. For live executions and logs, use Runs; for daily triage, use Home."
         actions={
           <button
             type="button"

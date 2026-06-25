@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { CatalogHubClient } from "@/components/catalog/catalog-hub-client";
 
 export const metadata: Metadata = {
-  title: "Catalog",
-  description: "Workspace catalog — assets, lake transforms, connectors, and optional git SQL projects.",
+  title: "Library",
+  description: "Scenarios, transform recipes, dbt, connectors, data products, and contracts.",
 };
 
 export default function CatalogPage() {
