@@ -794,16 +794,18 @@ function FlowCanvas({
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           isValidConnection={isValidConnection}
-          edgesDeletable
-          edgesFocusable
           deleteKeyCode={["Backspace", "Delete"]}
           onSelectionChange={onSelectionChange}
+          onEdgesDelete={() => setSelectedFlowEdges([])}
           onInit={(inst) => {
             rfRef.current = inst;
           }}
           nodeTypes={pipelineNodeTypes}
           defaultEdgeOptions={{
             animated: true,
+            deletable: true,
+            focusable: true,
+            selectable: true,
             interactionWidth: 20,
             style: { ...dashedAnimatedEdgeStyle },
           }}

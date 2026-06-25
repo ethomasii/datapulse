@@ -25,6 +25,9 @@ export function normalizeEdgesWithDefaults(edges: Edge[]): Edge[] {
   return edges.map((e) => ({
     ...e,
     animated: e.animated !== false,
+    deletable: e.deletable !== false,
+    focusable: e.focusable !== false,
+    selectable: e.selectable !== false,
     interactionWidth: e.interactionWidth ?? 20,
     style: { ...dashedAnimatedEdgeStyle, ...e.style },
   }));
