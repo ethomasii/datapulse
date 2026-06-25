@@ -11,6 +11,7 @@ import type { Edge, Node } from '@xyflow/react';
 import type { CreatePipelineBody } from '@/lib/elt/types';
 import type { InlineField, PatchPipelinePayload } from '@/app/api/elt/ai-assistant/route';
 import { useWorkspacePermissions } from '@/lib/hooks/use-workspace-permissions';
+import { builderUrl } from '@/lib/elt/builder-nav';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -552,7 +553,7 @@ export function AiPipelineAssistant({
 
   const openCanvas = useCallback((id?: string) => {
     const target = id ?? savedPipelineId;
-    router.push(target ? `/builder/canvas?pipeline=${encodeURIComponent(target)}` : '/builder/canvas');
+    router.push(target ? builderUrl({ view: "canvas", pipeline: target }) : builderUrl({ view: "canvas" }));
   }, [router, savedPipelineId]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

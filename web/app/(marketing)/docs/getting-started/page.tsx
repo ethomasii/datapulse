@@ -33,7 +33,7 @@ export default function GettingStartedDocsPage() {
         </li>
         <li>
           Optional: add post-load <strong>dbt</strong>, link a workspace dbt project, or open the{" "}
-          <Link href="/builder/canvas">visual canvas</Link> after save.
+          <Link href="/builder?view=canvas">canvas</Link> after save.
         </li>
         <li>
           Submit — we store the definition and generate <code>pipeline.py</code> or <code>replication.yaml</code>,{" "}

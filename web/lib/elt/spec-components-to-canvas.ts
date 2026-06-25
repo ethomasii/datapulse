@@ -44,6 +44,15 @@ function defaultBackbone(sourceType: string, destType: string): { nodes: Node[];
   return { nodes, edges };
 }
 
+/** Source → destination backbone for connector-sync pipelines with no saved canvas yet. */
+export function defaultPipelineCanvasBackbone(
+  sourceType: string,
+  destinationType: string
+): PipelineCanvasGraph {
+  const { nodes, edges } = defaultBackbone(sourceType, destinationType);
+  return { nodes, edges, v: 1 };
+}
+
 /** Build full canvas graph from v2 declarative spec (YAML apply → designer). */
 export function buildCanvasFromDeclarativeSpec(
   spec: DeclarativePipelineSpec,

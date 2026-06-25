@@ -24,7 +24,8 @@ describe("lake-defaults", () => {
       starterId: "entity_360_profile",
       pipelineName: "Zendesk Tickets",
     });
-    expect(href).toContain("/builder/canvas?");
+    expect(href).toContain("/builder?");
+    expect(href).toContain("view=canvas");
     expect(href).toContain("pipeline=pipe-1");
     expect(href).toContain("starter=entity_360_profile");
     expect(href).toContain("source_table=staging.events");

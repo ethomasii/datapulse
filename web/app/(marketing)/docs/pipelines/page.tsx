@@ -26,7 +26,7 @@ export default function PipelinesDocsPage() {
 
       <h2>Visual canvas</h2>
       <p>
-        The <Link href="/builder/canvas">visual canvas</Link> edits the same pipeline as the form builder — including{" "}
+        The <Link href="/builder?view=canvas">canvas</Link> edits the same pipeline as the form builder — including{" "}
         <code>sourceConfiguration.canvas</code> for the node graph and transform inspector fields. Transform nodes sync{" "}
         <code>dlt_dbt</code> / <code>post_transform</code> back into source config on save. The canvas transform
         inspector includes the same <strong>workspace dbt project picker</strong> as the builder.

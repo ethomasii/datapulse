@@ -63,7 +63,8 @@ export function LakeStarterChips({
             className
           )}
         >
-          <p className="text-sm font-semibold text-slate-900 dark:text-white">Empty canvas — pick a recipe</p>
+          <p className="text-sm font-semibold text-slate-900 dark:text-white">Start with a transform recipe</p>
+          <p className="mt-1 text-xs text-slate-500">Or drag components from the sidebar to build your own graph.</p>
           <div className="mt-2">
             <TransformJourneyStrip compact showRecipeLink={false} />
           </div>

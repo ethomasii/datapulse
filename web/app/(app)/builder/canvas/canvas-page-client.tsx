@@ -1,11 +1,9 @@
-"use client";
+﻿"use client";
 
-import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { Edge, Node } from "@xyflow/react";
-import { Loader2, PenLine, Plus } from "lucide-react";
-import { AppPage, AppPageHeader } from "@/components/layout/app-page";
+import { Loader2 } from "lucide-react";
 import { CanvasPreviewPanel } from "@/components/pipeline-canvas/canvas-preview-panel";
 import { DesignerFullscreenShell } from "@/components/pipeline-canvas/designer-fullscreen-shell";
 import { DesignerMobileChrome } from "@/components/pipeline-canvas/designer-mobile-chrome";
@@ -16,16 +14,13 @@ import { LakeStarterChips } from "@/components/elt/lake-starter-chips";
 import type { LakeStarterApplyResult } from "@/components/elt/lake-starter-apply-dialog";
 import { ComponentPalette } from "@/components/elt/component-palette";
 import { CopyEnvButton } from "@/components/elt/copy-env-button";
-import { EltLoadingState } from "@/components/elt/elt-loading-state";
 import { FormAccordion } from "@/components/elt/form-accordion";
 import { GuidedDestinationBlock } from "@/components/elt/guided-destination-block";
 import { GuidedSourceBlock } from "@/components/elt/guided-source-block";
 import { CanvasTransformInspector } from "@/components/pipeline-canvas/canvas-transform-inspector";
 import { CanvasComponentInspector } from "@/components/pipeline-canvas/canvas-component-inspector";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
-import { useWorkspaceDefaultDestination } from "@/lib/hooks/use-workspace-default-destination";
-import { NewPipelineForm } from "@/components/elt/new-pipeline-form";
-import { createEltPipeline, createTransformOnlyPipeline } from "@/lib/elt/create-pipeline-client";
+import { builderUrl, parseBuilderCanvasTab, type BuilderCanvasTab } from "@/lib/elt/builder-nav";
 import type { DbtTransformNodeData } from "@/lib/elt/dbt-canvas";
 import { CanvasAssetLineagePanel } from "@/components/pipeline-canvas/canvas-asset-lineage-panel";
 import {
@@ -59,14 +54,11 @@ import {
   transformOnlyCanvasGraph,
 } from "@/lib/elt/pipeline-mode";
 import { ensureGithubReposForForm } from "@/lib/elt/normalize-source-configuration";
-import clsx from "clsx";
-import { hydrateCanvasFromSourceConfiguration, extractSpecComponents } from "@/lib/elt/spec-components-to-canvas";
+import { hydrateCanvasFromSourceConfiguration, extractSpecComponents, defaultPipelineCanvasBackbone } from "@/lib/elt/spec-components-to-canvas";
 import { TransformDagPanel } from "@/components/pipeline-canvas/transform-dag-panel";
 import { IngestPanel } from "@/components/pipeline-canvas/ingest-panel";
 import { lakeStarterCanvasGraph } from "@/lib/elt/lake-pipeline-starters";
 import { defaultSourceTable } from "@/lib/elt/lake-defaults";
-
-type PipelineRow = { id: string; name: string };
 
 function pickConnectionSubset(values: Record<string, string>, keys: string[]): Record<string, string> {
   const out: Record<string, string> = {};
@@ -74,17 +66,14 @@ function pickConnectionSubset(values: Record<string, string>, keys: string[]): R
   return out;
 }
 
-export function CanvasPageClient() {
+/** Canvas editor for one pipeline â€” mounted from /builder?view=canvas&pipeline=â€¦ */
+export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  /** Ref avoids recreating fetch callbacks when `useSearchParams()` identity changes every render (Next.js). */
-  const pipelineFromUrlRef = useRef<string | null>(null);
-  pipelineFromUrlRef.current = searchParams.get("pipeline");
-  const pipelineFromUrl = pipelineFromUrlRef.current;
+  const selectedId = pipelineId;
 
-  const [pipelines, setPipelines] = useState<PipelineRow[]>([]);
-  const [listLoading, setListLoading] = useState(true);
-  const [selectedId, setSelectedId] = useState("");
-  const [detailLoading, setDetailLoading] = useState(false);
+  const [selectedName, setSelectedName] = useState<string>("");
+  const [detailLoading, setDetailLoading] = useState(true);
   const [loadedGraph, setLoadedGraph] = useState<{ nodes: Node[]; edges: Edge[] } | null>(null);
   const [loadedSig, setLoadedSig] = useState("");
   const [saving, setSaving] = useState(false);
@@ -107,42 +96,37 @@ export function CanvasPageClient() {
   /** When the catalog has no source schema, connector fields are edited as JSON. */
   const [connectorJson, setConnectorJson] = useState("{}");
   const [advancedJsonDirty, setAdvancedJsonDirty] = useState(false);
-  const [showNewPipelineForm, setShowNewPipelineForm] = useState(false);
-  const [pendingOpenId, setPendingOpenId] = useState("");
-  const [newName, setNewName] = useState("");
-  const [newPipelineKind, setNewPipelineKind] = useState<"elt" | "transform_only">("elt");
-  const [newSourceTable, setNewSourceTable] = useState("staging.events");
-  const [newSourceType, setNewSourceType] = useState("github");
-  const [newDestinationType, setNewDestinationType] = useState("duckdb");
-  const [newDestConnectionId, setNewDestConnectionId] = useState<string | null>(null);
-  const [createBusy, setCreateBusy] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
   const [linkedDbtProjectId, setLinkedDbtProjectId] = useState<string | null>(null);
   const [transformOnlyMode, setTransformOnlyMode] = useState(false);
-  const [canvasView, setCanvasView] = useState<"designer" | "dag" | "ingest">("designer");
+  const [canvasView, setCanvasViewState] = useState<BuilderCanvasTab>(() =>
+    parseBuilderCanvasTab(searchParams.get("canvas"))
+  );
   const [starterNotice, setStarterNotice] = useState<string | null>(null);
-  const [componentNodeCount, setComponentNodeCount] = useState(0);
+  const [graphStats, setGraphStats] = useState({ componentNodeCount: 0, hasIngestBackbone: false });
   const starterAppliedRef = useRef(false);
 
   const starterFromUrl = searchParams.get("starter");
   const sourceTableFromUrl = searchParams.get("source_table") ?? "staging.events";
-  const wantNewFromUrl = searchParams.get("new") === "1";
+
+  const setCanvasView = useCallback(
+    (view: BuilderCanvasTab) => {
+      setCanvasViewState(view);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("view", "canvas");
+      params.set("pipeline", pipelineId);
+      if (view === "designer") params.delete("canvas");
+      else params.set("canvas", view);
+      router.replace(builderUrl({ pipeline: pipelineId, view: "canvas", canvas: view }), { scroll: false });
+    },
+    [pipelineId, router, searchParams]
+  );
 
   useEffect(() => {
-    if (wantNewFromUrl || (starterFromUrl && !pipelineFromUrl)) {
-      setShowNewPipelineForm(true);
-    }
-  }, [wantNewFromUrl, starterFromUrl, pipelineFromUrl]);
+    setCanvasViewState(parseBuilderCanvasTab(searchParams.get("canvas")));
+  }, [searchParams]);
 
   const { permissions } = useWorkspacePermissions();
   const canWrite = permissions?.canWrite ?? true;
-  const workspaceDefault = useWorkspaceDefaultDestination();
-
-  useEffect(() => {
-    if (!workspaceDefault.loaded || !workspaceDefault.connector) return;
-    setNewDestinationType(workspaceDefault.connector.toLowerCase());
-    setNewDestConnectionId(workspaceDefault.connectionId);
-  }, [workspaceDefault.loaded, workspaceDefault.connector, workspaceDefault.connectionId]);
 
   const graphAbortRef = useRef<AbortController | null>(null);
 
@@ -209,7 +193,7 @@ export function CanvasPageClient() {
         return;
       }
       canvasControlRef.current?.replaceGraph(result.nodes, result.edges);
-      let notice = `${result.title}: ${result.stepCount} warehouse SQL steps on canvas — save to compile on your destination.`;
+      let notice = `${result.title}: ${result.stepCount} warehouse SQL steps on canvas â€” save to compile on your destination.`;
       if (result.medallion) {
         const merged = {
           ...lastFullSourceConfigRef.current,
@@ -224,7 +208,7 @@ export function CanvasPageClient() {
             body: JSON.stringify({ sourceConfiguration: merged }),
           });
           if (res.ok) {
-            notice += " Bronze→gold medallion layers tagged on assets.";
+            notice += " Bronzeâ†’gold medallion layers tagged on assets.";
           }
         } catch {
           /* best-effort medallion hint */
@@ -313,29 +297,6 @@ export function CanvasPageClient() {
     advancedJsonDirty,
   ]);
 
-  const loadPipelines = useCallback(async () => {
-    setListLoading(true);
-    try {
-      const res = await fetch("/api/elt/pipelines", { credentials: "same-origin" });
-      if (!res.ok) return;
-      const data = await res.json();
-      const rows = (data.pipelines ?? []) as PipelineRow[];
-      setPipelines(rows);
-      const fromUrl = pipelineFromUrlRef.current;
-      setSelectedId((prev) => {
-        if (prev && rows.some((r) => r.id === prev)) return prev;
-        if (fromUrl && rows.some((r) => r.id === fromUrl)) return fromUrl;
-        return "";
-      });
-    } finally {
-      setListLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadPipelines();
-  }, [loadPipelines]);
-
   useEffect(() => {
     starterAppliedRef.current = false;
     setStarterNotice(null);
@@ -354,7 +315,7 @@ export function CanvasPageClient() {
       });
       if (!result.nodes.length) return;
       canvasControlRef.current.replaceGraph(result.nodes, result.edges);
-      setStarterNotice(`${result.title} loaded — save pipeline to compile warehouse SQL.`);
+      setStarterNotice(`${result.title} loaded â€” save pipeline to compile warehouse SQL.`);
       starterAppliedRef.current = true;
     }, 400);
     return () => window.clearTimeout(timer);
@@ -411,6 +372,7 @@ export function CanvasPageClient() {
         dbtProjectId?: string | null;
       };
       setLinkedDbtProjectId(row.dbtProjectId ?? null);
+      setSelectedName(typeof row.name === "string" ? row.name : "Pipeline");
       setPipelineSourceType(typeof row.sourceType === "string" ? row.sourceType : "");
       setPipelineDestinationType(typeof row.destinationType === "string" ? row.destinationType : "");
       const st0 = typeof row.sourceType === "string" ? row.sourceType : "github";
@@ -423,7 +385,18 @@ export function CanvasPageClient() {
       const st = typeof row.sourceType === "string" ? row.sourceType : "github";
       const dt = typeof row.destinationType === "string" ? row.destinationType : "duckdb";
       hydrateFormFromSourceConfig(cfg, st, dt);
-      const canvas = hydrateCanvasFromSourceConfiguration(cfg, row.name) ?? getCanvasFromSourceConfig(cfg);
+      let canvas =
+        hydrateCanvasFromSourceConfiguration(cfg, row.name) ?? getCanvasFromSourceConfig(cfg);
+      if (!canvas?.nodes?.length) {
+        if (isTransformOnlyPipeline(cfg)) {
+          canvas = transformOnlyCanvasGraph({
+            warehouseLabel: dt.replace(/_/g, " "),
+            sourceTable: readTransformOnlySourceTable(cfg),
+          });
+        } else {
+          canvas = defaultPipelineCanvasBackbone(st, dt);
+        }
+      }
       if (canvas && Array.isArray(canvas.nodes) && Array.isArray(canvas.edges)) {
         const rawDbt = readDbtTransformConfig(cfg);
         const dbtObj =
@@ -491,7 +464,7 @@ export function CanvasPageClient() {
               if (Array.isArray(v)) parts.push(...v.map((x) => `${k}: ${String(x)}`));
               else parts.push(`${k}: ${String(v)}`);
             }
-            if (parts.length) msg = parts.join(" · ");
+            if (parts.length) msg = parts.join(" Â· ");
           }
           throw new Error(msg);
         }
@@ -530,62 +503,6 @@ export function CanvasPageClient() {
     },
     [selectedId, pipelineSourceType, pipelineDestinationType, hydrateFormFromSourceConfig]
   );
-
-  async function handleCreatePipeline(e: FormEvent) {
-    e.preventDefault();
-    const name = newName.trim();
-    if (!name) {
-      setCreateError("Enter a pipeline name (e.g. my_pipeline).");
-      return;
-    }
-    setCreateBusy(true);
-    setCreateError(null);
-    try {
-      let newId: string | undefined;
-      if (newPipelineKind === "transform_only") {
-        const destType = (workspaceDefault.connector ?? newDestinationType).toLowerCase();
-        const destConnId = workspaceDefault.connectionId ?? newDestConnectionId;
-        if (!destConnId) {
-          throw new Error(
-            "Set a workspace default warehouse under Connections (recommended), or create a destination connection first."
-          );
-        }
-        newId = await createTransformOnlyPipeline({
-          name,
-          sourceTable: newSourceTable,
-          destinationType: destType,
-          destinationConnectionId: destConnId,
-          warehouseName: workspaceDefault.name,
-        });
-        setNewPipelineKind("elt");
-      } else {
-        newId = await createEltPipeline({
-          name,
-          sourceType: newSourceType,
-          destinationType: newDestinationType,
-          destinationConnectionId: newDestConnectionId,
-        });
-      }
-      setShowNewPipelineForm(false);
-      setNewName("");
-      await loadPipelines();
-      if (newId) {
-        setSelectedId(newId);
-        setCanvasView("designer");
-      }
-    } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Create failed");
-    } finally {
-      setCreateBusy(false);
-    }
-  }
-
-  /** Client navigations to `?pipeline=` after the list is already loaded. */
-  useEffect(() => {
-    if (!pipelineFromUrl || pipelines.length === 0) return;
-    if (!pipelines.some((p) => p.id === pipelineFromUrl)) return;
-    setSelectedId((s) => (s === pipelineFromUrl ? s : pipelineFromUrl));
-  }, [pipelineFromUrl, pipelines]);
 
   function hasDbtTransform(nodes: Node[]): boolean {
     return nodes.some(
@@ -794,7 +711,7 @@ export function CanvasPageClient() {
           <div className={stickyHeaderClass}>
             <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Transform</h2>
             <p className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-400">
-              Code transform (dbt / SQL / Python). Native steps — cleanse, join, aggregate — use{" "}
+              Code transform (dbt / SQL / Python). Native steps â€” cleanse, join, aggregate â€” use{" "}
               <strong className="font-medium text-violet-800 dark:text-violet-200">Native</strong> on the toolbar or the
               catalog below.
             </p>
@@ -821,7 +738,7 @@ export function CanvasPageClient() {
           <div className={stickyHeaderClass}>
             <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Operator configuration</h2>
             <p className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-400">
-              Column mapping, filters, and step settings — same panel as Lakeflow&apos;s operator config.
+              Column mapping, filters, and step settings â€” same panel as Lakeflow&apos;s operator config.
             </p>
           </div>
           <CanvasComponentInspector
@@ -890,7 +807,7 @@ export function CanvasPageClient() {
           <details className="group rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
             <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900 dark:text-white [&::-webkit-details-marker]:hidden">
               <span className="inline-flex items-center gap-2">
-                <span className="text-slate-400 transition group-open:rotate-90">▸</span>
+                <span className="text-slate-400 transition group-open:rotate-90">â–¸</span>
                 Advanced: full JSON (no canvas)
               </span>
             </summary>
@@ -964,7 +881,7 @@ export function CanvasPageClient() {
         <details className="group rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
           <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900 dark:text-white [&::-webkit-details-marker]:hidden">
             <span className="inline-flex items-center gap-2">
-              <span className="text-slate-400 transition group-open:rotate-90">▸</span>
+              <span className="text-slate-400 transition group-open:rotate-90">â–¸</span>
               Advanced: full JSON (no canvas)
             </span>
           </summary>
@@ -994,7 +911,6 @@ export function CanvasPageClient() {
     );
   }
 
-  const selectedName = pipelines.find((p) => p.id === selectedId)?.name;
   const lakeDefaultSourceTable = useMemo(
     () =>
       transformOnlyMode
@@ -1005,6 +921,7 @@ export function CanvasPageClient() {
               typeof sourceCfg.schema_override === "string" ? sourceCfg.schema_override : undefined,
             fallback: sourceTableFromUrl,
           }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadedSig bumps when pipeline config is reloaded
     [selectedName, sourceCfg.schema_override, sourceTableFromUrl, transformOnlyMode, loadedSig]
   );
 
@@ -1013,10 +930,6 @@ export function CanvasPageClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadedSig bumps when pipeline config is reloaded
     [sourceCfg, loadedSig, selectedId]
   );
-  const showDockedInspector =
-    pipelines.length > 0 && Boolean(selectedId) && !detailLoading && canvasView === "ingest";
-  const isDesignerFullscreen =
-    canvasView === "designer" && pipelines.length > 0 && Boolean(selectedId);
 
   function renderDesignerWorkspace() {
     return (
@@ -1048,8 +961,10 @@ export function CanvasPageClient() {
               bindingsError={bindingsError}
               canvasControlRef={canvasControlRef}
               onInspectorFocusChange={setInspectorFocus}
-              onGraphStatsChange={({ componentNodeCount: count }) => setComponentNodeCount(count)}
-              showEmptyStateOverlay={componentNodeCount === 0}
+              onGraphStatsChange={setGraphStats}
+              showEmptyStateOverlay={
+                graphStats.componentNodeCount === 0 && !graphStats.hasIngestBackbone
+              }
               emptyStateOverlay={
                 <LakeStarterChips
                   variant="overlay"
@@ -1096,6 +1011,7 @@ export function CanvasPageClient() {
                   <LakeStarterGallery
                     compact
                     className="mt-4"
+                    ingestConfigured={graphStats.hasIngestBackbone}
                     defaultSourceTable={lakeDefaultSourceTable}
                     existingCanvas={existingCanvasGraph}
                     onApplyToCanvas={handleLakeStarterApply}
@@ -1119,6 +1035,7 @@ export function CanvasPageClient() {
             <LakeStarterGallery
               compact
               className="mt-4"
+              ingestConfigured={graphStats.hasIngestBackbone}
               defaultSourceTable={lakeDefaultSourceTable}
               existingCanvas={existingCanvasGraph}
               onApplyToCanvas={handleLakeStarterApply}
@@ -1129,364 +1046,134 @@ export function CanvasPageClient() {
     );
   }
 
-  return (
-    <AppPage
-      width="full"
-      className={clsx("space-y-6", showDockedInspector && "lg:pr-[380px]")}
-    >
-      {!isDesignerFullscreen ? <AppPageHeader title="Visual pipeline canvas" /> : null}
-
-      {!isDesignerFullscreen && !canWrite && permissions ? (
-        <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-          Read-only workspace role ({permissions.role}) — you can browse the canvas but cannot save pipeline changes.
-        </p>
-      ) : null}
-
-      <div className="w-full min-w-0 space-y-4">
-        {listLoading ? (
-          <EltLoadingState />
-        ) : (
-          <>
-            {(pipelines.length === 0 || showNewPipelineForm) && (
-              <NewPipelineForm
-                className="mt-4 max-w-xl"
-                title={
-                  pipelines.length === 0
-                    ? "Create your first pipeline"
-                    : starterFromUrl
-                      ? "Create a pipeline for this starter"
-                      : "New pipeline"
-                }
-                kind={newPipelineKind}
-                onKindChange={setNewPipelineKind}
-                name={newName}
-                onNameChange={setNewName}
-                sourceTable={newSourceTable}
-                onSourceTableChange={setNewSourceTable}
-                sourceType={newSourceType}
-                onSourceTypeChange={setNewSourceType}
-                destinationType={newDestinationType}
-                onDestinationTypeChange={setNewDestinationType}
-                busy={createBusy}
-                error={createError}
-                onSubmit={handleCreatePipeline}
-                showCancel={pipelines.length > 0}
-                onCancel={() => {
-                  setShowNewPipelineForm(false);
-                  setCreateError(null);
-                }}
-                workspaceDefault={workspaceDefault}
-              />
-            )}
-
-            {pipelines.length > 0 && !selectedId && !showNewPipelineForm && !isDesignerFullscreen ? (
-              <div className="mt-2 max-w-2xl rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
-                <div className="flex items-start gap-3">
-                  <PenLine className="mt-0.5 h-5 w-5 shrink-0 text-sky-600" aria-hidden />
-                  <div className="min-w-0 flex-1 space-y-4">
-                    <div>
-                      <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Start on the canvas</h2>
-                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                        Nothing is loaded yet — pick whether to design a new pipeline or open one you already have.
-                        Saves go to the pipeline you choose, so we don&apos;t open an existing pipeline by default.
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowNewPipelineForm(true);
-                          setCreateError(null);
-                        }}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
-                      >
-                        <Plus className="h-4 w-4 shrink-0" aria-hidden />
-                        New pipeline
-                      </button>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/50">
-                      <p className="text-sm font-medium text-slate-800 dark:text-slate-200">Open existing pipeline</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        View or edit a pipeline you&apos;ve already built ({pipelines.length} in this workspace).
-                      </p>
-                      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-                        <select
-                          value={pendingOpenId}
-                          onChange={(e) => setPendingOpenId(e.target.value)}
-                          className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                        >
-                          <option value="">Choose a pipeline…</option>
-                          {pipelines.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          disabled={!pendingOpenId}
-                          onClick={() => {
-                            if (pendingOpenId) setSelectedId(pendingOpenId);
-                          }}
-                          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800"
-                        >
-                          Open on canvas
-                        </button>
-                      </div>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      <Link href="/builder" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-                        Pipelines
-                      </Link>{" "}
-                      lists every pipeline and the full form editor. Visual canvas is the diagram view for one pipeline
-                      at a time.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            {pipelines.length > 0 && selectedId && !isDesignerFullscreen ? (
-              <div className="mt-4 space-y-3">
-                <div className="flex max-w-3xl flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/60 dark:bg-amber-950/30 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-amber-950 dark:text-amber-100">
-                    Editing{" "}
-                    <strong className="font-semibold">{selectedName ?? "pipeline"}</strong> — saves update this
-                    pipeline.
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedId("");
-                        setPendingOpenId("");
-                        setShowNewPipelineForm(false);
-                      }}
-                      className="rounded-lg border border-amber-300/80 bg-white px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-100/80 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100 dark:hover:bg-amber-900/40"
-                    >
-                      Choose different pipeline
-                    </button>
-                    <Link
-                      href={`/builder?pipeline=${encodeURIComponent(selectedId)}`}
-                      className="text-xs font-medium text-sky-700 hover:underline dark:text-sky-400"
-                    >
-                      Open in form builder
-                    </Link>
-                  </div>
-                </div>
-                {!showNewPipelineForm ? (
-                  <div className="flex max-w-2xl flex-wrap items-end gap-2">
-                    <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-sm">
-                      <span className="font-medium text-slate-700 dark:text-slate-300">Switch pipeline</span>
-                      <select
-                        value={selectedId}
-                        onChange={(e) => setSelectedId(e.target.value)}
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                      >
-                        {pipelines.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowNewPipelineForm(true);
-                        setCreateError(null);
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
-                    >
-                      <Plus className="h-4 w-4 shrink-0" aria-hidden />
-                      New pipeline
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </>
-        )}
-      </div>
-
-      {pipelines.length > 0 && selectedId && !isDesignerFullscreen ? (
-        <div className="w-full min-w-0">
-          {detailLoading ? (
-            <div className="flex h-[max(28rem,min(calc(100dvh-8rem),56rem))] items-center justify-center rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50">
-              <EltLoadingState message="Loading pipeline…" size="md" />
+  function renderIngestConfigSidebar() {
+    return (
+      <aside
+        className="hidden h-full w-[320px] shrink-0 overflow-y-auto overscroll-contain border-l border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/95 xl:w-[360px] 2xl:w-[420px] lg:block"
+        aria-label="Ingest configuration"
+      >
+        <div className="space-y-4">
+          <div className="border-b border-slate-200 pb-3 dark:border-slate-600">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Ingest configuration</h2>
+            <p className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-400">
+              Source connector, credentials, and ingest components.
+            </p>
+            <button
+              type="button"
+              onClick={() => void handleSaveSourceConfiguration()}
+              disabled={sourceConfigSaving || !canWrite}
+              className="mt-2 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            >
+              {sourceConfigSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              Save ingest config
+            </button>
+          </div>
+          <FormAccordion
+            id="ingest-inspector-source"
+            title="Source connector"
+            subtitle={pipelineSourceType.replace(/_/g, " ")}
+            defaultOpen
+          >
+            <GuidedSourceBlock
+              sourceType={pipelineSourceType || "github"}
+              schemaFields={schemaFields}
+              sourceCfg={sourceCfg}
+              onSourceCfgChange={setSourceCfg}
+              connectionValues={connectionValues}
+              onConnectionPatch={patchConnection}
+              genericConnectorJson={
+                schemaFields.length === 0 ? { value: connectorJson, onChange: setConnectorJson } : undefined
+              }
+            />
+            <div className="mt-3">
+              <CopyEnvButton values={sourceEnvValues} />
             </div>
-          ) : (
-            <>
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-950">
-                  <button
-                    type="button"
-                    onClick={() => setCanvasView("designer")}
-                    className={clsx(
-                      "rounded-md px-3 py-1.5 text-xs font-medium",
-                      canvasView === "designer"
-                        ? "bg-sky-600 text-white"
-                        : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
-                    )}
-                  >
-                    Designer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCanvasView("ingest")}
-                    className={clsx(
-                      "rounded-md px-3 py-1.5 text-xs font-medium",
-                      canvasView === "ingest"
-                        ? "bg-emerald-600 text-white"
-                        : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
-                    )}
-                  >
-                    Ingest
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCanvasView("dag")}
-                    className={clsx(
-                      "rounded-md px-3 py-1.5 text-xs font-medium",
-                      canvasView === "dag"
-                        ? "bg-sky-600 text-white"
-                        : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
-                    )}
-                  >
-                    Transform DAG
-                  </button>
-                </div>
-                <span className="text-xs text-slate-500">
-                  {canvasView === "ingest"
-                    ? "Source → landing tables · configure extract in the sidebar"
-                    : "Transform dependency graph from component edges → after[]"}
-                </span>
-              </div>
-              {canvasView === "ingest" ? (
-              <>
-              <IngestPanel
-                pipelineId={selectedId}
-                pipelineName={selectedName ?? "pipeline"}
-                tool={pipelineTool}
-                sourceType={pipelineSourceType}
-                destinationType={pipelineDestinationType}
-                sourceConfiguration={lineageSourceConfig}
-                canvasNodes={loadedGraph?.nodes ?? []}
-                onSwitchToDesigner={() => setCanvasView("designer")}
-              />
-              <aside
-                className={clsx(
-                  "mt-4 w-full border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/95",
-                  "rounded-2xl",
-                  "lg:fixed lg:bottom-0 lg:right-0 lg:top-14 lg:z-20 lg:mt-0 lg:w-[380px] lg:max-w-[380px] lg:overflow-y-auto lg:overscroll-contain lg:rounded-none lg:border-x-0 lg:border-t-0 lg:border-b-0 lg:border-l lg:p-4 lg:shadow-none"
-                )}
-                aria-label="Pipeline settings"
-              >
-                <div className="space-y-4">
-                  <div className="border-b border-slate-200 pb-3 dark:border-slate-600">
-                    <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Ingest configuration</h2>
-                    <p className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-400">
-                      Source connector, credentials, and ingest components.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => void handleSaveSourceConfiguration()}
-                      disabled={sourceConfigSaving || !canWrite}
-                      className="mt-2 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-                    >
-                      {sourceConfigSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                      Save ingest config
-                    </button>
-                  </div>
-                  <FormAccordion
-                    id="ingest-inspector-source"
-                    title="Source connector"
-                    subtitle={pipelineSourceType.replace(/_/g, " ")}
-                    defaultOpen
-                  >
-                    <GuidedSourceBlock
-                      sourceType={pipelineSourceType || "github"}
-                      schemaFields={schemaFields}
-                      sourceCfg={sourceCfg}
-                      onSourceCfgChange={setSourceCfg}
-                      connectionValues={connectionValues}
-                      onConnectionPatch={patchConnection}
-                      genericConnectorJson={
-                        schemaFields.length === 0
-                          ? { value: connectorJson, onChange: setConnectorJson }
-                          : undefined
-                      }
-                    />
-                    <div className="mt-3">
-                      <CopyEnvButton values={sourceEnvValues} />
-                    </div>
-                  </FormAccordion>
-                  <FormAccordion
-                    id="ingest-inspector-dest"
-                    title="Destination / warehouse"
-                    subtitle={pipelineDestinationType.replace(/_/g, " ")}
-                  >
-                    <GuidedDestinationBlock
-                      destinationType={pipelineDestinationType || "duckdb"}
-                      sourceCfg={sourceCfg}
-                      onSourceCfgChange={setSourceCfg}
-                      connectionValues={connectionValues}
-                      onConnectionPatch={patchConnection}
-                    />
-                    <div className="mt-3">
-                      <CopyEnvButton values={destinationEnvValues} />
-                    </div>
-                  </FormAccordion>
-                  {sourceConfigError ? (
-                    <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-                      {sourceConfigError}
-                    </p>
-                  ) : null}
-                  <ComponentPalette
-                    className="h-[240px]"
-                    categoryFilter="ingestion"
-                    onSelect={(c) => {
-                      setCanvasView("designer");
-                      canvasControlRef.current?.addComponentNode(c);
-                    }}
-                  />
-                </div>
-              </aside>
-              </>
-              ) : (
-              <div className="min-h-[max(28rem,min(calc(100dvh-8rem),56rem))] rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950">
-                <TransformDagPanel
-                  nodes={loadedGraph?.nodes ?? []}
-                  edges={loadedGraph?.edges ?? []}
-                  specComponents={extractSpecComponents(lastFullSourceConfigRef.current)}
-                  pipelineName={selectedName ?? "pipeline"}
-                />
-              </div>
-              )}
-            </>
-          )}
+          </FormAccordion>
+          <FormAccordion
+            id="ingest-inspector-dest"
+            title="Destination / warehouse"
+            subtitle={pipelineDestinationType.replace(/_/g, " ")}
+          >
+            <GuidedDestinationBlock
+              destinationType={pipelineDestinationType || "duckdb"}
+              sourceCfg={sourceCfg}
+              onSourceCfgChange={setSourceCfg}
+              connectionValues={connectionValues}
+              onConnectionPatch={patchConnection}
+            />
+            <div className="mt-3">
+              <CopyEnvButton values={destinationEnvValues} />
+            </div>
+          </FormAccordion>
+          {sourceConfigError ? (
+            <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+              {sourceConfigError}
+            </p>
+          ) : null}
+          <ComponentPalette
+            className="h-[240px]"
+            categoryFilter="ingestion"
+            onSelect={(c) => {
+              setCanvasView("designer");
+              canvasControlRef.current?.addComponentNode(c);
+            }}
+          />
         </div>
-      ) : null}
+      </aside>
+    );
+  }
 
-      {isDesignerFullscreen ? (
-        <DesignerFullscreenShell
-          pipelines={pipelines}
-          selectedId={selectedId}
-          selectedName={selectedName}
-          canvasView={canvasView}
-          onCanvasViewChange={setCanvasView}
-          onPipelineChange={setSelectedId}
-          onNewPipeline={() => {
-            setShowNewPipelineForm(true);
-            setCreateError(null);
-            setCanvasView("ingest");
-          }}
-          loading={detailLoading}
-          transformOnly={transformOnlyMode}
-        >
-          {renderDesignerWorkspace()}
-        </DesignerFullscreenShell>
-      ) : null}
-    </AppPage>
+  function renderIngestWorkspace() {
+    return (
+      <div className="flex h-full min-h-0 overflow-hidden lg:flex-row">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4">
+          <IngestPanel
+            pipelineId={selectedId}
+            pipelineName={selectedName || "pipeline"}
+            tool={pipelineTool}
+            sourceType={pipelineSourceType}
+            destinationType={pipelineDestinationType}
+            sourceConfiguration={lineageSourceConfig}
+            canvasNodes={loadedGraph?.nodes ?? []}
+            onSwitchToDesigner={() => setCanvasView("designer")}
+          />
+        </div>
+        {renderIngestConfigSidebar()}
+      </div>
+    );
+  }
+
+  function renderDagWorkspace() {
+    return (
+      <div className="h-full overflow-y-auto p-4">
+        <TransformDagPanel
+          nodes={loadedGraph?.nodes ?? []}
+          edges={loadedGraph?.edges ?? []}
+          specComponents={extractSpecComponents(lastFullSourceConfigRef.current)}
+          pipelineName={selectedName || "pipeline"}
+        />
+      </div>
+    );
+  }
+
+  function renderCanvasViewContent() {
+    if (canvasView === "designer") return renderDesignerWorkspace();
+    if (canvasView === "ingest") return renderIngestWorkspace();
+    return renderDagWorkspace();
+  }
+
+  return (
+    <DesignerFullscreenShell
+      selectedName={selectedName}
+      canvasView={canvasView}
+      onCanvasViewChange={setCanvasView}
+      formBuilderHref={builderUrl({ pipeline: pipelineId })}
+      loading={detailLoading}
+      transformOnly={transformOnlyMode}
+      readOnly={!canWrite}
+      readOnlyRole={permissions?.role}
+    >
+      {renderCanvasViewContent()}
+    </DesignerFullscreenShell>
   );
 }

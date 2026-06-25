@@ -15,7 +15,7 @@ export async function upsertContractFromAssets(
     fetchWarehouseColumns?: boolean;
   }
 ): Promise<{ contract: Awaited<ReturnType<typeof loadFullContract>>; created: boolean } | null> {
-  const uniqueKeys = [...new Set(assetKeys.map((k) => k.trim()).filter(Boolean))];
+  const uniqueKeys = Array.from(new Set(assetKeys.map((k) => k.trim()).filter(Boolean)));
   if (!uniqueKeys.length) return null;
 
   const loaded = await loadContractSchemaFromAssetKeys(ownerIds, uniqueKeys, {

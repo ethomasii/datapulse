@@ -1,4 +1,5 @@
 import type { MedallionLayer } from "@/lib/elt/declarative-pipeline-spec";
+import { builderUrl } from "@/lib/elt/builder-nav";
 
 /** Vendor-neutral hint shown in lake starter dialogs and transform copy. */
 export const WAREHOUSE_COMPUTE_HINT =
@@ -49,10 +50,5 @@ export function canvasStarterHref(opts: {
   const starter = opts.starterId ?? DEFAULT_LAKE_STARTER_ID;
   const source_table =
     opts.sourceTable ?? defaultSourceTable({ pipelineName: opts.pipelineName, fallback: "staging.events" });
-  const q = new URLSearchParams({
-    pipeline: opts.pipelineId,
-    starter,
-    source_table,
-  });
-  return `/builder/canvas?${q.toString()}`;
+  return builderUrl({ view: "canvas", pipeline: opts.pipelineId, starter, source_table });
 }

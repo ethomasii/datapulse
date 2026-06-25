@@ -127,7 +127,7 @@ export function WorkflowsClient() {
               Pipelines
             </Link>{" "}
             or{" "}
-            <Link href="/builder/canvas" className="text-sky-600 underline dark:text-sky-400">
+            <Link href="/builder?view=canvas" className="text-sky-600 underline dark:text-sky-400">
               Visual canvas
             </Link>
             . See{" "}

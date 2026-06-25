@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import {
   Activity,
@@ -15,7 +15,6 @@ import {
   LayoutDashboard,
   Layers,
   Network,
-  PenLine,
   PlayCircle,
   Split,
   Table2,
@@ -27,7 +26,7 @@ import {
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
 import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 const NAV_COLLAPSED_KEY = "eltpulse-nav-collapsed";
@@ -54,7 +53,6 @@ const NAV_SECTIONS: NavSection[] = [
     label: "Build",
     items: [
       { href: "/builder", label: "Pipelines", icon: Layers },
-      { href: "/builder/canvas", label: "Visual canvas", icon: PenLine },
       { href: "/workflows", label: "Pipeline chains", icon: Network },
       { href: "/connections", label: "Connections", icon: Cable },
     ],
@@ -103,10 +101,7 @@ function navLinkActive(pathname: string, href: string): boolean {
   if (pathname === href) return true;
   if (href === "/dashboard") return false;
   if (href === "/builder") {
-    return pathname === "/builder";
-  }
-  if (href === "/builder/canvas") {
-    return pathname.startsWith("/builder/canvas");
+    return pathname === "/builder" || pathname.startsWith("/builder/");
   }
   if (href === "/catalog") {
     return (
@@ -185,9 +180,19 @@ function NavSectionBlock({
   );
 }
 
+function FloatingAiGate() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const hide =
+    pathname === "/builder" &&
+    searchParams.get("view") === "canvas" &&
+    Boolean(searchParams.get("pipeline")?.trim());
+  if (hide) return null;
+  return <AiPipelineAssistant />;
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const hideFloatingAi = pathname?.startsWith("/builder/canvas");
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -314,7 +319,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
         <main className="min-h-0 min-w-0 w-full flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
       </div>
-      {!hideFloatingAi ? <AiPipelineAssistant /> : null}
+      <Suspense fallback={null}>
+        <FloatingAiGate />
+      </Suspense>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyCanvasComponentsToSourceConfig,
   buildPipelineCanvasFromComponents,
+  relayoutPipelineCanvas,
 } from "@/lib/elt/ai-pipeline-canvas-build";
 import { extractComponentsFromCanvas } from "@/lib/elt/canvas-component-sync";
 
@@ -71,5 +72,23 @@ describe("ai-pipeline-canvas-build", () => {
     expect(result.canvas.nodes.length).toBeGreaterThan(2);
     expect(Array.isArray(result.sourceConfiguration.elt_components)).toBe(true);
     expect(result.skippedComponents).toHaveLength(0);
+  });
+
+  it("relayoutPipelineCanvas separates nodes on the main chain", () => {
+    const { nodes, edges } = buildPipelineCanvasFromComponents({
+      sourceType: "github",
+      destinationType: "duckdb",
+      components: [
+        { component_id: "select_columns", config: { columns: ["id"] } },
+        { component_id: "filter_rows", config: { condition: "id is not null" } },
+        { component_id: "aggregate", config: { group_by: ["id"], metrics: [] } },
+      ],
+    });
+    const xs = nodes.map((n) => n.position.x);
+    const uniqueXs = new Set(xs);
+    expect(uniqueXs.size).toBe(xs.length);
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(40);
+    const positions = nodes.map((n) => `${n.position.x},${n.position.y}`);
+    expect(new Set(positions).size).toBe(positions.length);
   });
 });

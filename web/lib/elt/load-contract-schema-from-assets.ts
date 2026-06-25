@@ -11,6 +11,7 @@ import type { ContractColumnSpec } from "@/lib/elt/data-contract";
 import { buildAssetTechnicalProfile } from "@/lib/elt/asset-technical-profile";
 import { buildWorkspaceAssets, type PipelineRunAssetInput } from "@/lib/elt/pipeline-assets";
 import { fetchWarehouseColumnsForAsset } from "@/lib/elt/warehouse-column-introspect";
+import type { DestinationConnectionRow } from "@/lib/elt/warehouse-introspect";
 
 export type AssetSchemaProfile = {
   assetKey: string;
@@ -29,7 +30,7 @@ export async function loadContractSchemaFromAssetKeys(
   assets: AssetSchemaProfile[];
   suggested?: { name: string; slug: string };
 }> {
-  const uniqueKeys = [...new Set(assetKeys.map((k) => k.trim()).filter(Boolean))];
+  const uniqueKeys = Array.from(new Set(assetKeys.map((k) => k.trim()).filter(Boolean)));
   if (!uniqueKeys.length) {
     return { schemaSpec: [], assets: [] };
   }
@@ -77,10 +78,7 @@ export async function loadContractSchemaFromAssetKeys(
   const entriesByKey = new Map(catalogRows.map((r) => [r.assetKey, r]));
   payload = mergeCatalogIntoAssetsPayload(payload, entriesByKey);
 
-  const connectionCache = new Map<
-    string,
-    Awaited<ReturnType<typeof db.connection.findFirst>>
-  >();
+  const connectionCache = new Map<string, DestinationConnectionRow | null>();
 
   const profiles: AssetSchemaProfile[] = [];
   const specGroups: ContractColumnSpec[][] = [];

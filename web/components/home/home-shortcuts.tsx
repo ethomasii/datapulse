@@ -4,7 +4,7 @@ import { BarChart3, BookOpen, Cable, Layers, PenLine, PlayCircle, Zap } from "lu
 const SHORTCUTS = [
   { href: "/runs", label: "Runs", desc: "Trigger and inspect executions", icon: PlayCircle },
   { href: "/builder", label: "Pipelines", desc: "Form builder and config", icon: Layers },
-  { href: "/builder/canvas", label: "Visual canvas", desc: "Diagram editor and Genie", icon: PenLine },
+  { href: "/builder?view=canvas", label: "Canvas", desc: "Diagram editor and Genie", icon: PenLine },
   { href: "/observability", label: "Metrics", desc: "Trends, filters, alert rules", icon: BarChart3 },
   { href: "/connections", label: "Connections", desc: "Sources and warehouses", icon: Cable },
   { href: "/quick-start", label: "Quick start", desc: "Guided first pipeline", icon: Zap },

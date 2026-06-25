@@ -328,7 +328,7 @@ export function CatalogHubClient() {
         links={[
           { href: "/catalog/components", icon: Sparkles, label: "Transforms", desc: "Recipes and warehouse SQL" },
           { href: "/sources", icon: Database, label: "Source registry", desc: "Browse connector catalog" },
-          { href: "/builder/canvas", icon: LayoutGrid, label: "Canvas", desc: "Visual ingest + transform graph" },
+          { href: "/builder?view=canvas", icon: LayoutGrid, label: "Canvas", desc: "Visual ingest + transform graph" },
         ]}
       />
     </AppPage>

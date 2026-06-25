@@ -40,7 +40,7 @@ export function ComponentCatalogClient() {
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Component palette</h2>
           <p className="mt-1 text-sm text-slate-500">
             Individual transform steps — warehouse SQL by default. Open{" "}
-            <Link href="/builder/canvas" className="text-sky-600 underline dark:text-sky-400">
+            <Link href="/builder?view=canvas" className="text-sky-600 underline dark:text-sky-400">
               canvas
             </Link>{" "}
             to compose a graph.
@@ -67,7 +67,7 @@ export function ComponentCatalogClient() {
                   </p>
                 ) : null}
                 <Link
-                  href="/builder/canvas"
+                  href="/builder?view=canvas"
                   className="mt-4 inline-block rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500"
                 >
                   Add on canvas

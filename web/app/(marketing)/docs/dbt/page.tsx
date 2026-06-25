@@ -33,7 +33,7 @@ export default function DbtDocsPage() {
       <ol>
         <li>
           Open a pipeline in the <Link href="/builder">form builder</Link> or{" "}
-          <Link href="/builder/canvas">visual canvas</Link> (connector sync pipelines support in-pipeline dbt).
+          <Link href="/builder?view=canvas">canvas</Link> (connector sync pipelines support in-pipeline dbt).
         </li>
         <li>
           Under post-transform (builder) or the transform node inspector (canvas), choose <strong>dbt</strong>.

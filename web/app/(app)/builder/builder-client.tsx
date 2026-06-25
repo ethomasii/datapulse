@@ -64,6 +64,7 @@ import { PipelineRunPanel } from "@/components/elt/pipeline-run-panel";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NewPipelineForm, PipelineKindPicker, type NewPipelineKind } from "@/components/elt/new-pipeline-form";
 import { createTransformOnlyPipeline } from "@/lib/elt/create-pipeline-client";
+import { builderUrl } from "@/lib/elt/builder-nav";
 import { useWorkspaceDefaultDestination } from "@/lib/hooks/use-workspace-default-destination";
 
 type PipelineExecutionHost = "inherit" | "eltpulse_managed" | "customer_gateway";
@@ -101,8 +102,10 @@ sync:
 
 export function BuilderClient({
   initialEditPipelineId = null,
+  canvasPickHint = false,
 }: {
   initialEditPipelineId?: string | null;
+  canvasPickHint?: boolean;
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -584,7 +587,7 @@ export function BuilderClient({
       setNewPipelineKind("elt");
       await load();
       if (newId) {
-        router.push(`/builder/canvas?pipeline=${encodeURIComponent(newId)}`);
+        router.push(builderUrl({ view: "canvas", pipeline: newId }));
       }
     } catch (err) {
       setTransformCreateError(err instanceof Error ? err.message : "Create failed");
@@ -789,9 +792,15 @@ export function BuilderClient({
         }
       />
       <p className="-mt-4 max-w-3xl text-sm text-slate-500 dark:text-slate-400">
-          When you edit a pipeline, use <strong className="font-medium text-slate-600 dark:text-slate-300">Visual canvas</strong>{" "}
-          next to Guided / JSON for the diagram, or open Canvas from the table row — same record as this form.
+          When you edit a pipeline, open <strong className="font-medium text-slate-600 dark:text-slate-300">Canvas</strong>{" "}
+          from the table row or the Form / Canvas tabs — same pipeline record either way.
         </p>
+
+      {canvasPickHint ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+          Choose a pipeline below to open the canvas, or create a new pipeline first.
+        </p>
+      ) : null}
 
       <ExecutionStatusBanner />
 
@@ -900,7 +909,7 @@ export function BuilderClient({
                         <Pencil className="h-4 w-4" /> Edit
                       </button>
                       <Link
-                        href={`/builder/canvas?pipeline=${encodeURIComponent(p.id)}`}
+                        href={builderUrl({ view: "canvas", pipeline: p.id })}
                         className="mr-2 inline-flex items-center gap-1 text-emerald-600 hover:underline dark:text-emerald-400"
                       >
                         <Workflow className="h-4 w-4" /> Canvas
@@ -1042,15 +1051,11 @@ export function BuilderClient({
                 Spec YAML
               </button>
               <Link
-                href={
-                  editingId
-                    ? `/builder/canvas?pipeline=${encodeURIComponent(editingId)}`
-                    : "/builder/canvas"
-                }
+                href={builderUrl({ view: "canvas", pipeline: editingId ?? undefined })}
                 className="inline-flex items-center gap-1 rounded-md px-3 py-1 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 <Workflow className="h-3.5 w-3.5" aria-hidden />
-                Visual canvas
+                Canvas
               </Link>
               {editingId ? (
                 <>
@@ -1142,14 +1147,10 @@ export function BuilderClient({
               JSON mode includes connection keys you type in Guided. For the{" "}
               <strong className="font-medium text-slate-800 dark:text-slate-200">visual pipeline editor</strong>, use{" "}
               <Link
-                href={
-                  editingId
-                    ? `/builder/canvas?pipeline=${encodeURIComponent(editingId)}`
-                    : "/builder/canvas"
-                }
+                href={builderUrl({ view: "canvas", pipeline: editingId ?? undefined })}
                 className="font-medium text-sky-600 underline hover:no-underline dark:text-sky-400"
               >
-                Visual canvas
+                Canvas
               </Link>
               .
             </p>
@@ -1162,10 +1163,10 @@ export function BuilderClient({
                 This pipeline has a <strong className="font-medium">canvas layout</strong>. Saving here will update the
                 source configuration and may overwrite canvas-specific node positions. Use{" "}
                 <Link
-                  href={`/builder/canvas?pipeline=${encodeURIComponent(editingId)}`}
+                  href={builderUrl({ view: "canvas", pipeline: editingId })}
                   className="font-medium underline hover:no-underline"
                 >
-                  Visual canvas
+                  Canvas
                 </Link>{" "}
                 to edit the diagram directly.
               </span>

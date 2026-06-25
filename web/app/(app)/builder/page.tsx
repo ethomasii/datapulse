@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { BuilderClient } from "./builder-client";
+import { BuilderShellClient } from "./builder-shell-client";
 
 type SearchParamsInput = Record<string, string | string[] | undefined>;
 
@@ -13,7 +13,7 @@ export default async function BuilderPage({
   const pipeline = typeof sp.pipeline === "string" ? sp.pipeline : null;
   return (
     <Suspense fallback={<div className="p-6 text-slate-500">Loading builder…</div>}>
-      <BuilderClient initialEditPipelineId={pipeline} />
+      <BuilderShellClient initialPipelineId={pipeline} />
     </Suspense>
   );
 }

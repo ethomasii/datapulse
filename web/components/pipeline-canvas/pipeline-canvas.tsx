@@ -133,8 +133,8 @@ export type PipelineCanvasProps = {
   onInspectorFocusChange?: (focus: CanvasInspectorFocus) => void;
   /** Set by the canvas; use `patchNodeData` from the transform inspector (and similar). */
   canvasControlRef?: MutableRefObject<PipelineCanvasControl | null>;
-  /** Fires when component node count changes (for empty-state UI). */
-  onGraphStatsChange?: (stats: { componentNodeCount: number }) => void;
+  /** Fires when graph composition changes (for empty-state UI). */
+  onGraphStatsChange?: (stats: { componentNodeCount: number; hasIngestBackbone: boolean }) => void;
   /** Overlay when graph has no transform components (e.g. recipe chips). */
   emptyStateOverlay?: ReactNode;
   showEmptyStateOverlay?: boolean;
@@ -224,8 +224,11 @@ function FlowCanvas({
 
   useEffect(() => {
     const componentNodeCount = nodes.filter((n) => n.type === "componentNode").length;
-    onGraphStatsChange?.({ componentNodeCount });
-  }, [nodes, onGraphStatsChange]);
+    const sourceCount = nodes.filter((n) => n.type === "sourceNode").length;
+    const destCount = nodes.filter((n) => n.type === "destNode").length;
+    const hasIngestBackbone = transformOnly ? destCount > 0 : sourceCount > 0 && destCount > 0;
+    onGraphStatsChange?.({ componentNodeCount, hasIngestBackbone });
+  }, [nodes, onGraphStatsChange, transformOnly]);
 
   const isValidConnection: IsValidConnection = useCallback(
     (edge) => {

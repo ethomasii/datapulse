@@ -3,34 +3,28 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import clsx from "clsx";
+import { builderUrl } from "@/lib/elt/builder-nav";
 
 function BuilderSubnavInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const pipelineId = searchParams.get("pipeline")?.trim() || null;
-  const builderHref = pipelineId
-    ? `/builder?pipeline=${encodeURIComponent(pipelineId)}`
-    : "/builder";
-  const canvasHref = pipelineId
-    ? `/builder/canvas?pipeline=${encodeURIComponent(pipelineId)}`
-    : "/builder/canvas";
+  const view = searchParams.get("view") === "canvas" ? "canvas" : "form";
 
   const tabs = [
-    { href: builderHref, label: "Form builder" },
-    { href: canvasHref, label: "Visual canvas" },
+    { view: "form" as const, label: "Form builder" },
+    { view: "canvas" as const, label: "Canvas" },
   ];
 
   return (
     <nav className="flex justify-center gap-1" aria-label="Pipeline builder">
       {tabs.map((t) => {
-        const active =
-          t.href.startsWith("/builder/canvas")
-            ? pathname.startsWith("/builder/canvas")
-            : pathname === "/builder";
+        const href = builderUrl({ pipeline: pipelineId, view: t.view });
+        const active = pathname === "/builder" && view === t.view;
         return (
           <Link
             key={t.label}
-            href={t.href}
+            href={href}
             className={clsx(
               "-mb-px inline-flex border-b-2 px-4 py-2.5 text-sm font-medium transition",
               active

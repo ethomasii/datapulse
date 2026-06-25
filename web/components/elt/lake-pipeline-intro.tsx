@@ -33,7 +33,7 @@ export function LakePipelineIntro({ className, compact = false }: Props) {
             <Link href="/catalog/components#recipes" className="text-violet-700 underline dark:text-violet-300">
               Pipeline recipes
             </Link>
-            <Link href="/builder/canvas" className="text-sky-600 underline dark:text-sky-400">
+            <Link href="/builder?view=canvas" className="text-sky-600 underline dark:text-sky-400">
               Canvas designer
             </Link>
             <Link href="/catalog/dbt" className="text-slate-600 underline dark:text-slate-400">

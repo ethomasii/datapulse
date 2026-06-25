@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sparkles } from "lucide-react";
 import clsx from "clsx";
 import { LAKE_PIPELINE_STARTERS, type LakePipelineStarter } from "@/lib/elt/lake-pipeline-starters";
+import { builderUrl } from "@/lib/elt/builder-nav";
 import type { PipelineCanvasGraph } from "@/lib/elt/canvas-source-config";
 import {
   LakeStarterApplyDialog,
@@ -18,6 +19,8 @@ type Props = {
   compact?: boolean;
   className?: string;
   requirePipeline?: boolean;
+  /** Connector ingest (source → destination) is already on the canvas — recipes are optional add-ons. */
+  ingestConfigured?: boolean;
 };
 
 export function LakeStarterGallery({
@@ -27,6 +30,7 @@ export function LakeStarterGallery({
   existingCanvas,
   compact = false,
   className,
+  ingestConfigured = false,
 }: Props) {
   const [active, setActive] = useState<LakePipelineStarter | null>(null);
 
@@ -46,14 +50,18 @@ export function LakeStarterGallery({
         <div className="flex flex-wrap items-center gap-2">
           <Sparkles className="h-4 w-4 text-violet-600 dark:text-violet-400" aria-hidden />
           <h2 className={clsx("font-semibold text-slate-900 dark:text-white", compact ? "text-sm" : "text-lg")}>
-            Pipeline recipes
+            {ingestConfigured ? "Optional transform recipes" : "Pipeline recipes"}
           </h2>
-          <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800 dark:bg-violet-950 dark:text-violet-200">
-            Recommended
-          </span>
+          {!ingestConfigured ? (
+            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800 dark:bg-violet-950 dark:text-violet-200">
+              Recommended
+            </span>
+          ) : null}
         </div>
         <p className="mt-1 text-xs text-slate-500">
-          Curated transform chains after ingest — any warehouse. Click a card to configure tables, then open canvas.
+          {ingestConfigured
+            ? "Ingest is configured — add warehouse transforms when you want modeling beyond source → destination."
+            : "Curated transform chains after ingest — any warehouse. Click a card to configure tables, then open canvas."}
         </p>
       </div>
 
@@ -94,7 +102,11 @@ export function LakeStarterGallery({
           onNavigate={
             !onApplyToCanvas
               ? (id, params) => {
-                  window.location.href = `/builder/canvas?starter=${encodeURIComponent(id)}&source_table=${encodeURIComponent(params.source_table)}`;
+                  window.location.href = builderUrl({
+                    view: "canvas",
+                    starter: id,
+                    source_table: params.source_table,
+                  });
                 }
               : undefined
           }

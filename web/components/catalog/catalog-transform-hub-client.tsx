@@ -50,7 +50,7 @@ export function CatalogTransformHubClient() {
         links={[
           { href: "/catalog/dbt", icon: GitBranch, label: "Git SQL projects", desc: "Recommended production path" },
           { href: "/catalog/components#recipes", icon: Sparkles, label: "Canvas recipes", desc: "Prototype before dbt" },
-          { href: "/builder/canvas", icon: Layers, label: "Canvas designer", desc: "Visual ingest + transform graph" },
+          { href: "/builder?view=canvas", icon: Layers, label: "Canvas designer", desc: "Visual ingest + transform graph" },
         ]}
       />
     </div>
