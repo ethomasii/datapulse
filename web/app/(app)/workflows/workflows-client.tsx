@@ -119,10 +119,18 @@ export function WorkflowsClient() {
   return (
     <AppPage width="narrow">
       <AppPageHeader
-        title="Workflows"
+        title="Pipeline chains"
         description={
           <>
-            Chain pipelines after success. Monitor triggers fan out via workflow runner. See{" "}
+            Link pipelines so one run triggers the next on success — separate from building a single pipeline in{" "}
+            <Link href="/builder" className="text-sky-600 underline dark:text-sky-400">
+              Pipelines
+            </Link>{" "}
+            or{" "}
+            <Link href="/builder/canvas" className="text-sky-600 underline dark:text-sky-400">
+              Visual canvas
+            </Link>
+            . See{" "}
             <Link href="/docs/pipelines" className="text-sky-600 underline dark:text-sky-400">
               declarative pipelines
             </Link>{" "}

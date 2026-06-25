@@ -8,19 +8,20 @@ import {
   BookOpen,
   Cable,
   CalendarClock,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
   CircleHelp,
+  Database,
   FolderGit2,
   GitBranch,
-  LayoutGrid,
   LayoutDashboard,
   Layers,
+  Network,
+  PenLine,
   PlayCircle,
   Plug,
   Route,
+  Shield,
   Split,
   Table2,
   TableProperties,
@@ -38,8 +39,6 @@ import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 const NAV_COLLAPSED_KEY = "eltpulse-nav-collapsed";
-const NAV_ADVANCED_KEY = "eltpulse-nav-advanced";
-const NAV_CATALOG_KEY = "eltpulse-nav-catalog";
 
 type NavItem = {
   href: string;
@@ -48,44 +47,87 @@ type NavItem = {
   soon?: boolean;
 };
 
-const CORE_NAV: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/quick-start", label: "Quick start", icon: Zap },
-  { href: "/builder", label: "Pipelines", icon: Layers },
-  { href: "/connections", label: "Connections", icon: Cable },
-  { href: "/runs", label: "Runs", icon: PlayCircle },
-  { href: "/observability", label: "Observability", icon: Activity },
-];
+type NavSection = {
+  label: string;
+  items: NavItem[];
+};
 
-const CATALOG_NAV: NavItem[] = [
-  { href: "/catalog", label: "Overview", icon: LayoutGrid },
-  { href: "/assets", label: "Assets", icon: Table2 },
-  { href: "/catalog/components", label: "Transforms", icon: Sparkles },
-  { href: "/catalog/transform-hub", label: "dbt packages", icon: Workflow },
-  { href: "/catalog/dbt", label: "My dbt projects", icon: GitBranch },
-  { href: "/catalog/connectors", label: "Connectors", icon: Plug },
-  { href: "/catalog/scenarios", label: "Scenarios", icon: Route },
-];
-
-const ADVANCED_NAV: NavItem[] = [
-  { href: "/workflows", label: "Workflows", icon: Workflow },
-  { href: "/sources", label: "Source Registry", icon: BookOpen },
-  { href: "/orchestration", label: "Monitors", icon: Split },
-  { href: "/schedule", label: "Schedules", icon: CalendarClock },
-  { href: "/run-slices", label: "Run slices", icon: TableProperties },
-  { href: "/webhooks", label: "Webhooks", icon: Webhook },
-  { href: "/gateway", label: "Gateway", icon: Waypoints },
-  { href: "/repos", label: "Repositories", icon: FolderGit2 },
-  { href: "/help", label: "Help", icon: CircleHelp },
+/** Sidebar IA — flat sections, no hidden “Advanced” bucket. */
+const NAV_SECTIONS: NavSection[] = [
+  {
+    label: "Overview",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/quick-start", label: "Quick start", icon: Zap },
+    ],
+  },
+  {
+    label: "Build",
+    items: [
+      { href: "/builder", label: "Pipelines", icon: Layers },
+      { href: "/builder/canvas", label: "Visual canvas", icon: PenLine },
+      { href: "/workflows", label: "Pipeline chains", icon: Network },
+      { href: "/connections", label: "Connections", icon: Cable },
+    ],
+  },
+  {
+    label: "Operate",
+    items: [
+      { href: "/runs", label: "Runs", icon: PlayCircle },
+      { href: "/schedule", label: "Schedules", icon: CalendarClock },
+      { href: "/orchestration", label: "Monitors", icon: Split },
+      { href: "/observability", label: "Observability", icon: Activity },
+      { href: "/run-slices", label: "Run slices", icon: TableProperties },
+    ],
+  },
+  {
+    label: "Data catalog",
+    items: [
+      { href: "/assets", label: "Assets", icon: Table2 },
+      { href: "/catalog/products", label: "Data products", icon: Database },
+      { href: "/catalog/contracts", label: "Data contracts", icon: Shield },
+    ],
+  },
+  {
+    label: "Recipes & library",
+    items: [
+      { href: "/catalog/scenarios", label: "Scenarios", icon: Route },
+      { href: "/catalog/components", label: "Transform recipes", icon: Sparkles },
+      { href: "/catalog/dbt", label: "dbt projects", icon: GitBranch },
+      { href: "/catalog/transform-hub", label: "dbt packages", icon: Workflow },
+      { href: "/catalog/connectors", label: "Connectors", icon: Plug },
+      { href: "/sources", label: "Source registry", icon: BookOpen },
+    ],
+  },
+  {
+    label: "Platform",
+    items: [
+      { href: "/gateway", label: "Gateway", icon: Waypoints },
+      { href: "/webhooks", label: "Webhooks", icon: Webhook },
+      { href: "/repos", label: "Repositories", icon: FolderGit2 },
+      { href: "/help", label: "Help", icon: CircleHelp },
+    ],
+  },
 ];
 
 const ACCOUNT_NAV: NavItem[] = [
   { href: "/account", label: "Account & Settings", icon: UserCircle },
 ];
 
+const ALL_NAV_ITEMS: NavItem[] = [
+  ...NAV_SECTIONS.flatMap((section) => section.items),
+  ...ACCOUNT_NAV,
+];
+
 function navLinkActive(pathname: string, href: string): boolean {
   if (pathname === href) return true;
   if (href === "/dashboard") return false;
+  if (href === "/builder") {
+    return pathname === "/builder";
+  }
+  if (href === "/builder/canvas") {
+    return pathname.startsWith("/builder/canvas");
+  }
   return pathname.startsWith(`${href}/`);
 }
 
@@ -127,14 +169,12 @@ function NavLink({
   );
 }
 
-function NavSection({
-  label,
-  items,
+function NavSectionBlock({
+  section,
   pathname,
   collapsed,
 }: {
-  label: string;
-  items: NavItem[];
+  section: NavSection;
   pathname: string;
   collapsed: boolean;
 }) {
@@ -142,12 +182,12 @@ function NavSection({
     <div className="space-y-0.5">
       {!collapsed && (
         <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-          {label}
+          {section.label}
         </p>
       )}
       {collapsed && <div className="mb-1 h-px bg-slate-100 dark:bg-slate-800" aria-hidden />}
       <ul className="space-y-0.5">
-        {items.map((item) => (
+        {section.items.map((item) => (
           <li key={item.href}>
             <NavLink item={item} pathname={pathname} collapsed={collapsed} />
           </li>
@@ -161,57 +201,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const hideFloatingAi = pathname?.startsWith("/builder/canvas");
   const [collapsed, setCollapsed] = useState(false);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [catalogOpen, setCatalogOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-
-  const catalogActive = CATALOG_NAV.some((item) => navLinkActive(pathname, item.href));
-  const advancedActive = ADVANCED_NAV.some((item) => navLinkActive(pathname, item.href));
 
   useEffect(() => {
     setMounted(true);
     try {
       setCollapsed(localStorage.getItem(NAV_COLLAPSED_KEY) === "1");
-      const stored = localStorage.getItem(NAV_ADVANCED_KEY);
-      if (stored === "1") setAdvancedOpen(true);
-      const catalogStored = localStorage.getItem(NAV_CATALOG_KEY);
-      if (catalogStored === "1") setCatalogOpen(true);
     } catch {
       /* ignore */
     }
   }, []);
-
-  useEffect(() => {
-    if (advancedActive) setAdvancedOpen(true);
-  }, [advancedActive]);
-
-  useEffect(() => {
-    if (catalogActive) setCatalogOpen(true);
-  }, [catalogActive]);
-
-  function toggleCatalog() {
-    setCatalogOpen((v) => {
-      const next = !v;
-      try {
-        localStorage.setItem(NAV_CATALOG_KEY, next ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  }
-
-  function toggleAdvanced() {
-    setAdvancedOpen((v) => {
-      const next = !v;
-      try {
-        localStorage.setItem(NAV_ADVANCED_KEY, next ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  }
 
   function toggleCollapsed() {
     setCollapsed((v) => {
@@ -226,11 +225,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const mobileAll: NavItem[] = [
-    ...CORE_NAV,
-    { href: "/assets", label: "Assets", icon: Table2 },
-    { href: "/catalog", label: "Catalog", icon: LayoutGrid },
-    ...ADVANCED_NAV.slice(0, 2),
-    ...ACCOUNT_NAV,
+    NAV_SECTIONS[0]!.items[0]!,
+    NAV_SECTIONS[1]!.items[0]!,
+    NAV_SECTIONS[1]!.items[1]!,
+    NAV_SECTIONS[2]!.items[0]!,
+    NAV_SECTIONS[3]!.items[0]!,
+    NAV_SECTIONS[1]!.items[3]!,
+    ACCOUNT_NAV[0]!,
   ];
 
   const asideWidth = collapsed ? "md:w-14" : "md:w-56";
@@ -257,68 +258,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )}
           </Link>
         </div>
-        <nav className="flex flex-1 flex-col gap-6 overflow-y-auto p-3" aria-label="App">
-          <NavSection label="Product" items={CORE_NAV} pathname={pathname} collapsed={collapsed} />
-          {!collapsed ? (
-            <div className="space-y-0.5">
-              <button
-                type="button"
-                onClick={toggleCatalog}
-                className={clsx(
-                  "mb-1 flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest transition",
-                  catalogActive
-                    ? "text-sky-700 dark:text-sky-300"
-                    : "text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-                )}
-              >
-                Catalog
-                {catalogOpen ? (
-                  <ChevronUp className="h-3.5 w-3.5" aria-hidden />
-                ) : (
-                  <ChevronDown className="h-3.5 w-3.5" aria-hidden />
-                )}
-              </button>
-              {catalogOpen ? (
-                <ul className="space-y-0.5">
-                  {CATALOG_NAV.map((item) => (
-                    <li key={item.href}>
-                      <NavLink item={item} pathname={pathname} collapsed={collapsed} />
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ) : (
-            <NavSection label="Catalog" items={CATALOG_NAV} pathname={pathname} collapsed={collapsed} />
-          )}
-          {!collapsed ? (
-            <div className="space-y-0.5">
-              <button
-                type="button"
-                onClick={toggleAdvanced}
-                className="mb-1 flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-              >
-                Advanced
-                {advancedOpen ? (
-                  <ChevronUp className="h-3.5 w-3.5" aria-hidden />
-                ) : (
-                  <ChevronDown className="h-3.5 w-3.5" aria-hidden />
-                )}
-              </button>
-              {advancedOpen ? (
-                <ul className="space-y-0.5">
-                  {ADVANCED_NAV.map((item) => (
-                    <li key={item.href}>
-                      <NavLink item={item} pathname={pathname} collapsed={collapsed} />
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ) : (
-            <NavSection label="More" items={ADVANCED_NAV} pathname={pathname} collapsed={collapsed} />
-          )}
-          <NavSection label="Account & Settings" items={ACCOUNT_NAV} pathname={pathname} collapsed={collapsed} />
+        <nav className="flex flex-1 flex-col gap-5 overflow-y-auto p-3" aria-label="App">
+          {NAV_SECTIONS.map((section) => (
+            <NavSectionBlock
+              key={section.label}
+              section={section}
+              pathname={pathname}
+              collapsed={collapsed}
+            />
+          ))}
+          <NavSectionBlock
+            section={{ label: "Account", items: ACCOUNT_NAV }}
+            pathname={pathname}
+            collapsed={collapsed}
+          />
         </nav>
         <div
           className={clsx(
@@ -371,3 +324,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+// Exported for tests or breadcrumbs that need the canonical nav list.
+export { ALL_NAV_ITEMS, NAV_SECTIONS, navLinkActive };

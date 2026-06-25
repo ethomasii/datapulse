@@ -30,7 +30,7 @@ const FAQ = [
   },
   {
     q: "Where can I see everything we're ingesting?",
-    a: "Open Assets under Catalog in the sidebar — a config-derived map of sources, landing tables, and transform outputs across your pipelines.",
+    a: "Open Assets in the Data catalog section — a config-derived map of sources, landing tables, and transform outputs across your pipelines.",
     href: "/assets",
   },
   {
