@@ -3,8 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { BadgeCheck, Loader2 } from "lucide-react";
-import { FieldHelp } from "@/components/ui/field-help";
-import { CATALOG_FIELD_HELP } from "@/lib/catalog/field-help-copy";
 
 type Props = {
   assetKey: string;
@@ -86,10 +84,7 @@ export function AssetCertifyPanel({
           aria-hidden
         />
         <div className="min-w-0 flex-1">
-          <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white">
-            Certification
-            <FieldHelp>{CATALOG_FIELD_HELP.assetCertify}</FieldHelp>
-          </h2>
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Certification</h2>
           {certifiedAt ? (
             <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">
               Certified {new Date(certifiedAt).toLocaleDateString()}

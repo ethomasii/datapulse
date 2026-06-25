@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, CircleHelp, Loader2, Package, Pencil, Plus, Shield, Trash2, X } from "lucide-react";
+import { ArrowRight, Loader2, Package, Pencil, Plus, Shield, Trash2, X } from "lucide-react";
 import { assetDetailHref } from "@/lib/elt/asset-path";
 import { CatalogAccessBanner } from "@/components/catalog/catalog-access-banner";
 import { CatalogAssetPicker } from "@/components/catalog/catalog-asset-picker";
-import { FieldLabel, PageHelpBox } from "@/components/ui/field-help";
-import { CATALOG_FIELD_HELP } from "@/lib/catalog/field-help-copy";
+import { SlugUrlInput } from "@/components/ui/slug-url-input";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 
 type Product = {
@@ -109,7 +108,7 @@ export function CatalogProductsClient() {
   const save = async () => {
     const slug = form.slug.trim() || slugify(form.name);
     if (!slug || !form.name.trim()) {
-      setError("Name and URL identifier are required");
+      setError("Name and slug are required");
       return;
     }
     setSaving(true);
@@ -164,12 +163,15 @@ export function CatalogProductsClient() {
           </div>
           <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Curated data products</h1>
           <p className="mt-3 max-w-3xl text-slate-600 dark:text-slate-300">
-            Data products are governed bundles of catalog assets with owners, domains, intended consumers, and an optional{" "}
+            Data products are governed bundles of catalog assets — a named package for consumers, not a single table.
+            Each product has a <strong className="font-medium text-slate-700 dark:text-slate-200">slug</strong> that
+            becomes part of its URL (for example{" "}
+            <code className="rounded bg-slate-200/80 px-1 font-mono text-xs dark:bg-slate-800">/catalog/products/monthly-revenue</code>
+            ). You can optionally attach a{" "}
             <Link href="/catalog/contracts" className="text-sky-600 hover:underline dark:text-sky-400">
               data contract
             </Link>{" "}
-            defining schema and freshness SLAs. Think of a product as a curated “menu item” for data consumers — not a
-            single table, but a named package of related assets.
+            for schema and freshness guarantees.
           </p>
         </div>
         {canEdit ? (
@@ -186,32 +188,6 @@ export function CatalogProductsClient() {
 
       <CatalogAccessBanner />
 
-      <PageHelpBox title="Quick guide: data products">
-        <ul className="list-inside list-disc space-y-1.5">
-          <li>
-            <strong className="font-medium text-slate-700 dark:text-slate-200">Name</strong> — what consumers see in
-            the Library.
-          </li>
-          <li>
-            <strong className="font-medium text-slate-700 dark:text-slate-200">URL identifier</strong> — a short
-            machine-friendly ID (slug) like <code className="rounded bg-slate-200/80 px-1 font-mono text-xs dark:bg-slate-800">monthly-revenue</code>
-            ; auto-generated from the name.
-          </li>
-          <li>
-            <strong className="font-medium text-slate-700 dark:text-slate-200">Assets</strong> — the tables or models
-            included in the bundle.
-          </li>
-          <li>
-            <strong className="font-medium text-slate-700 dark:text-slate-200">Data contract</strong> (optional) —
-            schema and freshness guarantees for everything in the product.
-          </li>
-        </ul>
-        <p className="text-xs text-slate-500 dark:text-slate-500">
-          Click the <CircleHelp className="inline h-3 w-3 align-text-bottom" aria-hidden /> icon next to any field in
-          the editor for more detail.
-        </p>
-      </PageHelpBox>
-
       {editorOpen ? (
         <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-5 dark:border-sky-900 dark:bg-sky-950/20">
           <div className="flex items-center justify-between gap-2">
@@ -222,9 +198,9 @@ export function CatalogProductsClient() {
               <X className="h-5 w-5" aria-hidden />
             </button>
           </div>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <label className="block text-sm">
-              <FieldLabel label="Name" help={CATALOG_FIELD_HELP.productName} />
+          <div className="mt-4 grid gap-5 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Name</label>
               <input
                 value={form.name}
                 onChange={(e) =>
@@ -234,63 +210,80 @@ export function CatalogProductsClient() {
                     slug: editingSlug ? f.slug : slugify(e.target.value),
                   }))
                 }
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+                placeholder="Monthly revenue mart"
               />
-            </label>
-            <label className="block text-sm">
-              <FieldLabel label="URL identifier" help={CATALOG_FIELD_HELP.productSlug} />
-              <input
+              <p className="mt-1 text-xs text-slate-500">Display name shown in the Library.</p>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Slug</label>
+              <SlugUrlInput
+                prefix="/catalog/products/"
                 value={form.slug}
-                onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+                onChange={(slug) => setForm((f) => ({ ...f, slug }))}
                 disabled={Boolean(editingSlug)}
-                placeholder="e.g. monthly-revenue"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950"
+                placeholder="monthly-revenue"
+                hint={
+                  editingSlug
+                    ? "This slug is fixed after save — it identifies the product in URLs and the API."
+                    : "Short URL segment, auto-filled from the name. Lowercase letters, numbers, and hyphens only."
+                }
               />
-              {!editingSlug && form.slug ? (
-                <p className="mt-1 text-xs text-slate-500">Auto-generated from name — you can edit before saving.</p>
-              ) : null}
-            </label>
-            <label className="block text-sm sm:col-span-2">
-              <FieldLabel label="Description" help={CATALOG_FIELD_HELP.productDescription} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Description <span className="font-normal text-slate-400">(optional)</span>
+              </label>
               <textarea
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 rows={2}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+                placeholder="What this product contains and who should use it"
               />
-            </label>
-            <label className="block text-sm">
-              <FieldLabel label="Owner" help={CATALOG_FIELD_HELP.productOwner} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Owner <span className="font-normal text-slate-400">(optional)</span>
+              </label>
               <input
                 value={form.ownerName}
                 onChange={(e) => setForm((f) => ({ ...f, ownerName: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+                placeholder="Data platform team"
               />
-            </label>
-            <label className="block text-sm">
-              <FieldLabel label="Domain" help={CATALOG_FIELD_HELP.productDomain} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Domain <span className="font-normal text-slate-400">(optional)</span>
+              </label>
               <input
                 value={form.domain}
                 onChange={(e) => setForm((f) => ({ ...f, domain: e.target.value }))}
                 placeholder="e.g. finance, marketing"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
               />
-            </label>
-            <label className="block text-sm sm:col-span-2">
-              <FieldLabel label="Consumer tags" help={CATALOG_FIELD_HELP.productConsumerTags} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Consumer tags <span className="font-normal text-slate-400">(optional, comma-separated)</span>
+              </label>
               <input
                 value={form.consumerTags}
                 onChange={(e) => setForm((f) => ({ ...f, consumerTags: e.target.value }))}
                 placeholder="analytics, ml, finance"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
               />
-            </label>
-            <label className="block text-sm">
-              <FieldLabel label="Data contract" help={CATALOG_FIELD_HELP.productContract} />
+              <p className="mt-1 text-xs text-slate-500">Helps consumers discover who this product is for.</p>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Data contract <span className="font-normal text-slate-400">(optional)</span>
+              </label>
               <select
                 value={form.contractId}
                 onChange={(e) => setForm((f) => ({ ...f, contractId: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
               >
                 <option value="">None</option>
                 {contracts.map((c) => (
@@ -299,23 +292,33 @@ export function CatalogProductsClient() {
                   </option>
                 ))}
               </select>
-            </label>
-            <label className="flex items-center gap-2 self-end text-sm">
+              <p className="mt-1 text-xs text-slate-500">Optional schema and freshness SLA for assets in this product.</p>
+            </div>
+            <label className="flex items-start gap-2 self-end text-sm">
               <input
                 type="checkbox"
                 checked={form.featured}
                 onChange={(e) => setForm((f) => ({ ...f, featured: e.target.checked }))}
+                className="mt-0.5"
               />
-              <FieldLabel label="Featured on Library hub" help={CATALOG_FIELD_HELP.productFeatured} />
+              <span>
+                <span className="font-medium text-slate-700 dark:text-slate-300">Featured on Library hub</span>
+                <span className="mt-0.5 block text-xs font-normal text-slate-500">
+                  Highlight this product on the main Library page.
+                </span>
+              </span>
             </label>
             <div className="sm:col-span-2">
-              <FieldLabel label="Assets in this product" help={CATALOG_FIELD_HELP.productAssets} />
-              <div className="mt-2">
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Assets in this product
+              </label>
+              <div className="mt-1">
                 <CatalogAssetPicker
                   selected={form.assetKeys}
                   onChange={(keys) => setForm((f) => ({ ...f, assetKeys: keys }))}
                 />
               </div>
+              <p className="mt-1 text-xs text-slate-500">Tables and models bundled into this product.</p>
             </div>
           </div>
           {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}

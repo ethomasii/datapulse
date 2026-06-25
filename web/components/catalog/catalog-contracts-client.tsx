@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CircleHelp, Download, Loader2, Pencil, Plus, Shield, Trash2, X } from "lucide-react";
+import { Download, Loader2, Pencil, Plus, Shield, Trash2, X } from "lucide-react";
 import { CatalogAccessBanner } from "@/components/catalog/catalog-access-banner";
 import { CatalogAssetPicker } from "@/components/catalog/catalog-asset-picker";
-import { FieldLabel, PageHelpBox } from "@/components/ui/field-help";
-import { CATALOG_FIELD_HELP } from "@/lib/catalog/field-help-copy";
+import { SlugUrlInput } from "@/components/ui/slug-url-input";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 
 type SchemaColumn = {
@@ -206,7 +205,7 @@ export function CatalogContractsClient() {
   const save = async () => {
     const slug = form.slug.trim() || slugify(form.name);
     if (!slug || !form.name.trim()) {
-      setError("Name and URL identifier are required");
+      setError("Name and slug are required");
       return;
     }
     setSaving(true);
@@ -274,9 +273,11 @@ export function CatalogContractsClient() {
           </div>
           <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Data contracts</h1>
           <p className="mt-3 max-w-3xl text-slate-600 dark:text-slate-300">
-            Data contracts document what consumers can expect: required columns, freshness SLAs, and ownership. Assets
-            linked to a contract show compliance on their detail page. Products can reference a contract for a full
-            bundle guarantee. Violations trigger alerts after pipeline runs.
+            Data contracts document what consumers can expect: required columns, freshness SLAs, and ownership. Each
+            contract has a <strong className="font-medium text-slate-700 dark:text-slate-200">slug</strong> used in
+            links like{" "}
+            <code className="rounded bg-slate-200/80 px-1 font-mono text-xs dark:bg-slate-800">/catalog/contracts?edit=orders-raw</code>
+            . Link assets to show compliance on their detail pages; violations trigger alerts after pipeline runs.
           </p>
         </div>
         {canEdit ? (
@@ -293,19 +294,6 @@ export function CatalogContractsClient() {
 
       <CatalogAccessBanner />
 
-      <PageHelpBox title="Quick guide: data contracts">
-        <p>
-          A data contract is a promise to consumers: which columns must exist, how fresh data should be, and who owns
-          it. Link catalog assets to a contract to show compliance on their detail pages and get alerts when runs
-          violate the spec.
-        </p>
-        <p className="text-xs text-slate-500">
-          Tip: use <strong className="font-medium">Import from linked assets</strong> in the editor to build the schema
-          from an existing table instead of typing columns by hand. Click{" "}
-          <CircleHelp className="inline h-3 w-3 align-text-bottom" aria-hidden /> on any field for more detail.
-        </p>
-      </PageHelpBox>
-
       {editorOpen ? (
         <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-5 dark:border-sky-900 dark:bg-sky-950/20">
           <div className="flex items-center justify-between gap-2">
@@ -316,9 +304,9 @@ export function CatalogContractsClient() {
               <X className="h-5 w-5" aria-hidden />
             </button>
           </div>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <label className="block text-sm">
-              <FieldLabel label="Name" help={CATALOG_FIELD_HELP.contractName} />
+          <div className="mt-4 grid gap-5 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Name</label>
               <input
                 value={form.name}
                 onChange={(e) =>
@@ -328,73 +316,94 @@ export function CatalogContractsClient() {
                     slug: editingSlug ? f.slug : slugify(e.target.value),
                   }))
                 }
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+                placeholder="Orders raw table contract"
               />
-            </label>
-            <label className="block text-sm">
-              <FieldLabel label="URL identifier" help={CATALOG_FIELD_HELP.contractSlug} />
-              <input
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Slug</label>
+              <SlugUrlInput
+                prefix="/catalog/contracts/"
                 value={form.slug}
-                onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+                onChange={(slug) => setForm((f) => ({ ...f, slug }))}
                 disabled={Boolean(editingSlug)}
-                placeholder="e.g. orders-raw"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950"
+                placeholder="orders-raw"
+                hint={
+                  editingSlug
+                    ? `Opens at /catalog/contracts?edit=${form.slug || "…"} — fixed after save.`
+                    : "Short URL segment, auto-filled from the name. Used in edit links and run alerts."
+                }
               />
-            </label>
-            <label className="block text-sm sm:col-span-2">
-              <FieldLabel label="Description" help={CATALOG_FIELD_HELP.contractDescription} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Description <span className="font-normal text-slate-400">(optional)</span>
+              </label>
               <textarea
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 rows={2}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
               />
-            </label>
-            <label className="block text-sm">
-              <FieldLabel label="Owner" help={CATALOG_FIELD_HELP.contractOwner} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Owner <span className="font-normal text-slate-400">(optional)</span>
+              </label>
               <input
                 value={form.ownerName}
                 onChange={(e) => setForm((f) => ({ ...f, ownerName: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
               />
-            </label>
-            <label className="block text-sm">
-              <FieldLabel label="Owner email" help={CATALOG_FIELD_HELP.contractOwnerEmail} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Owner email <span className="font-normal text-slate-400">(optional)</span>
+              </label>
               <input
                 type="email"
                 value={form.ownerEmail}
                 onChange={(e) => setForm((f) => ({ ...f, ownerEmail: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
               />
-            </label>
-            <label className="block text-sm">
-              <FieldLabel label="Status" help={CATALOG_FIELD_HELP.contractStatus} />
+              <p className="mt-1 text-xs text-slate-500">Contact for contract questions or violation alerts.</p>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Status</label>
               <select
                 value={form.status}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, status: e.target.value as "draft" | "active" | "deprecated" }))
                 }
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
               >
-                <option value="draft">Draft</option>
-                <option value="active">Active</option>
-                <option value="deprecated">Deprecated</option>
+                <option value="draft">Draft — not enforced yet</option>
+                <option value="active">Active — compliance checks run after runs</option>
+                <option value="deprecated">Deprecated — kept for history only</option>
               </select>
-            </label>
-            <label className="block text-sm">
-              <FieldLabel label="Freshness SLA (hours)" help={CATALOG_FIELD_HELP.contractFreshnessSla} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Freshness SLA (hours) <span className="font-normal text-slate-400">(optional)</span>
+              </label>
               <input
                 type="number"
                 min={1}
                 value={form.freshnessSlaHours}
                 onChange={(e) => setForm((f) => ({ ...f, freshnessSlaHours: e.target.value }))}
                 placeholder="e.g. 24"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
               />
-            </label>
+              <p className="mt-1 text-xs text-slate-500">Max hours since last successful run (e.g. 24 = daily).</p>
+            </div>
             <div className="sm:col-span-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <FieldLabel label="Schema spec" help={CATALOG_FIELD_HELP.contractSchema} />
+                <div>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Schema spec</span>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Required columns consumers can expect. Import from linked assets to copy a table schema.
+                  </p>
+                </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="button"
@@ -471,13 +480,18 @@ export function CatalogContractsClient() {
               </ul>
             </div>
             <div className="sm:col-span-2">
-              <FieldLabel label="Linked assets" help={CATALOG_FIELD_HELP.contractLinkedAssets} />
-              <div className="mt-2">
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Linked assets
+              </label>
+              <div className="mt-1">
                 <CatalogAssetPicker
                   selected={form.assetKeys}
                   onChange={(keys) => setForm((f) => ({ ...f, assetKeys: keys }))}
                 />
               </div>
+              <p className="mt-1 text-xs text-slate-500">
+                Assets governed by this contract — compliance is checked on their detail pages and after runs.
+              </p>
             </div>
           </div>
           {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
