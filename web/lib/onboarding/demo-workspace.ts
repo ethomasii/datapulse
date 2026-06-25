@@ -2,7 +2,7 @@ import { db } from "@/lib/db/client";
 import { createPipelineDefinition } from "@/lib/elt/persist-pipeline";
 import { minimalSourceConfigurationForNewPipeline } from "@/lib/elt/minimal-source-configuration";
 
-const DEMO_PIPELINE_NAME = "demo_github_to_duckdb";
+const DEMO_PIPELINE_NAME = "demo_github_to_postgres";
 
 /**
  * Seeds a sample pipeline for new users so the builder and runs UI are not empty.
@@ -19,10 +19,10 @@ export async function seedDemoWorkspaceIfEmpty(userId: string): Promise<{
     const result = await createPipelineDefinition(userId, {
       name: DEMO_PIPELINE_NAME,
       sourceType: "github",
-      destinationType: "duckdb",
+      destinationType: "postgres",
       tool: "auto",
       description:
-        "Sample pipeline — connect your GitHub token, then run to sync issues and pull requests into DuckDB.",
+        "Sample pipeline — connect GitHub and a PostgreSQL warehouse, then run to sync issues and pull requests.",
       sourceConfiguration: minimalSourceConfigurationForNewPipeline("github"),
     });
     if (!result.ok) return { seeded: false };

@@ -6,6 +6,11 @@
  * automatically — no other files need to change.
  */
 
+import {
+  DUCKDB_DATABASE_CONFIG_FIELD,
+  DUCKDB_S3_CREDENTIAL_FIELDS,
+} from "./duckdb-destination";
+
 export type CredentialField = {
   key: string;
   label: string;
@@ -277,24 +282,41 @@ const DATABASE_CONNECTORS: ConnectorDef[] = [
     label: "DuckDB",
     connectionTypes: ["source", "destination"],
     category: "Databases",
-    configFields: [
-      { key: "database", label: "Database path", type: "text", placeholder: "/data/warehouse.duckdb" },
-    ],
-    credentialFields: [
-      { key: "DUCKDB_PATH", label: "Database File Path", type: "text", required: false, placeholder: "/path/to/database.duckdb", help: "Leave empty for in-memory database" },
+    configFields: [DUCKDB_DATABASE_CONFIG_FIELD],
+    credentialFields: [...DUCKDB_S3_CREDENTIAL_FIELDS],
+    sourceConfigFields: [
+      {
+        key: "database",
+        label: "Database location",
+        type: "text",
+        required: false,
+        placeholder: "s3://my-bucket/source.duckdb",
+        help: DUCKDB_DATABASE_CONFIG_FIELD.help,
+      },
     ],
   },
   {
     slug: "motherduck",
     label: "MotherDuck",
     connectionTypes: ["destination"],
-    category: "Databases",
+    category: "Cloud Warehouses",
     configFields: [
-      { key: "database", label: "Database", type: "text", placeholder: "md:my_db" },
+      {
+        key: "database",
+        label: "Database",
+        type: "text",
+        placeholder: "my_analytics",
+        help: "MotherDuck database name (created if it does not exist).",
+      },
     ],
     credentialFields: [
-      { key: "MOTHERDUCK_TOKEN", label: "MotherDuck Token", type: "password", required: true, help: "Find at: app.motherduck.com → Settings → API Tokens" },
-      { key: "MOTHERDUCK_DATABASE", label: "Database Name", type: "text", required: false, placeholder: "my_db", help: "Optional - will be created if it doesn't exist" },
+      {
+        key: "MOTHERDUCK_TOKEN",
+        label: "MotherDuck Token",
+        type: "password",
+        required: true,
+        help: "app.motherduck.com → Settings → API Tokens",
+      },
     ],
   },
   {

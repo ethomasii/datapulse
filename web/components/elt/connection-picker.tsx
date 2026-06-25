@@ -21,8 +21,10 @@ type Props = {
   connectionType: "source" | "destination";
   /** The connector key of the current pipeline (e.g. "postgres", "snowflake") */
   connector: string;
-  /** Called when user picks a saved connection — non-secret config plus row id for pipeline FK. */
-  onSelect: (selection: { id: string; config: Record<string, string> }) => void;
+  /** Currently linked saved connection id (if any). */
+  selectedConnectionId?: string | null;
+  /** Called when user picks or clears a saved connection — non-secret config plus row id for pipeline FK. */
+  onSelect: (selection: { id: string | null; config: Record<string, string> }) => void;
   /** Current connection field values — used to pre-fill the "save" form */
   currentValues: Record<string, string>;
 };
@@ -31,7 +33,13 @@ type Props = {
  * Dropdown that shows saved connections matching the current connector.
  * Also lets the user save the current values as a new named connection.
  */
-export function ConnectionPicker({ connectionType, connector, onSelect, currentValues }: Props) {
+export function ConnectionPicker({
+  connectionType,
+  connector,
+  selectedConnectionId = null,
+  onSelect,
+  currentValues,
+}: Props) {
   const [connections, setConnections] = useState<StoredConnection[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState(false);
@@ -74,6 +82,10 @@ export function ConnectionPicker({ connectionType, connector, onSelect, currentV
   const matching = connections.filter(
     (c) => c.connectionType === connectionType && c.connector.toLowerCase() === connector.toLowerCase()
   );
+  const active = selectedConnectionId
+    ? matching.find((c) => c.id === selectedConnectionId) ??
+      connections.find((c) => c.id === selectedConnectionId)
+    : null;
 
   function flattenConfig(raw: Record<string, unknown> | undefined): Record<string, string> {
     const flat: Record<string, string> = {};
@@ -140,7 +152,15 @@ export function ConnectionPicker({ connectionType, connector, onSelect, currentV
       : "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200";
 
   return (
-    <div ref={ref} className="relative flex items-center gap-2">
+    <div ref={ref} className="relative flex flex-wrap items-center gap-2">
+      {active ? (
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium ${colorClass}`}
+        >
+          <Cable className="h-3.5 w-3.5 shrink-0" />
+          {active.name}
+        </span>
+      ) : null}
       {/* Connection picker button */}
       <div className="relative">
         <button
@@ -186,6 +206,16 @@ export function ConnectionPicker({ connectionType, connector, onSelect, currentV
           </div>
         )}
       </div>
+
+      {active ? (
+        <button
+          type="button"
+          onClick={() => onSelect({ id: null, config: {} })}
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+        >
+          Unlink
+        </button>
+      ) : null}
 
       {/* Save as connection */}
       <div className="relative">

@@ -7,6 +7,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { parseStoredConnectionSecrets } from "@/lib/elt/connection-secrets-store";
 import { buildPostgresConnectionString } from "@/lib/elt/warehouse-introspect-connectors";
+import { resolveDuckdbDatabaseLocation } from "@/lib/elt/duckdb-destination";
 import type { DestinationConnectionRow } from "@/lib/elt/warehouse-introspect";
 
 const STEP_TIMEOUT_MS = 90_000;
@@ -35,11 +36,13 @@ export function buildStepEngineUrl(connection: DestinationConnectionRow): string
 
   if (connector === "duckdb" || connector === "sqlite") {
     const dbPath =
-      secret(secrets, "DEST_DUCKDB_PATH", "DUCKDB_PATH", "DESTINATION__DUCKDB__CREDENTIALS", "DEST_SQLITE_PATH") ||
-      String(config.database ?? config.path ?? "").trim();
+      connector === "sqlite"
+        ? secret(secrets, "DEST_SQLITE_PATH") || String(config.path ?? "").trim()
+        : resolveDuckdbDatabaseLocation(secrets, config) || "./data.duckdb";
     if (!dbPath) return null;
-    const abs = path.isAbsolute(dbPath) ? dbPath : path.resolve(dbPath);
-    return `duckdb:///${abs}`;
+    const isUri = /^[a-z][a-z0-9+.-]*:\/\//i.test(dbPath);
+    const target = isUri || dbPath.startsWith("./") ? dbPath : path.isAbsolute(dbPath) ? dbPath : path.resolve(dbPath);
+    return `duckdb:///${target.replace(/^\/+/, "")}`;
   }
 
   if (connector === "motherduck") {

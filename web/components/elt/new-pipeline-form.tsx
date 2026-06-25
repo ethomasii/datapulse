@@ -16,7 +16,7 @@ const PIPELINE_KIND_OPTIONS: ReadonlyArray<
   [
     "transform_only",
     "Transform only (warehouse)",
-    "Data already in your default warehouse — build native transform steps",
+    "Tables already in your warehouse — add joins, transforms, and marts on the canvas",
   ],
 ];
 
@@ -57,8 +57,6 @@ type Props = {
   onKindChange: (kind: NewPipelineKind) => void;
   name: string;
   onNameChange: (name: string) => void;
-  sourceTable: string;
-  onSourceTableChange: (table: string) => void;
   sourceType: string;
   onSourceTypeChange: (type: string) => void;
   destinationType: string;
@@ -83,8 +81,6 @@ export function NewPipelineForm({
   onKindChange,
   name,
   onNameChange,
-  sourceTable,
-  onSourceTableChange,
   sourceType,
   onSourceTypeChange,
   destinationType,
@@ -139,20 +135,10 @@ export function NewPipelineForm({
         <span className="text-xs text-slate-500">Letters, numbers, underscore; start with a letter.</span>
       </label>
       {kind === "transform_only" ? (
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-slate-700 dark:text-slate-300">Input table</span>
-          <input
-            type="text"
-            value={sourceTable}
-            onChange={(e) => onSourceTableChange(e.target.value)}
-            placeholder="staging.events"
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-            disabled={busy}
-          />
-          <span className="text-xs text-slate-500">
-            Existing warehouse table this pipeline reads from (schema.table).
-          </span>
-        </label>
+        <p className="text-xs text-slate-500">
+          No default input table — configure tables on each transform step in the canvas (joins can reference
+          multiple tables).
+        </p>
       ) : showEltSourceDest ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm">

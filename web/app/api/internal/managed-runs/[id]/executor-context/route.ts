@@ -10,6 +10,7 @@ import { RunIngestionExecutor } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
 import { parseStoredConnectionSecrets } from "@/lib/elt/connection-secrets-store";
+import { mergeConnectionRuntimeSecrets } from "@/lib/elt/duckdb-destination";
 import { sourceConfigurationFromDbtProject } from "@/lib/elt/dbt-projects";
 import { resolveRouteParamId } from "@/lib/server/route-params";
 
@@ -37,9 +38,19 @@ async function loadConnection(userId: string, id: string | null) {
   });
   if (!row) return null;
   const { connectionSecretsEnc, ...rest } = row;
+  const config =
+    rest.config && typeof rest.config === "object" && !Array.isArray(rest.config)
+      ? (rest.config as Record<string, unknown>)
+      : {};
+  const secrets = mergeConnectionRuntimeSecrets(
+    rest.connectionType as "source" | "destination",
+    rest.connector,
+    parseStoredConnectionSecrets(connectionSecretsEnc),
+    config
+  );
   return {
     ...rest,
-    secrets: parseStoredConnectionSecrets(connectionSecretsEnc),
+    secrets,
   };
 }
 

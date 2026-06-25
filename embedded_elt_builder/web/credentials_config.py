@@ -520,16 +520,7 @@ DESTINATION_CREDENTIALS = {
             "required": True
         }
     ],
-    "duckdb": [
-        {
-            "key": "DEST_DUCKDB_PATH",
-            "label": "Database File Path",
-            "type": "text",
-            "required": False,
-            "placeholder": "/path/to/warehouse.duckdb",
-            "help": "Leave empty for in-memory database (data.duckdb will be created by default)"
-        }
-    ],
+    "duckdb": [],
     "motherduck": [
         {
             "key": "MOTHERDUCK_TOKEN",
@@ -922,11 +913,7 @@ SOURCE_CREDENTIALS.update({
         {"key": "ASANA_ACCESS_TOKEN", "label": "Personal Access Token", "type": "password", "required": True,
          "help": "Create at: app.asana.com/0/my-apps"}
     ],
-    "duckdb": [
-        {"key": "DUCKDB_PATH", "label": "Database File Path", "type": "text", "required": False,
-         "placeholder": "/path/to/database.duckdb",
-         "help": "Leave empty for in-memory database"}
-    ],
+    "duckdb": [],
     "sqlite": [
         {"key": "SQLITE_PATH", "label": "Database File Path", "type": "text", "required": True,
          "placeholder": "/path/to/database.db"}

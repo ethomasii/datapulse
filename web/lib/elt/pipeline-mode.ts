@@ -13,17 +13,8 @@ export function isTransformOnlyPipeline(sourceConfiguration: unknown): boolean {
   return String(mode ?? "").trim() === TRANSFORM_ONLY_MODE;
 }
 
-export function readTransformOnlySourceTable(sourceConfiguration: unknown): string {
-  if (!sourceConfiguration || typeof sourceConfiguration !== "object") return "staging.events";
-  const table = (sourceConfiguration as Record<string, unknown>).source_table;
-  return typeof table === "string" && table.trim() ? table.trim() : "staging.events";
-}
-
-/** Initial canvas: warehouse anchor node only (no extract/load ingest). */
-export function transformOnlyCanvasGraph(options: {
-  warehouseLabel: string;
-  sourceTable: string;
-}): PipelineCanvasGraph {
+/** Initial canvas: warehouse anchor only (no extract/load ingest). */
+export function transformOnlyCanvasGraph(options: { warehouseLabel: string }): PipelineCanvasGraph {
   const nodes: Node[] = [
     {
       id: "n_warehouse",
@@ -32,21 +23,17 @@ export function transformOnlyCanvasGraph(options: {
       data: {
         hint: options.warehouseLabel,
         transformOnly: true,
-        sourceTable: options.sourceTable,
       },
     },
   ];
-  return { v: 1, nodes, edges: [] };
+  return { v: 1, nodes, edges: [] as Edge[] };
 }
 
 export function minimalTransformOnlySourceConfiguration(
-  sourceTable: string,
   canvas?: PipelineCanvasGraph
 ): Record<string, unknown> {
-  const table = sourceTable.trim() || "staging.events";
   return {
     [ELT_PIPELINE_MODE_KEY]: TRANSFORM_ONLY_MODE,
-    source_table: table,
     ...(canvas ? { canvas } : {}),
   };
 }

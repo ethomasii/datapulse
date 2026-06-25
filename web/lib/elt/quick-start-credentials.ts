@@ -25,5 +25,5 @@ export function quickStartSecretFields(
 }
 
 export function duckdbDestinationConfig(): Record<string, string> {
-  return { database: "quickstart.duckdb" };
+  return {};
 }

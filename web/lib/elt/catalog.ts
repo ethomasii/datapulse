@@ -60,8 +60,8 @@ function buildSourceGroups(): Record<string, readonly string[]> {
 export const SOURCE_GROUPS: Record<string, readonly string[]> = buildSourceGroups();
 
 export const DESTINATION_GROUPS: Record<string, readonly string[]> = {
-  "Cloud Warehouses": ["snowflake", "bigquery", "redshift", "databricks"],
-  Databases: ["postgres", "mysql", "duckdb", "motherduck", "clickhouse", "mssql", "sqlite"],
+  "Cloud Warehouses": ["snowflake", "bigquery", "redshift", "databricks", "motherduck"],
+  Databases: ["postgres", "mysql", "duckdb", "clickhouse", "mssql", "sqlite"],
   "Cloud Storage": ["s3", "gcs", "azure_blob", "iceberg"],
 };
 

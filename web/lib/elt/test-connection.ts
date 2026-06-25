@@ -116,7 +116,28 @@ export async function testConnection(input: ConnectionTestInput): Promise<Connec
     return testHttp(config);
   }
   if (connector === "duckdb") {
-    return { ok: true, message: "DuckDB config looks ready." };
+    const loc =
+      typeof config.database === "string"
+        ? config.database.trim()
+        : typeof config.path === "string"
+          ? config.path.trim()
+          : "";
+    if (loc) {
+      return {
+        ok: true,
+        message: `DuckDB location set (${loc}). Full connectivity is verified on the first pipeline run.`,
+      };
+    }
+    return {
+      ok: true,
+      message:
+        "DuckDB ready — leave location empty for eltPulse-managed storage, or set s3:// / gs:// on the connection.",
+    };
+  }
+  if (connector === "motherduck") {
+    const token = secrets.MOTHERDUCK_TOKEN ?? "";
+    if (!token.trim()) return { ok: false, message: "Set MOTHERDUCK_TOKEN to test MotherDuck." };
+    return { ok: true, message: "MotherDuck token present — full connectivity verified on first run." };
   }
   if (connector === "stripe" || connector === "stripe_analytics") {
     const key = secrets.STRIPE_SECRET_KEY ?? secrets.stripe_secret_key ?? "";

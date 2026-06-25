@@ -14,6 +14,7 @@ import { LakeStarterChips } from "@/components/elt/lake-starter-chips";
 import type { LakeStarterApplyResult } from "@/components/elt/lake-starter-apply-dialog";
 import { ComponentPalette } from "@/components/elt/component-palette";
 import { CopyEnvButton } from "@/components/elt/copy-env-button";
+import { ConnectionPicker } from "@/components/elt/connection-picker";
 import { FormAccordion } from "@/components/elt/form-accordion";
 import { GuidedDestinationBlock } from "@/components/elt/guided-destination-block";
 import { GuidedSourceBlock } from "@/components/elt/guided-source-block";
@@ -49,8 +50,6 @@ import { readDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
 import { attachCanvasToSourceConfiguration } from "@/lib/elt/merge-canvas-into-source-config";
 import {
   isTransformOnlyPipeline,
-  minimalTransformOnlySourceConfiguration,
-  readTransformOnlySourceTable,
   transformOnlyCanvasGraph,
 } from "@/lib/elt/pipeline-mode";
 import { ensureGithubReposForForm } from "@/lib/elt/normalize-source-configuration";
@@ -93,6 +92,8 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
   /** Guided form state (same model as /builder). */
   const [sourceCfg, setSourceCfg] = useState<Record<string, unknown>>({});
   const [connectionValues, setConnectionValues] = useState<Record<string, string>>({});
+  const [sourceConnectionId, setSourceConnectionId] = useState<string | null>(null);
+  const [destinationConnectionId, setDestinationConnectionId] = useState<string | null>(null);
   /** When the catalog has no source schema, connector fields are edited as JSON. */
   const [connectorJson, setConnectorJson] = useState("{}");
   const [advancedJsonDirty, setAdvancedJsonDirty] = useState(false);
@@ -106,7 +107,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
   const starterAppliedRef = useRef(false);
 
   const starterFromUrl = searchParams.get("starter");
-  const sourceTableFromUrl = searchParams.get("source_table") ?? "staging.events";
+  const sourceTableFromUrl = searchParams.get("source_table")?.trim() ?? "";
 
   const setCanvasView = useCallback(
     (view: BuilderCanvasTab) => {
@@ -370,8 +371,12 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
         destinationType?: string;
         tool?: string;
         dbtProjectId?: string | null;
+        sourceConnectionId?: string | null;
+        destinationConnectionId?: string | null;
       };
       setLinkedDbtProjectId(row.dbtProjectId ?? null);
+      setSourceConnectionId(row.sourceConnectionId ?? null);
+      setDestinationConnectionId(row.destinationConnectionId ?? null);
       setSelectedName(typeof row.name === "string" ? row.name : "Pipeline");
       setPipelineSourceType(typeof row.sourceType === "string" ? row.sourceType : "");
       setPipelineDestinationType(typeof row.destinationType === "string" ? row.destinationType : "");
@@ -391,7 +396,6 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
         if (isTransformOnlyPipeline(cfg)) {
           canvas = transformOnlyCanvasGraph({
             warehouseLabel: dt.replace(/_/g, " "),
-            sourceTable: readTransformOnlySourceTable(cfg),
           });
         } else {
           canvas = defaultPipelineCanvasBackbone(st, dt);
@@ -502,6 +506,32 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
       }
     },
     [selectedId, pipelineSourceType, pipelineDestinationType, hydrateFormFromSourceConfig]
+  );
+
+  const patchPipelineConnection = useCallback(
+    async (patch: { sourceConnectionId?: string | null; destinationConnectionId?: string | null }) => {
+      if (!selectedId) return;
+      setBindingsBusy(true);
+      setBindingsError(null);
+      try {
+        const res = await fetch(`/api/elt/pipelines/${selectedId}`, {
+          method: "PATCH",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        });
+        const data = (await res.json().catch(() => ({}))) as { error?: unknown };
+        if (!res.ok) {
+          const err = data.error;
+          throw new Error(typeof err === "string" ? err : "Could not update saved connection link");
+        }
+      } catch (e) {
+        setBindingsError(e instanceof Error ? e.message : "Update failed");
+      } finally {
+        setBindingsBusy(false);
+      }
+    },
+    [selectedId]
   );
 
   function hasDbtTransform(nodes: Node[]): boolean {
@@ -689,6 +719,8 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
               Click a <strong className="font-medium text-slate-800 dark:text-slate-200">source</strong>,{" "}
               <strong className="font-medium text-slate-800 dark:text-slate-200">destination</strong>, or{" "}
               <strong className="font-medium text-slate-800 dark:text-slate-200">transform</strong> on the diagram.
+              To remove a wire, click the line between nodes and use{" "}
+              <strong className="font-medium text-slate-800 dark:text-slate-200">Disconnect</strong> (or Delete).
             </p>
           </div>
           {selectedId && selectedName && pipelineSourceType && pipelineDestinationType ? (
@@ -785,6 +817,21 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
             subtitle="Catalog fields for this source type"
             defaultOpen
           >
+            <div className="mb-3">
+              <ConnectionPicker
+                connectionType="source"
+                connector={pipelineSourceType || "github"}
+                selectedConnectionId={sourceConnectionId}
+                currentValues={connectionValues}
+                onSelect={({ id, config }) => {
+                  setSourceConnectionId(id);
+                  if (Object.keys(config).length > 0) {
+                    setConnectionValues((prev) => ({ ...prev, ...config }));
+                  }
+                  void patchPipelineConnection({ sourceConnectionId: id });
+                }}
+              />
+            </div>
             <GuidedSourceBlock
               sourceType={pipelineSourceType || "github"}
               schemaFields={schemaFields}
@@ -865,6 +912,21 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
           subtitle="Dataset / instance and destination secrets"
           defaultOpen
         >
+          <div className="mb-3">
+            <ConnectionPicker
+              connectionType="destination"
+              connector={pipelineDestinationType || "postgres"}
+              selectedConnectionId={destinationConnectionId}
+              currentValues={connectionValues}
+              onSelect={({ id, config }) => {
+                setDestinationConnectionId(id);
+                if (Object.keys(config).length > 0) {
+                  setConnectionValues((prev) => ({ ...prev, ...config }));
+                }
+                void patchPipelineConnection({ destinationConnectionId: id });
+              }}
+            />
+          </div>
           <GuidedDestinationBlock
             destinationType={pipelineDestinationType || "duckdb"}
             sourceCfg={sourceCfg}
@@ -913,16 +975,14 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
 
   const lakeDefaultSourceTable = useMemo(
     () =>
-      transformOnlyMode
-        ? readTransformOnlySourceTable(lastFullSourceConfigRef.current)
-        : defaultSourceTable({
-            pipelineName: selectedName,
-            schemaOverride:
-              typeof sourceCfg.schema_override === "string" ? sourceCfg.schema_override : undefined,
-            fallback: sourceTableFromUrl,
-          }),
+      defaultSourceTable({
+        pipelineName: selectedName,
+        schemaOverride:
+          typeof sourceCfg.schema_override === "string" ? sourceCfg.schema_override : undefined,
+        fallback: sourceTableFromUrl || undefined,
+      }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadedSig bumps when pipeline config is reloaded
-    [selectedName, sourceCfg.schema_override, sourceTableFromUrl, transformOnlyMode, loadedSig]
+    [selectedName, sourceCfg.schema_override, sourceTableFromUrl, loadedSig]
   );
 
   const lineageSourceConfig = useMemo(
@@ -1074,6 +1134,21 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
             subtitle={pipelineSourceType.replace(/_/g, " ")}
             defaultOpen
           >
+            <div className="mb-3">
+              <ConnectionPicker
+                connectionType="source"
+                connector={pipelineSourceType || "github"}
+                selectedConnectionId={sourceConnectionId}
+                currentValues={connectionValues}
+                onSelect={({ id, config }) => {
+                  setSourceConnectionId(id);
+                  if (Object.keys(config).length > 0) {
+                    setConnectionValues((prev) => ({ ...prev, ...config }));
+                  }
+                  void patchPipelineConnection({ sourceConnectionId: id });
+                }}
+              />
+            </div>
             <GuidedSourceBlock
               sourceType={pipelineSourceType || "github"}
               schemaFields={schemaFields}
@@ -1094,8 +1169,23 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
             title="Destination / warehouse"
             subtitle={pipelineDestinationType.replace(/_/g, " ")}
           >
+            <div className="mb-3">
+              <ConnectionPicker
+                connectionType="destination"
+                connector={pipelineDestinationType || "postgres"}
+                selectedConnectionId={destinationConnectionId}
+                currentValues={connectionValues}
+                onSelect={({ id, config }) => {
+                  setDestinationConnectionId(id);
+                  if (Object.keys(config).length > 0) {
+                    setConnectionValues((prev) => ({ ...prev, ...config }));
+                  }
+                  void patchPipelineConnection({ destinationConnectionId: id });
+                }}
+              />
+            </div>
             <GuidedDestinationBlock
-              destinationType={pipelineDestinationType || "duckdb"}
+              destinationType={pipelineDestinationType || "postgres"}
               sourceCfg={sourceCfg}
               onSourceCfgChange={setSourceCfg}
               connectionValues={connectionValues}

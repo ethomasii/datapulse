@@ -27,7 +27,6 @@ export type CreateEltPipelineInput = {
 
 export type CreateTransformOnlyPipelineInput = {
   name: string;
-  sourceTable: string;
   destinationType: string;
   destinationConnectionId: string;
   warehouseName?: string | null;
@@ -57,12 +56,11 @@ export async function createEltPipeline(input: CreateEltPipelineInput): Promise<
 export async function createTransformOnlyPipeline(
   input: CreateTransformOnlyPipelineInput
 ): Promise<string | undefined> {
-  const sourceTable = input.sourceTable.trim() || "staging.events";
   const warehouseLabel = input.warehouseName
     ? `${input.warehouseName} (${input.destinationType})`
     : `Default warehouse · ${input.destinationType}`;
-  const canvas = transformOnlyCanvasGraph({ warehouseLabel, sourceTable });
-  const sourceConfiguration = minimalTransformOnlySourceConfiguration(sourceTable, canvas);
+  const canvas = transformOnlyCanvasGraph({ warehouseLabel });
+  const sourceConfiguration = minimalTransformOnlySourceConfiguration(canvas);
   const res = await fetch("/api/elt/pipelines", {
     method: "POST",
     credentials: "same-origin",

@@ -914,7 +914,7 @@ export function SourceCatalogWizard({ onPipelineSaved }: { onPipelineSaved?: (na
     sourceConnector: null,
     authValues: {},
     sourceConnectionId: null,
-    destination: 'duckdb',
+    destination: 'postgres',
     destinationConnectionId: null,
     pipelineName: '',
     saving: false,

@@ -25,7 +25,7 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import { useTheme } from "next-themes";
-import { Download, Loader2, Plus, RotateCcw, Save, Trash2, Upload } from "lucide-react";
+import { Download, Loader2, Plus, RotateCcw, Save, Trash2, Unlink, Upload } from "lucide-react";
 import { AddTransformMenu } from "./add-transform-menu";
 import type { ComponentListItem } from "@/components/elt/component-palette";
 import { CanvasBindingsProvider, type CanvasBindingsContextValue } from "./canvas-bindings-context";
@@ -192,6 +192,7 @@ function FlowCanvas({
   const rfRef = useRef<ReactFlowInstance | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedFlowNodes, setSelectedFlowNodes] = useState<Node[]>([]);
+  const [selectedFlowEdges, setSelectedFlowEdges] = useState<Edge[]>([]);
   const [localValidationError, setLocalValidationError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -289,8 +290,16 @@ function FlowCanvas({
     setNodes((nds) => nds.filter((n) => !ids.has(n.id)));
     setEdges((eds) => eds.filter((e) => !ids.has(e.source) && !ids.has(e.target)));
     setSelectedFlowNodes([]);
+    setSelectedFlowEdges([]);
     onInspectorFocusChange?.({ kind: "none" });
   }, [selectedFlowNodes, setNodes, setEdges, onInspectorFocusChange]);
+
+  const removeSelectedEdges = useCallback(() => {
+    if (selectedFlowEdges.length === 0) return;
+    const ids = new Set(selectedFlowEdges.map((e) => e.id));
+    setEdges((eds) => eds.filter((e) => !ids.has(e.id)));
+    setSelectedFlowEdges([]);
+  }, [selectedFlowEdges, setEdges]);
 
   const fit = useCallback(() => {
     requestAnimationFrame(() => rfRef.current?.fitView({ padding: 0.2 }));
@@ -577,8 +586,9 @@ function FlowCanvas({
   }, [canvasControlRef, setNodes, setEdges, addComponentNode, addNode, fit, emitInspectorFocus, nodes, edges]);
 
   const onSelectionChange = useCallback(
-    ({ nodes: selectedNodes }: { nodes: Node[] }) => {
+    ({ nodes: selectedNodes, edges: selectedEdges }: { nodes: Node[]; edges: Edge[] }) => {
       setSelectedFlowNodes(selectedNodes);
+      setSelectedFlowEdges(selectedEdges);
       if (!onInspectorFocusChange) return;
       const n = selectedNodes[0];
       if (!n?.type) {
@@ -651,6 +661,20 @@ function FlowCanvas({
         <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Selection</span>
         <button
           type="button"
+          onClick={removeSelectedEdges}
+          disabled={selectedFlowEdges.length === 0}
+          title={
+            selectedFlowEdges.length === 0
+              ? "Click a wire between nodes, then disconnect"
+              : "Remove selected wire(s) between nodes"
+          }
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          <Unlink className="h-3.5 w-3.5" />
+          Disconnect
+        </button>
+        <button
+          type="button"
           onClick={removeSelectedNodes}
           disabled={selectedFlowNodes.length === 0}
           title={
@@ -661,7 +685,7 @@ function FlowCanvas({
           className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           <Trash2 className="h-3.5 w-3.5" />
-          Remove
+          Remove nodes
         </button>
         <div className="mx-1 h-4 w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
         {!pipelineId ? (
@@ -770,6 +794,8 @@ function FlowCanvas({
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           isValidConnection={isValidConnection}
+          edgesDeletable
+          edgesFocusable
           deleteKeyCode={["Backspace", "Delete"]}
           onSelectionChange={onSelectionChange}
           onInit={(inst) => {
@@ -778,6 +804,7 @@ function FlowCanvas({
           nodeTypes={pipelineNodeTypes}
           defaultEdgeOptions={{
             animated: true,
+            interactionWidth: 20,
             style: { ...dashedAnimatedEdgeStyle },
           }}
           fitView

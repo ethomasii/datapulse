@@ -25,6 +25,7 @@ export function normalizeEdgesWithDefaults(edges: Edge[]): Edge[] {
   return edges.map((e) => ({
     ...e,
     animated: e.animated !== false,
+    interactionWidth: e.interactionWidth ?? 20,
     style: { ...dashedAnimatedEdgeStyle, ...e.style },
   }));
 }
@@ -60,8 +61,9 @@ export function withFallbackEdges(nodes: Node[]): Edge[] {
 }
 
 export function resolveCanvasEdges(nodes: Node[], edges: Edge[] | undefined | null): Edge[] {
-  const list = Array.isArray(edges) ? edges : [];
-  const resolved = list.length > 0 ? list : withFallbackEdges(nodes);
+  // Only infer backbone wiring when edges were never persisted (null/undefined).
+  // An explicit empty array means the user removed all wires — do not recreate them.
+  const resolved = edges === undefined || edges === null ? withFallbackEdges(nodes) : edges;
   const normalized = normalizeEdgesWithDefaults(resolved);
   return filterEdgesToPipelineRules(nodes, normalized);
 }

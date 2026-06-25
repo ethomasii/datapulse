@@ -53,14 +53,9 @@ export const CREDENTIAL_HINTS: Record<string, CredentialHint[]> = {
   ],
   duckdb: [
     {
-      key: "DESTINATION__DUCKDB__CREDENTIALS",
-      label: "DuckDB database path",
-      help: "Path to the DuckDB file for local or embedded analytics",
-    },
-    {
-      key: "DUCKDB_DATABASE",
-      label: "Database path (env)",
-      help: "When using environment-based configuration",
+      key: "DEST_DUCKDB_PATH",
+      label: "Database location",
+      help: "s3:// or gs:// URI, or leave empty for eltPulse-managed internal storage",
     },
   ],
   motherduck: [
@@ -72,7 +67,7 @@ export const CREDENTIAL_HINTS: Record<string, CredentialHint[]> = {
     {
       key: "MOTHERDUCK_DATABASE",
       label: "MotherDuck database name",
-      help: "Token and database in exported project secrets",
+      help: "Set on the connection (config) or as MOTHERDUCK_DATABASE in exported secrets",
     },
   ],
   sqlite: [

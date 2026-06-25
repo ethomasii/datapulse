@@ -13,8 +13,9 @@ import { pipelineSourceTypeFromCatalogSlug, saasDiscoverConnector } from "@/lib/
 export type QuickStartOption = { slug: string; label: string; hint: string };
 
 export const QUICK_START_DESTINATIONS: QuickStartOption[] = [
-  { slug: "duckdb", label: "DuckDB", hint: "Local file — great for trying eltPulse" },
+  { slug: "motherduck", label: "MotherDuck", hint: "Hosted DuckDB — easiest cloud warehouse" },
   { slug: "postgres", label: "PostgreSQL", hint: "Self-hosted or Neon" },
+  { slug: "duckdb", label: "DuckDB", hint: "Object storage URI or managed internal file" },
   { slug: "snowflake", label: "Snowflake", hint: "Cloud warehouse" },
   { slug: "bigquery", label: "BigQuery", hint: "Google Cloud" },
   { slug: "redshift", label: "Redshift", hint: "AWS warehouse" },

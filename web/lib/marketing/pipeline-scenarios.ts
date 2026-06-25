@@ -73,15 +73,15 @@ export const PIPELINE_SCENARIOS: PipelineScenario[] = [
     tags: ["database", "replication"],
   },
   {
-    id: "hubspot-duckdb",
-    title: "HubSpot CRM in DuckDB for startups",
+    id: "hubspot-motherduck",
+    title: "HubSpot CRM in MotherDuck",
     description:
-      "Pull contacts, deals, and engagements into DuckDB for fast local analytics, prototyping, and lightweight reverse-ETL experiments.",
+      "Pull contacts, deals, and engagements into hosted DuckDB for fast analytics, prototyping, and lightweight reverse-ETL experiments.",
     sourceSlug: "hubspot",
-    destinationSlug: "duckdb",
+    destinationSlug: "motherduck",
     persona: "Growth & ops",
     industry: "saas",
-    benefits: ["Low-cost destination", "Great for local dev", "Verified HubSpot source"],
+    benefits: ["Hosted DuckDB", "No file paths", "Verified HubSpot source"],
     tags: ["crm", "startup"],
   },
   {
@@ -134,15 +134,15 @@ export const PIPELINE_SCENARIOS: PipelineScenario[] = [
     tags: ["marketing", "ads"],
   },
   {
-    id: "notion-duckdb",
+    id: "notion-motherduck",
     title: "Notion docs as queryable tables",
     description:
-      "Turn Notion databases into structured tables in DuckDB for ops playbooks, OKR tracking, and lightweight reporting.",
+      "Turn Notion databases into structured tables in MotherDuck for ops playbooks, OKR tracking, and lightweight reporting.",
     sourceSlug: "notion",
-    destinationSlug: "duckdb",
+    destinationSlug: "motherduck",
     persona: "Ops & PM",
     industry: "saas",
-    benefits: ["No-code source", "Fast iteration", "Great for prototypes"],
+    benefits: ["No-code source", "Hosted DuckDB", "Great for prototypes"],
     tags: ["productivity"],
   },
   {

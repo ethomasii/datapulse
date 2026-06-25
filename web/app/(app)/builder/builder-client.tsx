@@ -126,7 +126,6 @@ export function BuilderClient({
   /** "ai" = inline AI chat, "browse" = source catalog wizard, "manual" = standard form */
   const [createMode, setCreateMode] = useState<"ai" | "browse" | "manual">("browse");
   const [newPipelineKind, setNewPipelineKind] = useState<NewPipelineKind>("elt");
-  const [newSourceTable, setNewSourceTable] = useState("staging.events");
   const [transformCreateBusy, setTransformCreateBusy] = useState(false);
   const [transformCreateError, setTransformCreateError] = useState<string | null>(null);
   const workspaceDefault = useWorkspaceDefaultDestination();
@@ -141,7 +140,7 @@ export function BuilderClient({
 
   const [name, setName] = useState("");
   const [sourceType, setSourceType] = useState("github");
-  const [destinationType, setDestinationType] = useState("duckdb");
+  const [destinationType, setDestinationType] = useState("postgres");
   const [description, setDescription] = useState("");
   const [formMode, setFormMode] = useState<FormMode>("structured");
   const [specYaml, setSpecYaml] = useState(DEFAULT_SPEC_YAML);
@@ -169,7 +168,7 @@ export function BuilderClient({
   const [canvasGraph, setCanvasGraph] = useState<PipelineCanvasGraph | null>(null);
   /** SOURCE_CREDENTIALS + DESTINATION_CREDENTIALS form values (secrets not persisted). */
   const [connectionValues, setConnectionValues] = useState<Record<string, string>>(() =>
-    emptyConnectionValuesForTypes("github", "duckdb")
+    emptyConnectionValuesForTypes("github", "postgres")
   );
   /** Saved Connection rows linked to this pipeline (persisted as FKs; not stored in source_configuration). */
   const [sourceConnectionId, setSourceConnectionId] = useState<string | null>(null);
@@ -497,7 +496,7 @@ export function BuilderClient({
         setCanvasGraph(null);
         setSourceConnectionId(null);
         setDestinationConnectionId(null);
-        resetConnectorForNewSourceType("github", "duckdb");
+        resetConnectorForNewSourceType("github", "postgres");
       } else {
         setEditingId(null);
       }
@@ -517,13 +516,12 @@ export function BuilderClient({
     setEditingId(null);
     setShowCreateForm(true);
     setNewPipelineKind("elt");
-    setNewSourceTable("staging.events");
     setTransformCreateError(null);
     setError(null);
     setName("");
     setDescription("");
     setSourceType("github");
-    setDestinationType("duckdb");
+    setDestinationType("postgres");
     setFormMode("structured");
     setTests("");
     setPipelineMonitors([]);
@@ -547,7 +545,7 @@ export function BuilderClient({
     setDbtSliceValueVar("");
     setDbtSliceColumnVar("");
     setLinkedDbtProjectId(null);
-    resetConnectorForNewSourceType("github", "duckdb");
+    resetConnectorForNewSourceType("github", "postgres");
   }
 
   function cancelCreate() {
@@ -577,7 +575,6 @@ export function BuilderClient({
     try {
       const newId = await createTransformOnlyPipeline({
         name: pipelineName,
-        sourceTable: newSourceTable,
         destinationType: destType,
         destinationConnectionId: destConnId,
         warehouseName: workspaceDefault.name,
@@ -1102,8 +1099,6 @@ export function BuilderClient({
               onKindChange={setNewPipelineKind}
               name={name}
               onNameChange={setName}
-              sourceTable={newSourceTable}
-              onSourceTableChange={setNewSourceTable}
               sourceType={sourceType}
               onSourceTypeChange={setSourceType}
               destinationType={destinationType}
@@ -1191,7 +1186,7 @@ export function BuilderClient({
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                        placeholder="github_issues_to_duckdb"
+                        placeholder="github_issues_to_postgres"
                       />
                     </label>
                     <label className="block">
@@ -1258,6 +1253,7 @@ export function BuilderClient({
                     <ConnectionPicker
                       connectionType="source"
                       connector={sourceType}
+                      selectedConnectionId={sourceConnectionId}
                       currentValues={connectionValues}
                       onSelect={({ id, config }) => {
                         setSourceConnectionId(id);
@@ -1290,6 +1286,7 @@ export function BuilderClient({
                     <ConnectionPicker
                       connectionType="destination"
                       connector={destinationType}
+                      selectedConnectionId={destinationConnectionId}
                       currentValues={connectionValues}
                       onSelect={({ id, config }) => {
                         setDestinationConnectionId(id);

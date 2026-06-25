@@ -4,6 +4,7 @@
  */
 
 import { parseStoredConnectionSecrets } from "@/lib/elt/connection-secrets-store";
+import { mergeConnectionRuntimeSecrets } from "@/lib/elt/duckdb-destination";
 import {
   introspectAzureBlob,
   introspectBigQuery,
@@ -110,11 +111,16 @@ export async function introspectDestinationConnection(
   row: DestinationConnectionRow
 ): Promise<WarehouseIntrospectionResult> {
   const connector = row.connector.toLowerCase().trim();
-  const secrets = parseStoredConnectionSecrets(row.connectionSecretsEnc);
   const config =
     row.config && typeof row.config === "object" && !Array.isArray(row.config)
       ? (row.config as Record<string, unknown>)
       : {};
+  const secrets = mergeConnectionRuntimeSecrets(
+    "destination",
+    connector,
+    parseStoredConnectionSecrets(row.connectionSecretsEnc),
+    config
+  );
 
   switch (connector) {
     case "postgres":

@@ -136,7 +136,7 @@ export function getConnectorCategories(role?: MarketingConnectorRole): string[] 
 /** Suggested pairings when no scenario exists */
 export function suggestedPairings(connector: MarketingConnector): MarketingConnector[] {
   const popularSources = ["github", "stripe_analytics", "postgres", "hubspot", "salesforce", "shopify_dlt"];
-  const popularDests = ["snowflake", "bigquery", "postgres", "duckdb", "redshift"];
+  const popularDests = ["snowflake", "bigquery", "postgres", "motherduck", "duckdb", "redshift"];
 
   if (connector.role === "source") {
     return popularDests

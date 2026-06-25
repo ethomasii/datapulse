@@ -4,6 +4,7 @@
 
 import { createHash, createHmac, createPrivateKey, createPublicKey, createSign, randomUUID } from "crypto";
 import { fetchGcpAccessToken } from "@/lib/elt/gcp-access-token";
+import { resolveDuckdbDatabaseLocation } from "@/lib/elt/duckdb-destination";
 import type { WarehouseIntrospectionResult, WarehouseTableRef } from "@/lib/elt/warehouse-introspect";
 
 const TABLE_LIMIT = 5000;
@@ -677,7 +678,7 @@ export async function introspectMotherduck(
   }
 }
 
-// ─── DuckDB / SQLite (local file — requires native duckdb on this host) ──────
+// ─── DuckDB / SQLite (file or cloud URI — requires duckdb on this host) ──────
 
 async function introspectDuckdbFile(
   connector: string,
@@ -687,8 +688,8 @@ async function introspectDuckdbFile(
     return fail(
       connector,
       connector === "sqlite"
-        ? "Set DEST_SQLITE_PATH to verify SQLite tables."
-        : "Set DEST_DUCKDB_PATH to verify DuckDB tables (or use MotherDuck for cloud)."
+        ? "Set a database path on the connection to verify SQLite tables."
+        : "Set a database location on the connection (cloud URI or leave empty for managed internal storage), or use MotherDuck for hosted DuckDB."
     );
   }
 
@@ -717,7 +718,8 @@ async function introspectDuckdbFile(
       qualified: `${schema}.${table}`,
     }));
     const label = connector === "sqlite" ? "SQLite" : "DuckDB";
-    return ok(connector, `Found ${tables.length} table(s) in local ${label} file.`, tables);
+    const scope = /^[a-z][a-z0-9+.-]*:\/\//i.test(dbPath) ? "remote" : "local";
+    return ok(connector, `Found ${tables.length} table(s) in ${scope} ${label} database.`, tables);
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
     const hint =
@@ -732,10 +734,7 @@ export async function introspectDuckdb(
   secrets: Record<string, string>,
   config: Record<string, unknown>
 ): Promise<WarehouseIntrospectionResult> {
-  const dbPath =
-    secret(secrets, "DEST_DUCKDB_PATH", "DUCKDB_PATH", "DESTINATION__DUCKDB__CREDENTIALS") ||
-    configString(config, "database", "path");
-  return introspectDuckdbFile("duckdb", dbPath);
+  return introspectDuckdbFile("duckdb", resolveDuckdbDatabaseLocation(secrets, config));
 }
 
 export async function introspectSqlite(
