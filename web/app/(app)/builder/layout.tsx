@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { BuilderSubnav } from "@/components/pipeline-canvas/builder-subnav";
 
 export const metadata: Metadata = {
@@ -14,7 +15,9 @@ export default function BuilderLayout({ children }: { children: React.ReactNode 
       */}
       <div className="-mx-4 border-b border-slate-200 dark:border-slate-800 sm:-mx-6 lg:-mx-8">
         <div className="px-4 sm:px-6 lg:px-8">
-          <BuilderSubnav />
+          <Suspense fallback={null}>
+            <BuilderSubnav />
+          </Suspense>
         </div>
       </div>
       <div className="mt-6 w-full min-w-0">{children}</div>

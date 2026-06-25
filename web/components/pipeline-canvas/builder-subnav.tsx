@@ -1,25 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import clsx from "clsx";
 
-export function BuilderSubnav() {
+function BuilderSubnavInner() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const pipelineId = searchParams.get("pipeline")?.trim() || null;
+  const builderHref = pipelineId
+    ? `/builder?pipeline=${encodeURIComponent(pipelineId)}`
+    : "/builder";
+  const canvasHref = pipelineId
+    ? `/builder/canvas?pipeline=${encodeURIComponent(pipelineId)}`
+    : "/builder/canvas";
 
   const tabs = [
-    { href: "/builder", label: "Form builder" },
-    { href: "/builder/canvas", label: "Visual canvas" },
+    { href: builderHref, label: "Form builder" },
+    { href: canvasHref, label: "Visual canvas" },
   ];
 
   return (
     <nav className="flex justify-center gap-1" aria-label="Pipeline builder">
       {tabs.map((t) => {
         const active =
-          t.href === "/builder" ? pathname === "/builder" : pathname.startsWith(t.href);
+          t.href.startsWith("/builder/canvas")
+            ? pathname.startsWith("/builder/canvas")
+            : pathname === "/builder";
         return (
           <Link
-            key={t.href}
+            key={t.label}
             href={t.href}
             className={clsx(
               "-mb-px inline-flex border-b-2 px-4 py-2.5 text-sm font-medium transition",
@@ -34,4 +44,8 @@ export function BuilderSubnav() {
       })}
     </nav>
   );
+}
+
+export function BuilderSubnav() {
+  return <BuilderSubnavInner />;
 }

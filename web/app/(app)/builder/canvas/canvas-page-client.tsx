@@ -4,7 +4,7 @@ import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Edge, Node } from "@xyflow/react";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, PenLine, Plus } from "lucide-react";
 import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 import { CanvasPreviewPanel } from "@/components/pipeline-canvas/canvas-preview-panel";
 import { DesignerFullscreenShell } from "@/components/pipeline-canvas/designer-fullscreen-shell";
@@ -108,6 +108,7 @@ export function CanvasPageClient() {
   const [connectorJson, setConnectorJson] = useState("{}");
   const [advancedJsonDirty, setAdvancedJsonDirty] = useState(false);
   const [showNewPipelineForm, setShowNewPipelineForm] = useState(false);
+  const [pendingOpenId, setPendingOpenId] = useState("");
   const [newName, setNewName] = useState("");
   const [newPipelineKind, setNewPipelineKind] = useState<"elt" | "transform_only">("elt");
   const [newSourceTable, setNewSourceTable] = useState("staging.events");
@@ -125,6 +126,13 @@ export function CanvasPageClient() {
 
   const starterFromUrl = searchParams.get("starter");
   const sourceTableFromUrl = searchParams.get("source_table") ?? "staging.events";
+  const wantNewFromUrl = searchParams.get("new") === "1";
+
+  useEffect(() => {
+    if (wantNewFromUrl || (starterFromUrl && !pipelineFromUrl)) {
+      setShowNewPipelineForm(true);
+    }
+  }, [wantNewFromUrl, starterFromUrl, pipelineFromUrl]);
 
   const { permissions } = useWorkspacePermissions();
   const canWrite = permissions?.canWrite ?? true;
@@ -317,7 +325,7 @@ export function CanvasPageClient() {
       setSelectedId((prev) => {
         if (prev && rows.some((r) => r.id === prev)) return prev;
         if (fromUrl && rows.some((r) => r.id === fromUrl)) return fromUrl;
-        return rows[0]?.id ?? "";
+        return "";
       });
     } finally {
       setListLoading(false);
@@ -1142,7 +1150,13 @@ export function CanvasPageClient() {
             {(pipelines.length === 0 || showNewPipelineForm) && (
               <NewPipelineForm
                 className="mt-4 max-w-xl"
-                title={pipelines.length === 0 ? "Create your first pipeline" : "New pipeline"}
+                title={
+                  pipelines.length === 0
+                    ? "Create your first pipeline"
+                    : starterFromUrl
+                      ? "Create a pipeline for this starter"
+                      : "New pipeline"
+                }
                 kind={newPipelineKind}
                 onKindChange={setNewPipelineKind}
                 name={newName}
@@ -1165,45 +1179,129 @@ export function CanvasPageClient() {
               />
             )}
 
-            {pipelines.length > 0 && !isDesignerFullscreen ? (
-              <div className="mt-4 flex max-w-2xl flex-col gap-3 sm:flex-row sm:items-end sm:flex-wrap">
-                <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-sm">
-                  <span className="font-medium text-slate-700 dark:text-slate-300">Pipeline</span>
-                  <select
-                    value={selectedId}
-                    onChange={(e) => setSelectedId(e.target.value)}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                  >
-                    {pipelines.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {!showNewPipelineForm ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowNewPipelineForm(true);
-                      setCreateError(null);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    <Plus className="h-4 w-4 shrink-0" aria-hidden />
-                    New pipeline
-                  </button>
-                ) : null}
-                {selectedName ? (
-                  <span className="w-full text-xs text-slate-500 sm:w-auto sm:pb-2">
-                    Editing <strong className="font-medium text-slate-700 dark:text-slate-300">{selectedName}</strong> ·{" "}
+            {pipelines.length > 0 && !selectedId && !showNewPipelineForm && !isDesignerFullscreen ? (
+              <div className="mt-2 max-w-2xl rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex items-start gap-3">
+                  <PenLine className="mt-0.5 h-5 w-5 shrink-0 text-sky-600" aria-hidden />
+                  <div className="min-w-0 flex-1 space-y-4">
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Start on the canvas</h2>
+                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                        Nothing is loaded yet — pick whether to design a new pipeline or open one you already have.
+                        Saves go to the pipeline you choose, so we don&apos;t open an existing pipeline by default.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowNewPipelineForm(true);
+                          setCreateError(null);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+                      >
+                        <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                        New pipeline
+                      </button>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/50">
+                      <p className="text-sm font-medium text-slate-800 dark:text-slate-200">Open existing pipeline</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        View or edit a pipeline you&apos;ve already built ({pipelines.length} in this workspace).
+                      </p>
+                      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <select
+                          value={pendingOpenId}
+                          onChange={(e) => setPendingOpenId(e.target.value)}
+                          className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                        >
+                          <option value="">Choose a pipeline…</option>
+                          {pipelines.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          disabled={!pendingOpenId}
+                          onClick={() => {
+                            if (pendingOpenId) setSelectedId(pendingOpenId);
+                          }}
+                          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800"
+                        >
+                          Open on canvas
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      <Link href="/builder" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+                        Pipelines
+                      </Link>{" "}
+                      lists every pipeline and the full form editor. Visual canvas is the diagram view for one pipeline
+                      at a time.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {pipelines.length > 0 && selectedId && !isDesignerFullscreen ? (
+              <div className="mt-4 space-y-3">
+                <div className="flex max-w-3xl flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/60 dark:bg-amber-950/30 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-amber-950 dark:text-amber-100">
+                    Editing{" "}
+                    <strong className="font-semibold">{selectedName ?? "pipeline"}</strong> — saves update this
+                    pipeline.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedId("");
+                        setPendingOpenId("");
+                        setShowNewPipelineForm(false);
+                      }}
+                      className="rounded-lg border border-amber-300/80 bg-white px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-100/80 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100 dark:hover:bg-amber-900/40"
+                    >
+                      Choose different pipeline
+                    </button>
                     <Link
                       href={`/builder?pipeline=${encodeURIComponent(selectedId)}`}
-                      className="text-sky-600 hover:underline dark:text-sky-400"
+                      className="text-xs font-medium text-sky-700 hover:underline dark:text-sky-400"
                     >
                       Open in form builder
                     </Link>
-                  </span>
+                  </div>
+                </div>
+                {!showNewPipelineForm ? (
+                  <div className="flex max-w-2xl flex-wrap items-end gap-2">
+                    <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-sm">
+                      <span className="font-medium text-slate-700 dark:text-slate-300">Switch pipeline</span>
+                      <select
+                        value={selectedId}
+                        onChange={(e) => setSelectedId(e.target.value)}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                      >
+                        {pipelines.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowNewPipelineForm(true);
+                        setCreateError(null);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                      New pipeline
+                    </button>
+                  </div>
                 ) : null}
               </div>
             ) : null}
