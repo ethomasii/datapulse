@@ -17,6 +17,7 @@ import { AssetCatalogAiPanel } from "@/components/assets/asset-catalog-ai-panel"
 import { AssetColumnsTable } from "@/components/assets/asset-columns-table";
 import { AssetColumnLineagePanel } from "@/components/assets/asset-column-lineage";
 import { AssetConversationPanel } from "@/components/assets/asset-conversation-panel";
+import { AssetCertifyPanel } from "@/components/assets/asset-certify-panel";
 import { AssetContractPanel } from "@/components/assets/asset-contract-panel";
 import { AssetHistoryPanel } from "@/components/assets/asset-history-panel";
 import { AssetSlicePanel } from "@/components/assets/asset-slice-panel";
@@ -38,6 +39,7 @@ import type { PipelineAssetBundle, WorkspaceAsset } from "@/lib/elt/pipeline-ass
 type AssetDetailResponse = {
   asset: WorkspaceAsset;
   bundle: PipelineAssetBundle;
+  catalogEntry?: { certifiedAt?: string | null } | null;
   technicalProfile?: AssetTechnicalProfile;
   warehouseColumns?: { ok: boolean; message: string };
   permissions?: { canEditCatalog: boolean };
@@ -74,6 +76,7 @@ export function AssetDetailClient({ assetKey }: { assetKey: string }) {
   const [columnLineageAllowed, setColumnLineageAllowed] = useState(false);
 
   const [loadingColumns, setLoadingColumns] = useState(false);
+  const [contractRefreshKey, setContractRefreshKey] = useState(0);
 
   useEffect(() => {
     void fetch("/api/billing/usage", { credentials: "same-origin" })
@@ -340,7 +343,24 @@ export function AssetDetailClient({ assetKey }: { assetKey: string }) {
             )}
           </section>
 
-          <AssetContractPanel assetKey={asset.id} />
+          <AssetCertifyPanel
+            assetKey={asset.id}
+            pipelineId={asset.pipelineId}
+            kind={asset.kind}
+            displayName={asset.catalogDisplayName ?? asset.displayName}
+            certifiedAt={data.catalogEntry?.certifiedAt ?? null}
+            canEdit={canEdit}
+            onCertified={() => {
+              setContractRefreshKey((k) => k + 1);
+              void load(true);
+            }}
+          />
+
+          <AssetContractPanel
+            key={contractRefreshKey}
+            assetKey={asset.id}
+            canEditCatalog={canEdit}
+          />
           <AssetConversationPanel assetKey={asset.id} assetLabel={asset.catalogDisplayName ?? asset.displayName} />
 
           {siblings.length > 0 ? (

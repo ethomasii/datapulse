@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, ShieldCheck, ShieldAlert } from "lucide-react";
+import Link from "next/link";
+import { Loader2, Shield, ShieldAlert, ShieldCheck } from "lucide-react";
 import type { ContractCompliance } from "@/lib/elt/data-contract";
 
 type ContractSummary = {
@@ -13,7 +14,13 @@ type ContractSummary = {
   ownerName: string | null;
 };
 
-export function AssetContractPanel({ assetKey }: { assetKey: string }) {
+export function AssetContractPanel({
+  assetKey,
+  canEditCatalog,
+}: {
+  assetKey: string;
+  canEditCatalog?: boolean;
+}) {
   const [loading, setLoading] = useState(true);
   const [contract, setContract] = useState<ContractSummary | null>(null);
   const [compliance, setCompliance] = useState<ContractCompliance | null>(null);
@@ -36,13 +43,34 @@ export function AssetContractPanel({ assetKey }: { assetKey: string }) {
 
   if (loading) {
     return (
-      <p className="flex items-center gap-2 text-sm text-slate-500">
-        <Loader2 className="h-4 w-4 animate-spin" /> Checking data contract…
-      </p>
+      <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+        <p className="flex items-center gap-2 text-sm text-slate-500">
+          <Loader2 className="h-4 w-4 animate-spin" /> Checking data contract…
+        </p>
+      </section>
     );
   }
 
-  if (!contract) return null;
+  if (!contract) {
+    if (!canEditCatalog) return null;
+    return (
+      <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex items-start gap-2">
+          <Shield className="mt-0.5 h-4 w-4 text-slate-400" aria-hidden />
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Data contract</h2>
+            <p className="mt-1 text-sm text-slate-500">No contract linked to this asset yet.</p>
+            <Link
+              href={`/catalog/contracts?fromAsset=${encodeURIComponent(assetKey)}&create=1`}
+              className="mt-3 inline-flex rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700"
+            >
+              Create contract from schema
+            </Link>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   const ok = compliance?.ok ?? false;
 
@@ -82,6 +110,12 @@ export function AssetContractPanel({ assetKey }: { assetKey: string }) {
               ) : null}
             </div>
           ) : null}
+          <Link
+            href={`/catalog/contracts?edit=${encodeURIComponent(contract.slug)}`}
+            className="mt-3 inline-block text-xs font-medium text-sky-600 hover:underline dark:text-sky-400"
+          >
+            Edit contract
+          </Link>
         </div>
       </div>
     </section>

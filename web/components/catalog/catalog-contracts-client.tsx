@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Pencil, Plus, Shield, Trash2, X } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { CircleHelp, Download, Loader2, Pencil, Plus, Shield, Trash2, X } from "lucide-react";
 import { CatalogAccessBanner } from "@/components/catalog/catalog-access-banner";
 import { CatalogAssetPicker } from "@/components/catalog/catalog-asset-picker";
+import { FieldLabel, PageHelpBox } from "@/components/ui/field-help";
+import { CATALOG_FIELD_HELP } from "@/lib/catalog/field-help-copy";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 
 type SchemaColumn = {
@@ -50,6 +53,7 @@ function slugify(name: string): string {
 }
 
 export function CatalogContractsClient() {
+  const searchParams = useSearchParams();
   const { permissions } = useWorkspacePermissions();
   const canEdit = permissions?.canEditCatalog ?? false;
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -58,7 +62,9 @@ export function CatalogContractsClient() {
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deepLinkHandled, setDeepLinkHandled] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,14 +83,85 @@ export function CatalogContractsClient() {
     void load();
   }, [load]);
 
-  const openCreate = () => {
-    setEditingSlug(null);
-    setForm(emptyForm);
-    setError(null);
-    setEditorOpen(true);
-  };
+  const schemaFromApi = useCallback(async (assetKeys: string[]) => {
+    if (!assetKeys.length) return null;
+    const qs = new URLSearchParams({
+      assetKeys: assetKeys.join(","),
+      columns: "1",
+    });
+    const res = await fetch(`/api/elt/catalog/contracts/schema-from-assets?${qs.toString()}`);
+    if (!res.ok) return null;
+    return (await res.json()) as {
+      schemaSpec: SchemaColumn[];
+      suggested?: { name: string; slug: string };
+      assets: { assetKey: string; displayName: string; columnCount: number }[];
+    };
+  }, []);
 
-  const openEdit = (c: Contract) => {
+  const importSchemaFromAssets = useCallback(
+    async (assetKeys: string[], merge = false) => {
+      if (!assetKeys.length) {
+        setError("Link at least one asset before importing schema");
+        return;
+      }
+      setImporting(true);
+      setError(null);
+      try {
+        const data = await schemaFromApi(assetKeys);
+        if (!data?.schemaSpec.length) {
+          throw new Error("No columns found on linked assets");
+        }
+        const imported = data.schemaSpec.map((c) => ({
+          name: c.name,
+          type: c.type ?? "",
+          required: c.required ?? true,
+          description: c.description ?? "",
+        }));
+        setForm((f) => ({
+          ...f,
+          schemaSpec: merge ? mergeSchemaRows(f.schemaSpec, imported) : imported,
+        }));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Import failed");
+      } finally {
+        setImporting(false);
+      }
+    },
+    [schemaFromApi]
+  );
+
+  const openCreateFromAsset = useCallback(
+    async (assetKey: string) => {
+      setEditingSlug(null);
+      setError(null);
+      setEditorOpen(true);
+      const data = await schemaFromApi([assetKey]);
+      if (!data) {
+        setForm({ ...emptyForm, assetKeys: [assetKey] });
+        setError("Could not load asset schema — link the asset and import manually");
+        return;
+      }
+      const suggested = data.suggested;
+      setForm({
+        ...emptyForm,
+        name: suggested?.name ?? "",
+        slug: suggested?.slug ?? "",
+        assetKeys: [assetKey],
+        schemaSpec: data.schemaSpec.length
+          ? data.schemaSpec.map((c) => ({
+              name: c.name,
+              type: c.type ?? "",
+              required: c.required ?? true,
+              description: c.description ?? "",
+            }))
+          : [emptyColumn()],
+        status: "draft",
+      });
+    },
+    [schemaFromApi]
+  );
+
+  const openEdit = useCallback((c: Contract) => {
     setEditingSlug(c.slug);
     const spec = (c.schemaSpec ?? []) as SchemaColumn[];
     setForm({
@@ -100,12 +177,36 @@ export function CatalogContractsClient() {
     });
     setError(null);
     setEditorOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (deepLinkHandled || loading) return;
+    const fromAsset = searchParams.get("fromAsset")?.trim();
+    const create = searchParams.get("create") === "1";
+    const editSlug = searchParams.get("edit")?.trim();
+    if (editSlug) {
+      const match = contracts.find((c) => c.slug === editSlug);
+      if (match) openEdit(match);
+      setDeepLinkHandled(true);
+      return;
+    }
+    if (fromAsset && create && canEdit) {
+      void openCreateFromAsset(fromAsset);
+      setDeepLinkHandled(true);
+    }
+  }, [canEdit, contracts, deepLinkHandled, loading, openCreateFromAsset, openEdit, searchParams]);
+
+  const openCreate = () => {
+    setEditingSlug(null);
+    setForm(emptyForm);
+    setError(null);
+    setEditorOpen(true);
   };
 
   const save = async () => {
     const slug = form.slug.trim() || slugify(form.name);
     if (!slug || !form.name.trim()) {
-      setError("Name and slug are required");
+      setError("Name and URL identifier are required");
       return;
     }
     setSaving(true);
@@ -192,6 +293,19 @@ export function CatalogContractsClient() {
 
       <CatalogAccessBanner />
 
+      <PageHelpBox title="Quick guide: data contracts">
+        <p>
+          A data contract is a promise to consumers: which columns must exist, how fresh data should be, and who owns
+          it. Link catalog assets to a contract to show compliance on their detail pages and get alerts when runs
+          violate the spec.
+        </p>
+        <p className="text-xs text-slate-500">
+          Tip: use <strong className="font-medium">Import from linked assets</strong> in the editor to build the schema
+          from an existing table instead of typing columns by hand. Click{" "}
+          <CircleHelp className="inline h-3 w-3 align-text-bottom" aria-hidden /> on any field for more detail.
+        </p>
+      </PageHelpBox>
+
       {editorOpen ? (
         <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-5 dark:border-sky-900 dark:bg-sky-950/20">
           <div className="flex items-center justify-between gap-2">
@@ -204,7 +318,7 @@ export function CatalogContractsClient() {
           </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <label className="block text-sm">
-              <span className="font-medium text-slate-700 dark:text-slate-300">Name</span>
+              <FieldLabel label="Name" help={CATALOG_FIELD_HELP.contractName} />
               <input
                 value={form.name}
                 onChange={(e) =>
@@ -218,16 +332,17 @@ export function CatalogContractsClient() {
               />
             </label>
             <label className="block text-sm">
-              <span className="font-medium text-slate-700 dark:text-slate-300">Slug</span>
+              <FieldLabel label="URL identifier" help={CATALOG_FIELD_HELP.contractSlug} />
               <input
                 value={form.slug}
                 onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
                 disabled={Boolean(editingSlug)}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950"
+                placeholder="e.g. orders-raw"
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950"
               />
             </label>
             <label className="block text-sm sm:col-span-2">
-              <span className="font-medium text-slate-700 dark:text-slate-300">Description</span>
+              <FieldLabel label="Description" help={CATALOG_FIELD_HELP.contractDescription} />
               <textarea
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
@@ -236,7 +351,7 @@ export function CatalogContractsClient() {
               />
             </label>
             <label className="block text-sm">
-              <span className="font-medium text-slate-700 dark:text-slate-300">Owner</span>
+              <FieldLabel label="Owner" help={CATALOG_FIELD_HELP.contractOwner} />
               <input
                 value={form.ownerName}
                 onChange={(e) => setForm((f) => ({ ...f, ownerName: e.target.value }))}
@@ -244,7 +359,7 @@ export function CatalogContractsClient() {
               />
             </label>
             <label className="block text-sm">
-              <span className="font-medium text-slate-700 dark:text-slate-300">Owner email</span>
+              <FieldLabel label="Owner email" help={CATALOG_FIELD_HELP.contractOwnerEmail} />
               <input
                 type="email"
                 value={form.ownerEmail}
@@ -253,7 +368,7 @@ export function CatalogContractsClient() {
               />
             </label>
             <label className="block text-sm">
-              <span className="font-medium text-slate-700 dark:text-slate-300">Status</span>
+              <FieldLabel label="Status" help={CATALOG_FIELD_HELP.contractStatus} />
               <select
                 value={form.status}
                 onChange={(e) =>
@@ -267,7 +382,7 @@ export function CatalogContractsClient() {
               </select>
             </label>
             <label className="block text-sm">
-              <span className="font-medium text-slate-700 dark:text-slate-300">Freshness SLA (hours)</span>
+              <FieldLabel label="Freshness SLA (hours)" help={CATALOG_FIELD_HELP.contractFreshnessSla} />
               <input
                 type="number"
                 min={1}
@@ -278,15 +393,36 @@ export function CatalogContractsClient() {
               />
             </label>
             <div className="sm:col-span-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Schema spec</span>
-                <button
-                  type="button"
-                  onClick={() => setForm((f) => ({ ...f, schemaSpec: [...f.schemaSpec, emptyColumn()] }))}
-                  className="text-xs font-medium text-sky-600 hover:underline dark:text-sky-400"
-                >
-                  + Add column
-                </button>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <FieldLabel label="Schema spec" help={CATALOG_FIELD_HELP.contractSchema} />
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void importSchemaFromAssets(form.assetKeys, false)}
+                    disabled={importing || !form.assetKeys.length}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-sky-600 hover:underline disabled:opacity-50 dark:text-sky-400"
+                  >
+                    {importing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                    Import from linked assets
+                  </button>
+                  {form.schemaSpec.some((c) => c.name.trim()) ? (
+                    <button
+                      type="button"
+                      onClick={() => void importSchemaFromAssets(form.assetKeys, true)}
+                      disabled={importing || !form.assetKeys.length}
+                      className="text-xs font-medium text-slate-600 hover:underline disabled:opacity-50 dark:text-slate-400"
+                    >
+                      Merge import
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, schemaSpec: [...f.schemaSpec, emptyColumn()] }))}
+                    className="text-xs font-medium text-sky-600 hover:underline dark:text-sky-400"
+                  >
+                    + Add column
+                  </button>
+                </div>
               </div>
               <ul className="mt-2 space-y-2">
                 {form.schemaSpec.map((col, i) => (
@@ -335,7 +471,7 @@ export function CatalogContractsClient() {
               </ul>
             </div>
             <div className="sm:col-span-2">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Linked assets</span>
+              <FieldLabel label="Linked assets" help={CATALOG_FIELD_HELP.contractLinkedAssets} />
               <div className="mt-2">
                 <CatalogAssetPicker
                   selected={form.assetKeys}
@@ -422,4 +558,26 @@ export function CatalogContractsClient() {
       )}
     </div>
   );
+}
+
+function mergeSchemaRows(existing: SchemaColumn[], imported: SchemaColumn[]): SchemaColumn[] {
+  const byName = new Map<string, SchemaColumn>();
+  for (const col of existing.filter((c) => c.name.trim())) {
+    byName.set(col.name.toLowerCase(), col);
+  }
+  for (const col of imported) {
+    const key = col.name.toLowerCase();
+    const prev = byName.get(key);
+    if (!prev) {
+      byName.set(key, col);
+      continue;
+    }
+    byName.set(key, {
+      name: prev.name,
+      type: prev.type || col.type,
+      required: prev.required || col.required,
+      description: prev.description || col.description,
+    });
+  }
+  return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
 }

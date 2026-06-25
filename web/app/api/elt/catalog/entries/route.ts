@@ -71,6 +71,7 @@ const patchSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
   pipelineId: z.string().nullable().optional(),
   certified: z.boolean().optional(),
+  createContractFromSchema: z.boolean().optional(),
 });
 
 export async function PUT(req: Request) {
@@ -122,7 +123,27 @@ export async function PUT(req: Request) {
     },
   });
 
-  return NextResponse.json({ entry: row });
+  let contract: { id: string; slug: string; name: string } | null = null;
+  let contractCreated: boolean | undefined;
+
+  if (data.certified === true && data.createContractFromSchema !== false) {
+    const ownerIds = await getAccessibleResourceOwnerIds(auth.user.id);
+    const { upsertContractFromAssets, certifiedAssetContractSlug } = await import(
+      "@/lib/elt/upsert-contract-from-assets"
+    );
+    const displayName = row.displayName ?? data.displayName ?? data.assetKey;
+    const result = await upsertContractFromAssets(resourceUserId, ownerIds, [data.assetKey], {
+      slug: certifiedAssetContractSlug(data.assetKey, displayName),
+      status: "active",
+      fetchWarehouseColumns: true,
+    });
+    if (result) {
+      contract = result.contract;
+      contractCreated = result.created;
+    }
+  }
+
+  return NextResponse.json({ entry: row, contract, contractCreated });
 }
 
 export async function POST(req: Request) {

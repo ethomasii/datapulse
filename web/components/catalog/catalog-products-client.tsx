@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, Loader2, Package, Pencil, Plus, Shield, Trash2, X } from "lucide-react";
+import { ArrowRight, CircleHelp, Loader2, Package, Pencil, Plus, Shield, Trash2, X } from "lucide-react";
 import { assetDetailHref } from "@/lib/elt/asset-path";
 import { CatalogAccessBanner } from "@/components/catalog/catalog-access-banner";
 import { CatalogAssetPicker } from "@/components/catalog/catalog-asset-picker";
+import { FieldLabel, PageHelpBox } from "@/components/ui/field-help";
+import { CATALOG_FIELD_HELP } from "@/lib/catalog/field-help-copy";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 
 type Product = {
@@ -107,7 +109,7 @@ export function CatalogProductsClient() {
   const save = async () => {
     const slug = form.slug.trim() || slugify(form.name);
     if (!slug || !form.name.trim()) {
-      setError("Name and slug are required");
+      setError("Name and URL identifier are required");
       return;
     }
     setSaving(true);
@@ -166,7 +168,8 @@ export function CatalogProductsClient() {
             <Link href="/catalog/contracts" className="text-sky-600 hover:underline dark:text-sky-400">
               data contract
             </Link>{" "}
-            defining schema and freshness SLAs.
+            defining schema and freshness SLAs. Think of a product as a curated “menu item” for data consumers — not a
+            single table, but a named package of related assets.
           </p>
         </div>
         {canEdit ? (
@@ -183,6 +186,32 @@ export function CatalogProductsClient() {
 
       <CatalogAccessBanner />
 
+      <PageHelpBox title="Quick guide: data products">
+        <ul className="list-inside list-disc space-y-1.5">
+          <li>
+            <strong className="font-medium text-slate-700 dark:text-slate-200">Name</strong> — what consumers see in
+            the Library.
+          </li>
+          <li>
+            <strong className="font-medium text-slate-700 dark:text-slate-200">URL identifier</strong> — a short
+            machine-friendly ID (slug) like <code className="rounded bg-slate-200/80 px-1 font-mono text-xs dark:bg-slate-800">monthly-revenue</code>
+            ; auto-generated from the name.
+          </li>
+          <li>
+            <strong className="font-medium text-slate-700 dark:text-slate-200">Assets</strong> — the tables or models
+            included in the bundle.
+          </li>
+          <li>
+            <strong className="font-medium text-slate-700 dark:text-slate-200">Data contract</strong> (optional) —
+            schema and freshness guarantees for everything in the product.
+          </li>
+        </ul>
+        <p className="text-xs text-slate-500 dark:text-slate-500">
+          Click the <CircleHelp className="inline h-3 w-3 align-text-bottom" aria-hidden /> icon next to any field in
+          the editor for more detail.
+        </p>
+      </PageHelpBox>
+
       {editorOpen ? (
         <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-5 dark:border-sky-900 dark:bg-sky-950/20">
           <div className="flex items-center justify-between gap-2">
@@ -195,7 +224,7 @@ export function CatalogProductsClient() {
           </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <label className="block text-sm">
-              <span className="font-medium text-slate-700 dark:text-slate-300">Name</span>
+              <FieldLabel label="Name" help={CATALOG_FIELD_HELP.productName} />
               <input
                 value={form.name}
                 onChange={(e) =>
@@ -209,16 +238,20 @@ export function CatalogProductsClient() {
               />
             </label>
             <label className="block text-sm">
-              <span className="font-medium text-slate-700 dark:text-slate-300">Slug</span>
+              <FieldLabel label="URL identifier" help={CATALOG_FIELD_HELP.productSlug} />
               <input
                 value={form.slug}
                 onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
                 disabled={Boolean(editingSlug)}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950"
+                placeholder="e.g. monthly-revenue"
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950"
               />
+              {!editingSlug && form.slug ? (
+                <p className="mt-1 text-xs text-slate-500">Auto-generated from name — you can edit before saving.</p>
+              ) : null}
             </label>
             <label className="block text-sm sm:col-span-2">
-              <span className="font-medium text-slate-700 dark:text-slate-300">Description</span>
+              <FieldLabel label="Description" help={CATALOG_FIELD_HELP.productDescription} />
               <textarea
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
@@ -227,7 +260,7 @@ export function CatalogProductsClient() {
               />
             </label>
             <label className="block text-sm">
-              <span className="font-medium text-slate-700 dark:text-slate-300">Owner</span>
+              <FieldLabel label="Owner" help={CATALOG_FIELD_HELP.productOwner} />
               <input
                 value={form.ownerName}
                 onChange={(e) => setForm((f) => ({ ...f, ownerName: e.target.value }))}
@@ -235,7 +268,7 @@ export function CatalogProductsClient() {
               />
             </label>
             <label className="block text-sm">
-              <span className="font-medium text-slate-700 dark:text-slate-300">Domain</span>
+              <FieldLabel label="Domain" help={CATALOG_FIELD_HELP.productDomain} />
               <input
                 value={form.domain}
                 onChange={(e) => setForm((f) => ({ ...f, domain: e.target.value }))}
@@ -244,7 +277,7 @@ export function CatalogProductsClient() {
               />
             </label>
             <label className="block text-sm sm:col-span-2">
-              <span className="font-medium text-slate-700 dark:text-slate-300">Consumer tags (comma-separated)</span>
+              <FieldLabel label="Consumer tags" help={CATALOG_FIELD_HELP.productConsumerTags} />
               <input
                 value={form.consumerTags}
                 onChange={(e) => setForm((f) => ({ ...f, consumerTags: e.target.value }))}
@@ -253,7 +286,7 @@ export function CatalogProductsClient() {
               />
             </label>
             <label className="block text-sm">
-              <span className="font-medium text-slate-700 dark:text-slate-300">Data contract</span>
+              <FieldLabel label="Data contract" help={CATALOG_FIELD_HELP.productContract} />
               <select
                 value={form.contractId}
                 onChange={(e) => setForm((f) => ({ ...f, contractId: e.target.value }))}
@@ -273,10 +306,10 @@ export function CatalogProductsClient() {
                 checked={form.featured}
                 onChange={(e) => setForm((f) => ({ ...f, featured: e.target.checked }))}
               />
-              <span className="font-medium text-slate-700 dark:text-slate-300">Featured on catalog hub</span>
+              <FieldLabel label="Featured on Library hub" help={CATALOG_FIELD_HELP.productFeatured} />
             </label>
             <div className="sm:col-span-2">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Assets in this product</span>
+              <FieldLabel label="Assets in this product" help={CATALOG_FIELD_HELP.productAssets} />
               <div className="mt-2">
                 <CatalogAssetPicker
                   selected={form.assetKeys}

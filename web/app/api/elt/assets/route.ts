@@ -193,6 +193,7 @@ export async function GET(req: Request) {
             tags: parseTags(catalogRow.tags),
             metadata: catalogMetadata,
             aiGeneratedAt: catalogMetadata.aiGeneratedAt,
+            certifiedAt: catalogRow.certifiedAt?.toISOString() ?? null,
           }
         : null,
       technicalProfile,
