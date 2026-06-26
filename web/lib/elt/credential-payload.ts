@@ -90,3 +90,38 @@ export function sanitizeCredentialsForPersistence(cfg: Record<string, unknown>):
   }
   return next;
 }
+
+/** Map saved connection `config` into catalog credential form keys (non-secrets only). */
+export function connectionConfigToFormValues(
+  connector: string,
+  config: Record<string, string>
+): Record<string, string> {
+  const slug = connector.toLowerCase().trim();
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(config)) {
+    if (v.trim()) out[k] = v.trim();
+  }
+  if (slug === "motherduck") {
+    const db = out.database ?? "";
+    if (db && !out.MOTHERDUCK_DATABASE) {
+      out.MOTHERDUCK_DATABASE = db;
+    }
+    delete out.database;
+  }
+  return out;
+}
+
+/** Apply non-secret saved connection config onto credential form state. */
+export function mergeLinkedConnectionFormValues(
+  connector: string,
+  config: Record<string, string>,
+  prev: Record<string, string>
+): Record<string, string> {
+  const mapped = connectionConfigToFormValues(connector, config);
+  const next = { ...prev };
+  for (const [k, v] of Object.entries(mapped)) {
+    if (CREDENTIAL_SENSITIVE_KEY_SET.has(k)) continue;
+    if (v.trim()) next[k] = v;
+  }
+  return next;
+}

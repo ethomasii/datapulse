@@ -144,7 +144,7 @@ export function CatalogCredentialFields({ fields, values, onPatch, secretsStored
                 </p>
               ) : (
                 <p className="mt-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                  Managed runs read <code className="font-mono text-[10px]">{f.key}</code> from the linked source
+                  Managed runs read <code className="font-mono text-[10px]">{f.key}</code> from the linked
                   connection at runtime — not from this pipeline JSON.
                 </p>
               )}

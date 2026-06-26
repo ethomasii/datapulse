@@ -34,6 +34,7 @@ import {
   emptyConnectionValuesForTypes,
   extractConnectionValues,
   mergeConnectionStrings,
+  mergeLinkedConnectionFormValues,
   sanitizeCredentialsForPersistence,
 } from "@/lib/elt/credential-payload";
 import {
@@ -96,6 +97,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
   const [sourceConnectionId, setSourceConnectionId] = useState<string | null>(null);
   const linkedSourceConnection = useLinkedConnectionMeta(sourceConnectionId);
   const [destinationConnectionId, setDestinationConnectionId] = useState<string | null>(null);
+  const linkedDestConnection = useLinkedConnectionMeta(destinationConnectionId);
   /** When the catalog has no source schema, connector fields are edited as JSON. */
   const [connectorJson, setConnectorJson] = useState("{}");
   const [advancedJsonDirty, setAdvancedJsonDirty] = useState(false);
@@ -225,6 +227,14 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
   useEffect(() => {
     setInspectorFocus({ kind: "none" });
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!linkedDestConnection) return;
+    setConnectionValues((prev) =>
+      mergeLinkedConnectionFormValues(linkedDestConnection.connector, linkedDestConnection.config, prev)
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hydrate form when linked destination connection changes
+  }, [linkedDestConnection?.id]);
 
   const patchConnection = useCallback((key: string, value: string) => {
     setConnectionValues((prev) => ({ ...prev, [key]: value }));
@@ -932,7 +942,9 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
               onSelect={({ id, config }) => {
                 setDestinationConnectionId(id);
                 if (Object.keys(config).length > 0) {
-                  setConnectionValues((prev) => ({ ...prev, ...config }));
+                  setConnectionValues((prev) =>
+                    mergeLinkedConnectionFormValues(pipelineDestinationType || "postgres", config, prev)
+                  );
                 }
                 void patchPipelineConnection({ destinationConnectionId: id });
               }}
@@ -944,6 +956,14 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
             onSourceCfgChange={setSourceCfg}
             connectionValues={connectionValues}
             onConnectionPatch={patchConnection}
+            linkedDestConnection={
+              linkedDestConnection
+                ? {
+                    name: linkedDestConnection.name,
+                    hasStoredSecrets: Boolean(linkedDestConnection.hasStoredSecrets),
+                  }
+                : null
+            }
           />
         </FormAccordion>
 
@@ -1198,7 +1218,9 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
                 onSelect={({ id, config }) => {
                   setDestinationConnectionId(id);
                   if (Object.keys(config).length > 0) {
-                    setConnectionValues((prev) => ({ ...prev, ...config }));
+                    setConnectionValues((prev) =>
+                      mergeLinkedConnectionFormValues(pipelineDestinationType || "postgres", config, prev)
+                    );
                   }
                   void patchPipelineConnection({ destinationConnectionId: id });
                 }}
@@ -1210,6 +1232,14 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
               onSourceCfgChange={setSourceCfg}
               connectionValues={connectionValues}
               onConnectionPatch={patchConnection}
+              linkedDestConnection={
+                linkedDestConnection
+                  ? {
+                      name: linkedDestConnection.name,
+                      hasStoredSecrets: Boolean(linkedDestConnection.hasStoredSecrets),
+                    }
+                  : null
+              }
             />
             <div className="mt-3">
               <CopyEnvButton values={destinationEnvValues} />

@@ -49,6 +49,7 @@ import {
   emptyConnectionValuesForTypes,
   extractConnectionValues,
   mergeConnectionStrings,
+  mergeLinkedConnectionFormValues,
   sanitizeCredentialsForPersistence,
 } from "@/lib/elt/credential-payload";
 import { ensureGithubReposForForm } from "@/lib/elt/normalize-source-configuration";
@@ -176,6 +177,7 @@ export function BuilderClient({
   const [sourceConnectionId, setSourceConnectionId] = useState<string | null>(null);
   const linkedSourceConnection = useLinkedConnectionMeta(sourceConnectionId);
   const [destinationConnectionId, setDestinationConnectionId] = useState<string | null>(null);
+  const linkedDestConnection = useLinkedConnectionMeta(destinationConnectionId);
   const [postTransformType, setPostTransformType] = useState<"" | "python" | "sql" | "dbt">("");
   const [postTransformCode, setPostTransformCode] = useState("");
   const [dbtPackagePath, setDbtPackagePath] = useState("");
@@ -224,6 +226,14 @@ export function BuilderClient({
     }, 200);
     return () => window.clearTimeout(timer);
   }, [wantDbtSetup, showCreateForm, editingId]);
+
+  useEffect(() => {
+    if (!linkedDestConnection) return;
+    setConnectionValues((prev) =>
+      mergeLinkedConnectionFormValues(linkedDestConnection.connector, linkedDestConnection.config, prev)
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hydrate form when linked destination connection changes
+  }, [linkedDestConnection?.id]);
 
   function patchConnection(key: string, value: string) {
     setConnectionValues((prev) => ({ ...prev, [key]: value }));
@@ -1302,7 +1312,11 @@ export function BuilderClient({
                       currentValues={connectionValues}
                       onSelect={({ id, config }) => {
                         setDestinationConnectionId(id);
-                        setConnectionValues((prev) => ({ ...prev, ...config }));
+                        if (Object.keys(config).length > 0) {
+                          setConnectionValues((prev) =>
+                            mergeLinkedConnectionFormValues(destinationType, config, prev)
+                          );
+                        }
                       }}
                     />
                   </div>
@@ -1312,6 +1326,14 @@ export function BuilderClient({
                     onSourceCfgChange={setSourceCfg}
                     connectionValues={connectionValues}
                     onConnectionPatch={patchConnection}
+                    linkedDestConnection={
+                      linkedDestConnection
+                        ? {
+                            name: linkedDestConnection.name,
+                            hasStoredSecrets: Boolean(linkedDestConnection.hasStoredSecrets),
+                          }
+                        : null
+                    }
                   />
                   <div className="mt-4">
                     <CopyEnvButton values={connectionValues} />
