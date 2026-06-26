@@ -11,7 +11,15 @@ import {
   isValidPipelineCanvasEdge,
 } from "@/lib/elt/canvas-component-sync";
 import { getCanvasFromSourceConfig, type PipelineCanvasGraph } from "@/lib/elt/canvas-source-config";
-import { applyCanvasComponentsToSourceConfig, type AiPipelineComponentInput } from "@/lib/elt/ai-pipeline-canvas-build";
+import {
+  applyCanvasComponentsToSourceConfig,
+  relayoutPipelineCanvas,
+} from "@/lib/elt/ai-pipeline-canvas-build";
+import {
+  findCanvasAppendTarget,
+  positionAfterUpstream,
+  type CanvasAppendNodeSpec,
+} from "@/lib/elt/canvas-node-placement";
 
 export type CanvasGraphEditAction =
   | {
@@ -108,7 +116,7 @@ function addTransformNode(
 export function applyCanvasGraphEdits(
   sourceConfiguration: Record<string, unknown>,
   actions: CanvasGraphEditAction[],
-  meta: { sourceType: string; destinationType: string; pipelineName?: string }
+  meta: { sourceType: string; destinationType: string; pipelineName?: string; transformOnly?: boolean }
 ): {
   sourceConfiguration: Record<string, unknown>;
   canvas: PipelineCanvasGraph;
@@ -165,59 +173,82 @@ export function applyCanvasGraphEdits(
         continue;
       }
       const route = routeComponent(catalog.id, catalog.category);
+      const appendSpec: CanvasAppendNodeSpec = {
+        type: "componentNode",
+        data: { compileHint: route.hint },
+      };
+      const placementOpts = { transformOnly: meta.transformOnly, append: appendSpec };
+      const afterRef = action.after?.trim();
+      const afterNode = afterRef ? findNodeByRef(nodes, afterRef) : null;
+      let wireFrom: Node | null = afterNode;
+      let position: { x: number; y: number };
+      if (afterNode) {
+        position = positionAfterUpstream(nodes, afterNode, appendSpec);
+      } else {
+        const anchor = findCanvasAppendTarget(nodes, edges, placementOpts);
+        position = anchor.position;
+        wireFrom = anchor.upstreamId ? (nodes.find((n) => n.id === anchor.upstreamId) ?? null) : null;
+      }
+
       const id = `n-comp-${nodes.length + 1}`;
       const node: Node = {
         id,
         type: "componentNode",
-        position: { x: 560, y: 80 + nodes.length * 90 },
+        position,
         data: {
           componentId: catalog.id,
           label: action.label ?? catalog.name,
           category: catalog.category,
           compileTarget: route.target,
+          compileBadge: route.badge ?? route.target,
           compileHint: route.hint,
           canvasPorts: canvasPortsForCategory(normalizeComponentCategory(catalog.category)),
           config: { ...(action.config ?? {}), template_id: catalog.id },
         },
       };
       nodes.push(node);
-      const afterRef = action.after?.trim();
-      if (afterRef) {
-        const afterNode = findNodeByRef(nodes, afterRef);
-        if (afterNode && isValidPipelineCanvasEdge(afterNode, node)) {
-          const outgoing = edges.filter((e) => e.source === afterNode.id);
-          if (outgoing.length === 1) {
-            const nextNode = nodes.find((n) => n.id === outgoing[0]!.target);
-            if (nextNode && isValidPipelineCanvasEdge(node, nextNode)) {
-              edges = edges.filter(
-                (e) => !(e.source === afterNode.id && e.target === nextNode.id)
-              );
-              edges.push(makeEdge(afterNode.id, node.id), makeEdge(node.id, nextNode.id));
-              node.position = {
-                x: (afterNode.position.x + nextNode.position.x) / 2,
-                y: (afterNode.position.y + nextNode.position.y) / 2,
-              };
-            } else {
-              edges.push(makeEdge(afterNode.id, node.id));
-            }
+
+      if (afterNode && isValidPipelineCanvasEdge(afterNode, node)) {
+        const outgoing = edges.filter((e) => e.source === afterNode.id);
+        if (outgoing.length === 1) {
+          const nextNode = nodes.find((n) => n.id === outgoing[0]!.target);
+          if (nextNode && isValidPipelineCanvasEdge(node, nextNode)) {
+            edges = edges.filter(
+              (e) => !(e.source === afterNode.id && e.target === nextNode.id)
+            );
+            edges.push(makeEdge(afterNode.id, node.id), makeEdge(node.id, nextNode.id));
           } else {
             edges.push(makeEdge(afterNode.id, node.id));
           }
+        } else {
+          edges.push(makeEdge(afterNode.id, node.id));
         }
-      } else {
-        const dest = findNodeByRef(nodes, "dest");
-        if (dest && isValidPipelineCanvasEdge(dest, node)) edges.push(makeEdge(dest.id, node.id));
+      } else if (wireFrom && isValidPipelineCanvasEdge(wireFrom, node)) {
+        edges.push(makeEdge(wireFrom.id, node.id));
       }
       messages.push(`Added component ${catalog.name}`);
     } else if (action.op === "add_transform") {
-      const afterNode = action.after ? findNodeByRef(nodes, action.after) : findNodeByRef(nodes, "dest");
-      const pos = afterNode
-        ? { x: afterNode.position.x + 200, y: afterNode.position.y }
-        : { x: 560, y: 200 };
-      const node = addTransformNode(nodes, action, pos);
+      const appendSpec: CanvasAppendNodeSpec = {
+        type: "transformNode",
+        data: { transformTool: action.tool },
+      };
+      const placementOpts = { transformOnly: meta.transformOnly, append: appendSpec };
+      const afterRef = action.after?.trim();
+      const afterNode = afterRef ? findNodeByRef(nodes, afterRef) : null;
+      let wireFrom: Node | null = afterNode;
+      let position: { x: number; y: number };
+      if (afterNode) {
+        position = positionAfterUpstream(nodes, afterNode, appendSpec);
+      } else {
+        const anchor = findCanvasAppendTarget(nodes, edges, placementOpts);
+        position = anchor.position;
+        wireFrom = anchor.upstreamId ? (nodes.find((n) => n.id === anchor.upstreamId) ?? null) : null;
+      }
+
+      const node = addTransformNode(nodes, action, position);
       nodes.push(node);
-      if (afterNode && isValidPipelineCanvasEdge(afterNode, node)) {
-        edges.push(makeEdge(afterNode.id, node.id));
+      if (wireFrom && isValidPipelineCanvasEdge(wireFrom, node)) {
+        edges.push(makeEdge(wireFrom.id, node.id));
       }
       messages.push(`Added ${action.tool} transform`);
     } else if (action.op === "update_node_config") {
@@ -237,6 +268,7 @@ export function applyCanvasGraphEdits(
   }
 
   edges = filterCanvasEdges(nodes, edges);
+  nodes = relayoutPipelineCanvas(nodes, edges);
   const canvas: PipelineCanvasGraph = { nodes, edges, v: 1 };
   const next: Record<string, unknown> = { ...sourceConfiguration, canvas };
   const extracted = extractComponentsFromCanvas(nodes, edges, { pipelineName: meta.pipelineName });

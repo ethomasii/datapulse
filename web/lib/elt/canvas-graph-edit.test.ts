@@ -1,5 +1,7 @@
+import type { Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 import { applyCanvasGraphEdits } from "@/lib/elt/canvas-graph-edit";
+import { CANVAS_HORIZONTAL_GAP } from "@/lib/elt/canvas-node-placement";
 
 describe("canvas-graph-edit", () => {
   const baseConfig = {
@@ -69,5 +71,50 @@ describe("canvas-graph-edit", () => {
     expect(r.messages[0]).toContain("dbt");
     const transform = (r.canvas.nodes as { type?: string }[]).find((n) => n.type === "transformNode");
     expect(transform).toBeDefined();
+  });
+
+  it("appends Genie-added components after the pipeline tail with layout spacing", () => {
+    const chainConfig = {
+      canvas: {
+        v: 1,
+        nodes: [
+          { id: "s", type: "sourceNode", position: { x: 40, y: 120 }, data: {} },
+          { id: "d", type: "destNode", position: { x: 360, y: 120 }, data: {} },
+          {
+            id: "c1",
+            type: "componentNode",
+            position: { x: 648, y: 120 },
+            data: {
+              componentId: "alter_row",
+              compileHint: "Warehouse SQL or dataframe transform after load",
+              category: "transformation",
+            },
+          },
+        ],
+        edges: [
+          { id: "e1", source: "s", target: "d" },
+          { id: "e2", source: "d", target: "c1" },
+        ],
+      },
+    };
+    const r = applyCanvasGraphEdits(
+      chainConfig,
+      [{ op: "add_component", component_id: "databricks_genie_query", label: "Genie" }],
+      { sourceType: "github", destinationType: "snowflake" }
+    );
+    expect(r.errors).toHaveLength(0);
+    const nodes = r.canvas.nodes as Node[];
+    const genie = nodes.find(
+      (n) => String((n.data as { componentId?: string }).componentId) === "databricks_genie_query"
+    );
+    const alterRow = nodes.find((n) => n.id === "c1");
+    expect(genie).toBeDefined();
+    expect(alterRow).toBeDefined();
+    expect(genie!.position.x).toBeGreaterThan(alterRow!.position.x);
+    expect(genie!.position.x - alterRow!.position.x).toBeGreaterThanOrEqual(200 + CANVAS_HORIZONTAL_GAP - 8);
+    const edgePairs = (r.canvas.edges as { source: string; target: string }[]).map(
+      (e) => `${e.source}->${e.target}`
+    );
+    expect(edgePairs).toContain(`c1->${genie!.id}`);
   });
 });

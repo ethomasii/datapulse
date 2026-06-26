@@ -1091,6 +1091,7 @@ async function toolEditPipelineCanvas(
     sourceType: pipeline.sourceType,
     destinationType: pipeline.destinationType,
     pipelineName: pipeline.name,
+    transformOnly: isTransformOnlyPipeline(base),
   });
 
   if (edited.errors.length && !edited.messages.length) {
