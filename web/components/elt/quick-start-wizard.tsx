@@ -31,8 +31,10 @@ import {
 } from "@/lib/elt/quick-start-catalog";
 import {
   duckdbDestinationConfig,
+  quickStartDestinationConfig,
   quickStartSecretFields,
 } from "@/lib/elt/quick-start-credentials";
+import { STARTER_WAREHOUSE_DEFAULT_DB } from "@/lib/elt/starter-warehouse";
 import { scenarioById, lakeStarterIdForScenario } from "@/lib/marketing/pipeline-scenarios";
 import { canvasStarterHref } from "@/lib/elt/lake-defaults";
 import { applyDiscoveryToSourceConfiguration } from "@/lib/elt/source-discover-catalog";
@@ -71,18 +73,21 @@ export function QuickStartWizard({
 }: QuickStartWizardProps) {
   const normDest = initialDestination
     ? normalizeQuickStartDestination(initialDestination)
-    : "duckdb";
+    : "motherduck";
   const normSource = initialSource ? normalizeQuickStartSource(initialSource) : "github";
   const resolvedInitialSource = isQuickStartSource(normSource) ? normSource : "github";
 
   const [step, setStep] = useState<Step>(() => initialStep(initialSource, initialDestination));
   const [destination, setDestination] = useState(
-    isQuickStartDestination(normDest) ? normDest : "duckdb"
+    isQuickStartDestination(normDest) ? normDest : "motherduck"
   );
   const [source, setSource] = useState(resolvedInitialSource);
   const [sourceSearch, setSourceSearch] = useState("");
   const [pipelineName, setPipelineName] = useState("");
   const [destSecrets, setDestSecrets] = useState<Record<string, string>>({});
+  const [destConfig, setDestConfig] = useState<Record<string, string>>({
+    database: STARTER_WAREHOUSE_DEFAULT_DB,
+  });
   const [sourceSecrets, setSourceSecrets] = useState<Record<string, string>>({});
   const [testing, setTesting] = useState(false);
   const [testOk, setTestOk] = useState<boolean | null>(null);
@@ -188,7 +193,7 @@ export function QuickStartWizard({
             body: JSON.stringify({
               connectionType: "destination",
               connector: destination,
-              config: destination === "duckdb" ? duckdbDestinationConfig() : {},
+              config: quickStartDestinationConfig(destination, destConfig),
               secrets: destSecrets,
             }),
           })
@@ -229,9 +234,13 @@ export function QuickStartWizard({
     type: "source" | "destination",
     connector: string,
     name: string,
-    secrets: Record<string, string>
+    secrets: Record<string, string>,
+    config: Record<string, unknown> = {}
   ): Promise<string> {
-    const config = type === "destination" && connector === "duckdb" ? duckdbDestinationConfig() : {};
+    const resolvedConfig =
+      type === "destination" && connector === "duckdb" && Object.keys(config).length === 0
+        ? duckdbDestinationConfig()
+        : config;
     const res = await fetch("/api/elt/connections", {
       method: "POST",
       credentials: "same-origin",
@@ -240,7 +249,7 @@ export function QuickStartWizard({
         name,
         connectionType: type,
         connector,
-        config,
+        config: resolvedConfig,
         secrets: Object.keys(secrets).some((k) => secrets[k]?.trim()) ? secrets : undefined,
       }),
     });
@@ -266,8 +275,17 @@ export function QuickStartWizard({
           "destination",
           destination,
           `qs-${destination}`,
-          destSecrets
+          destSecrets,
+          quickStartDestinationConfig(destination, destConfig)
         );
+        if (destConnId) {
+          await fetch("/api/elt/workspace-defaults", {
+            method: "PATCH",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ defaultDestinationConnectionId: destConnId }),
+          });
+        }
       }
 
       const baseConfig = minimalSourceConfigurationForNewPipeline(pipelineSourceType);
@@ -479,11 +497,11 @@ export function QuickStartWizard({
         <section className="space-y-4">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Where should data land?</h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Or{" "}
-            <Link href="/connections" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-              set a default warehouse
+            New here?{" "}
+            <Link href="/starter-warehouse" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+              Set up a free MotherDuck starter warehouse
             </Link>{" "}
-            under Connections to skip this step next time.
+            first, or pick a destination below.
           </p>
           <ul className="grid gap-3 sm:grid-cols-2">
             {QUICK_START_DESTINATIONS.map((d) => (
@@ -500,6 +518,11 @@ export function QuickStartWizard({
                   <div className="flex items-center gap-2">
                     <ConnectorIcon slug={d.slug} name={d.label} size={20} />
                     <span className="font-semibold text-slate-900 dark:text-white">{d.label}</span>
+                    {d.slug === "motherduck" ? (
+                      <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700 dark:bg-sky-900/50 dark:text-sky-300">
+                        Recommended
+                      </span>
+                    ) : null}
                   </div>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{d.hint}</p>
                 </button>
@@ -552,6 +575,16 @@ export function QuickStartWizard({
             <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
               <p className="text-xs font-semibold uppercase text-slate-500">Destination ({destination})</p>
               <div className="mt-3 space-y-2">
+                {destination === "motherduck" ? (
+                  <label className="block">
+                    <span className="text-xs text-slate-600 dark:text-slate-400">Database name</span>
+                    <input
+                      value={destConfig.database ?? STARTER_WAREHOUSE_DEFAULT_DB}
+                      onChange={(e) => setDestConfig((p) => ({ ...p, database: e.target.value }))}
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-950"
+                    />
+                  </label>
+                ) : null}
                 {destFields.map((f) => (
                   <label key={f.key} className="block">
                     <span className="text-xs text-slate-600 dark:text-slate-400">{f.label}</span>

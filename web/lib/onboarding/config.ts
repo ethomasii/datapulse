@@ -14,9 +14,9 @@ export type OnboardingStep = {
 export const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: "connection",
-    label: "Connect your warehouse",
-    description: "Save destination credentials once — reuse across pipelines",
-    href: "/connections",
+    label: "Get a starter warehouse",
+    description: "Free MotherDuck in ~2 min — or add Snowflake / Postgres later",
+    href: "/starter-warehouse",
   },
   {
     id: "pipeline",

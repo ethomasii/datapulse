@@ -1,4 +1,5 @@
 import { credentialKeysForConnectionSide } from "@/lib/elt/credential-payload";
+import { quickStartDestinationConfig as destinationConfigForConnector } from "@/lib/elt/starter-warehouse";
 
 export type QuickStartSecretField = { key: string; label: string; placeholder?: string };
 
@@ -27,3 +28,5 @@ export function quickStartSecretFields(
 export function duckdbDestinationConfig(): Record<string, string> {
   return {};
 }
+
+export { destinationConfigForConnector as quickStartDestinationConfig };

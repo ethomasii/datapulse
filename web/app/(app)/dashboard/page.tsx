@@ -15,6 +15,8 @@ import { ExecutionStatusBanner } from "@/components/elt/execution-status-banner"
 import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 import { getManagedExecutionStatus } from "@/lib/elt/managed-execution-status";
 import { resolveUserPlanTier, runHistoryPrismaFilter } from "@/lib/plans/tier-features";
+import { loadWorkspaceDefaults } from "@/lib/elt/workspace-default-destination";
+import { StarterWarehouseBanner } from "@/components/elt/starter-warehouse-banner";
 
 /** Narrow select so Home works when optional DB columns are not migrated yet. */
 const HOME_RUN_LIST = {
@@ -38,6 +40,8 @@ export default async function DashboardPage() {
   const [
     pipelineCount,
     connectionCount,
+    destinationCount,
+    workspaceDefaults,
     anyRun,
     activeRuns,
     recentFinished,
@@ -48,6 +52,10 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     db.eltPipeline.count({ where: ownerWhere }),
     db.connection.count({ where: { userId: { in: ownerIds } } }),
+    db.connection.count({
+      where: { userId: { in: ownerIds }, connectionType: "destination" },
+    }),
+    loadWorkspaceDefaults(user.id),
     db.eltPipelineRun.findFirst({ where: { userId: { in: ownerIds } }, select: { id: true } }),
     db.eltPipelineRun.findMany({
       where: { userId: { in: ownerIds }, status: { in: ["pending", "running"] } },
@@ -82,7 +90,11 @@ export default async function DashboardPage() {
 
   const completedIds = ONBOARDING_STEPS.map((s) => s.id).filter((id) => {
     if (id === "pipeline") return pipelineCount > 0;
-    if (id === "connection") return connectionCount > 0;
+    if (id === "connection") {
+      return (
+        destinationCount > 0 || !!workspaceDefaults.defaultDestinationConnectionId || connectionCount > 0
+      );
+    }
     if (id === "gateway") return namedAgents.length > 0 || !!user.agentToken;
     if (id === "execution") return executionStatus.readyForRealRuns || namedAgents.length > 0;
     if (id === "run") return !!anyRun;
@@ -112,6 +124,10 @@ export default async function DashboardPage() {
           )
         }
       />
+
+      {showOnboarding && !workspaceDefaults.defaultDestinationConnectionId ? (
+        <StarterWarehouseBanner />
+      ) : null}
 
       {showOnboarding ? (
         <OnboardingChecklist completedIds={completedIds} />
