@@ -1,5 +1,5 @@
 ---
-description: After meaningful code or asset changes, commit and push unless the user opts out.
+description: After meaningful code or asset changes, commit and push unless the user opts out. Run local build before push.
 alwaysApply: true
 ---
 
@@ -12,3 +12,19 @@ When you finish a task that changes the codebase (source, config, assets, migrat
 - If `git push` fails (auth, network), report the error and leave the commit local.
 
 Do not end a coding session with uncommitted work when the user wanted changes landed on the remote.
+
+## Before commit and push (Vercel)
+
+**Always run a local production build before pushing** when `web/` (or other deployable app roots) changed. Do not push and rely on Vercel to catch type/lint errors — that wastes build minutes and money.
+
+From `web/` (with `.env.local` present for Prisma if needed):
+
+```bash
+npm run build
+```
+
+Fix any compile/type errors locally first, then commit and push.
+
+For smaller web-only edits, at minimum run `npx tsc --noEmit` if a full build is too slow — but prefer `npm run build` before push when the change touches API routes, Prisma, or new pages.
+
+If the build fails, fix and re-run locally; do not push a broken commit hoping CI will report it.
