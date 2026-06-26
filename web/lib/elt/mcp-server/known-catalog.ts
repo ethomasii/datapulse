@@ -120,6 +120,30 @@ export const KNOWN_MCP_SERVER_TEMPLATES: KnownMcpServerTemplate[] = [
     runtimeNote: "Tool discovery works from this UI once token and organization are saved.",
   },
   {
+    id: "servicepulse-remote",
+    name: "ServicePulse",
+    vendor: "ServicePulse",
+    category: "platform",
+    description:
+      "Hosted ServicePulse MCP — stack health, incidents, uptime monitors, metrics, and Team+ AI assistant (Streamable HTTP + SSE).",
+    transport: "http",
+    config: {
+      url: "https://mcp.servicepulse.dev",
+      headers_env: { Authorization: "SERVICEPULSE_MCP_AUTH" },
+    },
+    docsUrl: "https://servicepulse.dev/docs#api-mcp",
+    envVars: [
+      {
+        name: "SERVICEPULSE_MCP_AUTH",
+        label: "Personal API token",
+        description: "Bearer sp_… from ServicePulse → Developers. Team+ required for servicepulse_ask.",
+        required: true,
+        bearerPrefix: true,
+      },
+    ],
+    runtimeNote: "Tool discovery works from this UI once the token is saved.",
+  },
+  {
     id: "stripe-remote",
     name: "Stripe",
     vendor: "Stripe",
