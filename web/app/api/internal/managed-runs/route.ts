@@ -1,6 +1,7 @@
 import { RunIngestionExecutor, type Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
+import { resolveExecutionPipelineCode } from "@/lib/elt/refresh-pipeline-artifacts-for-execution";
 
 export const dynamic = "force-dynamic";
 
@@ -77,10 +78,26 @@ export async function GET(req: Request) {
           pipelineCode: true,
           configYaml: true,
           workspaceYaml: true,
+          description: true,
+          groupName: true,
         },
       },
     },
   });
 
-  return NextResponse.json({ runs, pool: organizationId ? "dedicated" : pool ?? "all" });
+  const runsWithFreshCode = await Promise.all(
+    runs.map(async (run) => {
+      if (!run.pipeline) return run;
+      const pipelineCode = await resolveExecutionPipelineCode(run.user.id, {
+        ...run.pipeline,
+        pipelineCode: run.pipeline.pipelineCode ?? "",
+      });
+      return {
+        ...run,
+        pipeline: { ...run.pipeline, pipelineCode },
+      };
+    })
+  );
+
+  return NextResponse.json({ runs: runsWithFreshCode, pool: organizationId ? "dedicated" : pool ?? "all" });
 }

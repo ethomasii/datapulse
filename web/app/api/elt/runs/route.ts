@@ -17,6 +17,7 @@ import { resolveWorkspaceOrganizationId } from "@/lib/elt/resolve-workspace-org"
 import { RunPartitionResolutionError, resolveRunPartitionFields } from "@/lib/elt/run-partition-resolution";
 import { createRunBodySchema } from "@/lib/elt/run-types";
 import { validateManagedPipelineConnections } from "@/lib/elt/pipeline-run-readiness";
+import { refreshAndPersistPipelineArtifacts } from "@/lib/elt/refresh-pipeline-artifacts-for-execution";
 import {
   resolveUserPlanTier,
   runHistoryPrismaFilter,
@@ -160,6 +161,14 @@ export async function POST(req: Request) {
     });
     if (!readiness.ok) {
       return NextResponse.json({ error: readiness.error }, { status: 400 });
+    }
+  }
+
+  if (isManaged) {
+    try {
+      await refreshAndPersistPipelineArtifacts(pipeline.userId, pipeline.id);
+    } catch (e) {
+      console.warn("[elt/runs] pipeline artifact refresh failed", pipeline.id, e);
     }
   }
 

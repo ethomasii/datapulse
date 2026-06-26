@@ -9,6 +9,7 @@ import {
 import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
 import { db } from "@/lib/db/client";
 import { processManagedRunImmediately } from "@/lib/elt/process-managed-run";
+import { refreshAndPersistPipelineArtifacts } from "@/lib/elt/refresh-pipeline-artifacts-for-execution";
 
 type RouteContext = { params: { id: string } };
 
@@ -27,7 +28,7 @@ export async function POST(req: Request, context: RouteContext) {
   const ownerIds = perms.resourceOwnerIds;
   const run = await db.eltPipelineRun.findFirst({
     where: { id, userId: { in: ownerIds } },
-    select: { id: true, status: true, ingestionExecutor: true },
+    select: { id: true, status: true, ingestionExecutor: true, pipelineId: true, userId: true },
   });
   if (!run) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -46,6 +47,13 @@ export async function POST(req: Request, context: RouteContext) {
   }
 
   try {
+    if (run.pipelineId) {
+      try {
+        await refreshAndPersistPipelineArtifacts(run.userId, run.pipelineId);
+      } catch (e) {
+        console.warn("[elt/runs/kick] pipeline artifact refresh failed", run.pipelineId, e);
+      }
+    }
     const dispatch = await processManagedRunImmediately(run.id);
     const refreshed = await db.eltPipelineRun.findFirst({
       where: { id: run.id },

@@ -12,6 +12,7 @@ import { db } from "@/lib/db/client";
 import { loadWorkspaceConnectionById } from "@/lib/elt/workspace-connection-load";
 import { sourceConfigurationFromDbtProject } from "@/lib/elt/dbt-projects";
 import { resolveRouteParamId } from "@/lib/server/route-params";
+import { resolveExecutionPipelineCode } from "@/lib/elt/refresh-pipeline-artifacts-for-execution";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,8 @@ export async function GET(req: Request, ctx: Ctx) {
           pipelineCode: true,
           configYaml: true,
           workspaceYaml: true,
+          description: true,
+          groupName: true,
           sourceConnectionId: true,
           destinationConnectionId: true,
         },
@@ -109,6 +112,14 @@ export async function GET(req: Request, ctx: Ctx) {
     sourceConnectionId: null,
     destinationConnectionId,
   };
+
+  if (run.pipeline) {
+    const pipelineCode = await resolveExecutionPipelineCode(userId, {
+      ...run.pipeline,
+      pipelineCode: run.pipeline.pipelineCode ?? "",
+    });
+    pipelinePayload.pipelineCode = pipelineCode;
+  }
 
   return NextResponse.json({
     run: {
