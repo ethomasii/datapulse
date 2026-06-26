@@ -3,6 +3,14 @@
  * Module names match `dlt init <slug> duckdb` output folders.
  */
 
+import type { SourceResourceNormalizer } from "./source-resource-mappings";
+import {
+  normalizeHubspotResources,
+  normalizeSalesforceResources,
+  normalizeShopifyResources,
+  normalizeZendeskResources,
+} from "./source-resource-mappings";
+
 export type VerifiedCredentialSpec = {
   /** Factory kwarg name */
   param: string;
@@ -10,17 +18,22 @@ export type VerifiedCredentialSpec = {
   envKeys: string[];
 };
 
+export type VerifiedCredentialStyle = "flat" | "zendesk_token" | "salesforce_security_token" | "shopify";
+
 export type VerifiedSourceSpec = {
   module: string;
   factory: string;
   credentials: VerifiedCredentialSpec[];
+  credentialStyle?: VerifiedCredentialStyle;
   /** Config keys copied into factory kwargs when present */
   configKeys?: string[];
   /** Optional partition_key → factory kwarg for incremental runs */
   partitionKwarg?: string;
-  /** If set, call source.with_resources(*names) */
+  /** Config key holding selected resource ids */
   resourceConfigKey?: string;
+  alternateResourceConfigKeys?: string[];
   defaultResources?: string[];
+  normalizeResources?: SourceResourceNormalizer;
 };
 
 /** Slugs handled by dedicated golden-path generators (not generic verified template). */
@@ -39,28 +52,47 @@ export const VERIFIED_SKIP_SLUGS = new Set([
   "kinesis",
 ]);
 
+/** Catalog slug → verified package folder (e.g. shopify → shopify_dlt). */
+export const VERIFIED_SLUG_ALIASES: Record<string, string> = {
+  shopify: "shopify_dlt",
+};
+
+const SHOPIFY_SPEC: VerifiedSourceSpec = {
+  module: "shopify_dlt",
+  factory: "shopify_source",
+  credentialStyle: "shopify",
+  credentials: [{ param: "private_app_password", envKeys: ["SHOPIFY_PRIVATE_APP_PASSWORD", "SHOPIFY_ACCESS_TOKEN"] }],
+  configKeys: ["store_url", "start_date"],
+  partitionKwarg: "start_date",
+  resourceConfigKey: "resources",
+  defaultResources: ["orders", "customers", "products"],
+  normalizeResources: normalizeShopifyResources,
+};
+
 export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
-  shopify_dlt: {
-    module: "shopify_dlt",
-    factory: "shopify_source",
-    credentials: [{ param: "private_app_password", envKeys: ["SHOPIFY_PRIVATE_APP_PASSWORD", "SHOPIFY_ACCESS_TOKEN"] }],
-    configKeys: ["store_url", "start_date"],
-    partitionKwarg: "start_date",
-  },
+  shopify_dlt: SHOPIFY_SPEC,
   hubspot: {
     module: "hubspot",
     factory: "hubspot",
     credentials: [{ param: "api_key", envKeys: ["HUBSPOT_API_KEY", "HUBSPOT_ACCESS_TOKEN"] }],
     configKeys: ["start_date"],
+    resourceConfigKey: "resources",
+    defaultResources: ["contacts", "companies", "deals"],
+    normalizeResources: normalizeHubspotResources,
   },
   salesforce: {
     module: "salesforce",
     factory: "salesforce_source",
+    credentialStyle: "salesforce_security_token",
     credentials: [
       { param: "user_name", envKeys: ["SALESFORCE_USER", "SALESFORCE_USERNAME"] },
       { param: "password", envKeys: ["SALESFORCE_PASSWORD"] },
       { param: "security_token", envKeys: ["SALESFORCE_SECURITY_TOKEN", "SALESFORCE_TOKEN"] },
     ],
+    resourceConfigKey: "standard_objects",
+    alternateResourceConfigKeys: ["resources"],
+    defaultResources: ["account", "contact", "lead"],
+    normalizeResources: normalizeSalesforceResources,
   },
   pipedrive: {
     module: "pipedrive",
@@ -78,15 +110,18 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
   },
   zendesk: {
     module: "zendesk",
-    factory: "zendesk_source",
+    factory: "zendesk_support",
+    credentialStyle: "zendesk_token",
     credentials: [
-      { param: "credentials", envKeys: ["ZENDESK_CREDENTIALS"] },
       { param: "subdomain", envKeys: ["ZENDESK_SUBDOMAIN"] },
       { param: "email", envKeys: ["ZENDESK_EMAIL"] },
       { param: "token", envKeys: ["ZENDESK_TOKEN", "ZENDESK_API_TOKEN"] },
     ],
     configKeys: ["start_date"],
     partitionKwarg: "start_date",
+    resourceConfigKey: "resources",
+    defaultResources: ["tickets", "users"],
+    normalizeResources: normalizeZendeskResources,
   },
   jira: {
     module: "jira",
@@ -94,7 +129,7 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
     credentials: [
       { param: "api_token", envKeys: ["JIRA_API_TOKEN"] },
       { param: "email", envKeys: ["JIRA_EMAIL"] },
-      { param: "subdomain", envKeys: ["JIRA_SUBDOMAIN"] },
+      { param: "subdomain", envKeys: ["JIRA_SUBDOMAIN", "JIRA_DOMAIN"] },
     ],
   },
   asana_dlt: {
@@ -119,7 +154,7 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
   },
   notion: {
     module: "notion",
-    factory: "notion_source",
+    factory: "notion_databases",
     credentials: [{ param: "api_key", envKeys: ["NOTION_API_KEY", "NOTION_TOKEN"] }],
     configKeys: ["database_ids"],
   },
@@ -213,8 +248,9 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
 };
 
 export function resolveVerifiedSourceSpec(slug: string): VerifiedSourceSpec | null {
-  const key = slug.toLowerCase().trim();
-  if (VERIFIED_GOLDEN_SLUGS.has(key) || VERIFIED_SKIP_SLUGS.has(key)) return null;
+  const raw = slug.toLowerCase().trim();
+  if (VERIFIED_GOLDEN_SLUGS.has(raw) || VERIFIED_SKIP_SLUGS.has(raw)) return null;
+  const key = VERIFIED_SLUG_ALIASES[raw] ?? raw;
   const explicit = VERIFIED_SOURCE_SPECS[key];
   if (explicit) return explicit;
   // Heuristic for verified packages without an explicit row yet.

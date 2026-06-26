@@ -3,6 +3,7 @@ import { escapePyString } from "./escape-py";
 import { dltDbtRunnerBeforeReturn } from "./generate-dlt-dbt-append";
 import { postTransformBeforeReturn } from "./generate-post-transform";
 import { eltpulsePythonModuleHeader } from "./codegen-branding";
+import { normalizeStripeEndpoints } from "./source-resource-mappings";
 
 function destinationBlock(request: PipelineRequest): {
   destination: string;
@@ -47,6 +48,8 @@ export function generateStripePipeline(request: PipelineRequest): string {
         : "2024-01-01";
   const rawKeyEnv = String(config.stripe_secret_key_env ?? "STRIPE_SECRET_KEY").trim();
   const keyEnv = /^[A-Z][A-Z0-9_]*$/i.test(rawKeyEnv) ? rawKeyEnv.toUpperCase() : "STRIPE_SECRET_KEY";
+  const endpoints = normalizeStripeEndpoints(config.resources);
+  const endpointsPy = endpoints.map((e) => `"${escapePyString(e)}"`).join(", ");
   const { destination, destinationComment, datasetName } = destinationBlock(request);
   const desc = request.description || `Load Stripe billing data to ${request.destinationType}`;
 
@@ -70,7 +73,11 @@ def run(partition_key: str = None):
         dataset_name="${escapePyString(datasetName)}",
     )
 
-    source = stripe_source(start_date=start, stripe_secret_key=api_key)
+    source = stripe_source(
+        start_date=start,
+        stripe_secret_key=api_key,
+        endpoints=(${endpointsPy}),
+    )
     info = pipeline.run(
         source,
         write_disposition="${escapePyString(request.writeDisposition ?? "append")}",

@@ -522,7 +522,7 @@ const API_CONNECTORS: ConnectorDef[] = [
       { key: "STRIPE_SECRET_KEY", label: "Stripe Secret Key", type: "password", required: true, help: "Find in Stripe Dashboard → Developers → API Keys", placeholder: "sk_live_xxxxxxxxxxxx" },
     ],
     sourceConfigFields: [
-      { key: "resources", label: "Select resources to load", type: "multiselect", required: false, help: "Select which Stripe resources to sync", options: [{ value: "customers", label: "Customers" }, { value: "invoices", label: "Invoices" }, { value: "charges", label: "Charges" }, { value: "subscriptions", label: "Subscriptions" }, { value: "products", label: "Products" }, { value: "payment_intents", label: "Payment Intents" }], default: ["customers", "invoices", "charges"] },
+      { key: "resources", label: "Select resources to load", type: "multiselect", required: false, help: "Select which Stripe resources to sync", options: [{ value: "customers", label: "Customers" }, { value: "invoices", label: "Invoices" }, { value: "charges", label: "Charges / balance transactions" }, { value: "subscriptions", label: "Subscriptions" }, { value: "products", label: "Products" }, { value: "events", label: "Events" }], default: ["customers", "invoices", "subscriptions"] },
     ],
   },
   {
@@ -537,7 +537,7 @@ const API_CONNECTORS: ConnectorDef[] = [
       { key: "SHOPIFY_SHOP_NAME", label: "Shop Name", type: "text", required: true, help: "Your store name (from mystore.myshopify.com)", placeholder: "mystore" },
     ],
     sourceConfigFields: [
-      { key: "resources", label: "Select resources to load", type: "multiselect", required: false, options: [{ value: "orders", label: "Orders" }, { value: "customers", label: "Customers" }, { value: "products", label: "Products" }, { value: "inventory", label: "Inventory" }, { value: "fulfillments", label: "Fulfillments" }], default: ["orders", "customers", "products"] },
+      { key: "resources", label: "Select resources to load", type: "multiselect", required: false, options: [{ value: "orders", label: "Orders" }, { value: "customers", label: "Customers" }, { value: "products", label: "Products" }], default: ["orders", "customers", "products"] },
     ],
   },
   {
@@ -553,7 +553,7 @@ const API_CONNECTORS: ConnectorDef[] = [
       { key: "SALESFORCE_SECURITY_TOKEN", label: "Security Token", type: "password", required: true, help: "Reset at: Setup → My Personal Information → Reset Security Token" },
     ],
     sourceConfigFields: [
-      { key: "standard_objects", label: "Select Standard Salesforce Objects", type: "multiselect", required: false, help: "Select standard Salesforce objects to sync", options: [{ value: "Account", label: "Account" }, { value: "Contact", label: "Contact" }, { value: "Lead", label: "Lead" }, { value: "Opportunity", label: "Opportunity" }, { value: "OpportunityLineItem", label: "Opportunity Line Item" }, { value: "Case", label: "Case" }, { value: "Task", label: "Task" }, { value: "Event", label: "Event" }, { value: "Campaign", label: "Campaign" }, { value: "CampaignMember", label: "Campaign Member" }, { value: "Product2", label: "Product" }, { value: "Pricebook2", label: "Pricebook" }, { value: "PricebookEntry", label: "Pricebook Entry" }, { value: "Order", label: "Order" }, { value: "OrderItem", label: "Order Item" }, { value: "Contract", label: "Contract" }, { value: "Quote", label: "Quote" }, { value: "User", label: "User" }, { value: "UserRole", label: "User Role" }], default: ["Account", "Contact", "Opportunity", "Lead"] },
+      { key: "standard_objects", label: "Select Standard Salesforce Objects", type: "multiselect", required: false, help: "Objects supported by the verified Salesforce dlt source", options: [{ value: "Account", label: "Account" }, { value: "Contact", label: "Contact" }, { value: "Lead", label: "Lead" }, { value: "Opportunity", label: "Opportunity" }, { value: "OpportunityLineItem", label: "Opportunity Line Item" }, { value: "Task", label: "Task" }, { value: "Event", label: "Event" }, { value: "Campaign", label: "Campaign" }, { value: "CampaignMember", label: "Campaign Member" }, { value: "Product2", label: "Product" }, { value: "Pricebook2", label: "Pricebook" }, { value: "PricebookEntry", label: "Pricebook Entry" }, { value: "User", label: "User" }, { value: "UserRole", label: "User Role" }], default: ["Account", "Contact", "Lead"] },
       { key: "custom_objects", label: "Custom Objects (optional)", type: "text", required: false, help: "Comma-separated list of custom Salesforce objects", placeholder: "MyCustomObject__c, AnotherObject__c" },
       { key: "use_bulk_api", label: "Use Bulk API (for large datasets)", type: "boolean", default: true },
     ],

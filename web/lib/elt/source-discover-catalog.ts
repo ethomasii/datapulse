@@ -27,12 +27,12 @@ const DLT_RESOURCE_CATALOG: Record<string, DiscoverItem[]> = {
     { id: "stargazers", name: "stargazers", kind: "resource", description: "Stargazers" },
   ],
   stripe: [
-    { id: "customers", name: "customers", kind: "resource" },
-    { id: "charges", name: "charges", kind: "resource" },
-    { id: "subscriptions", name: "subscriptions", kind: "resource" },
-    { id: "invoices", name: "invoices", kind: "resource" },
-    { id: "products", name: "products", kind: "resource" },
-    { id: "events", name: "events", kind: "resource" },
+    { id: "customers", name: "Customer", kind: "resource", description: "Stripe customers" },
+    { id: "invoices", name: "Invoice", kind: "resource", description: "Invoices" },
+    { id: "subscriptions", name: "Subscription", kind: "resource" },
+    { id: "products", name: "Product", kind: "resource" },
+    { id: "charges", name: "BalanceTransaction", kind: "resource", description: "Charges / balance transactions" },
+    { id: "events", name: "Event", kind: "resource", description: "Stripe events (incremental)" },
   ],
   stripe_analytics: [
     { id: "customers", name: "customers", kind: "resource" },
@@ -108,7 +108,12 @@ export function applyDiscoveryToSourceConfiguration(
   }
 
   if (t === "stripe" || t === "stripe_analytics") {
-    out.resources = selected.length ? selected : ["customers", "charges"];
+    out.resources = selected.length ? selected : ["customers", "invoices", "subscriptions"];
+    return out;
+  }
+
+  if (t === "salesforce") {
+    out.standard_objects = selected.length ? selected : ["Account", "Contact", "Lead"];
     return out;
   }
 
