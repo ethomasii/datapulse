@@ -43,6 +43,7 @@ import { ConnectionPicker } from "@/components/elt/connection-picker";
 import { FormAccordion } from "@/components/elt/form-accordion";
 import { GuidedDestinationBlock } from "@/components/elt/guided-destination-block";
 import { GuidedSourceBlock } from "@/components/elt/guided-source-block";
+import { useLinkedConnectionMeta } from "@/lib/hooks/use-linked-connection-meta";
 import { getSourceConfigurationFields } from "@/lib/elt/credentials-catalog";
 import {
   emptyConnectionValuesForTypes,
@@ -173,6 +174,7 @@ export function BuilderClient({
   );
   /** Saved Connection rows linked to this pipeline (persisted as FKs; not stored in source_configuration). */
   const [sourceConnectionId, setSourceConnectionId] = useState<string | null>(null);
+  const linkedSourceConnection = useLinkedConnectionMeta(sourceConnectionId);
   const [destinationConnectionId, setDestinationConnectionId] = useState<string | null>(null);
   const [postTransformType, setPostTransformType] = useState<"" | "python" | "sql" | "dbt">("");
   const [postTransformCode, setPostTransformCode] = useState("");
@@ -1269,6 +1271,15 @@ export function BuilderClient({
                     onSourceCfgChange={setSourceCfg}
                     connectionValues={connectionValues}
                     onConnectionPatch={patchConnection}
+                    sourceConnectionId={sourceConnectionId}
+                    linkedSourceConnection={
+                      linkedSourceConnection
+                        ? {
+                            name: linkedSourceConnection.name,
+                            hasStoredSecrets: Boolean(linkedSourceConnection.hasStoredSecrets),
+                          }
+                        : null
+                    }
                     genericConnectorJson={
                       schemaFields.length === 0
                         ? { value: sourceJson, onChange: setSourceJson }

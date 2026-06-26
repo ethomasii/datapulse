@@ -2,6 +2,7 @@
 
 import { SchemaSourceConfigForm } from "@/components/elt/schema-source-config-form";
 import { CatalogCredentialFields } from "@/components/elt/catalog-credential-fields";
+import { GithubRepoField } from "@/components/elt/github-repo-field";
 import type { CatalogSourceConfigField } from "@/lib/elt/credentials-catalog";
 import { getSourceCredentials } from "@/lib/elt/credentials-catalog";
 
@@ -12,6 +13,8 @@ type Props = {
   onSourceCfgChange: (next: Record<string, unknown>) => void;
   connectionValues: Record<string, string>;
   onConnectionPatch: (key: string, value: string) => void;
+  sourceConnectionId?: string | null;
+  linkedSourceConnection?: { name: string; hasStoredSecrets: boolean } | null;
   /** When the catalog has no `SOURCE_CONFIGURATIONS` entry, edit connector JSON here. */
   genericConnectorJson?: { value: string; onChange: (s: string) => void };
 };
@@ -23,6 +26,8 @@ export function GuidedSourceBlock({
   onSourceCfgChange,
   connectionValues,
   onConnectionPatch,
+  sourceConnectionId = null,
+  linkedSourceConnection = null,
   genericConnectorJson,
 }: Props) {
   const sourceCreds = getSourceCredentials(sourceType);
@@ -50,6 +55,24 @@ export function GuidedSourceBlock({
           fields={schemaFields}
           value={sourceCfg}
           onChange={onSourceCfgChange}
+          githubRepoField={
+            sourceType === "github" ? (
+              <GithubRepoField
+                value={String(sourceCfg.repos ?? "")}
+                onChange={(fullName) => {
+                  const [owner, name] = fullName.split("/").map((s) => s.trim());
+                  onSourceCfgChange({
+                    ...sourceCfg,
+                    repos: fullName,
+                    ...(owner ? { repo_owner: owner } : {}),
+                    ...(name ? { repo_name: name } : {}),
+                  });
+                }}
+                sourceConnectionId={sourceConnectionId}
+                inlineSecrets={connectionValues}
+              />
+            ) : undefined
+          }
         />
       ) : null}
 
@@ -58,9 +81,8 @@ export function GuidedSourceBlock({
           <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">GitHub advanced settings</h3>
           <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
             Generated code reads the token from the <strong className="font-medium text-slate-700 dark:text-slate-300">environment variable name</strong>{" "}
-            you set below (default <code className="font-mono text-[11px]">GITHUB_TOKEN</code>). That name is what
-            matters for eltPulse, your gateway, or CI — the variable must exist at run time. The PAT field under
-            &quot;Source connection&quot; is the same secret for export only; it is not saved in the database.
+            below (default <code className="font-mono text-[11px]">GITHUB_TOKEN</code>). For managed runs, the PAT lives on
+            the linked source connection — not in this field.
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="block sm:col-span-2">
@@ -165,13 +187,33 @@ export function GuidedSourceBlock({
       )}
 
       <div>
-        <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Source connection</h4>
+        <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Source connection credentials</h4>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          Same fields as <code className="text-[11px]">SOURCE_CREDENTIALS</code> in the eltPulse connector catalog. Non-secret
-          values can be saved with the pipeline; passwords and large secrets are not persisted.
+          Passwords are encrypted on the linked connection profile and are never shown again after save. Managed runs
+          read them from the connection you select above.
         </p>
+        {linkedSourceConnection?.hasStoredSecrets ? (
+          <p className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-[11px] text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-100">
+            Encrypted credentials are stored on connection{" "}
+            <strong>{linkedSourceConnection.name}</strong>. Leave fields blank unless you want to replace them locally
+            before saving as a new connection.
+          </p>
+        ) : linkedSourceConnection ? (
+          <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-[11px] text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+            Connection <strong>{linkedSourceConnection.name}</strong> has no stored secrets yet — add a PAT on the{" "}
+            <a href="/connections" className="font-medium underline hover:no-underline">
+              Connections
+            </a>{" "}
+            page or enter one below and save as connection.
+          </p>
+        ) : null}
         <div className="mt-3">
-          <CatalogCredentialFields fields={sourceCreds} values={connectionValues} onPatch={onConnectionPatch} />
+          <CatalogCredentialFields
+            fields={sourceCreds}
+            values={connectionValues}
+            onPatch={onConnectionPatch}
+            secretsStoredOnConnection={Boolean(linkedSourceConnection?.hasStoredSecrets)}
+          />
         </div>
       </div>
     </div>

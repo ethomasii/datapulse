@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { CatalogSourceConfigField } from "@/lib/elt/credentials-catalog";
 
 function showIfMatches(showIf: Record<string, unknown>, value: Record<string, unknown>): boolean {
@@ -16,13 +17,15 @@ type Props = {
   fields: CatalogSourceConfigField[];
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
+  /** When set for GitHub, replaces the plain `repos` text field. */
+  githubRepoField?: ReactNode;
 };
 
 /**
  * Renders `SOURCE_CONFIGURATIONS[sourceType]` from the eltPulse connector catalog
  * (via credentials-catalog.json).
  */
-export function SchemaSourceConfigForm({ sourceType, fields, value, onChange }: Props) {
+export function SchemaSourceConfigForm({ sourceType, fields, value, onChange, githubRepoField }: Props) {
   if (fields.length === 0) {
     return null;
   }
@@ -47,6 +50,9 @@ export function SchemaSourceConfigForm({ sourceType, fields, value, onChange }: 
       <div className="grid gap-3 sm:grid-cols-2">
         {fields.map((f) => {
           if (!fieldVisible(f, value)) return null;
+          if (sourceType === "github" && f.key === "repos" && githubRepoField) {
+            return <div key={f.key}>{githubRepoField}</div>;
+          }
           const baseLabel = (
             <span className="text-xs text-slate-600 dark:text-slate-400">
               {f.label}

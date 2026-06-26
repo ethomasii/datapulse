@@ -18,6 +18,7 @@ import { ConnectionPicker } from "@/components/elt/connection-picker";
 import { FormAccordion } from "@/components/elt/form-accordion";
 import { GuidedDestinationBlock } from "@/components/elt/guided-destination-block";
 import { GuidedSourceBlock } from "@/components/elt/guided-source-block";
+import { useLinkedConnectionMeta } from "@/lib/hooks/use-linked-connection-meta";
 import { CanvasTransformInspector } from "@/components/pipeline-canvas/canvas-transform-inspector";
 import { CanvasComponentInspector } from "@/components/pipeline-canvas/canvas-component-inspector";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
@@ -93,6 +94,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
   const [sourceCfg, setSourceCfg] = useState<Record<string, unknown>>({});
   const [connectionValues, setConnectionValues] = useState<Record<string, string>>({});
   const [sourceConnectionId, setSourceConnectionId] = useState<string | null>(null);
+  const linkedSourceConnection = useLinkedConnectionMeta(sourceConnectionId);
   const [destinationConnectionId, setDestinationConnectionId] = useState<string | null>(null);
   /** When the catalog has no source schema, connector fields are edited as JSON. */
   const [connectorJson, setConnectorJson] = useState("{}");
@@ -839,6 +841,15 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
               onSourceCfgChange={setSourceCfg}
               connectionValues={connectionValues}
               onConnectionPatch={patchConnection}
+              sourceConnectionId={sourceConnectionId}
+              linkedSourceConnection={
+                linkedSourceConnection
+                  ? {
+                      name: linkedSourceConnection.name,
+                      hasStoredSecrets: Boolean(linkedSourceConnection.hasStoredSecrets),
+                    }
+                  : null
+              }
               genericConnectorJson={
                 schemaFields.length === 0
                   ? { value: connectorJson, onChange: setConnectorJson }
@@ -1156,6 +1167,15 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
               onSourceCfgChange={setSourceCfg}
               connectionValues={connectionValues}
               onConnectionPatch={patchConnection}
+              sourceConnectionId={sourceConnectionId}
+              linkedSourceConnection={
+                linkedSourceConnection
+                  ? {
+                      name: linkedSourceConnection.name,
+                      hasStoredSecrets: Boolean(linkedSourceConnection.hasStoredSecrets),
+                    }
+                  : null
+              }
               genericConnectorJson={
                 schemaFields.length === 0 ? { value: connectorJson, onChange: setConnectorJson } : undefined
               }

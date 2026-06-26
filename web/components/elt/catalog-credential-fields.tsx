@@ -23,10 +23,11 @@ type Props = {
   fields: CatalogCredentialField[];
   values: Record<string, string>;
   onPatch: (key: string, value: string) => void;
+  secretsStoredOnConnection?: boolean;
 };
 
 /** Renders `SOURCE_CREDENTIALS` / `DESTINATION_CREDENTIALS` field definitions. */
-export function CatalogCredentialFields({ fields, values, onPatch }: Props) {
+export function CatalogCredentialFields({ fields, values, onPatch, secretsStoredOnConnection = false }: Props) {
   if (fields.length === 0) {
     return (
       <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -93,18 +94,30 @@ export function CatalogCredentialFields({ fields, values, onPatch }: Props) {
                 value={cur}
                 autoComplete="off"
                 onChange={(e) => onPatch(f.key, e.target.value)}
-                placeholder={f.placeholder}
+                placeholder={
+                  secretsStoredOnConnection
+                    ? "•••••••• stored on linked connection (enter only to replace)"
+                    : f.placeholder
+                }
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
               />
               <CredentialFieldHelp help={f.help} />
-              <p className="mt-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                Store this secret in{" "}
-                <a href="/connections" className="font-medium text-sky-600 underline hover:no-underline dark:text-sky-400">
-                  Connections
-                </a>{" "}
-                so it is encrypted at rest and injected automatically when eltPulse-managed or gateway workers execute this pipeline.
-                The value entered here is only used for local export / <code className="font-mono text-[10px]">.env</code> generation.
-              </p>
+              {secretsStoredOnConnection && !cur ? (
+                <p className="mt-1 text-[11px] leading-relaxed text-emerald-700 dark:text-emerald-300">
+                  A value is already saved on the linked connection. Managed runs use that — you do not need to paste
+                  the PAT here again.
+                </p>
+              ) : (
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                  Store this secret in{" "}
+                  <a href="/connections" className="font-medium text-sky-600 underline hover:no-underline dark:text-sky-400">
+                    Connections
+                  </a>{" "}
+                  so it is encrypted at rest and injected automatically when eltPulse-managed or gateway workers execute
+                  this pipeline. The value entered here is only used for local export /{" "}
+                  <code className="font-mono text-[10px]">.env</code> generation.
+                </p>
+              )}
             </label>
           );
         }
