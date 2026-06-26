@@ -209,9 +209,6 @@ export async function POST(req: Request) {
     include: { pipeline: { select: { id: true, name: true } } },
   });
 
-  const isManaged =
-    ingestionExecutor === "eltpulse_managed" || ingestionExecutor === "datapulse_managed";
-
   if (isManaged) {
     try {
       await processManagedRunImmediately(run.id);
