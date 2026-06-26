@@ -45,7 +45,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install httpx "dlt[motherduck]>=1.5.0" "fastapi>=0.115.0" "pydantic>=2" "uvicorn[standard]>=0.32.0"
+          pip install httpx "dlt[motherduck]>=1.5.0" "fastapi>=0.115.0" "pydantic>=2" "uvicorn[standard]>=0.32.0" "psutil>=6.0.0"
+          pip install -r web/managed-worker-service/verified-sources-requirements.txt
           pip install "dbt-core>=1.8.0" "dbt-snowflake>=1.8.0" "dbt-bigquery>=1.8.0" "dbt-postgres>=1.8.0" "dbt-duckdb>=1.8.0"
           sudo apt-get update && sudo apt-get install -y git
 

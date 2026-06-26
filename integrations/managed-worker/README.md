@@ -5,7 +5,9 @@
 
 ## Production path: eltPulse-owned workers
 
-1. Deploy **`web/managed-worker-service`** as a separate Vercel project (see `web/managed-worker-service/README.md`).
+1. Deploy **`web/managed-worker-service`** — pick one:
+   - **AWS ECS/Fargate** (recommended): `docker build` using `web/managed-worker-service/Dockerfile`
+   - **Separate Vercel Python project** (see `vercel.json` in that folder)
 2. On the **control plane** Vercel project:
    - `ELTPULSE_MANAGED_DELEGATE_URL` → `https://your-workers.vercel.app/batch`
    - `ELTPULSE_MANAGED_DELEGATE_SECRET` → bearer secret (same on worker)

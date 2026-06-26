@@ -63,6 +63,18 @@ _VENDORED_VERIFIED_SOURCES: dict[str, Path] = {
 }
 
 
+def _vendored_verified_sources() -> dict[str, Path]:
+    """All packages under verified_sources/ with __init__.py (pre-vendored for fast starts)."""
+    out = dict(_VENDORED_VERIFIED_SOURCES)
+    root = _VERIFIED_SOURCES_ROOT
+    if not root.is_dir():
+        return out
+    for child in root.iterdir():
+        if child.is_dir() and (child / "__init__.py").is_file():
+            out.setdefault(child.name, child)
+    return out
+
+
 def _verified_import_modules(code: str) -> list[str]:
     """Detect top-level verified-source packages imported by generated pipeline code."""
     modules: set[str] = set()
@@ -87,7 +99,7 @@ def _stage_verified_source(tdir: Path, module: str) -> None:
     dest = tdir / module
     if dest.is_dir():
         return
-    vendored = _VENDORED_VERIFIED_SOURCES.get(module)
+    vendored = _vendored_verified_sources().get(module)
     if vendored and vendored.is_dir():
         shutil.copytree(vendored, dest)
         return
