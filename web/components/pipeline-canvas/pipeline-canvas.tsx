@@ -25,13 +25,14 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import { useTheme } from "next-themes";
-import { Download, Loader2, Plus, RotateCcw, Save, Trash2, Unlink, Upload } from "lucide-react";
+import { Download, LayoutGrid, Loader2, Plus, RotateCcw, Save, Trash2, Unlink, Upload } from "lucide-react";
 import { AddTransformMenu } from "./add-transform-menu";
 import type { ComponentListItem } from "@/components/elt/component-palette";
 import { CanvasBindingsProvider, type CanvasBindingsContextValue } from "./canvas-bindings-context";
 import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-graph";
 import { isValidPipelineCanvasEdge } from "@/lib/elt/canvas-component-sync";
 import { findCanvasAppendTarget } from "@/lib/elt/canvas-node-placement";
+import { autoLayoutPipelineCanvas } from "@/lib/elt/canvas-auto-layout";
 import { findNearestEdge, insertNodeOnEdge } from "@/lib/elt/canvas-edge-insert";
 import { wireInputFromUpstreamEdge } from "@/lib/elt/canvas-wire-input";
 import { dashedAnimatedEdgeStyle, resolveCanvasEdges } from "./canvas-edge-defaults";
@@ -311,6 +312,11 @@ function FlowCanvas({
       requestAnimationFrame(() => rfRef.current?.fitView({ padding: 0.22, duration: 220 }));
     });
   }, []);
+
+  const autoLayout = useCallback(() => {
+    setNodes((nds) => autoLayoutPipelineCanvas(nds, edges));
+    fitAfterGraphChange();
+  }, [edges, setNodes, fitAfterGraphChange]);
 
   const addNode = useCallback(
     (
@@ -731,6 +737,17 @@ function FlowCanvas({
           {transformOnly ? "Warehouse" : "Destination"}
         </button>
         <AddTransformMenu onAddNative={addNativeTransformNode} onAddCode={addCodeTransformNode} />
+        <div className="mx-1 h-4 w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
+        <button
+          type="button"
+          onClick={autoLayout}
+          disabled={nodes.length === 0}
+          title="Re-space nodes left-to-right with aligned connectors. Click Save to pipeline to persist positions."
+          className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1 text-xs font-medium text-sky-900 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100 dark:hover:bg-sky-900/40"
+        >
+          <LayoutGrid className="h-3.5 w-3.5" />
+          Auto layout
+        </button>
         <div className="mx-1 h-4 w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
         <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Selection</span>
         <button

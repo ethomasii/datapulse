@@ -6,7 +6,8 @@ import type { Edge, Node } from "@xyflow/react";
 import { isValidPipelineCanvasEdge } from "@/lib/elt/canvas-component-sync";
 
 /** Space between upstream right edge and next node left edge. */
-const HORIZONTAL_GAP = 88;
+export const CANVAS_HORIZONTAL_GAP = 88;
+const HORIZONTAL_GAP = CANVAS_HORIZONTAL_GAP;
 const DEFAULT_Y = 120;
 
 export type CanvasAppendTarget = {

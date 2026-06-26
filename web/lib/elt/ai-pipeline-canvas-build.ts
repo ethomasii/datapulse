@@ -11,6 +11,7 @@ import {
   filterCanvasEdges,
   type ExtractedCanvasComponents,
 } from "@/lib/elt/canvas-component-sync";
+import { autoLayoutPipelineCanvas } from "@/lib/elt/canvas-auto-layout";
 import { getCanvasFromSourceConfig, type PipelineCanvasGraph } from "@/lib/elt/canvas-source-config";
 
 const dashedAnimatedEdgeStyle = {
@@ -143,82 +144,9 @@ function findOrCreateSourceDest(nodes: Node[], options: BuildPipelineCanvasOptio
   return { sourceId: source.id, destId: dest.id, nodes: next };
 }
 
-function isParallelBranchNode(node: Node, incoming: Map<string, string[]>, nodesById: Map<string, Node>): boolean {
-  if (node.type !== "componentNode") return false;
-  const preds = incoming.get(node.id) ?? [];
-  if (preds.length !== 1) return false;
-  const parent = nodesById.get(preds[0]!);
-  if (parent?.type !== "sourceNode") return false;
-  const d = node.data as Record<string, unknown>;
-  const cat = String(d.category ?? "");
-  const target = String(d.compileTarget ?? "");
-  return cat === "sensor" || cat === "observation" || target === "monitor";
-}
-
 /** Left-to-right layout with clear spacing — run after graph build/merge. */
 export function relayoutPipelineCanvas(nodes: Node[], edges: Edge[]): Node[] {
-  if (!nodes.length) return nodes;
-
-  const H_GAP = 280;
-  const MAIN_Y = 200;
-  const PARALLEL_Y = 48;
-  const PARALLEL_X_STAGGER = 220;
-
-  const nodesById = new Map(nodes.map((n) => [n.id, n]));
-  const incoming = new Map<string, string[]>();
-  for (const n of nodes) incoming.set(n.id, []);
-  for (const e of edges) {
-    incoming.get(e.target)?.push(e.source);
-  }
-
-  const sourceIds = nodes.filter((n) => n.type === "sourceNode").map((n) => n.id);
-  const column = new Map<string, number>();
-  const queue = [...sourceIds];
-  for (const id of sourceIds) column.set(id, 0);
-
-  while (queue.length) {
-    const u = queue.shift()!;
-    const col = column.get(u) ?? 0;
-    for (const e of edges) {
-      if (e.source !== u) continue;
-      const next = col + 1;
-      if ((column.get(e.target) ?? -1) < next) {
-        column.set(e.target, next);
-        queue.push(e.target);
-      }
-    }
-  }
-
-  for (const n of nodes) {
-    if (!column.has(n.id)) column.set(n.id, 0);
-  }
-
-  const byColumn = new Map<number, Node[]>();
-  for (const n of nodes) {
-    const col = column.get(n.id) ?? 0;
-    if (!byColumn.has(col)) byColumn.set(col, []);
-    byColumn.get(col)!.push(n);
-  }
-
-  let parallelBranchIndex = 0;
-
-  return nodes.map((n) => {
-    const col = column.get(n.id) ?? 0;
-    const parallel = isParallelBranchNode(n, incoming, nodesById);
-    if (parallel) {
-      const x = 40 + parallelBranchIndex * PARALLEL_X_STAGGER;
-      parallelBranchIndex += 1;
-      return { ...n, position: { x, y: PARALLEL_Y } };
-    }
-
-    const colPeers = (byColumn.get(col) ?? []).filter(
-      (p) => !isParallelBranchNode(p, incoming, nodesById)
-    );
-    const stackIndex = Math.max(0, colPeers.findIndex((p) => p.id === n.id));
-    const y = MAIN_Y + stackIndex * 140;
-
-    return { ...n, position: { x: 40 + col * H_GAP, y } };
-  });
+  return autoLayoutPipelineCanvas(nodes, edges);
 }
 
 /** Build or extend a pipeline canvas graph from AI-selected components. */
