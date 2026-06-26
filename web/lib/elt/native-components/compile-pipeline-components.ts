@@ -140,7 +140,10 @@ export async function compilePipelineComponentsAsync(
   let compiled = false;
 
   for (const comp of components) {
-    let cfg = { ...(comp.config ?? {}), template_id: comp.config?.template_id ?? comp.id };
+    let cfg: Record<string, unknown> = {
+      ...(comp.config ?? {}),
+      template_id: comp.config?.template_id ?? comp.id,
+    };
     cfg = hydrateComponentMcpConfig(cfg, mcpServers);
     const nativeId = resolveNativeComponentId(cfg) ?? comp.id;
     const compiler = await resolveComponentCompiler(nativeId, {

@@ -120,6 +120,7 @@ export const KNOWN_MCP_SERVER_TEMPLATES: KnownMcpServerTemplate[] = [
     runtimeNote: "Tool discovery works from this UI once token and organization are saved.",
   },
   {
+    id: "stripe-remote",
     name: "Stripe",
     vendor: "Stripe",
     category: "payments",
