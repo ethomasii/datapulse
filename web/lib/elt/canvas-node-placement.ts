@@ -31,27 +31,27 @@ function componentCompileHint(node: Pick<Node, "data">): string {
 /** Y offset from `position.y` to the left/right connection handle (React Flow centers handles on the node box). */
 export function handleYOffset(node: Pick<Node, "type" | "data">): number {
   const type = String(node.type ?? "componentNode");
-  if (type === "sourceNode" || type === "destNode") return 61;
+  if (type === "sourceNode" || type === "destNode") return 65;
   if (type === "transformNode") return 84;
   const hint = componentCompileHint(node);
   if (!hint) return 44;
-  if (hint.length < 72) return 52;
-  return 58;
+  if (hint.length < 72) return 40;
+  return 48;
 }
 
 /** Estimated rendered size — matches pipeline-canvas custom node CSS. */
 export function estimateNodeLayout(node: Pick<Node, "type" | "data">): NodeLayoutSpec {
   const type = String(node.type ?? "componentNode");
   if (type === "sourceNode" || type === "destNode") {
-    return { width: 200, height: 122 };
+    return { width: 200, height: 130 };
   }
   if (type === "transformNode") {
     return { width: 220, height: 168 };
   }
   const hint = componentCompileHint(node);
-  if (!hint) return { width: 196, height: 88 };
-  if (hint.length < 72) return { width: 196, height: 104 };
-  return { width: 196, height: 116 };
+  if (!hint) return { width: 200, height: 88 };
+  if (hint.length < 72) return { width: 200, height: 80 };
+  return { width: 200, height: 96 };
 }
 
 function nodeById(nodes: Node[]): Map<string, Node> {

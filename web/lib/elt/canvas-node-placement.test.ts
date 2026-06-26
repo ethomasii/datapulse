@@ -53,6 +53,26 @@ describe("findCanvasAppendTarget", () => {
     expect(gap).toBe(88);
     expect(second.position.y).toBe(first.position.y);
   });
+
+  it("chains hinted components with full width spacing", () => {
+    const alterRowHint = "Warehouse SQL or dataframe transform after load";
+    const append = { type: "componentNode" as const, data: { compileHint: alterRowHint } };
+    const first = findCanvasAppendTarget(backbone, backboneEdges, { append });
+    const nodes: Node[] = [
+      ...backbone,
+      {
+        id: "c1",
+        type: "componentNode",
+        position: first.position,
+        data: { compileHint: alterRowHint },
+      },
+    ];
+    const edges: Edge[] = [...backboneEdges, { id: "e2", source: "d", target: "c1" }];
+    const second = findCanvasAppendTarget(nodes, edges, { append });
+    const gap = second.position.x - (first.position.x + estimateNodeLayout(nodes[2]!).width);
+    expect(gap).toBe(88);
+    expect(second.position.y).toBe(first.position.y);
+  });
 });
 
 describe("positionAfterUpstream", () => {

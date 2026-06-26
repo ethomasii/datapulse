@@ -267,7 +267,7 @@ export function ComponentNode({ id, data }: NodeProps) {
   const ports = d.canvasPorts as { left?: boolean; right?: boolean } | undefined;
 
   return (
-    <div className="min-w-[180px] rounded-lg border-2 border-violet-400 bg-white px-3 py-2 shadow-sm dark:border-violet-600 dark:bg-slate-900">
+    <div className="w-[200px] max-w-[200px] shrink-0 overflow-visible rounded-lg border-2 border-violet-400 bg-white px-3 py-2 shadow-sm dark:border-violet-600 dark:bg-slate-900">
       {ports?.left !== false ? (
         <Handle type="target" position={Position.Left} className={handleClass("sky")} />
       ) : null}
