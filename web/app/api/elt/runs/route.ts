@@ -16,7 +16,7 @@ import { resolveNewRunExecution } from "@/lib/agent/run-execution";
 import { resolveWorkspaceOrganizationId } from "@/lib/elt/resolve-workspace-org";
 import { RunPartitionResolutionError, resolveRunPartitionFields } from "@/lib/elt/run-partition-resolution";
 import { createRunBodySchema } from "@/lib/elt/run-types";
-import { validateManagedPipelineConnections } from "@/lib/elt/pipeline-run-readiness";
+import { validateManagedPipelineConnections, healPipelineConnectionLinks } from "@/lib/elt/pipeline-run-readiness";
 import { refreshAndPersistPipelineArtifacts } from "@/lib/elt/refresh-pipeline-artifacts-for-execution";
 import {
   resolveUserPlanTier,
@@ -152,23 +152,42 @@ export async function POST(req: Request) {
   const isManaged =
     ingestionExecutor === "eltpulse_managed" || ingestionExecutor === "datapulse_managed";
   if (isManaged) {
-    const readiness = await validateManagedPipelineConnections({
-      userId: pipeline.userId,
-      sourceType: pipeline.sourceType,
-      destinationType: pipeline.destinationType,
-      sourceConnectionId: pipeline.sourceConnectionId,
-      destinationConnectionId: pipeline.destinationConnectionId,
-    });
-    if (!readiness.ok) {
-      return NextResponse.json({ error: readiness.error }, { status: 400 });
-    }
-  }
-
-  if (isManaged) {
     try {
       await refreshAndPersistPipelineArtifacts(pipeline.userId, pipeline.id);
     } catch (e) {
       console.warn("[elt/runs] pipeline artifact refresh failed", pipeline.id, e);
+    }
+    try {
+      await healPipelineConnectionLinks(pipeline.userId, pipeline.id);
+    } catch (e) {
+      console.warn("[elt/runs] pipeline connection heal failed", pipeline.id, e);
+    }
+  }
+
+  const pipelineForRun = isManaged
+    ? await db.eltPipeline.findFirst({
+        where: { id: pipeline.id },
+        select: {
+          id: true,
+          userId: true,
+          sourceType: true,
+          destinationType: true,
+          sourceConnectionId: true,
+          destinationConnectionId: true,
+        },
+      })
+    : pipeline;
+
+  if (isManaged && pipelineForRun) {
+    const readiness = await validateManagedPipelineConnections({
+      userId: pipelineForRun.userId,
+      sourceType: pipelineForRun.sourceType,
+      destinationType: pipelineForRun.destinationType,
+      sourceConnectionId: pipelineForRun.sourceConnectionId,
+      destinationConnectionId: pipelineForRun.destinationConnectionId,
+    });
+    if (!readiness.ok) {
+      return NextResponse.json({ error: readiness.error }, { status: 400 });
     }
   }
 

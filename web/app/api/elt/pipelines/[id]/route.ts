@@ -150,12 +150,6 @@ export async function PUT(req: Request, ctx: Ctx) {
   const body = parsed.data;
   const mergedSourceConfiguration = mergeEltMetadataIntoSourceConfig(body);
   syncDltDbtWithCanvas(mergedSourceConfiguration);
-  const bodyMerged = { ...body, sourceConfiguration: mergedSourceConfiguration };
-  const prepared = await preparePipelinePersistenceAndArtifacts(user.id, bodyMerged, mergedSourceConfiguration);
-  if (!prepared.ok) {
-    return NextResponse.json({ error: prepared.message }, { status: 400 });
-  }
-  const bodyForArtifacts = prepared.artifactBody;
 
   try {
     const existing = await db.eltPipeline.findFirst({
@@ -164,6 +158,18 @@ export async function PUT(req: Request, ctx: Ctx) {
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+
+    const bodyMerged = {
+      ...body,
+      sourceConfiguration: mergedSourceConfiguration,
+      sourceConnectionId: body.sourceConnectionId ?? existing.sourceConnectionId ?? null,
+      destinationConnectionId: body.destinationConnectionId ?? existing.destinationConnectionId ?? null,
+    };
+    const prepared = await preparePipelinePersistenceAndArtifacts(user.id, bodyMerged, mergedSourceConfiguration);
+    if (!prepared.ok) {
+      return NextResponse.json({ error: prepared.message }, { status: 400 });
+    }
+    const bodyForArtifacts = prepared.artifactBody;
 
     const resolvedTool = resolveTool(bodyForArtifacts);
 
