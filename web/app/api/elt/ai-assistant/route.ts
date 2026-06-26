@@ -13,13 +13,14 @@ import { loadWorkspaceCatalogUrls } from "@/lib/elt/workspace-catalog-sources";
 import { setDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
 import { supportsInPipelineDbt } from "@/lib/elt/pipeline-tool-labels";
 import { listComponents, getComponentById, fetchComponentSchema } from "@/lib/elt/component-registry";
+import { getNativeComponent } from "@/lib/elt/native-components/registry";
 import { routeComponent, type ComponentCompileTarget } from "@/lib/elt/component-compile-router";
 import {
   applyCanvasComponentsToSourceConfig,
   type AiPipelineComponentInput,
 } from "@/lib/elt/ai-pipeline-canvas-build";
 import { applyCanvasGraphEdits, type CanvasGraphEditAction } from "@/lib/elt/canvas-graph-edit";
-import { isAdditiveCanvasPatch } from "@/lib/elt/canvas-patch-safety";
+import { isAdditiveCanvasPatch, isLocalCanvasPreviewPatch } from "@/lib/elt/canvas-patch-safety";
 import { isTransformOnlyPipeline } from "@/lib/elt/pipeline-mode";
 import { AI_PIPELINE_PLAYBOOKS, listPlaybooksForPrompt, matchPlaybook } from "@/lib/elt/ai-pipeline-playbook";
 import {
@@ -917,10 +918,20 @@ async function toolGetComponentDetails(componentId: string, includeSchema?: bool
     return { error: `Unknown component '${componentId}'. Use search_components first.` };
   }
   const route = routeComponent(c.id, c.category);
+  const native = getNativeComponent(c.id);
   let schema: unknown = null;
   if (includeSchema && c.schema_url) {
     schema = await fetchComponentSchema(c.schema_url);
   }
+  const nativeFields = native?.fields.map((f) => ({
+    key: f.key,
+    label: f.label,
+    type: f.type,
+    required: f.required ?? false,
+    default: f.default,
+    options: f.options,
+    description: f.description,
+  }));
   return {
     id: c.id,
     name: c.name,
@@ -933,7 +944,14 @@ async function toolGetComponentDetails(componentId: string, includeSchema?: bool
     monitor_pair: c.monitorPair ?? null,
     route,
     schema_url: c.schema_url,
+    ...(nativeFields?.length ? { native_config_fields: nativeFields } : {}),
     ...(schema ? { schema } : {}),
+    config_hint:
+      nativeFields?.length
+        ? `Pass native_config_fields as \`config\` on add_component, replace_component, or update_node_config. Required: ${nativeFields.filter((f) => f.required).map((f) => f.key).join(", ") || "none"}.`
+        : includeSchema
+          ? "Use schema properties for config keys when adding this component."
+          : "Call again with include_schema=true for remote schema.json field hints.",
     next_steps:
       route.target === "quality" || route.target === "monitor"
         ? "Pass in components[] on generate_pipeline (new) or add_pipeline_components (existing pipeline)."
@@ -1125,7 +1143,7 @@ async function toolEditPipelineCanvas(
 
   const configOnly =
     actions.length > 0 && actions.every((a) => a.op === "update_node_config");
-  const additiveOnly = isAdditiveCanvasPatch(beforeNodes, afterNodes);
+  const localPreview = isLocalCanvasPreviewPatch(beforeNodes, afterNodes);
   let nodePatch: { node_id: string; config: Record<string, unknown> } | undefined;
   if (configOnly && options?.genieTargetNodeId) {
     const updated = afterNodes.find((n) => n.id === options.genieTargetNodeId);
@@ -1140,7 +1158,7 @@ async function toolEditPipelineCanvas(
     next_action:
       configOnly && nodePatch
         ? "patch_node_local"
-        : additiveOnly && (options?.genieMode ?? false)
+        : localPreview && (options?.genieMode ?? false)
           ? "patch_canvas_local"
           : "patch_pipeline",
     pipeline_id: pipelineId,
@@ -1489,7 +1507,9 @@ When they describe a brand-new pipeline instead, use **generate_pipeline** witho
    - **Preserve every node** in the live canvas snapshot — only append/wire new steps
 2. **Replace a step** — "swap data cleansing for alter row", "use filter_rows instead":
    - **search_components** for the target id (e.g. \`alter_row\` for "alter rows" / CDC tagging)
-   - **edit_pipeline_canvas** with \`replace_component\` on the node id/label — keeps position and wires; do **not** remove+add (removal is blocked in Genie mode)
+   - **get_component_details** with \`include_schema=true\` for required \`config\` fields (table, conditions, etc.)
+   - **edit_pipeline_canvas** with \`replace_component\` + \`config\` on the node id/label — keeps position and wires; do **not** remove+add (removal is blocked in Genie mode)
+   - Canvas updates immediately in the designer; user clicks **Save to pipeline** to persist
 3. **Edit a step's settings** — rename columns, change filter, etc.:
    - **edit_pipeline_canvas** with \`update_node_config\` on the target node id
 4. **Connect / rewire** — \`connect\` / \`disconnect\` actions only when asked

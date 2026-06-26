@@ -129,6 +129,12 @@ export function GenieCanvasBar({
       }
 
       if (data.patchPayload && data.patchPipelineId) {
+        if (data.patchPayload.canvas && onReplaceGraph) {
+          onReplaceGraph(
+            data.patchPayload.canvas.nodes as Node[],
+            data.patchPayload.canvas.edges as Edge[]
+          );
+        }
         setPendingPatch({ pipelineId: data.patchPipelineId, patch: data.patchPayload });
         setQuickReply(
           (data.message ?? "Genie prepared canvas changes.") +

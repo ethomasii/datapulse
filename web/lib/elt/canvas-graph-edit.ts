@@ -20,6 +20,7 @@ import {
   positionAfterUpstream,
   type CanvasAppendNodeSpec,
 } from "@/lib/elt/canvas-node-placement";
+import { wireInputFromUpstreamEdge } from "@/lib/elt/canvas-wire-input";
 
 export type CanvasGraphEditAction =
   | {
@@ -272,6 +273,7 @@ export function applyCanvasGraphEdits(
       }
       const route = routeComponent(catalog.id, catalog.category);
       const prevLabel = nodeLabel(target);
+      const prevConfig = ((target.data as Record<string, unknown>).config ?? {}) as Record<string, unknown>;
       nodes = nodes.map((n) => {
         if (n.id !== target.id) return n;
         return {
@@ -284,10 +286,16 @@ export function applyCanvasGraphEdits(
             compileBadge: route.badge ?? route.target,
             compileHint: route.hint,
             canvasPorts: canvasPortsForCategory(normalizeComponentCategory(catalog.category)),
-            config: { ...(action.config ?? {}), template_id: catalog.id },
+            config: { ...prevConfig, ...(action.config ?? {}), template_id: catalog.id },
           },
         };
       });
+      const wired = wireInputFromUpstreamEdge(nodes, edges, target.id);
+      if (wired) {
+        nodes = nodes.map((n) =>
+          n.id === wired.nodeId ? { ...n, data: { ...n.data, config: wired.configPatch } } : n
+        );
+      }
       messages.push(`Replaced ${prevLabel} with ${catalog.name} (${catalog.id})`);
     } else if (action.op === "update_node_config") {
       const target = findNodeByRef(nodes, action.node);
