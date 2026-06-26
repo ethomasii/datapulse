@@ -105,7 +105,7 @@ def _generate_github_pipeline(request: PipelineRequest) -> str:
 """
 
 import dlt
-from dlt.sources.github import github_reactions
+from github import github_reactions
 
 def run(partition_key: str = None):
     """Run the GitHub pipeline."""

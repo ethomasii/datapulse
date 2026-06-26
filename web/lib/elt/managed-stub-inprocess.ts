@@ -200,6 +200,16 @@ export async function runManagedWorkerStubBatchInProcess(options: {
 }
 
 /** Claim a pending managed run in-process (no HTTP self-call). */
+export async function appendManagedRunLogInProcess(
+  runId: string,
+  message: string,
+  level: "info" | "warn" | "error" = "info"
+): Promise<void> {
+  await patchManagedRunInProcess(runId, {
+    appendLog: { level, message },
+  });
+}
+
 export async function claimManagedRunInProcess(
   runId: string,
   options?: { message?: string }

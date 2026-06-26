@@ -45,7 +45,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install httpx "dlt>=1.5.0" "fastapi>=0.115.0" "pydantic>=2" "uvicorn[standard]>=0.32.0"
+          pip install httpx "dlt[motherduck]>=1.5.0" "fastapi>=0.115.0" "pydantic>=2" "uvicorn[standard]>=0.32.0"
           pip install "dbt-core>=1.8.0" "dbt-snowflake>=1.8.0" "dbt-bigquery>=1.8.0" "dbt-postgres>=1.8.0" "dbt-duckdb>=1.8.0"
           sudo apt-get update && sudo apt-get install -y git
 
@@ -57,4 +57,7 @@ jobs:
           ELTPULSE_MANAGED_RUN_ID: ${{ inputs.run_id }}
           ELTPULSE_MANAGED_LIMIT: ${{ inputs.limit || vars.ELTPULSE_MANAGED_LIMIT || '5' }}
           ELTPULSE_MANAGED_DEADLINE_MS: ${{ vars.ELTPULSE_MANAGED_DEADLINE_MS || '900000' }}
-        run: python main.py
+        run: |
+          echo "Managed run id: ${ELTPULSE_MANAGED_RUN_ID:-<fetch pending queue>}"
+          echo "Control plane: ${ELTPULSE_CONTROL_PLANE_URL:-<not set>}"
+          python main.py

@@ -67,7 +67,7 @@ function generateGithubPipeline(request: PipelineRequest): string {
 
 import os
 import dlt
-from dlt.sources.github import github_reactions
+from github import github_reactions
 
 def run(partition_key: str = None):
     # partition_key: optional ISO date string, e.g. 2024-01-01

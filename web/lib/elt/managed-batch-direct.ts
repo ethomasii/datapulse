@@ -48,12 +48,18 @@ async function tryGithubActionsWorker(runId: string): Promise<boolean> {
     "@/lib/elt/managed-worker-github-dispatch"
   );
 
-  const claimed = await claimManagedRunInProcess(runId, {
-    message: "eltPulse managed worker: queued on GitHub Actions…",
-  });
-  if (!claimed) return !(await runStillPending(runId));
-
   await runManagedWorkerGithubDispatchHttp({ runId, limit: 1 });
+
+  const claimed = await claimManagedRunInProcess(runId, {
+    message: `eltPulse managed worker: queued on GitHub Actions (${repo})…`,
+  });
+  if (!claimed && (await runStillPending(runId))) {
+    const { appendManagedRunLogInProcess } = await import("@/lib/elt/managed-stub-inprocess");
+    await appendManagedRunLogInProcess(
+      runId,
+      `eltPulse managed worker: GitHub Actions dispatch sent for ${repo} (run already claimed).`
+    );
+  }
   return true;
 }
 

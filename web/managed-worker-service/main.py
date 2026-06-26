@@ -25,6 +25,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -48,6 +49,73 @@ _ROWS_LOADED = re.compile(r"\b([\d,]+)\s*rows\s+loaded\b", re.IGNORECASE)
 _ROWS_SO_FAR = re.compile(r"rows\s+processed\s+so\s+far:\s*([\d,]+)", re.IGNORECASE)
 _BYTES_LOADED = re.compile(r"\b([\d,]+)\s*bytes\s+loaded\b", re.IGNORECASE)
 _PHASE_PROGRESS = {"extract": 15, "load": 70, "dbt": 90, "done": 100, "failed": 100}
+
+_VERIFIED_SOURCES_ROOT = Path(__file__).resolve().parent / "verified_sources"
+_LEGACY_GITHUB_IMPORT = "from dlt.sources.github import github_reactions"
+_GITHUB_IMPORT = "from github import github_reactions"
+_VERIFIED_IMPORT_RE = re.compile(r"^from\s+([a-z][a-z0-9_]*)\s+import\s+", re.MULTILINE)
+# Stdlib / dlt imports that are not dlt verified-source packages.
+_BUILTIN_IMPORT_MODULES = frozenset(
+    {"os", "sys", "json", "re", "typing", "datetime", "pathlib", "base64", "dlt", "decimal", "collections"}
+)
+_VENDORED_VERIFIED_SOURCES: dict[str, Path] = {
+    "github": _VERIFIED_SOURCES_ROOT / "github",
+}
+
+
+def _verified_import_modules(code: str) -> list[str]:
+    """Detect top-level verified-source packages imported by generated pipeline code."""
+    modules: set[str] = set()
+    if "dlt.sources.github" in code:
+        modules.add("github")
+    for match in _VERIFIED_IMPORT_RE.finditer(code):
+        name = match.group(1)
+        if name in _BUILTIN_IMPORT_MODULES or name.startswith("dlt"):
+            continue
+        modules.add(name)
+    return sorted(modules)
+
+
+def _prepare_dlt_pipeline_code(code: str) -> tuple[str, list[str]]:
+    """Rewrite legacy imports and return verified-source modules to stage."""
+    if _LEGACY_GITHUB_IMPORT in code:
+        code = code.replace(_LEGACY_GITHUB_IMPORT, _GITHUB_IMPORT)
+    return code, _verified_import_modules(code)
+
+
+def _stage_verified_source(tdir: Path, module: str) -> None:
+    dest = tdir / module
+    if dest.is_dir():
+        return
+    vendored = _VENDORED_VERIFIED_SOURCES.get(module)
+    if vendored and vendored.is_dir():
+        shutil.copytree(vendored, dest)
+        return
+    proc = subprocess.run(
+        [sys.executable, "-m", "dlt", "init", module, "duckdb"],
+        cwd=tdir,
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout or "").strip()
+        raise RuntimeError(f"dlt init {module} failed: {detail[-2000:]}")
+    if not dest.is_dir():
+        raise RuntimeError(f"dlt init {module} did not create {module}/ package")
+
+
+def _install_verified_source_requirements(tdir: Path) -> None:
+    req = tdir / "requirements.txt"
+    if not req.is_file():
+        return
+    proc = subprocess.run(
+        [sys.executable, "-m", "pip", "install", "-r", str(req), "-q"],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout or "").strip()
+        raise RuntimeError(f"pip install verified source requirements failed: {detail[-2000:]}")
 
 
 def _control_plane_base() -> str:
@@ -445,6 +513,11 @@ async def _execute_one_run(
         if tool == "sling":
             (tdir / "replication.yaml").write_text(code, encoding="utf-8")
         else:
+            code, verified_modules = _prepare_dlt_pipeline_code(code)
+            for module in verified_modules:
+                _stage_verified_source(tdir, module)
+            if verified_modules:
+                _install_verified_source_requirements(tdir)
             (tdir / "pipeline.py").write_text(code, encoding="utf-8")
         cy = pipeline.get("configYaml")
         if isinstance(cy, str) and cy.strip():

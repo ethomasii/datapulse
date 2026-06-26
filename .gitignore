@@ -38,6 +38,7 @@ elt_pipelines_example/
 requirements.txt
 requirements-min.txt
 pyproject.toml
+.dlt/
 
 # Vercel Python managed worker (polyglot service) — keep dependency manifest
 !web/managed-worker-service/pyproject.toml
