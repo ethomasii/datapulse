@@ -5,7 +5,7 @@
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "prisma generate && next dev",
-    "build": "npm run build --prefix ../integrations/mcp-server && prisma migrate deploy && prisma generate && next build",
+    "build": "npm ci --prefix ../integrations/mcp-server --include=dev && npm run build --prefix ../integrations/mcp-server && prisma migrate deploy && prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "export-elt-catalog": "python ../scripts/export-credentials-catalog.py",
