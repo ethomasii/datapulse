@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bot, ExternalLink, Loader2, Plus, RefreshCw, Trash2, Network, Sparkles } from "lucide-react";
+import { Bot, ExternalLink, Layers, Loader2, Plug, Plus, RefreshCw, Trash2, Sparkles } from "lucide-react";
 import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 import { RelatedLinks } from "@/components/ui/related-links";
 import {
@@ -183,13 +183,12 @@ export default function McpServersPage() {
       <AppPageHeader
         title="MCP servers"
         description="Register Model Context Protocol servers for Genie and pipeline components (mcp_tool_call, litellm_agent, …)."
-        icon={Network}
       />
 
       <RelatedLinks
         links={[
-          { href: "/connections", label: "Connections", desc: "Warehouse and source credentials" },
-          { href: "/builder", label: "Pipeline builder", desc: "Add MCP/AI native components on canvas" },
+          { href: "/connections", icon: Plug, label: "Connections", desc: "Warehouse and source credentials" },
+          { href: "/builder", icon: Layers, label: "Pipeline builder", desc: "Add MCP/AI native components on canvas" },
         ]}
       />
 
