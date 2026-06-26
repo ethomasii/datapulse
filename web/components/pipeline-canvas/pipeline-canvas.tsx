@@ -361,7 +361,13 @@ function FlowCanvas({
       const id = `n-${idCounter}`;
       const anchor = position
         ? { position, upstreamId: null as string | null }
-        : findCanvasAppendTarget(nodes, edges, { transformOnly });
+        : findCanvasAppendTarget(nodes, edges, {
+            transformOnly,
+            append: {
+              type: "componentNode",
+              data: { compileHint: component.compileHint },
+            },
+          });
 
       let newNode: Node = {
         id,
@@ -419,7 +425,10 @@ function FlowCanvas({
       const preset = presets[tool];
       idCounter += 1;
       const id = `n-${idCounter}`;
-      const anchor = findCanvasAppendTarget(nodes, edges, { transformOnly });
+      const anchor = findCanvasAppendTarget(nodes, edges, {
+        transformOnly,
+        append: { type: "transformNode", data: { transformTool: tool } },
+      });
       const newNode: Node = {
         id,
         type: "transformNode",

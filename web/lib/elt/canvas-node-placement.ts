@@ -1,11 +1,12 @@
 /**
  * Place new canvas nodes after the current pipeline tail (not on top of dest).
+ * Positions use estimated box size so connection handles line up horizontally.
  */
 import type { Edge, Node } from "@xyflow/react";
 import { isValidPipelineCanvasEdge } from "@/lib/elt/canvas-component-sync";
 
-const NODE_WIDTH_EST = 220;
-const HORIZONTAL_GAP = 48;
+/** Space between upstream right edge and next node left edge. */
+const HORIZONTAL_GAP = 88;
 const DEFAULT_Y = 120;
 
 export type CanvasAppendTarget = {
@@ -13,6 +14,29 @@ export type CanvasAppendTarget = {
   /** Node to wire as edge source when auto-connecting the new node. */
   upstreamId: string | null;
 };
+
+export type CanvasAppendNodeSpec = {
+  type: Node["type"];
+  data?: Record<string, unknown>;
+};
+
+type NodeLayoutSpec = { width: number; height: number };
+
+/** Estimated rendered size — matches pipeline-canvas custom node CSS. */
+export function estimateNodeLayout(node: Pick<Node, "type" | "data">): NodeLayoutSpec {
+  const type = String(node.type ?? "componentNode");
+  if (type === "sourceNode" || type === "destNode") {
+    return { width: 200, height: 152 };
+  }
+  if (type === "transformNode") {
+    return { width: 220, height: 168 };
+  }
+  const data = (node.data ?? {}) as Record<string, unknown>;
+  const hint = String(data.compileHint ?? "").trim();
+  if (!hint) return { width: 196, height: 76 };
+  if (hint.length < 72) return { width: 196, height: 96 };
+  return { width: 196, height: 118 };
+}
 
 function nodeById(nodes: Node[]): Map<string, Node> {
   return new Map(nodes.map((n) => [n.id, n]));
@@ -22,22 +46,46 @@ function outgoingTargets(edges: Edge[], sourceId: string): string[] {
   return edges.filter((e) => e.source === sourceId).map((e) => e.target);
 }
 
-function appendRowY(nodes: Node[], upstream: Node): number {
+/** Vertical center of the main source → destination backbone row. */
+export function chainCenterY(nodes: Node[]): number {
   const dest = nodes.find((n) => n.type === "destNode");
-  if (dest) return dest.position.y;
-  const source = nodes.find((n) => n.type === "sourceNode");
-  if (source) return source.position.y;
-  return upstream.position.y;
+  const ref = dest ?? nodes.find((n) => n.type === "sourceNode");
+  if (!ref) return DEFAULT_Y + 76;
+  const layout = estimateNodeLayout(ref);
+  return ref.position.y + layout.height / 2;
+}
+
+export function positionAfterUpstream(
+  nodes: Node[],
+  upstream: Node,
+  append: CanvasAppendNodeSpec
+): { x: number; y: number } {
+  const up = estimateNodeLayout(upstream);
+  const next = estimateNodeLayout({ type: append.type, data: append.data ?? {} });
+  const centerY = chainCenterY(nodes);
+  return {
+    x: upstream.position.x + up.width + HORIZONTAL_GAP,
+    y: centerY - next.height / 2,
+  };
 }
 
 /** Rightmost leaf reachable from pipeline roots (source or warehouse). */
 export function findCanvasAppendTarget(
   nodes: Node[],
   edges: Edge[],
-  options?: { transformOnly?: boolean }
+  options?: { transformOnly?: boolean; append?: CanvasAppendNodeSpec }
 ): CanvasAppendTarget {
+  const append: CanvasAppendNodeSpec = options?.append ?? {
+    type: "componentNode",
+    data: {},
+  };
+
   if (nodes.length === 0) {
-    return { position: { x: 40, y: DEFAULT_Y }, upstreamId: null };
+    const layout = estimateNodeLayout({ type: append.type, data: append.data ?? {} });
+    return {
+      position: { x: 40, y: chainCenterY([]) - layout.height / 2 },
+      upstreamId: null,
+    };
   }
 
   const byId = nodeById(nodes);
@@ -53,10 +101,7 @@ export function findCanvasAppendTarget(
   if (startIds.length === 0) {
     const rightmost = [...nodes].sort((a, b) => b.position.x - a.position.x)[0]!;
     return {
-      position: {
-        x: rightmost.position.x + NODE_WIDTH_EST + HORIZONTAL_GAP,
-        y: appendRowY(nodes, rightmost),
-      },
+      position: positionAfterUpstream(nodes, rightmost, append),
       upstreamId: rightmost.id,
     };
   }
@@ -85,7 +130,6 @@ export function findCanvasAppendTarget(
           queue.push(child.id);
         }
       }
-      // Prefer deepest node on the main horizontal chain (single child to the right).
       if (outs.length === 1) {
         const only = outs[0]!;
         if (only.position.x >= node.position.x && isValidPipelineCanvasEdge(node, only)) {
@@ -99,7 +143,6 @@ export function findCanvasAppendTarget(
     tail = startIds.map((id) => byId.get(id)).find(Boolean) ?? nodes[0]!;
   }
 
-  // Walk one more step along a linear component/transform chain to the true end.
   let cursor = tail;
   for (;;) {
     const next = outgoingTargets(edges, cursor.id)
@@ -112,10 +155,7 @@ export function findCanvasAppendTarget(
   tail = cursor;
 
   return {
-    position: {
-      x: tail.position.x + NODE_WIDTH_EST + HORIZONTAL_GAP,
-      y: appendRowY(nodes, tail),
-    },
+    position: positionAfterUpstream(nodes, tail, append),
     upstreamId: tail.id,
   };
 }
