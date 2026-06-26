@@ -6,6 +6,7 @@ import { UserButton } from "@clerk/nextjs";
 import {
   Activity,
   BookOpen,
+  Bot,
   Cable,
   CalendarClock,
   ChevronLeft,
@@ -55,6 +56,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/builder", label: "Pipelines", icon: Layers },
       { href: "/workflows", label: "Pipeline chains", icon: Network },
       { href: "/connections", label: "Connections", icon: Cable },
+      { href: "/mcp-servers", label: "MCP servers", icon: Bot },
     ],
   },
   {
