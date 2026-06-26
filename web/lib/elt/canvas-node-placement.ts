@@ -22,6 +22,14 @@ function outgoingTargets(edges: Edge[], sourceId: string): string[] {
   return edges.filter((e) => e.source === sourceId).map((e) => e.target);
 }
 
+function appendRowY(nodes: Node[], upstream: Node): number {
+  const dest = nodes.find((n) => n.type === "destNode");
+  if (dest) return dest.position.y;
+  const source = nodes.find((n) => n.type === "sourceNode");
+  if (source) return source.position.y;
+  return upstream.position.y;
+}
+
 /** Rightmost leaf reachable from pipeline roots (source or warehouse). */
 export function findCanvasAppendTarget(
   nodes: Node[],
@@ -47,7 +55,7 @@ export function findCanvasAppendTarget(
     return {
       position: {
         x: rightmost.position.x + NODE_WIDTH_EST + HORIZONTAL_GAP,
-        y: rightmost.position.y,
+        y: appendRowY(nodes, rightmost),
       },
       upstreamId: rightmost.id,
     };
@@ -106,7 +114,7 @@ export function findCanvasAppendTarget(
   return {
     position: {
       x: tail.position.x + NODE_WIDTH_EST + HORIZONTAL_GAP,
-      y: tail.position.y,
+      y: appendRowY(nodes, tail),
     },
     upstreamId: tail.id,
   };

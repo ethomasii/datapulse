@@ -303,7 +303,13 @@ function FlowCanvas({
   }, [selectedFlowEdges, setEdges]);
 
   const fit = useCallback(() => {
-    requestAnimationFrame(() => rfRef.current?.fitView({ padding: 0.2 }));
+    requestAnimationFrame(() => rfRef.current?.fitView({ padding: 0.22, duration: 220 }));
+  }, []);
+
+  const fitAfterGraphChange = useCallback(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => rfRef.current?.fitView({ padding: 0.22, duration: 220 }));
+    });
   }, []);
 
   const addNode = useCallback(
@@ -398,8 +404,9 @@ function FlowCanvas({
 
       setNodes((nds) => [...nds, newNode]);
       if (nextEdges !== edges) setEdges(nextEdges);
+      if (!position) fitAfterGraphChange();
     },
-    [nodes, edges, transformOnly, setNodes, setEdges]
+    [nodes, edges, transformOnly, setNodes, setEdges, fitAfterGraphChange]
   );
 
   const addCodeTransformNode = useCallback(
@@ -439,8 +446,9 @@ function FlowCanvas({
       }
       setNodes((nds) => [...nds, newNode]);
       if (nextEdges !== edges) setEdges(nextEdges);
+      fitAfterGraphChange();
     },
-    [nodes, edges, transformOnly, setNodes, setEdges]
+    [nodes, edges, transformOnly, setNodes, setEdges, fitAfterGraphChange]
   );
 
   const addNativeTransformNode = useCallback(

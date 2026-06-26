@@ -17,7 +17,7 @@ describe("findCanvasAppendTarget", () => {
     expect(position.y).toBe(120);
   });
 
-  it("chains after an existing component", () => {
+  it("chains after an existing component on the same row as destination", () => {
     const nodes: Node[] = [
       ...backbone,
       { id: "c1", type: "componentNode", position: { x: 628, y: 120 }, data: {} },
@@ -26,5 +26,6 @@ describe("findCanvasAppendTarget", () => {
     const { position, upstreamId } = findCanvasAppendTarget(nodes, edges);
     expect(upstreamId).toBe("c1");
     expect(position.x).toBeGreaterThan(628);
+    expect(position.y).toBe(120);
   });
 });
