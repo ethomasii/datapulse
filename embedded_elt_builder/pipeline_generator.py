@@ -80,10 +80,17 @@ def _generate_github_pipeline(request: PipelineRequest) -> str:
     config = request.source_configuration
     repo_owner = config.get('repo_owner', 'REPO_OWNER')
     repo_name = config.get('repo_name', 'REPO_NAME')
-    resources = config.get('resources', ['issues', 'pull_requests'])
-
-    # Build resource list for code
-    resource_list = ', '.join([f'"{r}"' for r in resources])
+    raw_resources = config.get('resources', ['issues', 'pull_requests'])
+    if isinstance(raw_resources, str):
+        resources = [r.strip() for r in raw_resources.split(',') if r.strip()]
+    else:
+        resources = list(raw_resources)
+    implemented = {"issues", "pull_requests", "repo_events", "stargazers"}
+    resources = [r for r in resources if r in implemented] or ["issues", "pull_requests"]
+    reactions = [r for r in resources if r in ("issues", "pull_requests")]
+    repo_events = "repo_events" in resources
+    stargazers = "stargazers" in resources
+    reactions_list = ', '.join([f'"{r}"' for r in reactions])
 
     # Determine dataset name
     dataset_name = request.schema_override or f"github_{repo_owner}_{repo_name}"
@@ -99,16 +106,45 @@ def _generate_github_pipeline(request: PipelineRequest) -> str:
     if _bucket_hint:
         destination_comment = (destination_comment + f"\n    # Set DESTINATION__FILESYSTEM__BUCKET_URL={_bucket_hint}").strip()
 
+    run_blocks = []
+    if reactions:
+        run_blocks.append(
+            f"""    reactions_resources = [{reactions_list}]
+    if reactions_resources:
+        source = github_reactions(**source_kwargs).with_resources(*reactions_resources)
+        last_info = pipeline.run(source, **run_kwargs)"""
+        )
+    if repo_events:
+        run_blocks.append(
+            f"""    source = github_repo_events(
+        owner="{repo_owner}",
+        name="{repo_name}",
+        access_token=github_token,
+    )
+    last_info = pipeline.run(source, **run_kwargs)"""
+        )
+    if stargazers:
+        run_blocks.append(
+            """    source = github_stargazers(**source_kwargs)
+    last_info = pipeline.run(source, **run_kwargs)"""
+        )
+    run_body = "\n\n".join(run_blocks)
+
     return f'''"""dlt pipeline: {request.name}
 
 {request.description or f"Load GitHub data from {repo_owner}/{repo_name} to {request.destination_type}"}
 """
 
+import os
 import dlt
-from github import github_reactions
+from github import github_reactions, github_repo_events, github_stargazers
 
 def run(partition_key: str = None):
     """Run the GitHub pipeline."""
+
+    github_token = os.environ.get("GITHUB_TOKEN")
+    if not github_token:
+        raise RuntimeError("Missing GitHub token. Set GITHUB_TOKEN.")
 
     # Configure the pipeline
     {destination_comment}
@@ -118,28 +154,27 @@ def run(partition_key: str = None):
         dataset_name="{dataset_name}",
     )
 
-    # Load GitHub data
-    # Access token will be read from GITHUB_TOKEN environment variable
-    source = github_reactions(
+    source_kwargs = dict(
         owner="{repo_owner}",
         name="{repo_name}",
         items_per_page=100,
-        max_items=None,  # Load all data
+        max_items=None,
+        access_token=github_token,
     )
 
-    # Select which resources to load
-    resources_to_load = [{resource_list}]
-    source = source.with_resources(*resources_to_load)
-
-    # Run the pipeline with write disposition
-    info = pipeline.run(
-        source,
+    run_kwargs = dict(
         write_disposition="{request.write_disposition}",
-        loader_file_format="{request.file_format}"  # File format for file-based destinations
+        loader_file_format="{request.file_format}",
     )
 
-    print(f"Pipeline completed: {{info}}")
-    return info
+    last_info = None
+{run_body}
+
+    if last_info is None:
+        raise RuntimeError("No GitHub resources selected for load.")
+
+    print(f"Pipeline completed: {{last_info}}")
+    return last_info
 
 if __name__ == "__main__":
     import sys

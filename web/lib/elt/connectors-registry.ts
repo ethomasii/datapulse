@@ -508,7 +508,7 @@ const API_CONNECTORS: ConnectorDef[] = [
     ],
     sourceConfigFields: [
       { key: "repos", label: "Which repositories do you want to load?", type: "text", required: true, help: "Comma-separated list of repos in format owner/repo", placeholder: "my-org/my-repo, your-org/your-repo" },
-      { key: "resources", label: "Select resources to load", type: "multiselect", required: false, help: "Select which GitHub resources to sync", options: [{ value: "issues", label: "Issues" }, { value: "pull_requests", label: "Pull Requests" }, { value: "commits", label: "Commits" }, { value: "stargazers", label: "Stargazers" }, { value: "workflows", label: "Workflows" }, { value: "releases", label: "Releases" }], default: ["issues", "pull_requests"] },
+      { key: "resources", label: "Select resources to load", type: "multiselect", required: false, help: "Select which GitHub resources to sync", options: [{ value: "issues", label: "Issues" }, { value: "pull_requests", label: "Pull Requests" }, { value: "repo_events", label: "Repository events" }, { value: "stargazers", label: "Stargazers" }], default: ["issues", "pull_requests"] },
     ],
   },
   {

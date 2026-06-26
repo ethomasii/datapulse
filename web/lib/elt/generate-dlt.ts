@@ -8,6 +8,7 @@ import { generatePostgresDltPipeline, generateStripePipeline } from "./generate-
 import { generateVerifiedSourcePipeline } from "./generate-dlt-verified";
 import { isVerifiedPackageSource } from "./verified-source-spec";
 import { eltpulsePythonModuleHeader, ELTPULSE_PIPELINES_DOCS } from "./codegen-branding";
+import { normalizeGithubResources, partitionGithubResources } from "./github-dlt-resources";
 
 // SWC/webpack misparses Python triple-quotes inside JS template literals.
 // Use this constant so the parser never sees `"""` as a literal in source.
@@ -33,12 +34,9 @@ function generateGithubPipeline(request: PipelineRequest): string {
   const config = request.sourceConfiguration;
   const repoOwner = String(config.repo_owner ?? "REPO_OWNER");
   const repoName = String(config.repo_name ?? "REPO_NAME");
-  const resources = Array.isArray(config.resources)
-    ? (config.resources as string[])
-    : typeof config.resources === "string"
-      ? (config.resources as string).split(",").map((x) => x.trim()).filter(Boolean)
-      : ["issues", "pull_requests"];
-  const resourceList = resources.map((r) => `"${escapePyString(r)}"`).join(", ");
+  const resources = normalizeGithubResources(config.resources);
+  const { reactions, repoEvents, stargazers } = partitionGithubResources(resources);
+  const reactionsList = reactions.map((r) => `"${escapePyString(r)}"`).join(", ");
   const rawTokenEnv = String(config.github_token_env ?? "GITHUB_TOKEN").trim() || "GITHUB_TOKEN";
   const tokenEnv = /^[A-Z][A-Z0-9_]*$/i.test(rawTokenEnv) ? rawTokenEnv.toUpperCase() : "GITHUB_TOKEN";
   const itemsPerPage =
@@ -66,11 +64,31 @@ function generateGithubPipeline(request: PipelineRequest): string {
     request.description ||
     `Load GitHub data from ${repoOwner}/${repoName} to ${request.destinationType}`;
 
+  const runBlocks: string[] = [];
+  if (reactions.length > 0) {
+    runBlocks.push(`    reactions_resources = [${reactionsList}]
+    if reactions_resources:
+        source = github_reactions(**source_kwargs).with_resources(*reactions_resources)
+        last_info = pipeline.run(source, **run_kwargs)`);
+  }
+  if (repoEvents) {
+    runBlocks.push(`    source = github_repo_events(
+        owner="${escapePyString(repoOwner)}",
+        name="${escapePyString(repoName)}",
+        access_token=github_token,
+    )
+    last_info = pipeline.run(source, **run_kwargs)`);
+  }
+  if (stargazers) {
+    runBlocks.push(`    source = github_stargazers(**source_kwargs)
+    last_info = pipeline.run(source, **run_kwargs)`);
+  }
+
   return `${eltpulsePythonModuleHeader(request.name, desc)}
 
 import os
 import dlt
-from github import github_reactions
+from github import github_reactions, github_repo_events, github_stargazers
 
 def run(partition_key: str = None):
     # partition_key: optional ISO date string, e.g. 2024-01-01
@@ -96,7 +114,7 @@ def run(partition_key: str = None):
         dataset_name="${escapePyString(datasetName)}",
     )
 
-    # Build source kwargs -- inject since when a partition key (date) is provided
+    # Shared kwargs for GraphQL-based verified sources
     source_kwargs = dict(
         owner="${escapePyString(repoOwner)}",
         name="${escapePyString(repoName)}",
@@ -105,21 +123,19 @@ def run(partition_key: str = None):
         access_token=github_token,
     )
 
-    source = github_reactions(**source_kwargs)
-
-    # Select which resources to load
-    resources_to_load = [${resourceList}]
-    source = source.with_resources(*resources_to_load)
-
-    # Run the pipeline with write disposition
-    info = pipeline.run(
-        source,
+    run_kwargs = dict(
         write_disposition="${escapePyString(request.writeDisposition ?? "append")}",
-        loader_file_format="${escapePyString(request.fileFormat ?? "parquet")}"
+        loader_file_format="${escapePyString(request.fileFormat ?? "parquet")}",
     )
 
-    print(f"Pipeline completed: {info}")${eltpulseReportLoadInfoPython("info")}${dltDbtRunnerBeforeReturn(request)}${postTransformBeforeReturn(request)}
-    return info
+    last_info = None
+${runBlocks.join("\n\n")}
+
+    if last_info is None:
+        raise RuntimeError("No GitHub resources selected for load.")
+
+    print(f"Pipeline completed: {last_info}")${eltpulseReportLoadInfoPython("last_info")}${dltDbtRunnerBeforeReturn(request)}${postTransformBeforeReturn(request)}
+    return last_info
 
 if __name__ == "__main__":
     import sys
