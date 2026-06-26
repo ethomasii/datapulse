@@ -70,7 +70,7 @@ def run(partition_key: str = None):
         dataset_name="${escapePyString(datasetName)}",
     )
 
-    source = stripe_source(start_date=start, api_key=api_key)
+    source = stripe_source(start_date=start, stripe_secret_key=api_key)
     info = pipeline.run(
         source,
         write_disposition="${escapePyString(request.writeDisposition ?? "append")}",

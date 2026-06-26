@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
 import { parseStoredConnectionSecrets } from "@/lib/elt/connection-secrets-store";
 import { mergeConnectionRuntimeSecrets } from "@/lib/elt/duckdb-destination";
+import { getGithubAccessTokenForUser } from "@/lib/integrations/github-access-token";
 import { sourceConfigurationFromDbtProject } from "@/lib/elt/dbt-projects";
 import { resolveRouteParamId } from "@/lib/server/route-params";
 
@@ -52,6 +53,22 @@ async function loadConnection(userId: string, id: string | null) {
     ...rest,
     secrets,
   };
+}
+
+async function enrichSourceSecrets(
+  userId: string,
+  pipelineSourceType: string | null | undefined,
+  source: Awaited<ReturnType<typeof loadConnection>>
+) {
+  if (!source) return source;
+  const secrets = { ...(source.secrets ?? {}) };
+  const connector = source.connector?.toLowerCase() ?? "";
+  const srcType = (pipelineSourceType ?? connector).toLowerCase();
+  if ((connector === "github" || srcType === "github") && !secrets.GITHUB_TOKEN?.trim()) {
+    const oauth = await getGithubAccessTokenForUser(userId);
+    if (oauth) secrets.GITHUB_TOKEN = oauth;
+  }
+  return { ...source, secrets };
 }
 
 export async function GET(req: Request, ctx: Ctx) {
@@ -119,10 +136,11 @@ export async function GET(req: Request, ctx: Ctx) {
   const userId = run.userId;
   const destinationConnectionId =
     run.pipeline?.destinationConnectionId ?? run.dbtProject?.destinationConnectionId ?? null;
-  const [source, destination] = await Promise.all([
+  const [sourceRaw, destination] = await Promise.all([
     loadConnection(userId, run.pipeline?.sourceConnectionId ?? null),
     loadConnection(userId, destinationConnectionId),
   ]);
+  const source = await enrichSourceSecrets(userId, run.pipeline?.sourceType, sourceRaw);
 
   const pipelinePayload = run.pipeline ?? {
     id: run.dbtProject!.id,

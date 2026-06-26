@@ -15,7 +15,16 @@ import sys
 import tempfile
 from pathlib import Path
 
-DEFAULT_SOURCES = ("github", "stripe_analytics")
+DEFAULT_SOURCES = (
+  "github",
+  "stripe_analytics",
+  "hubspot",
+  "shopify_dlt",
+  "pipedrive",
+  "salesforce",
+  "zendesk",
+  "notion",
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "verified_sources"

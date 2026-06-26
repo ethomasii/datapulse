@@ -88,10 +88,52 @@ def _verified_import_modules(code: str) -> list[str]:
     return sorted(modules)
 
 
+def _inject_dlt_secret_aliases(env: dict[str, str]) -> dict[str, str]:
+    """Map connection env vars to dlt SOURCES__* secrets expected by verified packages."""
+    out = dict(env)
+    gh = out.get("GITHUB_TOKEN") or out.get("github_token")
+    if gh:
+        out.setdefault("GITHUB_TOKEN", gh)
+        out.setdefault("SOURCES__GITHUB__ACCESS_TOKEN", gh)
+    stripe = out.get("STRIPE_SECRET_KEY") or out.get("STRIPE_API_KEY")
+    if stripe:
+        out.setdefault("STRIPE_SECRET_KEY", stripe)
+        out.setdefault("SOURCES__STRIPE_ANALYTICS__STRIPE_SECRET_KEY", stripe)
+    hs = out.get("HUBSPOT_API_KEY") or out.get("HUBSPOT_ACCESS_TOKEN")
+    if hs:
+        out.setdefault("HUBSPOT_API_KEY", hs)
+        out.setdefault("SOURCES__HUBSPOT__API_KEY", hs)
+    pd = out.get("PIPEDRIVE_API_KEY") or out.get("PIPEDRIVE_API_TOKEN")
+    if pd:
+        out.setdefault("PIPEDRIVE_API_KEY", pd)
+        out.setdefault("SOURCES__PIPEDRIVE__PIPEDRIVE_API_KEY", pd)
+    return out
+
+
+def _patch_legacy_github_pipeline(code: str) -> str:
+    """Upgrade saved pipelines that only read GITHUB_TOKEN once without validation."""
+    if "from github import github_reactions" not in code or "Missing GitHub token" in code:
+        return code
+    pattern = r'github_token = os\.environ\.get\("[^"]+"\)'
+    if not re.search(pattern, code):
+        return code
+    replacement = '''github_token = (
+        os.environ.get("GITHUB_TOKEN")
+        or os.environ.get("SOURCES__GITHUB__ACCESS_TOKEN")
+    )
+    if not github_token:
+        raise RuntimeError(
+            "Missing GitHub token. Link a GitHub source connection with GITHUB_TOKEN, "
+            "or connect GitHub under Integrations."
+        )'''
+    return re.sub(pattern, replacement, code, count=1)
+
+
 def _prepare_dlt_pipeline_code(code: str) -> tuple[str, list[str]]:
     """Rewrite legacy imports and return verified-source modules to stage."""
     if _LEGACY_GITHUB_IMPORT in code:
         code = code.replace(_LEGACY_GITHUB_IMPORT, _GITHUB_IMPORT)
+    code = _patch_legacy_github_pipeline(code)
     return code, _verified_import_modules(code)
 
 
@@ -560,10 +602,12 @@ async def _execute_one_run(
         dst = connections.get("destination") or {}
         secrets_s = src.get("secrets") if isinstance(src, dict) else None
         secrets_d = dst.get("secrets") if isinstance(dst, dict) else None
-        child_env = _merge_env(
+        child_env = _inject_dlt_secret_aliases(
+            _merge_env(
             {k: str(v) for k, v in os.environ.items() if v is not None and isinstance(v, str)},
             secrets_s if isinstance(secrets_s, dict) else None,
             secrets_d if isinstance(secrets_d, dict) else None,
+            )
         )
         child_env["ELTPULSE_RUN_ID"] = run_id
         child_env["ELTPULSE_CONTROL_PLANE_URL"] = base

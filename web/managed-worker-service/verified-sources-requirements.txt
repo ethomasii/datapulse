@@ -1,4 +1,5 @@
 # Extra pip deps for vendored dlt verified sources (managed worker / GHA).
 # Regenerate: python web/managed-worker-service/scripts/vendor-verified-sources.py
 
+simple-salesforce>=1.12.4
 stripe<16,>=5.0.0

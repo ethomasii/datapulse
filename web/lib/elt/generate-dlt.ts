@@ -5,6 +5,8 @@ import { eltpulseReportLoadInfoPython } from "./generate-eltpulse-run-reporting"
 import { postTransformBeforeReturn } from "./generate-post-transform";
 import { generateRestApiAdvanced, generateRestApiPipeline } from "./generate-dlt-rest";
 import { generatePostgresDltPipeline, generateStripePipeline } from "./generate-dlt-golden";
+import { generateVerifiedSourcePipeline } from "./generate-dlt-verified";
+import { isVerifiedPackageSource } from "./verified-source-spec";
 import { eltpulsePythonModuleHeader, ELTPULSE_PIPELINES_DOCS } from "./codegen-branding";
 
 // SWC/webpack misparses Python triple-quotes inside JS template literals.
@@ -16,6 +18,7 @@ export function generateDltPipeline(request: PipelineRequest): string {
   if (sourceType === "github") return generateGithubPipeline(request);
   if (sourceType === "stripe" || sourceType === "stripe_analytics") return generateStripePipeline(request);
   if (sourceType === "postgres" || sourceType === "postgresql") return generatePostgresDltPipeline(request);
+  if (isVerifiedPackageSource(sourceType)) return generateVerifiedSourcePipeline(request);
   if (sourceType === "rest_api") {
     const c = request.sourceConfiguration;
     if (c.advanced_mode && c.advanced_config) {
@@ -74,8 +77,17 @@ def run(partition_key: str = None):
     # When provided it is passed as the 'since' arg to github_reactions so only items
     # updated on or after that date are fetched (date-based incremental load).
 
-    # Resolve the GitHub PAT from the environment
-    github_token = os.environ.get("${escapePyString(tokenEnv)}")
+    # Resolve the GitHub PAT from the environment (connection secrets or OAuth-backed run)
+    github_token = (
+        os.environ.get("${escapePyString(tokenEnv)}")
+        or os.environ.get("GITHUB_TOKEN")
+        or os.environ.get("SOURCES__GITHUB__ACCESS_TOKEN")
+    )
+    if not github_token:
+        raise RuntimeError(
+            "Missing GitHub token. Link a GitHub source connection with GITHUB_TOKEN, "
+            "or connect GitHub under Integrations."
+        )
 
     # Configure the pipeline
     ${destinationComment}
@@ -93,8 +105,6 @@ def run(partition_key: str = None):
         max_items=${maxItemsPy},  # None = load all (within API limits)
         access_token=github_token,
     )
-    if partition_key:
-        source_kwargs["since"] = partition_key
 
     source = github_reactions(**source_kwargs)
 
