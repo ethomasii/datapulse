@@ -11,6 +11,7 @@ import { toDbtProjectSummary } from "@/lib/elt/dbt-projects";
 import { generatePipelineArtifacts } from "@/lib/elt/generate-artifacts";
 import { loadWorkspaceCatalogUrls } from "@/lib/elt/workspace-catalog-sources";
 import { toPublicMcpServer } from "@/lib/elt/mcp-server/public";
+import { KNOWN_MCP_SERVER_TEMPLATES, KNOWN_MCP_CATEGORY_LABELS } from "@/lib/elt/mcp-server/known-catalog";
 import { discoverMcpTools } from "@/lib/elt/mcp-server/discover-tools";
 import { mcpSecretsForServer } from "@/lib/elt/mcp-server/resolve";
 import type { McpServerConfig, McpTransport } from "@/lib/elt/mcp-server/types";
@@ -96,7 +97,7 @@ When the user mentions monitors, sensors, quality checks, or data validation:
 4. **Wire the graph** (connect/disconnect steps, add dbt transform after load): call **edit_pipeline_canvas** with \`actions[]\` — use node labels or ids like "source", "dest", "join", "filter".
 5. **Playbooks** — call **list_pipeline_playbooks** or **build_lake_pipeline** for curated recipes; apply with add_pipeline_components + edit_pipeline_canvas in one turn.
 6. Prefer **native** component ids (filter_rows, join_tables, lookup, group_aggregate, data_cleansing, **alter_row**, datetime_parser, pivot, anti_join, dq_check) — they compile and run inline on the canvas.
-7. **AI / MCP** — use **list_mcp_servers** to see workspace MCP connections; native ids: **mcp_tool_call** (deterministic ingest), **litellm_agent** / **openai_agent** (LLM + MCP loop), **litellm_inference_asset** (row enrichment), **llm_evaluator** (judge upstream output). Set \`mcp_server_id\` from registry. See [agent family demo](https://dagster-component-ui.vercel.app/examples/agent_family).
+7. **AI / MCP** — use **list_mcp_server_catalog** for known integrations (Stripe, GitHub, **Dagster+**, **FastMCP**, **Prefect Horizon**, …); **list_mcp_servers** for workspace registrations. Custom tools: build with [FastMCP](https://gofastmcp.com), deploy via [Horizon](https://www.prefect.io/horizon), register the HTTP URL here, wire **litellm_agent**. Dagster+: \`https://mcp.agent.dagster.cloud/mcp/\` with Bearer token + \`Dagster-Cloud-Organization\` header. Native ids: **mcp_tool_call**, **litellm_agent**, **litellm_inference_asset**, **llm_evaluator**. See [agent family demo](https://dagster-component-ui.vercel.app/examples/agent_family).
 
 ## Curated playbooks (use list_pipeline_playbooks)
 ${listPlaybooksForPrompt()}
@@ -392,6 +393,12 @@ const TOOLS: Anthropic.Tool[] = [
       },
       required: ["component_id"],
     },
+  },
+  {
+    name: "list_mcp_server_catalog",
+    description:
+      "Curated MCP integration templates (Stripe, GitHub, Postgres, Brave Search, etc.) — suggest these when the user needs to register a new MCP server.",
+    input_schema: { type: "object" as const, properties: {}, required: [] },
   },
   {
     name: "list_mcp_servers",
@@ -931,6 +938,22 @@ function toolSearchComponents(query: string, category?: string, compileTarget?: 
       items.length > 0
         ? `Best match: ${items[0].name} (${items[0].id}) → compiles to ${items[0].compileTarget}. Use get_component_details for schema fields.`
         : "No components matched — try search_sources for connector slugs or generate_pipeline directly.",
+  };
+}
+
+async function toolListMcpServerCatalog() {
+  return {
+    templates: KNOWN_MCP_SERVER_TEMPLATES.map((t) => ({
+      id: t.id,
+      name: t.name,
+      vendor: t.vendor,
+      category: KNOWN_MCP_CATEGORY_LABELS[t.category],
+      description: t.description,
+      transport: t.transport,
+      docsUrl: t.docsUrl,
+      envVars: t.envVars?.map((e) => e.name),
+    })),
+    hint: "User registers at /mcp-servers — pick a template, add secrets, then use the saved id in pipeline components.",
   };
 }
 
@@ -1827,6 +1850,8 @@ Use this as the source of truth for graph edits — not the last saved pipeline 
             String(inp.component_id ?? ""),
             inp.include_schema === true
           );
+        } else if (name === "list_mcp_server_catalog") {
+          result = await toolListMcpServerCatalog();
         } else if (name === "list_mcp_servers") {
           result = await toolListMcpServers(user.id);
         } else if (name === "refresh_mcp_tools") {
