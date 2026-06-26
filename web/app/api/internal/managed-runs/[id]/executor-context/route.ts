@@ -11,7 +11,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
 import { parseStoredConnectionSecrets } from "@/lib/elt/connection-secrets-store";
 import { mergeConnectionRuntimeSecrets } from "@/lib/elt/duckdb-destination";
-import { getGithubAccessTokenForUser } from "@/lib/integrations/github-access-token";
+import { resolveManagedRunSourceConnection } from "@/lib/elt/managed-run-source-secrets";
 import { sourceConfigurationFromDbtProject } from "@/lib/elt/dbt-projects";
 import { resolveRouteParamId } from "@/lib/server/route-params";
 
@@ -55,20 +55,21 @@ async function loadConnection(userId: string, id: string | null) {
   };
 }
 
-async function enrichSourceSecrets(
-  userId: string,
-  pipelineSourceType: string | null | undefined,
-  source: Awaited<ReturnType<typeof loadConnection>>
-) {
-  if (!source) return source;
-  const secrets = { ...(source.secrets ?? {}) };
-  const connector = source.connector?.toLowerCase() ?? "";
-  const srcType = (pipelineSourceType ?? connector).toLowerCase();
-  if ((connector === "github" || srcType === "github") && !secrets.GITHUB_TOKEN?.trim()) {
-    const oauth = await getGithubAccessTokenForUser(userId);
-    if (oauth) secrets.GITHUB_TOKEN = oauth;
-  }
-  return { ...source, secrets };
+function toManagedRunSource(
+  row: Awaited<ReturnType<typeof loadConnection>>
+): Parameters<typeof resolveManagedRunSourceConnection>[2] {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    connectionType: row.connectionType,
+    connector: row.connector,
+    config:
+      row.config && typeof row.config === "object" && !Array.isArray(row.config)
+        ? (row.config as Record<string, unknown>)
+        : {},
+    secrets: row.secrets ?? {},
+  };
 }
 
 export async function GET(req: Request, ctx: Ctx) {
@@ -140,7 +141,11 @@ export async function GET(req: Request, ctx: Ctx) {
     loadConnection(userId, run.pipeline?.sourceConnectionId ?? null),
     loadConnection(userId, destinationConnectionId),
   ]);
-  const source = await enrichSourceSecrets(userId, run.pipeline?.sourceType, sourceRaw);
+  const source = await resolveManagedRunSourceConnection(
+    userId,
+    run.pipeline?.sourceType,
+    toManagedRunSource(sourceRaw)
+  );
 
   const pipelinePayload = run.pipeline ?? {
     id: run.dbtProject!.id,
