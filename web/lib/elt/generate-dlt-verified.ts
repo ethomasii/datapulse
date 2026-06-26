@@ -40,6 +40,16 @@ function shopUrlFromConfig(config: Record<string, unknown>): string | null {
   return `https://${shop}.myshopify.com`;
 }
 
+function parseCommaSeparatedConfig(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map(String).map((x) => x.trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value.split(",").map((x) => x.trim()).filter(Boolean);
+  }
+  return [];
+}
+
 function readResourcesForSpec(
   spec: VerifiedSourceSpec,
   config: Record<string, unknown>
@@ -118,6 +128,96 @@ ${pyResolveCredential(sec, "_sf_token")}
     };
   }
 
+  if (style === "jira_api") {
+    const [domainSpec, emailSpec, tokenSpec] = spec.credentials;
+    return {
+      imports: "",
+      setup: `${pyResolveCredential(domainSpec, "_jira_domain")}
+${pyResolveCredential(emailSpec, "_jira_email")}
+${pyResolveCredential(tokenSpec, "_jira_token")}
+    if not _jira_domain or not _jira_email or not _jira_token:
+        raise RuntimeError("Set JIRA_DOMAIN, JIRA_EMAIL, and JIRA_API_TOKEN for Jira API access")
+
+    def _jira_subdomain(raw: str) -> str:
+        value = (raw or "").strip().lower()
+        value = value.removeprefix("https://").removeprefix("http://")
+        if value.endswith(".atlassian.net"):
+            value = value[: -len(".atlassian.net")]
+        return value.split("/")[0].strip()
+
+    subdomain = _jira_subdomain(_jira_domain)
+    if not subdomain:
+        raise RuntimeError("JIRA_DOMAIN must be a subdomain or *.atlassian.net host")`,
+      kwargLines: [
+        "        subdomain=subdomain,",
+        "        email=_jira_email,",
+        "        api_token=_jira_token,",
+      ],
+    };
+  }
+
+  if (style === "slack") {
+    const tokenSpec = spec.credentials[0];
+    const channels = parseCommaSeparatedConfig(config.channels);
+    const includePrivate = config.include_private === true;
+    const channelLines =
+      channels.length > 0
+        ? [`    selected_channels = [${channels.map((c) => `"${escapePyString(c)}"`).join(", ")}]`]
+        : ["    selected_channels = None"];
+    const kwargLines = ["        access_token=_slack_token,"];
+    if (channels.length > 0) {
+      kwargLines.push("        selected_channels=selected_channels,");
+    }
+    if (includePrivate) {
+      kwargLines.push("        include_private_channels=True,");
+    }
+    return {
+      imports: "",
+      setup: `${pyResolveCredential(tokenSpec, "_slack_token")}
+    if not _slack_token:
+        raise RuntimeError("Set SLACK_BOT_TOKEN or SLACK_ACCESS_TOKEN for Slack API access")
+${channelLines.join("\n")}`,
+      kwargLines,
+    };
+  }
+
+  if (style === "asana_secrets") {
+    const tokenSpec = spec.credentials[0];
+    return {
+      imports: "",
+      setup: `${pyResolveCredential(tokenSpec, "_asana_token")}
+    if not _asana_token:
+        raise RuntimeError("Set ASANA_ACCESS_TOKEN for Asana API access")
+    os.environ.setdefault("SOURCES__ASANA_DLT__ACCESS_TOKEN", _asana_token)`,
+      kwargLines: [],
+    };
+  }
+
+  if (style === "workable") {
+    const tokenSpec = spec.credentials[0];
+    const configuredSubdomain =
+      typeof config.subdomain === "string"
+        ? config.subdomain.trim()
+        : typeof config.account_subdomain === "string"
+          ? config.account_subdomain.trim()
+          : "";
+    const subdomainLiteral = configuredSubdomain ? `"${escapePyString(configuredSubdomain)}"` : "None";
+    return {
+      imports: "",
+      setup: `${pyResolveCredential(tokenSpec, "_workable_token")}
+    if not _workable_token:
+        raise RuntimeError("Set WORKABLE_ACCESS_TOKEN for Workable API access")
+    subdomain = (
+        os.environ.get("WORKABLE_ACCOUNT_SUBDOMAIN")
+        or os.environ.get("WORKABLE_SUBDOMAIN")
+        or ${subdomainLiteral}
+    )
+    if not subdomain:
+        raise RuntimeError("Set WORKABLE_ACCOUNT_SUBDOMAIN or WORKABLE_SUBDOMAIN (or subdomain in pipeline config)")`,
+      kwargLines: ["        access_token=_workable_token,", "        subdomain=subdomain,"],
+    };
+  }
+
   const credLines: string[] = [];
   const credChecks: string[] = [];
   spec.credentials.forEach((c, i) => {
@@ -151,6 +251,8 @@ export function generateVerifiedSourcePipeline(request: PipelineRequest): string
 
   for (const key of spec.configKeys ?? []) {
     if (spec.credentialStyle === "shopify" && (key === "store_url" || key === "shop")) continue;
+    if (spec.credentialStyle === "slack" && (key === "channels" || key === "include_private")) continue;
+    if (spec.credentialStyle === "workable" && (key === "subdomain" || key === "account_subdomain")) continue;
     const raw = config[key];
     if (raw === undefined || raw === null || raw === "") continue;
     if (typeof raw === "string") {

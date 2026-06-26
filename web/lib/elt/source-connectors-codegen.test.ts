@@ -110,6 +110,53 @@ describe("generateVerifiedSourcePipeline connectors", () => {
     expect(code).toContain("SecurityTokenAuth");
     expect(code).toContain('resources_to_load = ["account", "contact"]');
   });
+
+  it("jira uses jira factory and maps JIRA_DOMAIN to subdomain", () => {
+    const code = generateVerifiedSourcePipeline({
+      name: "jira_sync",
+      sourceType: "jira",
+      destinationType: "motherduck",
+      sourceConfiguration: { resources: ["issues", "users", "projects"] },
+      writeDisposition: "append",
+      fileFormat: "parquet",
+    } as PipelineRequest);
+    expect(code).toContain("from jira import jira");
+    expect(code).toContain("subdomain = _jira_subdomain(_jira_domain)");
+    expect(code).toContain('resources_to_load = ["issues", "users", "projects"]');
+  });
+
+  it("slack maps channels config to selected_channels", () => {
+    const code = generateVerifiedSourcePipeline({
+      name: "slack_sync",
+      sourceType: "slack",
+      destinationType: "motherduck",
+      sourceConfiguration: {
+        channels: "general, C1234567890",
+        include_private: true,
+      },
+      writeDisposition: "append",
+      fileFormat: "parquet",
+    } as PipelineRequest);
+    expect(code).toContain("from slack import slack_source");
+    expect(code).toContain('selected_channels = ["general", "C1234567890"]');
+    expect(code).toContain("include_private_channels=True");
+    expect(code).toContain("access_token=_slack_token");
+  });
+
+  it("asana slug resolves to asana_dlt and sets dlt secret env", () => {
+    expect(resolveVerifiedSourceSpec("asana")?.module).toBe("asana_dlt");
+    const code = generateVerifiedSourcePipeline({
+      name: "asana_sync",
+      sourceType: "asana",
+      destinationType: "motherduck",
+      sourceConfiguration: {},
+      writeDisposition: "append",
+      fileFormat: "parquet",
+    } as PipelineRequest);
+    expect(code).toContain("from asana_dlt import asana_source");
+    expect(code).toContain("SOURCES__ASANA_DLT__ACCESS_TOKEN");
+    expect(code).toContain("source = asana_source(**source_kwargs)");
+  });
 });
 
 describe("normalize helpers", () => {

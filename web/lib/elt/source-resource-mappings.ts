@@ -97,6 +97,22 @@ export function normalizeZendeskResources(raw: unknown): string[] {
   return unique.length > 0 ? unique : ["tickets", "users"];
 }
 
+export const JIRA_IMPLEMENTED_RESOURCES = new Set(["issues", "users", "projects", "workflows"]);
+
+export function normalizeJiraResources(raw: unknown): string[] {
+  const list = parseResourceList(raw, ["issues", "projects"]);
+  const unique = list.filter((r) => JIRA_IMPLEMENTED_RESOURCES.has(r));
+  return unique.length > 0 ? unique : ["issues", "projects"];
+}
+
+export const SLACK_IMPLEMENTED_RESOURCES = new Set(["channels", "users", "access_logs"]);
+
+export function normalizeSlackResources(raw: unknown): string[] {
+  const list = parseResourceList(raw, ["channels", "users"]);
+  const unique = list.filter((r) => SLACK_IMPLEMENTED_RESOURCES.has(r));
+  return unique.length > 0 ? unique : ["channels", "users"];
+}
+
 function parseResourceList(raw: unknown, fallback: string[]): string[] {
   const list = Array.isArray(raw)
     ? raw.map(String)

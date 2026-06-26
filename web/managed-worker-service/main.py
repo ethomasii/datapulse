@@ -107,6 +107,43 @@ def _inject_dlt_secret_aliases(env: dict[str, str]) -> dict[str, str]:
     if pd:
         out.setdefault("PIPEDRIVE_API_KEY", pd)
         out.setdefault("SOURCES__PIPEDRIVE__PIPEDRIVE_API_KEY", pd)
+    jira_domain = out.get("JIRA_DOMAIN") or out.get("JIRA_SUBDOMAIN")
+    jira_email = out.get("JIRA_EMAIL")
+    jira_token = out.get("JIRA_API_TOKEN")
+    if jira_domain:
+        out.setdefault("JIRA_DOMAIN", jira_domain)
+        subdomain = jira_domain.strip().lower().removeprefix("https://").removeprefix("http://")
+        if subdomain.endswith(".atlassian.net"):
+            subdomain = subdomain[: -len(".atlassian.net")]
+        subdomain = subdomain.split("/")[0].strip()
+        if subdomain:
+            out.setdefault("JIRA_SUBDOMAIN", subdomain)
+            out.setdefault("SOURCES__JIRA__SUBDOMAIN", subdomain)
+    if jira_email:
+        out.setdefault("SOURCES__JIRA__EMAIL", jira_email)
+    if jira_token:
+        out.setdefault("SOURCES__JIRA__API_TOKEN", jira_token)
+    slack = out.get("SLACK_BOT_TOKEN") or out.get("SLACK_ACCESS_TOKEN")
+    if slack:
+        out.setdefault("SLACK_BOT_TOKEN", slack)
+        out.setdefault("SOURCES__SLACK__ACCESS_TOKEN", slack)
+    asana = out.get("ASANA_ACCESS_TOKEN") or out.get("ASANA_DLT_ACCESS_TOKEN")
+    if asana:
+        out.setdefault("ASANA_ACCESS_TOKEN", asana)
+        out.setdefault("SOURCES__ASANA_DLT__ACCESS_TOKEN", asana)
+    fd_key = out.get("FRESHDESK_API_KEY")
+    fd_domain = out.get("FRESHDESK_DOMAIN")
+    if fd_key:
+        out.setdefault("SOURCES__FRESHDESK__API_SECRET_KEY", fd_key)
+    if fd_domain:
+        out.setdefault("SOURCES__FRESHDESK__DOMAIN", fd_domain)
+    workable = out.get("WORKABLE_ACCESS_TOKEN") or out.get("WORKABLE_API_TOKEN")
+    workable_sub = out.get("WORKABLE_ACCOUNT_SUBDOMAIN") or out.get("WORKABLE_SUBDOMAIN")
+    if workable:
+        out.setdefault("SOURCES__WORKABLE__ACCESS_TOKEN", workable)
+    if workable_sub:
+        out.setdefault("WORKABLE_SUBDOMAIN", workable_sub)
+        out.setdefault("SOURCES__WORKABLE__SUBDOMAIN", workable_sub)
     return out
 
 

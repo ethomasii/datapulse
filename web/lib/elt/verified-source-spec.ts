@@ -6,8 +6,10 @@
 import type { SourceResourceNormalizer } from "./source-resource-mappings";
 import {
   normalizeHubspotResources,
+  normalizeJiraResources,
   normalizeSalesforceResources,
   normalizeShopifyResources,
+  normalizeSlackResources,
   normalizeZendeskResources,
 } from "./source-resource-mappings";
 
@@ -18,7 +20,15 @@ export type VerifiedCredentialSpec = {
   envKeys: string[];
 };
 
-export type VerifiedCredentialStyle = "flat" | "zendesk_token" | "salesforce_security_token" | "shopify";
+export type VerifiedCredentialStyle =
+  | "flat"
+  | "zendesk_token"
+  | "salesforce_security_token"
+  | "shopify"
+  | "jira_api"
+  | "slack"
+  | "asana_secrets"
+  | "workable";
 
 export type VerifiedSourceSpec = {
   module: string;
@@ -55,6 +65,7 @@ export const VERIFIED_SKIP_SLUGS = new Set([
 /** Catalog slug → verified package folder (e.g. shopify → shopify_dlt). */
 export const VERIFIED_SLUG_ALIASES: Record<string, string> = {
   shopify: "shopify_dlt",
+  asana: "asana_dlt",
 };
 
 const SHOPIFY_SPEC: VerifiedSourceSpec = {
@@ -104,7 +115,7 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
     module: "freshdesk",
     factory: "freshdesk_source",
     credentials: [
-      { param: "api_key", envKeys: ["FRESHDESK_API_KEY"] },
+      { param: "api_secret_key", envKeys: ["FRESHDESK_API_KEY"] },
       { param: "domain", envKeys: ["FRESHDESK_DOMAIN"] },
     ],
   },
@@ -125,32 +136,41 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
   },
   jira: {
     module: "jira",
-    factory: "jira_source",
+    factory: "jira",
+    credentialStyle: "jira_api",
     credentials: [
-      { param: "api_token", envKeys: ["JIRA_API_TOKEN"] },
-      { param: "email", envKeys: ["JIRA_EMAIL"] },
       { param: "subdomain", envKeys: ["JIRA_SUBDOMAIN", "JIRA_DOMAIN"] },
+      { param: "email", envKeys: ["JIRA_EMAIL"] },
+      { param: "api_token", envKeys: ["JIRA_API_TOKEN"] },
     ],
+    resourceConfigKey: "resources",
+    defaultResources: ["issues", "projects"],
+    normalizeResources: normalizeJiraResources,
   },
   asana_dlt: {
     module: "asana_dlt",
     factory: "asana_source",
+    credentialStyle: "asana_secrets",
     credentials: [{ param: "access_token", envKeys: ["ASANA_ACCESS_TOKEN", "ASANA_DLT_ACCESS_TOKEN"] }],
   },
   workable: {
     module: "workable",
     factory: "workable_source",
-    credentials: [
-      { param: "access_token", envKeys: ["WORKABLE_ACCESS_TOKEN", "WORKABLE_API_TOKEN"] },
-      { param: "account_subdomain", envKeys: ["WORKABLE_ACCOUNT_SUBDOMAIN", "WORKABLE_SUBDOMAIN"] },
-    ],
+    credentialStyle: "workable",
+    credentials: [{ param: "access_token", envKeys: ["WORKABLE_ACCESS_TOKEN", "WORKABLE_API_TOKEN"] }],
+    configKeys: ["start_date"],
+    partitionKwarg: "start_date",
   },
   slack: {
     module: "slack",
     factory: "slack_source",
+    credentialStyle: "slack",
     credentials: [{ param: "access_token", envKeys: ["SLACK_ACCESS_TOKEN", "SLACK_BOT_TOKEN"] }],
-    configKeys: ["start_date", "channel_list"],
+    configKeys: ["start_date"],
     partitionKwarg: "start_date",
+    alternateResourceConfigKeys: ["resources"],
+    defaultResources: ["channels", "users"],
+    normalizeResources: normalizeSlackResources,
   },
   notion: {
     module: "notion",
