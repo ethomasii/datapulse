@@ -11,7 +11,8 @@ import { CopyEnvButton } from "@/components/elt/copy-env-button";
 import { getDestinationCredentials, getSourceCredentials } from "@/lib/elt/credentials-catalog";
 import {
   ALL_CONNECTORS,
-  SOURCE_CONNECTOR_SLUGS,
+  DESTINATION_CONNECTOR_OPTIONS,
+  SOURCE_CONNECTOR_OPTIONS,
   DESTINATION_CONNECTOR_SLUGS,
   getConnectorConfigFields,
   connectorLabel,
@@ -538,7 +539,11 @@ function CreateConnectionForm({ onCreated }: { onCreated: (c: Connection) => voi
               )}
               value={connector}
               onChange={setConnector}
-              placeholder="Search connectors…"
+              placeholder={
+                type === "source"
+                  ? `Search ${SOURCE_CONNECTOR_OPTIONS.length} sources…`
+                  : `Search ${DESTINATION_CONNECTOR_OPTIONS.length} destinations…`
+              }
             />
           </div>
         </label>

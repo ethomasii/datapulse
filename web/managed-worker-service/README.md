@@ -46,9 +46,16 @@ pip install -r web/managed-worker-service/verified-sources-requirements.txt
 
 Pipelines that import other verified packages still work via runtime `dlt init` fallback (slower).
 
-**Core dlt sources** (`rest_api`, `sql_database`) ship inside `dlt` — no vendoring.
+**111+ catalog sources on managed GHA:**
 
-**AI-built REST API pipelines** use `dlt.sources.rest_api` — no vendoring.
+| Pipeline kind | Runtime on worker |
+|---------------|-------------------|
+| **Context / LLM REST API** (Mailchimp, Linear, …) | `dlt.sources.rest_api` — core dlt, no staging |
+| **Golden paths** (GitHub, Stripe) | Pre-vendored under `verified_sources/` |
+| **Other verified dlt packages** (HubSpot, Salesforce, …) | `dlt init` + `pip install -r requirements.txt` at run time |
+| **Postgres / SQL / files** | Core dlt or Sling |
+
+Same worker code path whether triggered from GitHub Actions or ECS — end users only see run status in eltPulse.
 
 ## HTTP
 

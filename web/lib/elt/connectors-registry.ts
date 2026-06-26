@@ -1,11 +1,12 @@
 /**
  * Single source of truth for all source and destination connectors.
  *
- * To add a new connector, add one entry here. Everything else (connections
- * page, catalog, credential forms, env-hint blocks) derives from this file
- * automatically — no other files need to change.
+ * Manual entries below cover warehouses, databases, and popular APIs with rich forms.
+ * Every slug from dlt-hub-registry (111+ pipeline sources) is merged in automatically
+ * for the Connections page — no per-source edits required.
  */
 
+import { ALL_DLT_SOURCES, type DltHubSource } from "./dlt-hub-registry";
 import {
   DUCKDB_DATABASE_CONFIG_FIELD,
   DUCKDB_S3_CREDENTIAL_FIELDS,
@@ -741,16 +742,89 @@ const FILE_CONNECTORS: ConnectorDef[] = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Hub registry bridge (111+ pipeline sources → connection forms)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function hubCategoryToConnectionCategory(
+  category: DltHubSource["category"]
+): ConnectorDef["category"] {
+  if (category === "Databases") return "Databases";
+  if (category === "Storage & Files") return "Cloud Storage";
+  return "APIs & SaaS";
+}
+
+function envKeyForHubParam(slug: string, param: string): string {
+  const normalized = param.toUpperCase().replace(/-/g, "_");
+  const prefix = slug.toUpperCase().replace(/-/g, "_");
+  if (
+    normalized === "API_KEY" ||
+    normalized === "ACCESS_TOKEN" ||
+    normalized === "API_TOKEN" ||
+    normalized === "PRIVATE_TOKEN" ||
+    normalized === "AUTH_TOKEN"
+  ) {
+    return `${prefix}_${normalized}`;
+  }
+  return normalized.includes("_") ? normalized : `${prefix}_${normalized}`;
+}
+
+function credentialFieldsFromHubSource(src: DltHubSource): CredentialField[] {
+  if (src.params.length === 0) {
+    const prefix = src.slug.toUpperCase().replace(/-/g, "_");
+    return [
+      {
+        key: `${prefix}_ACCESS_TOKEN`,
+        label: "API credentials",
+        type: "password",
+        required: true,
+        help: src.auth.length ? `Auth: ${src.auth.join(", ")}` : "Paste API token or key for this source",
+      },
+    ];
+  }
+
+  return src.params.map((param) => ({
+    key: envKeyForHubParam(src.slug, param),
+    label: param.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+    type: /password|secret|token|key|pass/i.test(param) ? "password" : "text",
+    required: !/optional/i.test(param),
+    help: src.auth.length ? src.auth.join(", ") : undefined,
+  }));
+}
+
+function extendConnectorsWithHubSources(manual: ConnectorDef[]): ConnectorDef[] {
+  const seen = new Set(manual.map((c) => c.slug.toLowerCase()));
+  const extras: ConnectorDef[] = [];
+
+  for (const src of ALL_DLT_SOURCES) {
+    const slug = src.slug.toLowerCase();
+    if (seen.has(slug)) continue;
+    seen.add(slug);
+    extras.push({
+      slug: src.slug,
+      label: src.name,
+      connectionTypes: ["source"],
+      category: hubCategoryToConnectionCategory(src.category),
+      credentialFields: credentialFieldsFromHubSource(src),
+    });
+  }
+
+  return [...manual, ...extras];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Exports
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const ALL_CONNECTORS: ConnectorDef[] = [
+const MANUAL_CONNECTORS: ConnectorDef[] = [
   ...WAREHOUSE_CONNECTORS,
   ...DATABASE_CONNECTORS,
   ...STORAGE_CONNECTORS,
   ...API_CONNECTORS,
   ...FILE_CONNECTORS,
 ];
+
+/** Manual connectors + every dlt-hub-registry source (111+) for connections UI. */
+export const ALL_CONNECTORS: ConnectorDef[] = extendConnectorsWithHubSources(MANUAL_CONNECTORS);
 
 /** Human-readable label for a connector slug */
 export function connectorLabel(slug: string): string {
