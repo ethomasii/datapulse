@@ -457,6 +457,9 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       if (data.run) setDetail({ run: data.run });
+      if (data.dispatch?.errors?.length) {
+        setError(data.dispatch.errors.join("; "));
+      }
       await loadRuns();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start managed run");

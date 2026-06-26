@@ -198,3 +198,33 @@ export async function runManagedWorkerStubBatchInProcess(options: {
   }
   return { processed, errors };
 }
+
+/** Claim a pending managed run in-process (no HTTP self-call). */
+export async function claimManagedRunInProcess(
+  runId: string,
+  options?: { message?: string }
+): Promise<boolean> {
+  const claimed = await db.eltPipelineRun.updateMany({
+    where: { id: runId, status: "pending", ingestionExecutor: { in: MANAGED } },
+    data: { status: "running" },
+  });
+  if (claimed.count === 0) return false;
+  if (options?.message) {
+    await patchManagedRunInProcess(runId, {
+      status: "running",
+      appendLog: { level: "info", message: options.message },
+    });
+  }
+  return true;
+}
+
+export async function failManagedRunInProcess(runId: string, errorSummary: string): Promise<void> {
+  const existing = await db.eltPipelineRun.findFirst({ where: { id: runId } });
+  if (!existing || existing.status === "cancelled") return;
+  await patchManagedRunInProcess(runId, {
+    status: "failed",
+    errorSummary,
+    appendLog: { level: "error", message: errorSummary },
+    telemetrySummary: { currentPhase: "failed", progress: 100 },
+  });
+}

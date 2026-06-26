@@ -232,7 +232,22 @@ export async function runManagedWorkerBatchHttp(options: {
     });
   }
   if (mode === "delegate") {
+    const { runManagedWorkerBatchDirect, shouldUseDelegateHttp } = await import(
+      "@/lib/elt/managed-batch-direct"
+    );
     const { dispatchManagedWorkerCron } = await import("@/lib/elt/org-managed-compute");
+    const delegate = resolveManagedDelegateConfig();
+    if (options.runId || (delegate && !shouldUseDelegateHttp(delegate.url))) {
+      const result = await runManagedWorkerBatchDirect({
+        limit: options.limit,
+        deadlineMs: options.deadlineMs,
+        runId: options.runId,
+      });
+      return {
+        processed: result.processed,
+        errors: result.errors,
+      };
+    }
     const result = await dispatchManagedWorkerCron({
       limit: options.limit,
       deadlineMs: options.deadlineMs,

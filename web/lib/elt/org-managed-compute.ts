@@ -3,6 +3,10 @@ import { db } from "@/lib/db/client";
 import { resolveManagedDelegateConfig } from "@/lib/elt/managed-worker-stub-http";
 import { runManagedWorkerDelegateBatchHttp } from "@/lib/elt/managed-worker-delegate";
 import {
+  runManagedWorkerBatchDirect,
+  shouldUseDelegateHttp,
+} from "@/lib/elt/managed-batch-direct";
+import {
   dedicatedComputeBillingBypassed,
   isDedicatedComputeBillingActive,
 } from "@/lib/billing/dedicated-compute-subscription";
@@ -92,9 +96,7 @@ export async function dispatchManagedWorkerCron(options: {
 
   if (options.runId?.trim()) {
     try {
-      const result = await runManagedWorkerDelegateBatchHttp({
-        batchUrl: sharedConfig.url,
-        secret: sharedConfig.secret,
+      const result = await runManagedWorkerBatchDirect({
         limit: 1,
         deadlineMs: options.deadlineMs,
         runId: options.runId.trim(),
@@ -136,15 +138,24 @@ export async function dispatchManagedWorkerCron(options: {
   }
 
   try {
-    const shared = await runManagedWorkerDelegateBatchHttp({
-      batchUrl: sharedConfig.url,
-      secret: sharedConfig.secret,
-      limit: options.limit,
-      deadlineMs: options.deadlineMs,
-      pool: "shared",
-    });
-    sharedProcessed = shared.processed;
-    errors.push(...shared.errors);
+    if (shouldUseDelegateHttp(sharedConfig.url)) {
+      const shared = await runManagedWorkerDelegateBatchHttp({
+        batchUrl: sharedConfig.url,
+        secret: sharedConfig.secret,
+        limit: options.limit,
+        deadlineMs: options.deadlineMs,
+        pool: "shared",
+      });
+      sharedProcessed = shared.processed;
+      errors.push(...shared.errors);
+    } else {
+      const shared = await runManagedWorkerBatchDirect({
+        limit: options.limit,
+        deadlineMs: options.deadlineMs,
+      });
+      sharedProcessed = shared.processed;
+      errors.push(...shared.errors);
+    }
   } catch (e) {
     errors.push(`shared: ${e instanceof Error ? e.message : String(e)}`);
   }

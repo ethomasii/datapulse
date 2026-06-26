@@ -46,20 +46,22 @@ export async function POST(req: Request, context: RouteContext) {
   }
 
   try {
-    await processManagedRunImmediately(run.id);
+    const dispatch = await processManagedRunImmediately(run.id);
+    const refreshed = await db.eltPipelineRun.findFirst({
+      where: { id: run.id },
+      include: {
+        pipeline: { select: { id: true, name: true, tool: true, sourceType: true, sourceConfiguration: true } },
+        dbtProject: { select: { id: true, name: true } },
+        targetAgentToken: { select: { id: true, name: true } },
+      },
+    });
+
+    return NextResponse.json({
+      run: refreshed,
+      dispatch,
+    });
   } catch (e) {
     console.error("[elt/runs/kick]", run.id, e);
     return NextResponse.json({ error: "Failed to start managed worker" }, { status: 502 });
   }
-
-  const refreshed = await db.eltPipelineRun.findFirst({
-    where: { id: run.id },
-    include: {
-      pipeline: { select: { id: true, name: true, tool: true, sourceType: true, sourceConfiguration: true } },
-      dbtProject: { select: { id: true, name: true } },
-      targetAgentToken: { select: { id: true, name: true } },
-    },
-  });
-
-  return NextResponse.json({ run: refreshed });
 }

@@ -27,16 +27,10 @@
       "maxDuration": 900,
       "memory": 3008,
       "excludeFiles": "{.next,*.cache,node_modules,public,app}/**"
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/eltpulse-compute/batch",
-      "destination": "/api/compute/batch"
     },
-    {
-      "source": "/eltpulse-compute/health",
-      "destination": "/api/compute/batch"
+    "app/eltpulse-compute/batch/route.ts": {
+      "maxDuration": 800,
+      "memory": 3008
     }
-  ]
+  }
 }
