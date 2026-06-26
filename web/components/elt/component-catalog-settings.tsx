@@ -5,7 +5,14 @@ import { Loader2, Package, Plus, Trash2 } from "lucide-react";
 
 type ResolvedCatalog = { input: string; id: string; rawBase: string };
 
-export function ComponentCatalogSettings({ className }: { className?: string }) {
+export function ComponentCatalogSettings({
+  className,
+  /** When true, omit the section title — for use inside a parent disclosure. */
+  embedded = false,
+}: {
+  className?: string;
+  embedded?: boolean;
+}) {
   const [urls, setUrls] = useState<string[]>([]);
   const [resolved, setResolved] = useState<ResolvedCatalog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,11 +91,13 @@ export function ComponentCatalogSettings({ className }: { className?: string }) 
 
   return (
     <div className={className}>
-      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-        <Package className="h-4 w-4 text-violet-600 dark:text-violet-400" aria-hidden />
-        Component catalogs
-      </div>
-      <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+      {embedded ? null : (
+        <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+          <Package className="h-4 w-4 text-violet-600 dark:text-violet-400" aria-hidden />
+          Component catalogs
+        </div>
+      )}
+      <p className={`text-xs text-slate-600 dark:text-slate-400 ${embedded ? "" : "mt-1"}`}>
         Add GitHub repos with <code className="text-[11px]">component.json</code> +{" "}
         <code className="text-[11px]">compile.mjs</code> — merged into the builder palette and pipeline compile
         (bring-your-own packages). Use <code className="text-[11px]">owner/repo</code> or a raw GitHub URL.

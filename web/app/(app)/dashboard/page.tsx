@@ -102,6 +102,8 @@ export default async function DashboardPage() {
     return false;
   });
   const showOnboarding = !user.onboardingDismissedAt;
+  const needsStarterWarehouse =
+    !workspaceDefaults.defaultDestinationConnectionId && destinationCount === 0;
 
   return (
     <AppPage width="wide" className="space-y-10">
@@ -125,9 +127,7 @@ export default async function DashboardPage() {
         }
       />
 
-      {showOnboarding && !workspaceDefaults.defaultDestinationConnectionId ? (
-        <StarterWarehouseBanner />
-      ) : null}
+      {needsStarterWarehouse ? <StarterWarehouseBanner /> : null}
 
       {showOnboarding ? (
         <OnboardingChecklist completedIds={completedIds} />

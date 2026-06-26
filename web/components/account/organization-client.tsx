@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Building2, Loader2, Users } from "lucide-react";
 import { BillingUpgradeButton } from "@/components/account/billing-upgrade-button";
-import { ComponentCatalogSettings } from "@/components/elt/component-catalog-settings";
 
 type Org = {
   id: string;
@@ -126,9 +125,16 @@ export function OrganizationClient() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950">
-        <ComponentCatalogSettings />
-      </div>
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        Need custom canvas transform packages from GitHub? Configure them under{" "}
+        <Link
+          href="/catalog/components#custom-catalogs"
+          className="font-medium text-slate-700 hover:underline dark:text-slate-300"
+        >
+          Library → Transforms
+        </Link>{" "}
+        (advanced).
+      </p>
 
       {message ? <p className="text-sm text-slate-600">{message}</p> : null}
     </div>

@@ -18,7 +18,6 @@ import {
 } from "@/lib/elt/connectors-registry";
 import { ConnectorCombobox } from "@/components/elt/connector-combobox";
 import { ConnectorOAuthButton, supportsConnectorOAuth } from "@/components/elt/connector-oauth-button";
-import { ComponentCatalogSettings } from "@/components/elt/component-catalog-settings";
 import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 
 function connectorsByCategory(connectionType: "source" | "destination"): { category: string; slugs: string[] }[] {
@@ -750,11 +749,18 @@ export default function ConnectionsPage() {
             Expand a destination connection and set it as the workspace default to streamline declarative pipelines.
           </p>
         </div>
-      ) : null}
-
-      <div className="rounded-xl border border-violet-200 bg-violet-50/40 px-4 py-4 dark:border-violet-900/40 dark:bg-violet-950/20">
-        <ComponentCatalogSettings />
-      </div>
+      ) : (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+          <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">No warehouse yet</p>
+          <p className="mt-1 text-xs text-amber-900/90 dark:text-amber-100/90">
+            Most pipelines need a destination to land data.{" "}
+            <Link href="/starter-warehouse" className="font-medium text-amber-800 underline dark:text-amber-200">
+              Set up a free MotherDuck starter warehouse
+            </Link>{" "}
+            in ~2 minutes, or add Snowflake / Postgres below.
+          </p>
+        </div>
+      )}
 
       <div className="rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 dark:border-sky-900/50 dark:bg-sky-950/25">
         <div className="flex flex-wrap items-start gap-2">

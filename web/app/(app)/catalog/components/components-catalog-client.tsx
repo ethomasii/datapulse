@@ -80,12 +80,15 @@ export function ComponentCatalogClient() {
         </div>
       </section>
 
-      <details className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-slate-900 dark:text-white">
-          Advanced — custom component catalogs
+      <details
+        id="custom-catalogs"
+        className="scroll-mt-6 rounded-lg border border-dashed border-slate-200 bg-slate-50/40 dark:border-slate-700 dark:bg-slate-900/30"
+      >
+        <summary className="cursor-pointer px-4 py-3 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300">
+          Custom component catalogs (advanced)
         </summary>
-        <div className="border-t border-slate-200 px-5 py-4 dark:border-slate-800">
-          <ComponentCatalogSettings />
+        <div className="border-t border-dashed border-slate-200 px-4 py-4 dark:border-slate-700">
+          <ComponentCatalogSettings embedded />
         </div>
       </details>
     </AppPage>
