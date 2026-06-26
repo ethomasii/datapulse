@@ -84,7 +84,7 @@ export function enrichCanvasComponentNodeData(data: Record<string, unknown>): Re
   const catalog = componentId ? getComponentById(componentId) : null;
   const category = String(data.category ?? catalog?.category ?? "transformation");
   const ports = canvasPortsForCategory(category);
-  const next = { ...data, category };
+  const next: Record<string, unknown> = { ...data, category };
   if (!data.canvasPorts) {
     next.canvasPorts = { left: ports.left, right: ports.right };
   }
