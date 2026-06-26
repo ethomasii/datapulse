@@ -40,6 +40,14 @@ export type CanvasGraphEditAction =
       after?: string;
     }
   | {
+      op: "replace_component";
+      /** Node id, label, or component id to swap out. */
+      node: string;
+      component_id: string;
+      label?: string;
+      config?: Record<string, unknown>;
+    }
+  | {
       op: "add_transform";
       tool: "dbt" | "python" | "sql" | "other";
       label?: string;
@@ -251,6 +259,36 @@ export function applyCanvasGraphEdits(
         edges.push(makeEdge(wireFrom.id, node.id));
       }
       messages.push(`Added ${action.tool} transform`);
+    } else if (action.op === "replace_component") {
+      const target = findNodeByRef(nodes, action.node);
+      if (!target || target.type !== "componentNode") {
+        errors.push(`replace_component: could not resolve component node "${action.node}"`);
+        continue;
+      }
+      const catalog = getComponentById(action.component_id);
+      if (!catalog) {
+        errors.push(`replace_component: unknown ${action.component_id}`);
+        continue;
+      }
+      const route = routeComponent(catalog.id, catalog.category);
+      const prevLabel = nodeLabel(target);
+      nodes = nodes.map((n) => {
+        if (n.id !== target.id) return n;
+        return {
+          ...n,
+          data: {
+            componentId: catalog.id,
+            label: action.label ?? catalog.name,
+            category: catalog.category,
+            compileTarget: route.target,
+            compileBadge: route.badge ?? route.target,
+            compileHint: route.hint,
+            canvasPorts: canvasPortsForCategory(normalizeComponentCategory(catalog.category)),
+            config: { ...(action.config ?? {}), template_id: catalog.id },
+          },
+        };
+      });
+      messages.push(`Replaced ${prevLabel} with ${catalog.name} (${catalog.id})`);
     } else if (action.op === "update_node_config") {
       const target = findNodeByRef(nodes, action.node);
       if (!target) {

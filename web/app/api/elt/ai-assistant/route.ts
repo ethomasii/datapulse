@@ -90,7 +90,7 @@ When the user mentions monitors, sensors, quality checks, freshness, or data val
 3. **Existing pipeline** (pipeline context below): call **add_pipeline_components** with the same \`components\` array — nodes land on the visual canvas and sync to v2 YAML on apply.
 4. **Wire the graph** (connect/disconnect steps, add dbt transform after load): call **edit_pipeline_canvas** with \`actions[]\` — use node labels or ids like "source", "dest", "join", "filter".
 5. **Playbooks** — call **list_pipeline_playbooks** or **build_lake_pipeline** for curated recipes; apply with add_pipeline_components + edit_pipeline_canvas in one turn.
-6. Prefer **native** component ids (filter_rows, join_tables, lookup, group_aggregate, data_cleansing, datetime_parser, pivot, anti_join, dq_check) — they compile and run inline on the canvas.
+6. Prefer **native** component ids (filter_rows, join_tables, lookup, group_aggregate, data_cleansing, **alter_row**, datetime_parser, pivot, anti_join, dq_check) — they compile and run inline on the canvas.
 
 ## Curated playbooks (use list_pipeline_playbooks)
 ${listPlaybooksForPrompt()}
@@ -406,12 +406,12 @@ const TOOLS: Anthropic.Tool[] = [
             properties: {
               op: {
                 type: "string",
-                enum: ["connect", "disconnect", "add_component", "add_transform", "update_node_config"],
+                enum: ["connect", "disconnect", "add_component", "replace_component", "add_transform", "update_node_config"],
               },
               source: { type: "string", description: "connect/disconnect: source node label or id" },
               target: { type: "string", description: "connect/disconnect: target node label or id" },
-              node: { type: "string", description: "update_node_config: node id or label (use Genie target node id when set)" },
-              component_id: { type: "string", description: "add_component: component id from search_components" },
+              component_id: { type: "string", description: "add_component / replace_component: component id from search_components" },
+              node: { type: "string", description: "update_node_config / replace_component: node id, label, or component id on canvas" },
               label: { type: "string" },
               config: { type: "object" },
               merge: { type: "boolean", description: "update_node_config: merge into existing config (default true)" },
@@ -1484,12 +1484,15 @@ When they describe a brand-new pipeline instead, use **generate_pipeline** witho
 
 ## Lakeflow Genie (designer bar — primary use cases)
 1. **Add a step** — "add a filter", "dedupe after bronze", "aggregate by day":
-   - Call **add_pipeline_components** with one \`component_id\` (prefer native: filter_rows, dedupe_rows, group_aggregate, data_cleansing, select_columns, join_tables, etc.)
+   - Call **add_pipeline_components** with one \`component_id\` (prefer native: filter_rows, dedupe_rows, group_aggregate, data_cleansing, **alter_row** (CDC alter row / ADF semantics), select_columns, join_tables, etc.)
    - OR **edit_pipeline_canvas** with \`add_component\` + \`after\` set to the upstream node id/label
    - **Preserve every node** in the live canvas snapshot — only append/wire new steps
-2. **Edit a step's settings** — rename columns, change filter, etc.:
+2. **Replace a step** — "swap data cleansing for alter row", "use filter_rows instead":
+   - **search_components** for the target id (e.g. \`alter_row\` for "alter rows" / CDC tagging)
+   - **edit_pipeline_canvas** with \`replace_component\` on the node id/label — keeps position and wires; do **not** remove+add (removal is blocked in Genie mode)
+3. **Edit a step's settings** — rename columns, change filter, etc.:
    - **edit_pipeline_canvas** with \`update_node_config\` on the target node id
-3. **Connect / rewire** — \`connect\` / \`disconnect\` actions only when asked
+4. **Connect / rewire** — \`connect\` / \`disconnect\` actions only when asked
 
 Do **NOT** call generate_pipeline, build_lake_pipeline, or build_transform_steps on this open pipeline unless the user explicitly asks to replace the entire pipeline.`;
       }

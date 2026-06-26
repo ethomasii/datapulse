@@ -117,4 +117,42 @@ describe("canvas-graph-edit", () => {
     );
     expect(edgePairs).toContain(`c1->${genie!.id}`);
   });
+
+  it("replaces a component in place for Genie swap requests", () => {
+    const r = applyCanvasGraphEdits(
+      {
+        canvas: {
+          v: 1,
+          nodes: [
+            { id: "d", type: "destNode", position: { x: 360, y: 120 }, data: {} },
+            {
+              id: "c1",
+              type: "componentNode",
+              position: { x: 648, y: 120 },
+              data: {
+                componentId: "data_cleansing",
+                label: "Data cleansing",
+                category: "transformation",
+                compileHint: "Trim, lowercase, drop null rows",
+              },
+            },
+          ],
+          edges: [{ id: "e1", source: "d", target: "c1" }],
+        },
+      },
+      [
+        {
+          op: "replace_component",
+          node: "data_cleansing",
+          component_id: "alter_row",
+          label: "Alter row (CDC)",
+        },
+      ],
+      { sourceType: "github", destinationType: "snowflake" }
+    );
+    expect(r.errors).toHaveLength(0);
+    const swapped = (r.canvas.nodes as Node[]).find((n) => n.id === "c1");
+    expect((swapped?.data as { componentId?: string }).componentId).toBe("alter_row");
+    expect(r.messages[0]).toContain("alter_row");
+  });
 });

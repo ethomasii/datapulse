@@ -58,6 +58,11 @@ export const TOP_COMPONENT_ROUTES: Record<string, ComponentRoute> = {
   cross_join: { target: "python", badge: "native", hint: "Cartesian product of two tables" },
   anti_join: { target: "warehouse", badge: "native", hint: "Warehouse SQL anti-join — dataframe optional" },
   data_cleansing: { target: "python", badge: "native", hint: "Trim, lowercase, drop null rows" },
+  alter_row: {
+    target: "python",
+    badge: "native",
+    hint: "CDC alter row — tag each row insert/update/delete/upsert (ADF Alter Row semantics)",
+  },
   datetime_parser: { target: "python", badge: "native", hint: "Parse string columns to datetime" },
   unpivot: { target: "python", badge: "native", hint: "Unpivot wide → long (melt)" },
   rank: { target: "python", badge: "native", hint: "Rank rows by column" },

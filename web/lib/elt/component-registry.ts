@@ -57,6 +57,44 @@ type ManifestIndex = {
 
 const index = manifestIndex as ManifestIndex;
 
+/** Extra search phrases → component id (helps Genie match natural language). */
+const COMPONENT_SEARCH_ALIASES: Record<string, string[]> = {
+  alter_row: ["alter row", "alter rows", "alterrow", "cdc marker", "change type", "adf alter row"],
+};
+
+function searchQueryVariants(q: string): string[] {
+  const base = q.trim().toLowerCase();
+  if (!base) return [];
+  const variants = new Set<string>([base]);
+  variants.add(base.replace(/\s+/g, "_"));
+  variants.add(base.replace(/\s+/g, "-"));
+  variants.add(base.replace(/[^a-z0-9]+/g, ""));
+  if (base.endsWith("s") && base.length > 4) {
+    const singular = base.slice(0, -1);
+    variants.add(singular);
+    variants.add(singular.replace(/\s+/g, "_"));
+  }
+  for (const [id, aliases] of Object.entries(COMPONENT_SEARCH_ALIASES)) {
+    if (aliases.some((a) => base.includes(a) || a.includes(base))) variants.add(id);
+  }
+  return Array.from(variants);
+}
+
+function componentMatchesQuery(c: ComponentManifestEntry, variants: string[]): boolean {
+  const id = c.id.toLowerCase();
+  const name = c.name.toLowerCase();
+  const description = c.description.toLowerCase();
+  const tags = (c.tags ?? []).map((t) => t.toLowerCase());
+  return variants.some(
+    (q) =>
+      q === id ||
+      id.includes(q) ||
+      name.includes(q) ||
+      description.includes(q) ||
+      tags.some((t) => t.includes(q) || q.includes(t))
+  );
+}
+
 export const COMPONENT_MANIFEST_META = {
   version: index.version,
   repository: index.repository,
@@ -79,13 +117,8 @@ export function listComponents(filters?: {
 
   const q = filters?.q?.trim().toLowerCase();
   if (q) {
-    rows = rows.filter(
-      (c) =>
-        c.id.toLowerCase().includes(q) ||
-        c.name.toLowerCase().includes(q) ||
-        c.description.toLowerCase().includes(q) ||
-        (c.tags ?? []).some((t) => t.toLowerCase().includes(q))
-    );
+    const variants = searchQueryVariants(q);
+    rows = rows.filter((c) => componentMatchesQuery(c, variants));
   }
 
   const cat = filters?.category?.trim().toLowerCase();

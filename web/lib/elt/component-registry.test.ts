@@ -31,4 +31,10 @@ describe("component-registry", () => {
     expect(p.left).toBe(true);
     expect(p.right).toBe(true);
   });
+
+  it("finds alter_row when user searches alter rows", () => {
+    const { items, total } = listComponents({ q: "alter rows", limit: 10 });
+    expect(total).toBeGreaterThan(0);
+    expect(items.some((c) => c.id === "alter_row")).toBe(true);
+  });
 });
