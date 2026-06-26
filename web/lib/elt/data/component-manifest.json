@@ -9938,35 +9938,6 @@
       }
     },
     {
-      "id": "freshness_check",
-      "name": "Freshness Policy",
-      "category": "check",
-      "description": "Attach a Dagster FreshnessPolicy to an asset for continuous SLA monitoring.",
-      "version": "1.0.0",
-      "author": "Dagster Community",
-      "path": "asset_checks/freshness_check",
-      "tags": [
-        "check",
-        "freshness"
-      ],
-      "dependencies": {
-        "pip": [
-          "dagster"
-        ]
-      },
-      "readme_url": "https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/asset_checks/freshness_check/README.md",
-      "component_url": "https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/asset_checks/freshness_check/component.py",
-      "schema_url": "https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/asset_checks/freshness_check/schema.json",
-      "example_url": "https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/asset_checks/freshness_check/example.yaml",
-      "requirements_url": "https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/asset_checks/freshness_check/requirements.txt",
-      "icon": "CheckCircle",
-      "validation": {
-        "level": "live",
-        "evidence": "https://github.com/eric-thomas-dagster/dagster-community-components-cli/blob/main/examples/data_quality.md",
-        "last_validated": "2026-05-08"
-      }
-    },
-    {
       "id": "funnel_analysis",
       "name": "Funnel Analysis",
       "category": "analytics",

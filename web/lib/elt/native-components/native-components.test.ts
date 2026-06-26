@@ -4,6 +4,8 @@ import { joinTablesComponent } from "@/lib/elt/native-components/definitions/joi
 import { dqCheckComponent } from "@/lib/elt/native-components/definitions/dq-check";
 import { getNativeComponent, isNativeComponent, listNativeComponents } from "@/lib/elt/native-components/registry";
 import { dagsterAttributesToFields } from "@/lib/elt/native-components/dagster-schema";
+import { minimalNativeConfig } from "@/lib/elt/native-components/minimal-config";
+import type { NativeComponentCompileResult } from "@/lib/elt/native-components/types";
 
 describe("native-components", () => {
   it("resolves aliases", () => {
@@ -116,8 +118,35 @@ describe("native-components", () => {
     expect(sensors.length).toBe(1);
   });
 
-  it("lists 71 native components", () => {
-    expect(listNativeComponents().length).toBe(71);
+  it("lists 74 native components", () => {
+    expect(listNativeComponents().length).toBe(74);
+  });
+
+  it("every native component compile() emits output without throwing", () => {
+    const natives = listNativeComponents();
+    const failures: string[] = [];
+
+    function hasOutput(result: NativeComponentCompileResult): boolean {
+      if (result.python?.some((line) => line.trim())) return true;
+      if (result.sql?.some((line) => line.trim())) return true;
+      if (result.tests?.length) return true;
+      if (result.quality?.length) return true;
+      if (result.configPatch && Object.keys(result.configPatch).length > 0) return true;
+      return false;
+    }
+
+    for (const def of natives) {
+      try {
+        const out = def.compile(minimalNativeConfig(def));
+        if (!hasOutput(out)) {
+          failures.push(`${def.id}: compile returned no python/sql/tests/quality/configPatch`);
+        }
+      } catch (err) {
+        failures.push(`${def.id}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    expect(failures, failures.join("\n")).toEqual([]);
   });
 
   it("hash emits hashlib python", () => {

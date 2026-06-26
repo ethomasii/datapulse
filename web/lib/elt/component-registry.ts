@@ -57,6 +57,9 @@ type ManifestIndex = {
 
 const index = manifestIndex as ManifestIndex;
 
+/** Not canvas components — Dagster policy/metadata only; hidden from catalog and Genie. */
+export const CATALOG_EXCLUDED_COMPONENT_IDS = new Set<string>(["freshness_check"]);
+
 /** Extra search phrases → component id (helps Genie match natural language). */
 const COMPONENT_SEARCH_ALIASES: Record<string, string[]> = {
   alter_row: ["alter row", "alter rows", "alterrow", "cdc marker", "change type", "adf alter row"],
@@ -113,7 +116,7 @@ export function listComponents(filters?: {
   limit?: number;
   offset?: number;
 }): { items: ComponentListItem[]; total: number } {
-  let rows = index.components;
+  let rows = index.components.filter((c) => !CATALOG_EXCLUDED_COMPONENT_IDS.has(c.id));
 
   const q = filters?.q?.trim().toLowerCase();
   if (q) {
@@ -149,6 +152,7 @@ export function listComponents(filters?: {
 }
 
 export function getComponentById(id: string): ComponentListItem | null {
+  if (CATALOG_EXCLUDED_COMPONENT_IDS.has(id)) return null;
   const row = index.components.find((c) => c.id === id);
   if (row) return enrichComponent(row);
 
@@ -195,6 +199,7 @@ export function getComponentById(id: string): ComponentListItem | null {
 export function listComponentCategories(): { category: string; count: number }[] {
   const counts = new Map<string, number>();
   for (const c of index.components) {
+    if (CATALOG_EXCLUDED_COMPONENT_IDS.has(c.id)) continue;
     const key = normalizeComponentCategory(c.category);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }

@@ -5336,20 +5336,6 @@
       "example_url": "https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/resources/freshdesk_resource/example.yaml"
     },
     {
-      "id": "freshness_check",
-      "name": "Freshness Policy",
-      "category": "check",
-      "description": "Attach a Dagster FreshnessPolicy to an asset for continuous SLA monitoring.",
-      "tags": [
-        "check",
-        "freshness"
-      ],
-      "path": "asset_checks/freshness_check",
-      "icon": "CheckCircle",
-      "schema_url": "https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/asset_checks/freshness_check/schema.json",
-      "example_url": "https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/asset_checks/freshness_check/example.yaml"
-    },
-    {
       "id": "funnel_analysis",
       "name": "Funnel Analysis",
       "category": "analytics",

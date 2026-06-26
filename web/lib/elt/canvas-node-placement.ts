@@ -4,11 +4,15 @@
  */
 import type { Edge, Node } from "@xyflow/react";
 import { isValidPipelineCanvasEdge } from "@/lib/elt/canvas-component-sync";
+import { isTerminalComponentData, isTerminalComponentNode } from "@/lib/elt/component-canvas-io";
 
 /** Space between upstream right edge and next node left edge. */
 export const CANVAS_HORIZONTAL_GAP = 88;
 const HORIZONTAL_GAP = CANVAS_HORIZONTAL_GAP;
 const DEFAULT_Y = 120;
+
+/** Vertical offset below the main transform row for terminal validate nodes. */
+export const TERMINAL_ROW_BELOW_GAP = 88;
 
 export type CanvasAppendTarget = {
   position: { x: number; y: number };
@@ -89,6 +93,38 @@ export function positionAfterUpstream(
   };
 }
 
+/** Place terminal validate nodes below the step they assert on (not in the transform row). */
+export function positionTerminalAfterUpstream(
+  nodes: Node[],
+  upstream: Node,
+  append: CanvasAppendNodeSpec
+): { x: number; y: number } {
+  const handleLine = chainHandleY(nodes);
+  const nextHandle = handleYOffset({ type: append.type, data: append.data ?? {} });
+  return {
+    x: upstream.position.x,
+    y: handleLine + TERMINAL_ROW_BELOW_GAP - nextHandle,
+  };
+}
+
+export function positionForAppend(
+  nodes: Node[],
+  upstream: Node,
+  append: CanvasAppendNodeSpec
+): { x: number; y: number } {
+  if (isTerminalComponentData(append.data ?? {})) {
+    return positionTerminalAfterUpstream(nodes, upstream, append);
+  }
+  return positionAfterUpstream(nodes, upstream, append);
+}
+
+function upstreamForAppend(tail: Node, edges: Edge[], byId: Map<string, Node>, append: CanvasAppendNodeSpec): Node {
+  if (!isTerminalComponentData(append.data ?? {})) return tail;
+  if (!isTerminalComponentNode(tail)) return tail;
+  const predId = edges.find((e) => e.target === tail.id)?.source;
+  return (predId ? byId.get(predId) : undefined) ?? tail;
+}
+
 /** Rightmost leaf reachable from pipeline roots (source or warehouse). */
 export function findCanvasAppendTarget(
   nodes: Node[],
@@ -121,9 +157,10 @@ export function findCanvasAppendTarget(
 
   if (startIds.length === 0) {
     const rightmost = [...nodes].sort((a, b) => b.position.x - a.position.x)[0]!;
+    const wireFrom = upstreamForAppend(rightmost, edges, byId, append);
     return {
-      position: positionAfterUpstream(nodes, rightmost, append),
-      upstreamId: rightmost.id,
+      position: positionForAppend(nodes, wireFrom, append),
+      upstreamId: wireFrom.id,
     };
   }
 
@@ -164,19 +201,24 @@ export function findCanvasAppendTarget(
     tail = startIds.map((id) => byId.get(id)).find(Boolean) ?? nodes[0]!;
   }
 
+  const appendingTerminal = isTerminalComponentData(append.data ?? {});
+
   let cursor = tail;
   for (;;) {
     const next = outgoingTargets(edges, cursor.id)
       .map((tid) => byId.get(tid))
       .filter((n): n is Node => !!n && (n.type === "componentNode" || n.type === "transformNode"))
+      .filter((n) => appendingTerminal || !isTerminalComponentNode(n))
       .sort((a, b) => b.position.x - a.position.x)[0];
     if (!next || !isValidPipelineCanvasEdge(cursor, next)) break;
     cursor = next;
   }
   tail = cursor;
 
+  const wireFrom = upstreamForAppend(tail, edges, byId, append);
+
   return {
-    position: positionAfterUpstream(nodes, tail, append),
-    upstreamId: tail.id,
+    position: positionForAppend(nodes, wireFrom, append),
+    upstreamId: wireFrom.id,
   };
 }

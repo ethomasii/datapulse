@@ -22,11 +22,12 @@ function parseEltLines(c: Record<string, unknown>, key: string): string[] {
 
 async function bodyToRequest(
   body: CreatePipelineBody,
-  options?: { workspaceCatalogUrls?: string[] | null }
+  options?: { workspaceCatalogUrls?: string[] | null; ownerIds?: string[] }
 ): Promise<PipelineRequest> {
   const c = body.sourceConfiguration ?? {};
   const { config: compiledConfig } = await compilePipelineComponentsAsync(c as Record<string, unknown>, {
     workspaceCatalogUrls: options?.workspaceCatalogUrls,
+    ownerIds: options?.ownerIds,
   });
   const stripped = stripCanvasFromSourceConfig(compiledConfig);
   const cCodegen = normalizeSourceConfigurationForCodegen(body.sourceType, stripped);
@@ -80,7 +81,7 @@ export function resolveTool(body: CreatePipelineBody): "dlt" | "sling" {
 
 export async function generatePipelineArtifacts(
   body: CreatePipelineBody,
-  options?: { workspaceCatalogUrls?: string[] | null }
+  options?: { workspaceCatalogUrls?: string[] | null; ownerIds?: string[] }
 ) {
   const req = await bodyToRequest(body, options);
 

@@ -18,6 +18,7 @@ import {
 import {
   findCanvasAppendTarget,
   positionAfterUpstream,
+  positionForAppend,
   type CanvasAppendNodeSpec,
 } from "@/lib/elt/canvas-node-placement";
 import { wireInputFromUpstreamEdge } from "@/lib/elt/canvas-wire-input";
@@ -182,9 +183,15 @@ export function applyCanvasGraphEdits(
         continue;
       }
       const route = routeComponent(catalog.id, catalog.category);
+      const ports = canvasPortsForCategory(normalizeComponentCategory(catalog.category));
       const appendSpec: CanvasAppendNodeSpec = {
         type: "componentNode",
-        data: { compileHint: route.hint },
+        data: {
+          compileHint: route.hint,
+          category: catalog.category,
+          compileTarget: route.target,
+          canvasPorts: ports,
+        },
       };
       const placementOpts = { transformOnly: meta.transformOnly, append: appendSpec };
       const afterRef = action.after?.trim();
@@ -192,7 +199,7 @@ export function applyCanvasGraphEdits(
       let wireFrom: Node | null = afterNode;
       let position: { x: number; y: number };
       if (afterNode) {
-        position = positionAfterUpstream(nodes, afterNode, appendSpec);
+        position = positionForAppend(nodes, afterNode, appendSpec);
       } else {
         const anchor = findCanvasAppendTarget(nodes, edges, placementOpts);
         position = anchor.position;
@@ -211,26 +218,30 @@ export function applyCanvasGraphEdits(
           compileTarget: route.target,
           compileBadge: route.badge ?? route.target,
           compileHint: route.hint,
-          canvasPorts: canvasPortsForCategory(normalizeComponentCategory(catalog.category)),
+          canvasPorts: ports,
           config: { ...(action.config ?? {}), template_id: catalog.id },
         },
       };
       nodes.push(node);
 
       if (afterNode && isValidPipelineCanvasEdge(afterNode, node)) {
-        const outgoing = edges.filter((e) => e.source === afterNode.id);
-        if (outgoing.length === 1) {
-          const nextNode = nodes.find((n) => n.id === outgoing[0]!.target);
-          if (nextNode && isValidPipelineCanvasEdge(node, nextNode)) {
-            edges = edges.filter(
-              (e) => !(e.source === afterNode.id && e.target === nextNode.id)
-            );
-            edges.push(makeEdge(afterNode.id, node.id), makeEdge(node.id, nextNode.id));
+        if (!ports.right) {
+          edges.push(makeEdge(afterNode.id, node.id));
+        } else {
+          const outgoing = edges.filter((e) => e.source === afterNode.id);
+          if (outgoing.length === 1) {
+            const nextNode = nodes.find((n) => n.id === outgoing[0]!.target);
+            if (nextNode && isValidPipelineCanvasEdge(node, nextNode)) {
+              edges = edges.filter(
+                (e) => !(e.source === afterNode.id && e.target === nextNode.id)
+              );
+              edges.push(makeEdge(afterNode.id, node.id), makeEdge(node.id, nextNode.id));
+            } else {
+              edges.push(makeEdge(afterNode.id, node.id));
+            }
           } else {
             edges.push(makeEdge(afterNode.id, node.id));
           }
-        } else {
-          edges.push(makeEdge(afterNode.id, node.id));
         }
       } else if (wireFrom && isValidPipelineCanvasEdge(wireFrom, node)) {
         edges.push(makeEdge(wireFrom.id, node.id));

@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { getComponentById, listComponents, listComponentCategories } from "@/lib/elt/component-registry";
 import { routeComponent } from "@/lib/elt/component-compile-router";
 import { companionIngestionForSensor } from "@/lib/elt/component-sensor-pairs";
-import { canvasPortsForCategory } from "@/lib/elt/component-canvas-io";
+import {
+  canvasPortsForCategory,
+  isTerminalComponentCategory,
+  isValidComponentEdge,
+} from "@/lib/elt/component-canvas-io";
 
 describe("component-registry", () => {
   it("loads manifest index", () => {
@@ -32,9 +36,24 @@ describe("component-registry", () => {
     expect(p.right).toBe(true);
   });
 
+  it("canvas ports for validate checks are terminal", () => {
+    const p = canvasPortsForCategory("check");
+    expect(p.left).toBe(true);
+    expect(p.right).toBe(false);
+    expect(isTerminalComponentCategory("check")).toBe(true);
+    expect(isValidComponentEdge("check", "transformation")).toBe(false);
+    expect(isValidComponentEdge("transformation", "check")).toBe(true);
+  });
+
   it("finds alter_row when user searches alter rows", () => {
     const { items, total } = listComponents({ q: "alter rows", limit: 10 });
     expect(total).toBeGreaterThan(0);
     expect(items.some((c) => c.id === "alter_row")).toBe(true);
+  });
+
+  it("excludes freshness_check (Freshness Policy) from catalog", () => {
+    expect(getComponentById("freshness_check")).toBeNull();
+    const { items } = listComponents({ q: "freshness policy", limit: 20 });
+    expect(items.some((c) => c.id === "freshness_check")).toBe(false);
   });
 });

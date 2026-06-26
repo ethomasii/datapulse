@@ -5,10 +5,12 @@
 import type { Edge, Node } from "@xyflow/react";
 import {
   CANVAS_HORIZONTAL_GAP,
+  TERMINAL_ROW_BELOW_GAP,
   chainHandleY,
   estimateNodeLayout,
   handleYOffset,
 } from "@/lib/elt/canvas-node-placement";
+import { isTerminalComponentNode } from "@/lib/elt/component-canvas-io";
 
 const START_X = 40;
 const PARALLEL_Y = 48;
@@ -120,6 +122,18 @@ export function autoLayoutPipelineCanvas(nodes: Node[], edges: Edge[]): Node[] {
       y: PARALLEL_Y,
     });
     parallelBranchIndex += 1;
+  }
+
+  for (const n of nodes) {
+    if (!isTerminalComponentNode(n)) continue;
+    const preds = incoming.get(n.id) ?? [];
+    const parentId = preds[0];
+    const parentPos = parentId ? positionById.get(parentId) : undefined;
+    if (!parentPos) continue;
+    positionById.set(n.id, {
+      x: parentPos.x,
+      y: handleLine + TERMINAL_ROW_BELOW_GAP - handleYOffset(n),
+    });
   }
 
   return nodes.map((n) => ({

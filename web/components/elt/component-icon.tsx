@@ -50,7 +50,6 @@ const ID_ICONS: Record<string, LucideIcon> = {
   select_columns: Table2,
   drop_duplicates: Box,
   dq_check: CheckCircle,
-  freshness_check: Activity,
   s3_monitor: Radar,
   s3_to_database_asset: FileInput,
   kafka_to_database_asset: Zap,

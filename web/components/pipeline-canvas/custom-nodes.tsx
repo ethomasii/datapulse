@@ -265,11 +265,21 @@ export function ComponentNode({ id, data }: NodeProps) {
   const componentId = String(d.componentId ?? "");
   const manifestIcon = typeof d.icon === "string" ? d.icon : undefined;
   const ports = d.canvasPorts as { left?: boolean; right?: boolean } | undefined;
+  const isTerminal =
+    category === "check" || target === "quality" || (ports?.left === true && ports?.right === false);
+  const accent = isTerminal ? "amber" : "sky";
+  const displayBadge = isTerminal ? "Validate" : badge;
 
   return (
-    <div className="w-[200px] max-w-[200px] shrink-0 overflow-visible rounded-lg border-2 border-violet-400 bg-white px-3 py-2 shadow-sm dark:border-violet-600 dark:bg-slate-900">
+    <div
+      className={`w-[200px] max-w-[200px] shrink-0 overflow-visible rounded-lg border-2 px-3 py-2 shadow-sm ${
+        isTerminal
+          ? "border-dashed border-amber-400 bg-amber-50/40 dark:border-amber-500 dark:bg-amber-950/20"
+          : "border-violet-400 bg-white dark:border-violet-600 dark:bg-slate-900"
+      }`}
+    >
       {ports?.left !== false ? (
-        <Handle type="target" position={Position.Left} className={handleClass("sky")} />
+        <Handle type="target" position={Position.Left} className={handleClass(accent)} />
       ) : null}
       <div className="flex items-center gap-1.5">
         <ComponentIcon
@@ -278,23 +288,32 @@ export function ComponentNode({ id, data }: NodeProps) {
           manifestIcon={manifestIcon}
           compileTarget={target}
           size="sm"
-          className="text-violet-600 dark:text-violet-300"
+          className={isTerminal ? "text-amber-600 dark:text-amber-300" : "text-violet-600 dark:text-violet-300"}
         />
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-600 dark:text-violet-300">
-          {badge}
+        <p
+          className={`text-[10px] font-semibold uppercase tracking-wide ${
+            isTerminal ? "text-amber-700 dark:text-amber-300" : "text-violet-600 dark:text-violet-300"
+          }`}
+        >
+          {displayBadge}
         </p>
       </div>
       <NodeTitleField
         value={title}
         onChange={(v) => update({ label: v })}
-        accent="sky"
-        placeholder="Component"
+        accent={accent}
+        placeholder={isTerminal ? "Validation check" : "Component"}
       />
       {typeof d.compileHint === "string" && d.compileHint ? (
         <p className="mt-1 line-clamp-2 text-[10px] text-slate-500">{d.compileHint}</p>
       ) : null}
+      {isTerminal ? (
+        <p className="mt-1 text-[9px] font-medium uppercase tracking-wide text-amber-700/80 dark:text-amber-400/80">
+          Assert only · no output
+        </p>
+      ) : null}
       {ports?.right !== false ? (
-        <Handle type="source" position={Position.Right} className={handleClass("sky")} />
+        <Handle type="source" position={Position.Right} className={handleClass(accent)} />
       ) : null}
     </div>
   );

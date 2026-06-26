@@ -32,11 +32,14 @@ async function fetchJson(path) {
 }
 
 function slimIndex(manifest) {
+  const excluded = new Set(["freshness_check"]);
   return {
     version: manifest.version ?? "1",
     repository: repo,
     last_updated: new Date().toISOString().slice(0, 10),
-    components: (manifest.components ?? []).map((c) => ({
+    components: (manifest.components ?? [])
+      .filter((c) => !excluded.has(c.id ?? c.name))
+      .map((c) => ({
       id: c.id ?? c.name,
       name: c.name ?? c.id,
       category: c.category ?? "other",
@@ -54,6 +57,8 @@ async function main() {
   mkdirSync(dataDir, { recursive: true });
   console.log(`Fetching manifest from ${repo}…`);
   const manifest = await fetchJson("manifest.json");
+  const excluded = new Set(["freshness_check"]);
+  manifest.components = (manifest.components ?? []).filter((c) => !excluded.has(c.id ?? c.name));
   const index = slimIndex(manifest);
 
   writeFileSync(join(dataDir, "component-manifest.json"), JSON.stringify(manifest, null, 2));

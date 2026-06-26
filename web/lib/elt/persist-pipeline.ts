@@ -5,6 +5,7 @@ import { assertUserOwnsGatewayToken } from "@/lib/agent/gateway-routing";
 import { db } from "@/lib/db/client";
 import { syncDltDbtWithCanvas, syncPostTransformWithCanvas } from "@/lib/elt/dbt-canvas";
 import { generatePipelineArtifacts, resolveTool } from "@/lib/elt/generate-artifacts";
+import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
 import { loadWorkspaceCatalogUrls } from "@/lib/elt/workspace-catalog-sources";
 import { mergeEltMetadataIntoSourceConfig } from "@/lib/elt/merge-elt-metadata";
 import { preparePipelinePersistenceAndArtifacts } from "@/lib/elt/pipeline-connection-fks";
@@ -54,8 +55,10 @@ async function prepareWrite(
   const bodyForArtifacts = prepared.artifactBody;
   const resolvedTool = resolveTool(bodyForArtifacts);
   const workspaceCatalogUrls = await loadWorkspaceCatalogUrls(userId);
+  const ownerIds = await getAccessibleResourceOwnerIds(userId);
   const { pipelineCode, configYaml, workspaceYaml } = await generatePipelineArtifacts(bodyForArtifacts, {
     workspaceCatalogUrls,
+    ownerIds,
   });
   return {
     bodyMerged,

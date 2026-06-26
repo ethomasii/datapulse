@@ -189,6 +189,7 @@ export async function PUT(req: Request, ctx: Ctx) {
     const workspaceCatalogUrls = await loadWorkspaceCatalogUrls(user.id);
     const { pipelineCode, configYaml, workspaceYaml } = await generatePipelineArtifacts(bodyForArtifacts, {
       workspaceCatalogUrls,
+      ownerIds,
     });
 
     let runsWebhookUrl: string | null | undefined;
@@ -531,6 +532,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     const workspaceCatalogUrls = await loadWorkspaceCatalogUrls(user.id);
     const { pipelineCode, configYaml, workspaceYaml } = await generatePipelineArtifacts(preparedPatch.artifactBody, {
       workspaceCatalogUrls,
+      ownerIds,
     });
 
     const row = await db.eltPipeline.update({

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
-import { Cable, Layers, Play, Plus, Trash2, ChevronDown, ChevronRight, Check, Shield, Waypoints } from "lucide-react";
+import { Bot, Cable, Layers, Play, Plus, Trash2, ChevronDown, ChevronRight, Check, Shield, Waypoints } from "lucide-react";
 import { RelatedLinks } from "@/components/ui/related-links";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConnectionStoredSecretsForm } from "@/components/elt/connection-stored-secrets-form";
@@ -881,6 +881,7 @@ export default function ConnectionsPage() {
 
       <RelatedLinks links={[
         { href: "/builder", icon: Layers, label: "Pipelines", desc: "Pick saved connections in source and destination forms" },
+        { href: "/mcp-servers", icon: Bot, label: "MCP servers", desc: "Register MCP servers for AI pipeline components" },
         { href: "/runs", icon: Play, label: "Runs", desc: "View executions that used these credentials" },
         { href: "/gateway", icon: Waypoints, label: "Gateway & execution", desc: "Configure where pipelines run" },
       ]} />

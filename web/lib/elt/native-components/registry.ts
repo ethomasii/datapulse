@@ -1,7 +1,10 @@
 import { joinTablesComponent } from "./definitions/join-tables";
 import { filterRowsComponent } from "./definitions/filter-rows";
 import { dqCheckComponent } from "./definitions/dq-check";
-import { freshnessCheckComponent } from "./definitions/freshness-check";
+import { mcpToolCallComponent } from "./definitions/mcp-tool-call";
+import { litellmAgentComponent } from "./definitions/litellm-agent";
+import { litellmInferenceComponent } from "./definitions/litellm-inference";
+import { llmEvaluatorComponent } from "./definitions/llm-evaluator";
 import { sqlTransformComponent } from "./definitions/sql-transform";
 import { selectColumnsComponent } from "./definitions/select-columns";
 import { dropDuplicatesComponent } from "./definitions/drop-duplicates";
@@ -77,7 +80,10 @@ const ALL_NATIVE: NativeComponentDefinition[] = [
   joinTablesComponent,
   filterRowsComponent,
   dqCheckComponent,
-  freshnessCheckComponent,
+  mcpToolCallComponent,
+  litellmAgentComponent,
+  litellmInferenceComponent,
+  llmEvaluatorComponent,
   sqlTransformComponent,
   selectColumnsComponent,
   dropDuplicatesComponent,

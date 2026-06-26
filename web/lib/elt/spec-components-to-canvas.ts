@@ -5,6 +5,7 @@ import type { Edge, Node } from "@xyflow/react";
 import type { DeclarativePipelineSpec, PipelineComponentSpec } from "@/lib/elt/declarative-pipeline-spec";
 import { routeComponent } from "@/lib/elt/component-compile-router";
 import { getComponentById } from "@/lib/elt/component-registry";
+import { canvasPortsForCategory, normalizeComponentCategory } from "@/lib/elt/component-canvas-io";
 import type { PipelineCanvasGraph } from "@/lib/elt/canvas-source-config";
 import { enrichComponentListAssets } from "@/lib/elt/pipeline-asset-keys";
 
@@ -114,6 +115,7 @@ export function buildCanvasFromDeclarativeSpec(
     const catalog = getComponentById(componentId);
     const category = catalog?.category ?? "transformation";
     const route = routeComponent(componentId, category);
+    const ports = canvasPortsForCategory(normalizeComponentCategory(category));
     const nodeId = nextNodeId(comp.id);
     specIdToNodeId.set(comp.id, nodeId);
     nodes.push({
@@ -126,6 +128,7 @@ export function buildCanvasFromDeclarativeSpec(
         category,
         compileTarget: route.target,
         compileHint: route.hint,
+        canvasPorts: { left: ports.left, right: ports.right },
         config: {
           ...cfg,
           template_id: componentId || comp.id,

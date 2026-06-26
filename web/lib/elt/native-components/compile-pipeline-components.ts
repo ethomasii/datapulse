@@ -1,6 +1,8 @@
 import type { PipelineComponentSpec } from "@/lib/elt/declarative-pipeline-spec";
 import { resolveComponentCompiler } from "@/lib/elt/component-packages";
 import { getNativeComponent, resolveNativeComponentId } from "./registry";
+import { resetMcpPreambleFlagForTests } from "./mcp-python-runtime";
+import { hydrateComponentMcpConfig, loadMcpServersForCompile } from "@/lib/elt/mcp-server/resolve";
 import type { CompiledPipelineComponents } from "./types";
 
 function parseEltComponents(raw: unknown): PipelineComponentSpec[] {
@@ -118,10 +120,17 @@ function compilePipelineComponentsSync(
  */
 export async function compilePipelineComponentsAsync(
   sourceConfiguration: Record<string, unknown>,
-  options?: { workspaceCatalogUrls?: string[] | null }
+  options?: { workspaceCatalogUrls?: string[] | null; ownerIds?: string[] }
 ): Promise<{ config: Record<string, unknown>; result: CompiledPipelineComponents }> {
+  resetMcpPreambleFlagForTests();
   const config = { ...sourceConfiguration };
   const components = topoOrder(parseEltComponents(config.elt_components));
+
+  let mcpServers = new Map<string, import("@/lib/elt/mcp-server/types").ResolvedMcpServer>();
+  if (options?.ownerIds?.length) {
+    const cfgs = components.map((c) => (c.config ?? {}) as Record<string, unknown>);
+    mcpServers = await loadMcpServersForCompile(options.ownerIds, cfgs);
+  }
 
   const pythonBlocks: string[] = [];
   const sqlStatements: string[] = [];
@@ -131,7 +140,8 @@ export async function compilePipelineComponentsAsync(
   let compiled = false;
 
   for (const comp of components) {
-    const cfg = { ...(comp.config ?? {}), template_id: comp.config?.template_id ?? comp.id };
+    let cfg = { ...(comp.config ?? {}), template_id: comp.config?.template_id ?? comp.id };
+    cfg = hydrateComponentMcpConfig(cfg, mcpServers);
     const nativeId = resolveNativeComponentId(cfg) ?? comp.id;
     const compiler = await resolveComponentCompiler(nativeId, {
       sourceConfiguration: config,

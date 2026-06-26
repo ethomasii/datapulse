@@ -3,6 +3,8 @@
  * Maps component category → left/right connection ports for the visual pipeline canvas.
  */
 
+import type { Node } from "@xyflow/react";
+import { getComponentById } from "@/lib/elt/component-registry";
 import schemaSpec from "@/lib/elt/data/component-schema-spec.json";
 
 export type ComponentCanvasPorts = {
@@ -54,4 +56,45 @@ export function isValidComponentEdge(sourceCategory: string, targetCategory: str
   const src = canvasPortsForCategory(sourceCategory);
   const tgt = canvasPortsForCategory(targetCategory);
   return src.right && tgt.left;
+}
+
+export function isTerminalComponentCategory(category: string): boolean {
+  const ports = canvasPortsForCategory(category);
+  return ports.left && !ports.right;
+}
+
+/** Terminal validators (e.g. DQ checks) — assert on upstream data, no output port. */
+export function isTerminalComponentData(data: Record<string, unknown>): boolean {
+  const ports = data.canvasPorts as { left?: boolean; right?: boolean } | undefined;
+  if (ports && ports.left && ports.right === false) return true;
+  const category = String(data.category ?? "");
+  if (category && isTerminalComponentCategory(category)) return true;
+  const compileTarget = String(data.compileTarget ?? "");
+  return compileTarget === "quality";
+}
+
+export function isTerminalComponentNode(node: Pick<Node, "type" | "data">): boolean {
+  if (node.type !== "componentNode") return false;
+  return isTerminalComponentData((node.data ?? {}) as Record<string, unknown>);
+}
+
+/** Fill missing canvasPorts/category from the component catalog (legacy saved graphs). */
+export function enrichCanvasComponentNodeData(data: Record<string, unknown>): Record<string, unknown> {
+  const componentId = String(data.componentId ?? "").trim();
+  const catalog = componentId ? getComponentById(componentId) : null;
+  const category = String(data.category ?? catalog?.category ?? "transformation");
+  const ports = canvasPortsForCategory(category);
+  const next = { ...data, category };
+  if (!data.canvasPorts) {
+    next.canvasPorts = { left: ports.left, right: ports.right };
+  }
+  return next;
+}
+
+export function enrichCanvasComponentNodes(nodes: Node[]): Node[] {
+  return nodes.map((n) =>
+    n.type === "componentNode"
+      ? { ...n, data: enrichCanvasComponentNodeData((n.data ?? {}) as Record<string, unknown>) }
+      : n
+  );
 }

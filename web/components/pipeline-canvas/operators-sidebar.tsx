@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Database,
+  Eye,
   Layers,
   Loader2,
   Search,
+  ShieldCheck,
   Sparkles,
   Target,
   Workflow,
@@ -37,9 +39,17 @@ const FEATURED_NATIVE_IDS = [
   "replace_values",
 ] as const;
 
+const FEATURED_AI_IDS = [
+  "mcp_tool_call",
+  "litellm_agent",
+  "litellm_inference_asset",
+  "llm_evaluator",
+] as const;
+
 type Section = {
   id: string;
   title: string;
+  subtitle?: string;
   icon: typeof Workflow;
   items: ComponentListItem[];
 };
@@ -78,6 +88,7 @@ function OperatorRow({
   }
 
   const c = item as ComponentListItem;
+  const isValidate = c.category === "check" || c.compileTarget === "quality";
   return (
     <button
       type="button"
@@ -87,7 +98,12 @@ function OperatorRow({
         e.dataTransfer.effectAllowed = "copy";
       }}
       onClick={() => onSelect(c)}
-      className="flex w-full cursor-grab items-start gap-2 rounded-md px-2 py-1.5 text-left hover:bg-violet-50 active:cursor-grabbing dark:hover:bg-violet-950/30"
+      className={clsx(
+        "flex w-full cursor-grab items-start gap-2 rounded-md px-2 py-1.5 text-left active:cursor-grabbing",
+        isValidate
+          ? "hover:bg-amber-50 dark:hover:bg-amber-950/30"
+          : "hover:bg-violet-50 dark:hover:bg-violet-950/30"
+      )}
     >
       <ComponentIcon
         componentId={c.id}
@@ -95,7 +111,10 @@ function OperatorRow({
         manifestIcon={c.icon}
         compileTarget={c.compileTarget}
         size="sm"
-        className="mt-0.5 text-violet-600 dark:text-violet-300"
+        className={clsx(
+          "mt-0.5",
+          isValidate ? "text-amber-600 dark:text-amber-300" : "text-violet-600 dark:text-violet-300"
+        )}
       />
       <span className="min-w-0">
         <span className="block text-xs font-medium text-slate-900 dark:text-white">{c.name}</span>
@@ -111,27 +130,51 @@ function OperatorRow({
 export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, className }: Props) {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
-  const [nativeItems, setNativeItems] = useState<ComponentListItem[]>([]);
-  const [checkItems, setCheckItems] = useState<ComponentListItem[]>([]);
+  const [transformItems, setTransformItems] = useState<ComponentListItem[]>([]);
+  const [validateItems, setValidateItems] = useState<ComponentListItem[]>([]);
+  const [ingestItems, setIngestItems] = useState<ComponentListItem[]>([]);
+  const [monitorItems, setMonitorItems] = useState<ComponentListItem[]>([]);
+  const [aiItems, setAiItems] = useState<ComponentListItem[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [nativeRes, checkRes] = await Promise.all([
+      const [transformRes, validateRes, ingestRes, monitorRes, aiRes] = await Promise.all([
         fetch("/api/elt/components?nativeOnly=1&executableOnly=1&category=transformation&limit=120", {
           credentials: "same-origin",
         }),
         fetch("/api/elt/components?nativeOnly=1&executableOnly=1&category=check&limit=40", {
           credentials: "same-origin",
         }),
+        fetch("/api/elt/components?nativeOnly=1&executableOnly=1&category=ingestion&limit=40", {
+          credentials: "same-origin",
+        }),
+        fetch("/api/elt/components?nativeOnly=1&executableOnly=1&category=sensor&limit=40", {
+          credentials: "same-origin",
+        }),
+        fetch("/api/elt/components?nativeOnly=1&executableOnly=1&category=ai&limit=40", {
+          credentials: "same-origin",
+        }),
       ]);
-      if (nativeRes.ok) {
-        const data = (await nativeRes.json()) as { components: ComponentListItem[] };
-        setNativeItems(data.components ?? []);
+      if (transformRes.ok) {
+        const data = (await transformRes.json()) as { components: ComponentListItem[] };
+        setTransformItems(data.components ?? []);
       }
-      if (checkRes.ok) {
-        const data = (await checkRes.json()) as { components: ComponentListItem[] };
-        setCheckItems(data.components ?? []);
+      if (validateRes.ok) {
+        const data = (await validateRes.json()) as { components: ComponentListItem[] };
+        setValidateItems(data.components ?? []);
+      }
+      if (ingestRes.ok) {
+        const data = (await ingestRes.json()) as { components: ComponentListItem[] };
+        setIngestItems(data.components ?? []);
+      }
+      if (monitorRes.ok) {
+        const data = (await monitorRes.json()) as { components: ComponentListItem[] };
+        setMonitorItems(data.components ?? []);
+      }
+      if (aiRes.ok) {
+        const data = (await aiRes.json()) as { components: ComponentListItem[] };
+        setAiItems(data.components ?? []);
       }
     } finally {
       setLoading(false);
@@ -142,43 +185,84 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
     void load();
   }, [load]);
 
-  const featured = useMemo(() => {
-    const byId = new Map(nativeItems.map((c) => [c.id, c]));
-    const ordered = FEATURED_NATIVE_IDS.map((id) => byId.get(id)).filter(Boolean) as ComponentListItem[];
-    return ordered.length ? ordered : nativeItems.slice(0, 12);
-  }, [nativeItems]);
+  const allItems = useMemo(
+    () => [...transformItems, ...validateItems, ...ingestItems, ...monitorItems, ...aiItems],
+    [transformItems, validateItems, ingestItems, monitorItems, aiItems]
+  );
 
-  const filteredNative = useMemo(() => {
+  const featured = useMemo(() => {
+    const byId = new Map(transformItems.map((c) => [c.id, c]));
+    const ordered = FEATURED_NATIVE_IDS.map((id) => byId.get(id)).filter(Boolean) as ComponentListItem[];
+    return ordered.length ? ordered : transformItems.slice(0, 12);
+  }, [transformItems]);
+
+  const featuredAi = useMemo(() => {
+    const pool = [...aiItems, ...ingestItems.filter((c) => c.id === "mcp_tool_call")];
+    const byId = new Map(pool.map((c) => [c.id, c]));
+    const ordered = FEATURED_AI_IDS.map((id) => byId.get(id)).filter(Boolean) as ComponentListItem[];
+    return ordered.length ? ordered : aiItems.slice(0, 6);
+  }, [aiItems, ingestItems]);
+
+  const filteredSearch = useMemo(() => {
     const ql = q.trim().toLowerCase();
     if (!ql) return [];
-    return nativeItems.filter(
+    return allItems.filter(
       (c) =>
         c.id.toLowerCase().includes(ql) ||
         c.name.toLowerCase().includes(ql) ||
         c.description.toLowerCase().includes(ql)
     );
-  }, [nativeItems, q]);
+  }, [allItems, q]);
 
   const sections: Section[] = useMemo(
-    () => [
-      {
-        id: "transforms",
-        title: "Transformations (Native)",
-        icon: Workflow,
-        items: q.trim() ? filteredNative : featured,
-      },
-      ...(q.trim()
-        ? []
+    () =>
+      q.trim()
+        ? [
+            {
+              id: "search",
+              title: "Search results",
+              icon: Search,
+              items: filteredSearch,
+            },
+          ]
         : [
             {
-              id: "checks",
-              title: "Data quality",
-              icon: Sparkles,
-              items: checkItems.slice(0, 8),
+              id: "transforms",
+              title: "Transform",
+              subtitle: "Inline steps — read and write tables",
+              icon: Workflow,
+              items: featured,
             },
-          ]),
-    ],
-    [featured, filteredNative, checkItems, q]
+            {
+              id: "validate",
+              title: "Validate",
+              subtitle: "Terminal checks — assert only, no output",
+              icon: ShieldCheck,
+              items: validateItems,
+            },
+            {
+              id: "ai",
+              title: "AI & MCP",
+              subtitle: "Agents, tool calls, row enrichment, evaluators",
+              icon: Sparkles,
+              items: featuredAi,
+            },
+            {
+              id: "ingest",
+              title: "Ingest",
+              subtitle: "Source-side load hints (dlt / Sling)",
+              icon: Database,
+              items: ingestItems.slice(0, 8),
+            },
+            {
+              id: "monitors",
+              title: "Monitor",
+              subtitle: "Parallel sensors off the source",
+              icon: Eye,
+              items: monitorItems.slice(0, 6),
+            },
+          ],
+    [featured, featuredAi, filteredSearch, validateItems, ingestItems, monitorItems, q]
   );
 
   function onQuickAction(action: "source" | "dest") {
@@ -202,7 +286,7 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search transforms…"
+            placeholder="Search operators…"
             className="w-full rounded-md border border-slate-200 py-1.5 pl-7 pr-2 text-xs dark:border-slate-700 dark:bg-slate-900"
           />
         </div>
@@ -235,24 +319,29 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
             <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
           </div>
         ) : (
-          sections.map((section) => (
-            <section key={section.id} className="mb-3">
-              <h3 className="mb-1 flex items-center gap-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                <section.icon className="h-3 w-3" aria-hidden />
-                {section.title}
-              </h3>
-              {section.items.length === 0 ? (
-                <p className="px-2 py-2 text-[11px] text-slate-500">No matches</p>
-              ) : (
-                section.items.map((c) => <OperatorRow key={c.id} item={c} onSelect={onSelect} />)
-              )}
-            </section>
-          ))
+          sections.map((section) =>
+            section.items.length === 0 && section.id !== "search" ? null : (
+              <section key={section.id} className="mb-3">
+                <h3 className="mb-0.5 flex items-center gap-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  <section.icon className="h-3 w-3" aria-hidden />
+                  {section.title}
+                </h3>
+                {section.subtitle ? (
+                  <p className="mb-1 px-1 text-[9px] leading-snug text-slate-400">{section.subtitle}</p>
+                ) : null}
+                {section.items.length === 0 ? (
+                  <p className="px-2 py-2 text-[11px] text-slate-500">No matches</p>
+                ) : (
+                  section.items.map((c) => <OperatorRow key={c.id} item={c} onSelect={onSelect} />)
+                )}
+              </section>
+            )
+          )
         )}
 
-        {!q.trim() && !loading && nativeItems.length > featured.length ? (
+        {!q.trim() && !loading && transformItems.length > featured.length ? (
           <p className="px-2 py-1 text-[10px] text-slate-400">
-            {nativeItems.length - featured.length} more — search to find them
+            {transformItems.length - featured.length} more transforms — search to find them
           </p>
         ) : null}
       </div>

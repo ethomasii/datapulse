@@ -10,6 +10,10 @@ import { chooseTool } from "@/lib/elt/choose-tool";
 import { toDbtProjectSummary } from "@/lib/elt/dbt-projects";
 import { generatePipelineArtifacts } from "@/lib/elt/generate-artifacts";
 import { loadWorkspaceCatalogUrls } from "@/lib/elt/workspace-catalog-sources";
+import { toPublicMcpServer } from "@/lib/elt/mcp-server/public";
+import { discoverMcpTools } from "@/lib/elt/mcp-server/discover-tools";
+import { mcpSecretsForServer } from "@/lib/elt/mcp-server/resolve";
+import type { McpServerConfig, McpTransport } from "@/lib/elt/mcp-server/types";
 import { setDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
 import { supportsInPipelineDbt } from "@/lib/elt/pipeline-tool-labels";
 import { listComponents, getComponentById, fetchComponentSchema } from "@/lib/elt/component-registry";
@@ -85,19 +89,20 @@ Example — "one ingested table, build medallion layers":
 - build_lake_pipeline starter_id=single_lake_medallion source_table=staging.events
 
 ## NL → canvas components
-When the user mentions monitors, sensors, quality checks, freshness, or data validation:
+When the user mentions monitors, sensors, quality checks, or data validation:
 1. Call **search_components** then **get_component_details** (include_schema=true when config fields matter).
 2. **New pipeline**: pass \`components\` on **generate_pipeline** — each item needs \`component_id\` and sensible \`config\` (e.g. dq_check: table + not_null columns; s3_monitor: prefix/bucket defaults).
 3. **Existing pipeline** (pipeline context below): call **add_pipeline_components** with the same \`components\` array — nodes land on the visual canvas and sync to v2 YAML on apply.
 4. **Wire the graph** (connect/disconnect steps, add dbt transform after load): call **edit_pipeline_canvas** with \`actions[]\` — use node labels or ids like "source", "dest", "join", "filter".
 5. **Playbooks** — call **list_pipeline_playbooks** or **build_lake_pipeline** for curated recipes; apply with add_pipeline_components + edit_pipeline_canvas in one turn.
 6. Prefer **native** component ids (filter_rows, join_tables, lookup, group_aggregate, data_cleansing, **alter_row**, datetime_parser, pivot, anti_join, dq_check) — they compile and run inline on the canvas.
+7. **AI / MCP** — use **list_mcp_servers** to see workspace MCP connections; native ids: **mcp_tool_call** (deterministic ingest), **litellm_agent** / **openai_agent** (LLM + MCP loop), **litellm_inference_asset** (row enrichment), **llm_evaluator** (judge upstream output). Set \`mcp_server_id\` from registry. See [agent family demo](https://dagster-component-ui.vercel.app/examples/agent_family).
 
 ## Curated playbooks (use list_pipeline_playbooks)
 ${listPlaybooksForPrompt()}
 
 Component config defaults:
-- dq_check / freshness_check: table = main entity table, not_null = ["id"]
+- dq_check / unique_check: table = main entity table, not_null = ["id"] where applicable
 - s3_monitor: prefix = "s3://your-bucket/incoming/"
 - great_expectations_check: table + basic expectations in config when known
 
@@ -142,7 +147,7 @@ const AI_COMPONENT_ITEMS_SCHEMA = {
     properties: {
       component_id: {
         type: "string",
-        description: "Component id from search_components, e.g. s3_monitor, dq_check, freshness_check",
+        description: "Component id from search_components, e.g. s3_monitor, dq_check, unique_check",
       },
       label: { type: "string", description: "Optional canvas label" },
       config: {
@@ -386,6 +391,23 @@ const TOOLS: Anthropic.Tool[] = [
         include_schema: { type: "boolean", description: "Fetch remote schema.json for config field hints" },
       },
       required: ["component_id"],
+    },
+  },
+  {
+    name: "list_mcp_servers",
+    description:
+      "List workspace MCP server registry entries (stdio/http/sse). Use before mcp_tool_call or litellm_agent — pass mcp_server_id in component config.",
+    input_schema: { type: "object" as const, properties: {}, required: [] },
+  },
+  {
+    name: "refresh_mcp_tools",
+    description: "Discover tools from an MCP server (http/sse) and refresh the cached tool list.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        mcp_server_id: { type: "string", description: "MCP server id from list_mcp_servers" },
+      },
+      required: ["mcp_server_id"],
     },
   },
   {
@@ -912,6 +934,50 @@ function toolSearchComponents(query: string, category?: string, compileTarget?: 
   };
 }
 
+async function toolListMcpServers(userId: string) {
+  const ownerIds = await getAccessibleResourceOwnerIds(userId);
+  try {
+    const rows = await db.mcpServer.findMany({
+      where: { userId: { in: ownerIds } },
+      orderBy: { updatedAt: "desc" },
+    });
+    return {
+      servers: rows.map((r) => ({
+        ...toPublicMcpServer(r),
+        tool_count: Array.isArray(r.toolsCache) ? (r.toolsCache as unknown[]).length : 0,
+      })),
+      hint: "Use mcp_server_id in mcp_tool_call or mcp_server_ids in litellm_agent component config.",
+    };
+  } catch {
+    return { servers: [], _migrationPending: true };
+  }
+}
+
+async function toolRefreshMcpTools(userId: string, serverId: string) {
+  const ownerIds = await getAccessibleResourceOwnerIds(userId);
+  const row = await db.mcpServer.findFirst({
+    where: { id: serverId, userId: { in: ownerIds } },
+  });
+  if (!row) return { error: "MCP server not found" };
+  const config = (row.config ?? {}) as McpServerConfig;
+  const secrets = await mcpSecretsForServer(row);
+  try {
+    const tools = await discoverMcpTools({
+      name: row.name,
+      transport: row.transport as McpTransport,
+      config,
+      secrets,
+    });
+    await db.mcpServer.update({
+      where: { id: row.id },
+      data: { toolsCache: tools, toolsCachedAt: new Date() },
+    });
+    return { server_id: row.id, tools };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 async function toolGetComponentDetails(componentId: string, includeSchema?: boolean) {
   const c = getComponentById(componentId);
   if (!c) {
@@ -1393,7 +1459,10 @@ async function toolGeneratePipeline(userId: string, params: GeneratePipelinePara
 
   try {
     const workspaceCatalogUrls = await loadWorkspaceCatalogUrls(userId);
-    const artifacts = await generatePipelineArtifacts(body, { workspaceCatalogUrls });
+    const artifacts = await generatePipelineArtifacts(body, {
+      workspaceCatalogUrls,
+      ownerIds: await getAccessibleResourceOwnerIds(userId),
+    });
     const preview = artifacts.pipelineCode.slice(0, 800) + (artifacts.pipelineCode.length > 800 ? "\n# ... (truncated)" : "");
     return {
       success: true,
@@ -1758,6 +1827,10 @@ Use this as the source of truth for graph edits — not the last saved pipeline 
             String(inp.component_id ?? ""),
             inp.include_schema === true
           );
+        } else if (name === "list_mcp_servers") {
+          result = await toolListMcpServers(user.id);
+        } else if (name === "refresh_mcp_tools") {
+          result = await toolRefreshMcpTools(user.id, String(inp.mcp_server_id ?? ""));
         } else {
           result = { error: `Unknown tool: ${name}` };
         }

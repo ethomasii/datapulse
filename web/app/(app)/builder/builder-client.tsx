@@ -20,6 +20,7 @@ import {
   Sparkles,
   LayoutGrid,
   Layers,
+  Bot,
 } from "lucide-react";
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
 import { AppPage, AppPageHeader } from "@/components/layout/app-page";
@@ -1824,6 +1825,7 @@ export function BuilderClient({
       <RelatedLinks links={[
         { href: "/runs", icon: Play, label: "Runs", desc: "Trigger and monitor pipeline executions with live telemetry" },
         { href: "/connections", icon: Plug, label: "Connections", desc: "Manage saved source and destination credentials" },
+        { href: "/mcp-servers", icon: Bot, label: "MCP servers", desc: "Model Context Protocol registry for AI components" },
         { href: "/gateway", icon: Waypoints, label: "Gateway & execution", desc: "Configure where pipelines run" },
         { href: "/webhooks", icon: Webhook, label: "Webhooks", desc: "Get notified when runs reach a terminal state" },
       ]} />

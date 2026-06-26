@@ -31,6 +31,7 @@ import type { ComponentListItem } from "@/components/elt/component-palette";
 import { CanvasBindingsProvider, type CanvasBindingsContextValue } from "./canvas-bindings-context";
 import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-graph";
 import { isValidPipelineCanvasEdge } from "@/lib/elt/canvas-component-sync";
+import { enrichCanvasComponentNodes } from "@/lib/elt/component-canvas-io";
 import { findCanvasAppendTarget } from "@/lib/elt/canvas-node-placement";
 import { autoLayoutPipelineCanvas } from "@/lib/elt/canvas-auto-layout";
 import { findNearestEdge, insertNodeOnEdge } from "@/lib/elt/canvas-edge-insert";
@@ -200,9 +201,9 @@ function FlowCanvas({
   useEffect(() => {
     if (!pipelineId) return;
     const hasGraph = loadedGraph && Array.isArray(loadedGraph.nodes);
-    const nextNodes = hasGraph ? loadedGraph.nodes : demoNodes;
+    const nextNodes = enrichCanvasComponentNodes(hasGraph ? loadedGraph.nodes : demoNodes);
     const nextEdges = hasGraph
-      ? resolveCanvasEdges(loadedGraph.nodes, loadedGraph.edges)
+      ? resolveCanvasEdges(nextNodes, loadedGraph.edges)
       : resolveCanvasEdges(demoNodes, demoEdges);
     setNodes(nextNodes);
     setEdges(nextEdges);
@@ -371,7 +372,12 @@ function FlowCanvas({
             transformOnly,
             append: {
               type: "componentNode",
-              data: { compileHint: component.compileHint },
+              data: {
+                compileHint: component.compileHint,
+                category: component.category,
+                compileTarget: component.compileTarget,
+                canvasPorts: component.canvasPorts,
+              },
             },
           });
 

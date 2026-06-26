@@ -142,6 +142,7 @@ model User {
   githubConnection GithubConnection?
   eltPipelineRuns EltPipelineRun[]
   connections Connection[]
+  mcpServers McpServer[]
   eltMonitors EltMonitor[]
   catalogEntries CatalogEntry[]
   catalogAssetViews CatalogAssetView[]
@@ -304,6 +305,30 @@ model Connection {
   dbtProjectsAsDestination DbtProject[] @relation("DbtProjectDestination")
   usersAsDefaultDestination User[] @relation("UserDefaultDestination")
   organizationsAsDefaultDestination Organization[] @relation("OrganizationDefaultDestination")
+}
+
+/// Workspace MCP server registry — shared by Genie and pipeline AI/MCP native components.
+model McpServer {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  /// stdio | http | sse
+  transport   String
+  /// Non-secret transport config: command[], url, env key names, headers_env map, etc.
+  config      Json     @default("{}")
+  /// AES-256-GCM ciphertext of JSON env/header secret values.
+  secretsEnc  String?  @map("secrets_enc") @db.Text
+  /// Cached tool list from last successful discovery.
+  toolsCache  Json?    @map("tools_cache")
+  toolsCachedAt DateTime? @map("tools_cached_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("McpServer")
 }
 
 /// eltPulse monitor — evaluated on the control plane and/or your gateway depending on `executionHost` + account plane.

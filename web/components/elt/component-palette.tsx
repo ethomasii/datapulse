@@ -43,13 +43,15 @@ const ALL_PALETTE_TABS = [
   { id: "", label: "All" },
   { id: "ingestion", label: "Ingest" },
   { id: "transformation", label: "Transform" },
-  { id: "check", label: "Check" },
-  { id: "sensor", label: "Sensor" },
+  { id: "check", label: "Validate" },
+  { id: "sensor", label: "Monitor" },
 ] as const;
 
 const TRANSFORM_PALETTE_TABS = [
   { id: "transformation", label: "Transform" },
-  { id: "check", label: "Check" },
+  { id: "check", label: "Validate" },
+  { id: "ingestion", label: "Ingest" },
+  { id: "sensor", label: "Monitor" },
   { id: "", label: "All" },
 ] as const;
 
@@ -135,9 +137,9 @@ export function ComponentPalette({
         </p>
         <p className="mt-0.5 text-xs text-slate-500">
           {nativeOnly
-            ? `${total} native compilers — cleanse, join, aggregate, checks, …`
+            ? `${total} native compilers — Transform · Validate · Ingest · Monitor`
             : transformDesigner
-              ? `${total} transform components — click native (violet) or code (amber) on toolbar`
+              ? `${total} components — Transform (inline) · Validate (terminal) · Ingest · Monitor`
               : executableOnly
                 ? `${total} executable components — faithful compilers only`
                 : `${total} templates — drag onto canvas or click to add`}
