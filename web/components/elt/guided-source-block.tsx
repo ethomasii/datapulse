@@ -80,13 +80,15 @@ export function GuidedSourceBlock({
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/50">
           <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">GitHub advanced settings</h3>
           <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-            Generated code reads the token from the <strong className="font-medium text-slate-700 dark:text-slate-300">environment variable name</strong>{" "}
-            below (default <code className="font-mono text-[11px]">GITHUB_TOKEN</code>). For managed runs, the PAT lives on
-            the linked source connection — not in this field.
+            This is <strong className="font-medium">not</strong> your PAT — it is the{" "}
+            <strong className="font-medium">name of the environment variable</strong> that{" "}
+            <code className="font-mono text-[11px]">pipeline.py</code> reads at run time (default{" "}
+            <code className="font-mono text-[11px]">GITHUB_TOKEN</code>). The token value itself is stored under Source
+            connection credentials above.
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="block sm:col-span-2">
-              <span className="text-xs text-slate-600 dark:text-slate-400">PAT env var name (runtime)</span>
+              <span className="text-xs text-slate-600 dark:text-slate-400">Env var name for the PAT (not the token)</span>
               <input
                 value={String(sourceCfg.github_token_env ?? "GITHUB_TOKEN")}
                 onChange={(e) =>
