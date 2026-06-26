@@ -10,10 +10,12 @@ import {
   type DiscoverItem,
   type DiscoverResult,
 } from "@/lib/elt/source-discover-catalog";
+import { githubJson, type GithubRepoListItem } from "@/lib/integrations/github-rest";
 
 export type { DiscoverItem, DiscoverResult } from "@/lib/elt/source-discover-catalog";
 export {
   applyDiscoveryToSourceConfiguration,
+  applyGithubRepoToSourceConfiguration,
   hasDiscoverCatalog,
 } from "@/lib/elt/source-discover-catalog";
 
@@ -23,6 +25,8 @@ export type DiscoverInput = {
   config: Record<string, unknown>;
   connectionSecretsEnc?: string | null;
   secrets?: Record<string, string>;
+  /** GitHub only: list repositories instead of static resource catalog. */
+  discoverPhase?: "repos" | "resources";
 };
 
 function mergedSecrets(input: DiscoverInput): Record<string, string> {
@@ -234,6 +238,36 @@ async function discoverS3Prefixes(
   }
 }
 
+async function discoverGithubRepositories(secrets: Record<string, string>): Promise<DiscoverResult> {
+  const token = secrets.GITHUB_TOKEN ?? secrets.github_token ?? "";
+  if (!token.trim()) {
+    return { ok: false, message: "Set GITHUB_TOKEN to list repositories.", items: [] };
+  }
+  const { ok, status, json } = await githubJson<GithubRepoListItem[]>(
+    token.trim(),
+    "/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member"
+  );
+  if (!ok || !Array.isArray(json)) {
+    return {
+      ok: false,
+      message: `Could not list GitHub repositories (${status}).`,
+      items: [],
+    };
+  }
+  const items: DiscoverItem[] = json.map((r) => ({
+    id: r.full_name,
+    name: r.full_name,
+    kind: "endpoint",
+    description: r.private ? "Private repository" : "Public repository",
+  }));
+  return {
+    ok: true,
+    message: "Select a repository to sync.",
+    items,
+    defaultSelected: items[0] ? [items[0].id] : [],
+  };
+}
+
 export async function discoverSource(input: DiscoverInput): Promise<DiscoverResult> {
   if (input.connectionType !== "source") {
     return { ok: false, message: "Discovery is only supported for source connections.", items: [] };
@@ -241,6 +275,10 @@ export async function discoverSource(input: DiscoverInput): Promise<DiscoverResu
 
   const connector = input.connector.toLowerCase();
   const secrets = mergedSecrets(input);
+
+  if (connector === "github" && input.discoverPhase === "repos") {
+    return discoverGithubRepositories(secrets);
+  }
 
   if (connector === "postgres" || connector === "postgresql") {
     return discoverPostgresTables(secrets, input.config);

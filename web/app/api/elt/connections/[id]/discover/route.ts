@@ -8,9 +8,14 @@ import { resolveRouteParamId } from "@/lib/server/route-params";
 type Ctx = { params: { id: string } | Promise<{ id: string }> };
 
 /** GET /api/elt/connections/:id/discover */
-export async function GET(_req: Request, ctx: Ctx) {
+export async function GET(req: Request, ctx: Ctx) {
   const user = await getCurrentDbUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const url = new URL(req.url);
+  const discoverPhaseRaw = url.searchParams.get("phase");
+  const discoverPhase =
+    discoverPhaseRaw === "repos" || discoverPhaseRaw === "resources" ? discoverPhaseRaw : undefined;
 
   const id = await resolveRouteParamId(ctx.params);
   const ownerIds = await getAccessibleResourceOwnerIds(user.id);
@@ -30,6 +35,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     connector: row.connector,
     config: (row.config ?? {}) as Record<string, unknown>,
     connectionSecretsEnc: row.connectionSecretsEnc,
+    discoverPhase,
   });
 
   return NextResponse.json(result, { status: result.ok ? 200 : 422 });

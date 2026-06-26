@@ -77,7 +77,7 @@ def run(partition_key: str = None):
     # When provided it is passed as the 'since' arg to github_reactions so only items
     # updated on or after that date are fetched (date-based incremental load).
 
-    # Resolve the GitHub PAT from the environment (connection secrets or OAuth-backed run)
+    # Resolve the GitHub PAT from the linked source connection (GITHUB_TOKEN env var)
     github_token = (
         os.environ.get("${escapePyString(tokenEnv)}")
         or os.environ.get("GITHUB_TOKEN")
@@ -85,8 +85,7 @@ def run(partition_key: str = None):
     )
     if not github_token:
         raise RuntimeError(
-            "Missing GitHub token. Link a GitHub source connection with GITHUB_TOKEN, "
-            "or connect GitHub under Integrations."
+            "Missing GitHub token. Link a GitHub source connection with GITHUB_TOKEN in the builder."
         )
 
     # Configure the pipeline

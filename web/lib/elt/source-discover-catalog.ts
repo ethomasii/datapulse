@@ -69,6 +69,21 @@ export function catalogResourcesForConnector(connector: string): DiscoverResult 
 }
 
 /** Apply discovered selection to sourceConfiguration for codegen. */
+export function applyGithubRepoToSourceConfiguration(
+  base: Record<string, unknown>,
+  fullName: string
+): Record<string, unknown> {
+  const out = { ...base };
+  const trimmed = fullName.trim();
+  if (!trimmed) return out;
+  out.repos = trimmed;
+  const [owner, repo] = trimmed.split("/").map((s) => s.trim());
+  if (owner) out.repo_owner = owner;
+  if (repo) out.repo_name = repo;
+  return out;
+}
+
+/** Apply discovered selection to sourceConfiguration for codegen. */
 export function applyDiscoveryToSourceConfiguration(
   sourceType: string,
   base: Record<string, unknown>,

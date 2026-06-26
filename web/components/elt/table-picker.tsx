@@ -11,6 +11,8 @@ export type TablePickerProps = {
   loading?: boolean;
   message?: string;
   emptyHint?: string;
+  /** When true, only one item can be selected at a time (e.g. GitHub repo pick). */
+  singleSelect?: boolean;
 };
 
 export function TablePicker({
@@ -20,6 +22,7 @@ export function TablePicker({
   loading,
   message,
   emptyHint,
+  singleSelect = false,
 }: TablePickerProps) {
   const [filter, setFilter] = useState("");
 
@@ -41,6 +44,10 @@ export function TablePicker({
   }, [items, selected.size]);
 
   function toggle(id: string) {
+    if (singleSelect) {
+      onChange(new Set([id]));
+      return;
+    }
     const next = new Set(selected);
     if (next.has(id)) next.delete(id);
     else next.add(id);
@@ -48,6 +55,7 @@ export function TablePicker({
   }
 
   function selectAll() {
+    if (singleSelect) return;
     onChange(new Set(filtered.map((i) => i.id)));
   }
 
@@ -82,24 +90,28 @@ export function TablePicker({
             type="search"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filter tables…"
+            placeholder={singleSelect ? "Filter repositories…" : "Filter tables…"}
             className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 py-2 pl-9 pr-3 text-sm dark:text-white"
           />
         </div>
-        <button
-          type="button"
-          onClick={selectAll}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium dark:border-slate-600"
-        >
-          Select all
-        </button>
-        <button
-          type="button"
-          onClick={clearAll}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium dark:border-slate-600"
-        >
-          Clear
-        </button>
+        {!singleSelect ? (
+          <>
+            <button
+              type="button"
+              onClick={selectAll}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium dark:border-slate-600"
+            >
+              Select all
+            </button>
+            <button
+              type="button"
+              onClick={clearAll}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium dark:border-slate-600"
+            >
+              Clear
+            </button>
+          </>
+        ) : null}
         <span className="text-xs text-slate-500">{selected.size} selected</span>
       </div>
       <ul className="max-h-64 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-800">
@@ -107,7 +119,8 @@ export function TablePicker({
           <li key={item.id}>
             <label className="flex cursor-pointer items-start gap-3 px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <input
-                type="checkbox"
+                type={singleSelect ? "radio" : "checkbox"}
+                name={singleSelect ? "table-picker-single" : undefined}
                 checked={selected.has(item.id)}
                 onChange={() => toggle(item.id)}
                 className="mt-1 rounded border-slate-300"
@@ -209,6 +222,78 @@ export function useSourceDiscovery(options: {
       cancelled = true;
     };
   }, [options.connector, options.connectionId, options.enabled]);
+
+  return { items, message, loading, selected, setSelected, error };
+}
+
+/** Hook: list GitHub repositories visible to the PAT (quick-start repo step). */
+export function useGithubRepoDiscovery(options: {
+  secrets?: Record<string, string>;
+  connectionId?: string | null;
+  enabled?: boolean;
+}) {
+  const [items, setItems] = useState<DiscoverItem[]>([]);
+  const [message, setMessage] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (options.enabled === false) return;
+    let cancelled = false;
+
+    async function run() {
+      setLoading(true);
+      setError(null);
+      try {
+        let res: Response;
+        if (options.connectionId) {
+          res = await fetch(
+            `/api/elt/connections/${options.connectionId}/discover?phase=repos`,
+            { credentials: "same-origin" }
+          );
+        } else {
+          res = await fetch("/api/elt/connections/discover", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              connectionType: "source",
+              connector: "github",
+              config: {},
+              secrets: options.secrets ?? {},
+              discoverPhase: "repos",
+            }),
+          });
+        }
+        const data = (await res.json()) as {
+          ok?: boolean;
+          message?: string;
+          items?: DiscoverItem[];
+          defaultSelected?: string[];
+        };
+        if (cancelled) return;
+        if (!data.ok && !data.items?.length) {
+          setError(data.message ?? "Could not list repositories");
+          setItems([]);
+          return;
+        }
+        setItems(data.items ?? []);
+        setMessage(data.message ?? "");
+        const defaults = data.defaultSelected ?? (data.items?.[0] ? [data.items[0].id] : []);
+        setSelected(new Set(defaults));
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Could not list repositories");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [options.connectionId, options.enabled, options.secrets]);
 
   return { items, message, loading, selected, setSelected, error };
 }

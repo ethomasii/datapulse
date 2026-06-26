@@ -123,8 +123,7 @@ def _patch_legacy_github_pipeline(code: str) -> str:
     )
     if not github_token:
         raise RuntimeError(
-            "Missing GitHub token. Link a GitHub source connection with GITHUB_TOKEN, "
-            "or connect GitHub under Integrations."
+            "Missing GitHub token. Link a GitHub source connection with GITHUB_TOKEN in the builder."
         )'''
     return re.sub(pattern, replacement, code, count=1)
 

@@ -1,4 +1,5 @@
 import { db } from "@/lib/db/client";
+import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
 import type { CreatePipelineBody } from "./types";
 
 const LEGACY_KEYS = ["source_connection", "destination_connection"] as const;
@@ -30,16 +31,17 @@ export async function loadConnectionNamesForCodegen(
   sourceConnectionId: string | null,
   destinationConnectionId: string | null
 ): Promise<{ source: string | null; destination: string | null }> {
+  const ownerIds = await getAccessibleResourceOwnerIds(userId);
   const [src, dest] = await Promise.all([
     sourceConnectionId
       ? db.connection.findFirst({
-          where: { id: sourceConnectionId, userId },
+          where: { id: sourceConnectionId, userId: { in: ownerIds } },
           select: { name: true },
         })
       : null,
     destinationConnectionId
       ? db.connection.findFirst({
-          where: { id: destinationConnectionId, userId },
+          where: { id: destinationConnectionId, userId: { in: ownerIds } },
           select: { name: true },
         })
       : null,
@@ -59,8 +61,9 @@ export async function validatePipelineConnectionIds(
     expectType: "source" | "destination",
     expectConnector: string
   ): Promise<string | null> {
+    const ownerIds = await getAccessibleResourceOwnerIds(userId);
     const row = await db.connection.findFirst({
-      where: { id, userId },
+      where: { id, userId: { in: ownerIds } },
       select: { connectionType: true, connector: true },
     });
     if (!row) return "Invalid connection";

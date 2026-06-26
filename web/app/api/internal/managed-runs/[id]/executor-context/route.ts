@@ -9,9 +9,7 @@
 import { RunIngestionExecutor } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
-import { parseStoredConnectionSecrets } from "@/lib/elt/connection-secrets-store";
-import { mergeConnectionRuntimeSecrets } from "@/lib/elt/duckdb-destination";
-import { resolveManagedRunSourceConnection } from "@/lib/elt/managed-run-source-secrets";
+import { loadWorkspaceConnectionById } from "@/lib/elt/workspace-connection-load";
 import { sourceConfigurationFromDbtProject } from "@/lib/elt/dbt-projects";
 import { resolveRouteParamId } from "@/lib/server/route-params";
 
@@ -25,51 +23,7 @@ const MANAGED: RunIngestionExecutor[] = [
 type Ctx = { params: { id: string } | Promise<{ id: string }> };
 
 async function loadConnection(userId: string, id: string | null) {
-  if (!id) return null;
-  const row = await db.connection.findFirst({
-    where: { id, userId },
-    select: {
-      id: true,
-      name: true,
-      connectionType: true,
-      connector: true,
-      config: true,
-      connectionSecretsEnc: true,
-    },
-  });
-  if (!row) return null;
-  const { connectionSecretsEnc, ...rest } = row;
-  const config =
-    rest.config && typeof rest.config === "object" && !Array.isArray(rest.config)
-      ? (rest.config as Record<string, unknown>)
-      : {};
-  const secrets = mergeConnectionRuntimeSecrets(
-    rest.connectionType as "source" | "destination",
-    rest.connector,
-    parseStoredConnectionSecrets(connectionSecretsEnc),
-    config
-  );
-  return {
-    ...rest,
-    secrets,
-  };
-}
-
-function toManagedRunSource(
-  row: Awaited<ReturnType<typeof loadConnection>>
-): Parameters<typeof resolveManagedRunSourceConnection>[2] {
-  if (!row) return null;
-  return {
-    id: row.id,
-    name: row.name,
-    connectionType: row.connectionType,
-    connector: row.connector,
-    config:
-      row.config && typeof row.config === "object" && !Array.isArray(row.config)
-        ? (row.config as Record<string, unknown>)
-        : {},
-    secrets: row.secrets ?? {},
-  };
+  return loadWorkspaceConnectionById(userId, id);
 }
 
 export async function GET(req: Request, ctx: Ctx) {
@@ -137,15 +91,10 @@ export async function GET(req: Request, ctx: Ctx) {
   const userId = run.userId;
   const destinationConnectionId =
     run.pipeline?.destinationConnectionId ?? run.dbtProject?.destinationConnectionId ?? null;
-  const [sourceRaw, destination] = await Promise.all([
+  const [source, destination] = await Promise.all([
     loadConnection(userId, run.pipeline?.sourceConnectionId ?? null),
     loadConnection(userId, destinationConnectionId),
   ]);
-  const source = await resolveManagedRunSourceConnection(
-    userId,
-    run.pipeline?.sourceType,
-    toManagedRunSource(sourceRaw)
-  );
 
   const pipelinePayload = run.pipeline ?? {
     id: run.dbtProject!.id,

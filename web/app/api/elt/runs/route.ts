@@ -16,6 +16,7 @@ import { resolveNewRunExecution } from "@/lib/agent/run-execution";
 import { resolveWorkspaceOrganizationId } from "@/lib/elt/resolve-workspace-org";
 import { RunPartitionResolutionError, resolveRunPartitionFields } from "@/lib/elt/run-partition-resolution";
 import { createRunBodySchema } from "@/lib/elt/run-types";
+import { validateManagedPipelineConnections } from "@/lib/elt/pipeline-run-readiness";
 import {
   resolveUserPlanTier,
   runHistoryPrismaFilter,
@@ -114,6 +115,10 @@ export async function POST(req: Request) {
       userId: true,
       defaultTargetAgentTokenId: true,
       executionHost: true,
+      sourceType: true,
+      destinationType: true,
+      sourceConnectionId: true,
+      destinationConnectionId: true,
       sourceConfiguration: true,
     },
   });
@@ -141,6 +146,21 @@ export async function POST(req: Request) {
     ingestionExecutor = resolved.ingestionExecutor;
   } catch {
     return NextResponse.json({ error: "Invalid gateway token" }, { status: 400 });
+  }
+
+  const isManaged =
+    ingestionExecutor === "eltpulse_managed" || ingestionExecutor === "datapulse_managed";
+  if (isManaged) {
+    const readiness = await validateManagedPipelineConnections({
+      userId: pipeline.userId,
+      sourceType: pipeline.sourceType,
+      destinationType: pipeline.destinationType,
+      sourceConnectionId: pipeline.sourceConnectionId,
+      destinationConnectionId: pipeline.destinationConnectionId,
+    });
+    if (!readiness.ok) {
+      return NextResponse.json({ error: readiness.error }, { status: 400 });
+    }
   }
 
   const correlationId = body.correlationId?.trim() || crypto.randomUUID();

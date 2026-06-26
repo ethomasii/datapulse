@@ -38,9 +38,9 @@ import {
 import { STARTER_WAREHOUSE_DEFAULT_DB } from "@/lib/elt/starter-warehouse";
 import { scenarioById, lakeStarterIdForScenario } from "@/lib/marketing/pipeline-scenarios";
 import { canvasStarterHref } from "@/lib/elt/lake-defaults";
-import { applyDiscoveryToSourceConfiguration } from "@/lib/elt/source-discover-catalog";
+import { applyDiscoveryToSourceConfiguration, applyGithubRepoToSourceConfiguration } from "@/lib/elt/source-discover-catalog";
 import { QuickStartConnectionPicker } from "@/components/elt/quick-start-connection-picker";
-import { TablePicker, useSourceDiscovery } from "@/components/elt/table-picker";
+import { TablePicker, useGithubRepoDiscovery, useSourceDiscovery } from "@/components/elt/table-picker";
 import {
   matchingQuickStartConnections,
   useQuickStartConnections,
@@ -48,7 +48,7 @@ import {
 import { useWorkspaceDefaultDestination } from "@/lib/hooks/use-workspace-default-destination";
 import { WorkspaceLakeBanner } from "@/components/elt/workspace-lake-banner";
 
-type Step = "source" | "destination" | "credentials" | "tables" | "name" | "done";
+type Step = "source" | "destination" | "credentials" | "repo" | "tables" | "name" | "done";
 
 export type QuickStartWizardProps = {
   initialSource?: string;
@@ -185,12 +185,24 @@ export function QuickStartWizard({
   const usingSavedDest =
     !usingWorkspaceDest && destConnectionChoice === "reuse" && Boolean(selectedDestConnectionId);
 
+  const pipelineSourceType = useMemo(() => quickStartPipelineSourceType(source), [source]);
+  const isGithubQuickStart = pipelineSourceType === "github";
+  const nextStepAfterCredentials = (): Step => (isGithubQuickStart ? "repo" : "tables");
+
   const discovery = useSourceDiscovery({
     connector: quickStartDiscoverConnector(source),
     secrets: usingSavedSource ? undefined : sourceSecrets,
     connectionId: usingSavedSource ? selectedSourceConnectionId : null,
     enabled: discoverEnabled && step === "tables",
   });
+
+  const repoDiscovery = useGithubRepoDiscovery({
+    secrets: usingSavedSource ? undefined : sourceSecrets,
+    connectionId: usingSavedSource ? selectedSourceConnectionId : null,
+    enabled: isGithubQuickStart && step === "repo",
+  });
+
+  const selectedGithubRepo = useMemo(() => Array.from(repoDiscovery.selected)[0] ?? "", [repoDiscovery.selected]);
 
   const allSourceOptions = useMemo(() => allQuickStartSourceOptions(), []);
   const sourceComboboxOptions = useMemo(() => allQuickStartSourceComboboxOptions(), []);
@@ -211,8 +223,6 @@ export function QuickStartWizard({
   const defaultName = `${source}_to_${destination}`.replace(/[^a-zA-Z0-9_]/g, "_");
   const effectiveName = pipelineName.trim() || defaultName;
 
-  const pipelineSourceType = useMemo(() => quickStartPipelineSourceType(source), [source]);
-
   const destFieldDefs = usingWorkspaceDest
     ? []
     : quickStartSecretFields("destination", destination);
@@ -230,9 +240,9 @@ export function QuickStartWizard({
     if (!connectionsLoaded || step !== "credentials") return;
     if (!needsCredentials) {
       setDiscoverEnabled(true);
-      setStep("tables");
+      setStep(nextStepAfterCredentials());
     }
-  }, [connectionsLoaded, step, needsCredentials]);
+  }, [connectionsLoaded, step, needsCredentials, isGithubQuickStart]);
 
   const effectiveDestination =
     usingWorkspaceDest && workspaceDefault.connector
@@ -243,18 +253,20 @@ export function QuickStartWizard({
     const labels = ["Source"];
     if (!skipDestinationStep) labels.push("Destination");
     if (needsCredentials) labels.push("Credentials");
-    labels.push("Tables", "Run");
+    if (isGithubQuickStart) labels.push("Repository");
+    labels.push("Resources", "Run");
     return labels;
-  }, [skipDestinationStep, needsCredentials]);
+  }, [skipDestinationStep, needsCredentials, isGithubQuickStart]);
 
   const stepIndex = useMemo(() => {
     const order: Step[] = ["source"];
     if (!skipDestinationStep) order.push("destination");
     if (needsCredentials) order.push("credentials");
+    if (isGithubQuickStart) order.push("repo");
     order.push("tables", "name", "done");
     const idx = order.indexOf(step);
     return idx >= 0 ? idx : order.length - 1;
-  }, [step, skipDestinationStep, needsCredentials]);
+  }, [step, skipDestinationStep, needsCredentials, isGithubQuickStart]);
 
   async function testCredentials() {
     setTesting(true);
@@ -295,7 +307,7 @@ export function QuickStartWizard({
       if (tests.length === 0) {
         setTestOk(true);
         setDiscoverEnabled(true);
-        setStep("tables");
+        setStep(nextStepAfterCredentials());
         return;
       }
       const results = await Promise.all(tests);
@@ -305,7 +317,7 @@ export function QuickStartWizard({
       }
       setTestOk(true);
       setDiscoverEnabled(true);
-      setStep("tables");
+      setStep(nextStepAfterCredentials());
     } catch (e) {
       setTestOk(false);
       setError(e instanceof Error ? e.message : "Test failed");
@@ -321,10 +333,14 @@ export function QuickStartWizard({
     secrets: Record<string, string>,
     config: Record<string, unknown> = {}
   ): Promise<string> {
+    const trimmedSecrets = Object.fromEntries(
+      Object.entries(secrets).filter(([, v]) => typeof v === "string" && v.trim())
+    );
     const resolvedConfig =
       type === "destination" && connector === "duckdb" && Object.keys(config).length === 0
         ? duckdbDestinationConfig()
         : config;
+
     const res = await fetch("/api/elt/connections", {
       method: "POST",
       credentials: "same-origin",
@@ -334,14 +350,58 @@ export function QuickStartWizard({
         connectionType: type,
         connector,
         config: resolvedConfig,
-        secrets: Object.keys(secrets).some((k) => secrets[k]?.trim()) ? secrets : undefined,
+        secrets: Object.keys(trimmedSecrets).length > 0 ? trimmedSecrets : undefined,
       }),
     });
     const data = (await res.json()) as { connection?: { id: string }; error?: string };
-    if (!res.ok || !data.connection?.id) {
-      throw new Error(typeof data.error === "string" ? data.error : "Failed to save connection");
+    if (res.ok && data.connection?.id) {
+      return data.connection.id;
     }
-    return data.connection.id;
+
+    const errText = typeof data.error === "string" ? data.error : "";
+    if (Object.keys(trimmedSecrets).length > 0) {
+      const listRes = await fetch("/api/elt/connections", { credentials: "same-origin" });
+      const listData = (await listRes.json()) as {
+        connections?: { id: string; name: string; connectionType: string; connector: string }[];
+      };
+      const existing = (listData.connections ?? []).find(
+        (c) =>
+          c.name === name &&
+          c.connectionType === type &&
+          c.connector.toLowerCase() === connector.toLowerCase()
+      );
+      if (existing) {
+        const patchRes = await fetch(`/api/elt/connections/${existing.id}`, {
+          method: "PATCH",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ secrets: trimmedSecrets }),
+        });
+        const patchData = (await patchRes.json()) as { connection?: { id: string }; error?: string };
+        if (patchRes.ok && patchData.connection?.id) {
+          return patchData.connection.id;
+        }
+        throw new Error(
+          typeof patchData.error === "string" ? patchData.error : "Failed to update saved connection"
+        );
+      }
+    }
+
+    throw new Error(errText || "Failed to save connection");
+  }
+
+  function assertQuickStartSecrets(
+    fields: { key: string; required?: boolean }[],
+    secrets: Record<string, string>,
+    sideLabel: string
+  ) {
+    const missing = fields
+      .filter((f) => f.required !== false)
+      .map((f) => f.key)
+      .filter((k) => !secrets[k]?.trim());
+    if (missing.length > 0) {
+      throw new Error(`Enter ${sideLabel} credentials (${missing.join(", ")}) before running.`);
+    }
   }
 
   async function createAndRun() {
@@ -354,6 +414,7 @@ export function QuickStartWizard({
       if (usingSavedSource && selectedSourceConnectionId) {
         sourceConnId = selectedSourceConnectionId;
       } else if (sourceFieldDefs.length > 0) {
+        assertQuickStartSecrets(sourceFieldDefs, sourceSecrets, "source");
         sourceConnId = await createConnection(
           "source",
           connectionSourceConnector,
@@ -364,6 +425,7 @@ export function QuickStartWizard({
       if (usingSavedDest && selectedDestConnectionId) {
         destConnId = selectedDestConnectionId;
       } else if (destFieldDefs.length > 0) {
+        assertQuickStartSecrets(destFieldDefs, destSecrets, "destination");
         destConnId = await createConnection(
           "destination",
           destination,
@@ -382,9 +444,15 @@ export function QuickStartWizard({
       }
 
       const baseConfig = minimalSourceConfigurationForNewPipeline(pipelineSourceType);
+      if (isGithubQuickStart && !selectedGithubRepo) {
+        throw new Error("Select a GitHub repository before running.");
+      }
+      const withRepo = isGithubQuickStart
+        ? applyGithubRepoToSourceConfiguration(baseConfig, selectedGithubRepo)
+        : baseConfig;
       const sourceConfiguration = applyDiscoveryToSourceConfiguration(
         pipelineSourceType,
-        baseConfig,
+        withRepo,
         Array.from(discovery.selected)
       );
 
@@ -573,7 +641,7 @@ export function QuickStartWizard({
                 setPipelineName(defaultName);
                 setDiscoverEnabled(true);
                 if (skipDestinationStep) {
-                  setStep(needsCredentials ? "credentials" : "tables");
+                  setStep(needsCredentials ? "credentials" : nextStepAfterCredentials());
                 } else {
                   setStep("destination");
                 }
@@ -646,7 +714,7 @@ export function QuickStartWizard({
               onClick={() => {
                 setPipelineName(defaultName);
                 setDiscoverEnabled(true);
-                setStep(needsCredentials ? "credentials" : "tables");
+                setStep(needsCredentials ? "credentials" : nextStepAfterCredentials());
               }}
               className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500"
             >
@@ -771,12 +839,67 @@ export function QuickStartWizard({
               type="button"
               onClick={() => {
                 setDiscoverEnabled(true);
-                setStep("tables");
+                setStep(nextStepAfterCredentials());
               }}
               className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500"
             >
               {usingSavedSource || usingSavedDest ? "Continue with saved connection" : "Continue"}{" "}
               <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </section>
+      )}
+
+      {step === "repo" && isGithubQuickStart && (
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Which repository?</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Pick the GitHub repository to sync. We list repos your token can access.
+          </p>
+          <TablePicker
+            items={repoDiscovery.items}
+            selected={repoDiscovery.selected}
+            onChange={repoDiscovery.setSelected}
+            loading={repoDiscovery.loading}
+            message={repoDiscovery.message}
+            singleSelect
+            emptyHint="Enter a valid GitHub token on the previous step, or type owner/repo below."
+          />
+          {repoDiscovery.error ? (
+            <p className="text-sm text-amber-600">{repoDiscovery.error}</p>
+          ) : null}
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+              Or enter owner/repo manually
+            </span>
+            <input
+              type="text"
+              value={selectedGithubRepo}
+              onChange={(e) => repoDiscovery.setSelected(new Set([e.target.value.trim()]))}
+              placeholder="my-org/my-repo"
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+            />
+          </label>
+          <div className="flex justify-between">
+            <button
+              type="button"
+              onClick={() =>
+                setStep(needsCredentials ? "credentials" : skipDestinationStep ? "source" : "destination")
+              }
+              className="text-sm text-slate-600"
+            >
+              <ArrowLeft className="inline h-4 w-4" /> Back
+            </button>
+            <button
+              type="button"
+              disabled={!selectedGithubRepo.trim()}
+              onClick={() => {
+                setDiscoverEnabled(true);
+                setStep("tables");
+              }}
+              className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
+            >
+              Continue <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </section>
@@ -802,7 +925,13 @@ export function QuickStartWizard({
               type="button"
               onClick={() =>
                 setStep(
-                  needsCredentials ? "credentials" : skipDestinationStep ? "source" : "destination"
+                  isGithubQuickStart
+                    ? "repo"
+                    : needsCredentials
+                      ? "credentials"
+                      : skipDestinationStep
+                        ? "source"
+                        : "destination"
                 )
               }
               className="text-sm text-slate-600"
