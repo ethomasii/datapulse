@@ -55,7 +55,7 @@ export function DesignerFullscreenShell({
           {(
             [
               ["designer", "Designer", "bg-sky-600 text-white"],
-              ["ingest", "Ingest", "bg-emerald-600 text-white"],
+              ["ingest", "Ingest", "bg-sky-600 text-white"],
               ["dag", "Transform DAG", "bg-sky-600 text-white"],
             ] as const
           ).map(([id, label, activeClass]) => (

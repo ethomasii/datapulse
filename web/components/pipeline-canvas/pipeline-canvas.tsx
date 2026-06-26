@@ -31,6 +31,7 @@ import type { ComponentListItem } from "@/components/elt/component-palette";
 import { CanvasBindingsProvider, type CanvasBindingsContextValue } from "./canvas-bindings-context";
 import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-graph";
 import { isValidPipelineCanvasEdge } from "@/lib/elt/canvas-component-sync";
+import { findCanvasAppendTarget } from "@/lib/elt/canvas-node-placement";
 import { findNearestEdge, insertNodeOnEdge } from "@/lib/elt/canvas-edge-insert";
 import { wireInputFromUpstreamEdge } from "@/lib/elt/canvas-wire-input";
 import { dashedAnimatedEdgeStyle, resolveCanvasEdges } from "./canvas-edge-defaults";
@@ -336,23 +337,6 @@ function FlowCanvas({
     [setNodes]
   );
 
-  const addCodeTransformNode = useCallback(
-    (tool: "dbt" | "sql" | "python") => {
-      const presets: Record<typeof tool, { label: string; hint: string }> = {
-        dbt: { label: "dbt transform", hint: "Link a dbt project — models run after load" },
-        sql: { label: "Warehouse SQL", hint: "CTAS / views against the destination after load" },
-        python: { label: "Python transform", hint: "Legacy dataframe on the worker" },
-      };
-      const preset = presets[tool];
-      addNode("transformNode", {
-        label: preset.label,
-        hint: preset.hint,
-        transformTool: tool,
-      });
-    },
-    [addNode]
-  );
-
   const addComponentNode = useCallback(
     (
       component: {
@@ -367,9 +351,17 @@ function FlowCanvas({
       },
       position?: { x: number; y: number }
     ) => {
-      addNode(
-        "componentNode",
-        {
+      idCounter += 1;
+      const id = `n-${idCounter}`;
+      const anchor = position
+        ? { position, upstreamId: null as string | null }
+        : findCanvasAppendTarget(nodes, edges, { transformOnly });
+
+      let newNode: Node = {
+        id,
+        type: "componentNode",
+        position: anchor.position,
+        data: {
           componentId: component.id,
           label: component.name,
           category: component.category,
@@ -380,10 +372,75 @@ function FlowCanvas({
           icon: component.icon,
           config: {},
         },
-        position
-      );
+      };
+
+      let nextEdges = edges;
+      const upstream = anchor.upstreamId ? nodes.find((n) => n.id === anchor.upstreamId) : null;
+      if (upstream && isValidPipelineCanvasEdge(upstream, newNode)) {
+        nextEdges = addEdge(
+          {
+            id: `e-${upstream.id}-${id}`,
+            source: upstream.id,
+            target: id,
+            animated: true,
+            style: { ...dashedAnimatedEdgeStyle },
+          },
+          edges
+        );
+        const wired = wireInputFromUpstreamEdge([...nodes, newNode], nextEdges, id);
+        if (wired) {
+          newNode = {
+            ...newNode,
+            data: { ...newNode.data, config: wired.configPatch },
+          };
+        }
+      }
+
+      setNodes((nds) => [...nds, newNode]);
+      if (nextEdges !== edges) setEdges(nextEdges);
     },
-    [addNode]
+    [nodes, edges, transformOnly, setNodes, setEdges]
+  );
+
+  const addCodeTransformNode = useCallback(
+    (tool: "dbt" | "sql" | "python") => {
+      const presets: Record<typeof tool, { label: string; hint: string }> = {
+        dbt: { label: "dbt transform", hint: "Link a dbt project — models run after load" },
+        sql: { label: "Warehouse SQL", hint: "CTAS / views against the destination after load" },
+        python: { label: "Python transform", hint: "Legacy dataframe on the worker" },
+      };
+      const preset = presets[tool];
+      idCounter += 1;
+      const id = `n-${idCounter}`;
+      const anchor = findCanvasAppendTarget(nodes, edges, { transformOnly });
+      const newNode: Node = {
+        id,
+        type: "transformNode",
+        position: anchor.position,
+        data: {
+          label: preset.label,
+          hint: preset.hint,
+          transformTool: tool,
+        },
+      };
+      let nextEdges = edges;
+      const upstream = anchor.upstreamId ? nodes.find((n) => n.id === anchor.upstreamId) : null;
+      if (upstream && isValidPipelineCanvasEdge(upstream, newNode)) {
+        nextEdges = addEdge(
+          {
+            id: `e-${upstream.id}-${id}`,
+            source: upstream.id,
+            target: id,
+            animated: true,
+            style: { ...dashedAnimatedEdgeStyle },
+          },
+          edges
+        );
+      }
+      setNodes((nds) => [...nds, newNode]);
+      if (nextEdges !== edges) setEdges(nextEdges);
+    },
+    [nodes, edges, transformOnly, setNodes, setEdges]
   );
 
   const addNativeTransformNode = useCallback(
