@@ -5,8 +5,9 @@
 import type { Edge, Node } from "@xyflow/react";
 import {
   CANVAS_HORIZONTAL_GAP,
-  chainCenterY,
+  chainHandleY,
   estimateNodeLayout,
+  handleYOffset,
 } from "@/lib/elt/canvas-node-placement";
 
 const START_X = 40;
@@ -70,7 +71,7 @@ export function autoLayoutPipelineCanvas(nodes: Node[], edges: Edge[]): Node[] {
   for (const e of edges) incoming.get(e.target)?.push(e.source);
 
   const column = assignColumns(nodes, edges);
-  const centerY = chainCenterY(nodes);
+  const handleLine = chainHandleY(nodes);
 
   const byColumn = new Map<number, Node[]>();
   for (const n of nodes) {
@@ -92,15 +93,21 @@ export function autoLayoutPipelineCanvas(nodes: Node[], edges: Edge[]): Node[] {
     if (colNodes.length === 0) continue;
 
     const maxWidth = Math.max(...colNodes.map((n) => estimateNodeLayout(n).width));
-    const totalHeight =
-      colNodes.reduce((sum, n) => sum + estimateNodeLayout(n).height, 0) +
-      STACK_GAP * Math.max(0, colNodes.length - 1);
-    let stackY = centerY - totalHeight / 2;
 
-    for (const n of colNodes) {
-      const layout = estimateNodeLayout(n);
-      positionById.set(n.id, { x: cursorX, y: stackY });
-      stackY += layout.height + STACK_GAP;
+    if (colNodes.length === 1) {
+      const n = colNodes[0]!;
+      positionById.set(n.id, { x: cursorX, y: handleLine - handleYOffset(n) });
+    } else {
+      const totalHeight =
+        colNodes.reduce((sum, n) => sum + estimateNodeLayout(n).height, 0) +
+        STACK_GAP * Math.max(0, colNodes.length - 1);
+      let stackY = handleLine - totalHeight / 2;
+
+      for (const n of colNodes) {
+        const layout = estimateNodeLayout(n);
+        positionById.set(n.id, { x: cursorX, y: stackY });
+        stackY += layout.height + STACK_GAP;
+      }
     }
 
     cursorX += maxWidth + CANVAS_HORIZONTAL_GAP;

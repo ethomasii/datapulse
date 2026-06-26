@@ -1,7 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 import { autoLayoutPipelineCanvas } from "./canvas-auto-layout";
-import { estimateNodeLayout } from "./canvas-node-placement";
+import { estimateNodeLayout, handleYOffset } from "./canvas-node-placement";
 
 describe("autoLayoutPipelineCanvas", () => {
   it("spaces source, destination, and components on one horizontal band", () => {
@@ -26,8 +26,8 @@ describe("autoLayoutPipelineCanvas", () => {
     expect(byId.get("s")!.position.x).toBeLessThan(byId.get("d")!.position.x);
     expect(byId.get("d")!.position.x).toBeLessThan(byId.get("c1")!.position.x);
 
-    const destCenter = byId.get("d")!.position.y + estimateNodeLayout(byId.get("d")!).height / 2;
-    const compCenter = byId.get("c1")!.position.y + estimateNodeLayout(byId.get("c1")!).height / 2;
-    expect(compCenter).toBeCloseTo(destCenter, 0);
+    const destHandle = byId.get("d")!.position.y + handleYOffset(byId.get("d")!);
+    const compHandle = byId.get("c1")!.position.y + handleYOffset(byId.get("c1")!);
+    expect(compHandle).toBeCloseTo(destHandle, 0);
   });
 });

@@ -23,20 +23,35 @@ export type CanvasAppendNodeSpec = {
 
 type NodeLayoutSpec = { width: number; height: number };
 
+function componentCompileHint(node: Pick<Node, "data">): string {
+  const data = (node.data ?? {}) as Record<string, unknown>;
+  return String(data.compileHint ?? "").trim();
+}
+
+/** Y offset from `position.y` to the left/right connection handle (React Flow centers handles on the node box). */
+export function handleYOffset(node: Pick<Node, "type" | "data">): number {
+  const type = String(node.type ?? "componentNode");
+  if (type === "sourceNode" || type === "destNode") return 61;
+  if (type === "transformNode") return 84;
+  const hint = componentCompileHint(node);
+  if (!hint) return 44;
+  if (hint.length < 72) return 52;
+  return 58;
+}
+
 /** Estimated rendered size — matches pipeline-canvas custom node CSS. */
 export function estimateNodeLayout(node: Pick<Node, "type" | "data">): NodeLayoutSpec {
   const type = String(node.type ?? "componentNode");
   if (type === "sourceNode" || type === "destNode") {
-    return { width: 200, height: 152 };
+    return { width: 200, height: 122 };
   }
   if (type === "transformNode") {
     return { width: 220, height: 168 };
   }
-  const data = (node.data ?? {}) as Record<string, unknown>;
-  const hint = String(data.compileHint ?? "").trim();
-  if (!hint) return { width: 196, height: 76 };
-  if (hint.length < 72) return { width: 196, height: 96 };
-  return { width: 196, height: 118 };
+  const hint = componentCompileHint(node);
+  if (!hint) return { width: 196, height: 88 };
+  if (hint.length < 72) return { width: 196, height: 104 };
+  return { width: 196, height: 116 };
 }
 
 function nodeById(nodes: Node[]): Map<string, Node> {
@@ -47,13 +62,17 @@ function outgoingTargets(edges: Edge[], sourceId: string): string[] {
   return edges.filter((e) => e.source === sourceId).map((e) => e.target);
 }
 
-/** Vertical center of the main source → destination backbone row. */
-export function chainCenterY(nodes: Node[]): number {
+/** Connection-handle Y on the main source → destination backbone row. */
+export function chainHandleY(nodes: Node[]): number {
   const dest = nodes.find((n) => n.type === "destNode");
   const ref = dest ?? nodes.find((n) => n.type === "sourceNode");
-  if (!ref) return DEFAULT_Y + 76;
-  const layout = estimateNodeLayout(ref);
-  return ref.position.y + layout.height / 2;
+  if (!ref) return DEFAULT_Y + handleYOffset({ type: "destNode", data: {} });
+  return ref.position.y + handleYOffset(ref);
+}
+
+/** @deprecated Prefer {@link chainHandleY} — kept for callers/tests expecting the backbone row anchor. */
+export function chainCenterY(nodes: Node[]): number {
+  return chainHandleY(nodes);
 }
 
 export function positionAfterUpstream(
@@ -62,11 +81,11 @@ export function positionAfterUpstream(
   append: CanvasAppendNodeSpec
 ): { x: number; y: number } {
   const up = estimateNodeLayout(upstream);
-  const next = estimateNodeLayout({ type: append.type, data: append.data ?? {} });
-  const centerY = chainCenterY(nodes);
+  const handleLine = chainHandleY(nodes);
+  const nextHandle = handleYOffset({ type: append.type, data: append.data ?? {} });
   return {
     x: upstream.position.x + up.width + HORIZONTAL_GAP,
-    y: centerY - next.height / 2,
+    y: handleLine - nextHandle,
   };
 }
 
@@ -82,9 +101,10 @@ export function findCanvasAppendTarget(
   };
 
   if (nodes.length === 0) {
-    const layout = estimateNodeLayout({ type: append.type, data: append.data ?? {} });
+    const handleLine = chainHandleY([]);
+    const nextHandle = handleYOffset({ type: append.type, data: append.data ?? {} });
     return {
-      position: { x: 40, y: chainCenterY([]) - layout.height / 2 },
+      position: { x: 40, y: handleLine - nextHandle },
       upstreamId: null,
     };
   }

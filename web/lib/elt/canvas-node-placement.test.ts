@@ -1,9 +1,10 @@
 import type { Edge, Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 import {
-  chainCenterY,
+  chainHandleY,
   estimateNodeLayout,
   findCanvasAppendTarget,
+  handleYOffset,
   positionAfterUpstream,
 } from "./canvas-node-placement";
 
@@ -16,19 +17,22 @@ const backboneEdges: Edge[] = [{ id: "e1", source: "s", target: "d" }];
 
 describe("estimateNodeLayout", () => {
   it("uses a shorter box when a component has no compile hint", () => {
-    expect(estimateNodeLayout({ type: "componentNode", data: {} }).height).toBe(76);
+    expect(estimateNodeLayout({ type: "componentNode", data: {} }).height).toBe(88);
   });
 });
 
 describe("findCanvasAppendTarget", () => {
-  it("centers a compact component on the destination row", () => {
-    const center = chainCenterY(backbone);
+  it("aligns a compact component handle with the destination row", () => {
+    const handleLine = chainHandleY(backbone);
     const { position, upstreamId } = findCanvasAppendTarget(backbone, backboneEdges, {
       append: { type: "componentNode", data: { compileHint: "" } },
     });
     expect(upstreamId).toBe("d");
     expect(position.x).toBe(360 + 200 + 88);
-    expect(position.y + 76 / 2).toBeCloseTo(center, 0);
+    expect(position.y + handleYOffset({ type: "componentNode", data: { compileHint: "" } })).toBeCloseTo(
+      handleLine,
+      0
+    );
   });
 
   it("chains with spacing from upstream width, not a fixed estimate", () => {
@@ -52,14 +56,26 @@ describe("findCanvasAppendTarget", () => {
 });
 
 describe("positionAfterUpstream", () => {
-  it("aligns handle centers between destination and short component", () => {
+  it("aligns handles between destination and short component", () => {
     const dest = backbone[1]!;
     const pos = positionAfterUpstream(backbone, dest, {
       type: "componentNode",
       data: { compileHint: "" },
     });
-    const destCenter = dest.position.y + estimateNodeLayout(dest).height / 2;
-    const nextCenter = pos.y + estimateNodeLayout({ type: "componentNode", data: {} }).height / 2;
-    expect(nextCenter).toBeCloseTo(destCenter, 0);
+    const destHandle = dest.position.y + handleYOffset(dest);
+    const nextHandle = pos.y + handleYOffset({ type: "componentNode", data: {} });
+    expect(nextHandle).toBeCloseTo(destHandle, 0);
+  });
+
+  it("aligns alter_row-style components that ship a category compile hint", () => {
+    const dest = backbone[1]!;
+    const hint = "Warehouse SQL or dataframe transform after load";
+    const pos = positionAfterUpstream(backbone, dest, {
+      type: "componentNode",
+      data: { compileHint: hint },
+    });
+    const destHandle = dest.position.y + handleYOffset(dest);
+    const nextHandle = pos.y + handleYOffset({ type: "componentNode", data: { compileHint: hint } });
+    expect(nextHandle).toBeCloseTo(destHandle, 0);
   });
 });
