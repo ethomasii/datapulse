@@ -218,11 +218,11 @@ export function resolveVerifiedSourceSpec(slug: string): VerifiedSourceSpec | nu
   const explicit = VERIFIED_SOURCE_SPECS[key];
   if (explicit) return explicit;
   // Heuristic for verified packages without an explicit row yet.
-  const module = key;
+  const importModule = key;
   const factory = key.includes(".") ? key : `${key.replace(/_dlt$/, "")}_source`;
   const prefix = key.toUpperCase().replace(/-/g, "_");
   return {
-    module,
+    module: importModule,
     factory,
     credentials: [{ param: "api_key", envKeys: [`${prefix}_API_KEY`, `${prefix}_ACCESS_TOKEN`, "API_KEY"] }],
   };
