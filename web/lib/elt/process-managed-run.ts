@@ -1,9 +1,19 @@
+import { db } from "@/lib/db/client";
+import { getManagedExecutionStatus } from "@/lib/elt/managed-execution-status";
 import {
   resolveControlPlaneBaseUrl,
   resolveManagedExecutorMode,
   runManagedWorkerBatchHttp,
 } from "@/lib/elt/managed-worker-stub-http";
 import { stubCompleteManagedRunInProcess } from "@/lib/elt/managed-stub-inprocess";
+
+async function runStillPending(runId: string): Promise<boolean> {
+  const row = await db.eltPipelineRun.findFirst({
+    where: { id: runId },
+    select: { status: true },
+  });
+  return row?.status === "pending";
+}
 
 /**
  * Process a single pending managed run immediately (don't wait for cron).
@@ -44,10 +54,25 @@ export async function processManagedRunImmediately(runId: string): Promise<void>
     return;
   }
 
-  await runManagedWorkerBatchHttp({
-    baseUrl,
-    secret,
-    limit: 5,
-    deadlineMs: 120_000,
-  });
+  const { readyForRealRuns } = getManagedExecutionStatus();
+
+  try {
+    const result = await runManagedWorkerBatchHttp({
+      baseUrl,
+      secret,
+      limit: 1,
+      deadlineMs: 120_000,
+      runId,
+    });
+    if (result.processed > 0) return;
+    if (result.errors.length > 0) {
+      console.error("[processManagedRunImmediately]", runId, result.errors.join("; "));
+    }
+  } catch (e) {
+    console.error("[processManagedRunImmediately]", runId, e);
+  }
+
+  if (!readyForRealRuns && (await runStillPending(runId))) {
+    await stubCompleteManagedRunInProcess(runId);
+  }
 }

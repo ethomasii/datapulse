@@ -47,6 +47,7 @@ class handler(BaseHTTPRequestHandler):  # noqa: N801 — Vercel Python entrypoin
 
         limit = int(body.get("limit", 5))
         deadline_ms = int(body.get("deadlineMs", body.get("deadline_ms", 900_000)))
+        run_id = body.get("runId") or body.get("run_id")
         organization_id = body.get("organizationId") or body.get("organization_id")
         pool = body.get("pool")
 
@@ -55,6 +56,7 @@ class handler(BaseHTTPRequestHandler):  # noqa: N801 — Vercel Python entrypoin
                 run_managed_batch(
                     limit,
                     deadline_ms,
+                    str(run_id).strip() if run_id else None,
                     organization_id=str(organization_id).strip() if organization_id else None,
                     pool=str(pool).strip() if pool else None,
                 )

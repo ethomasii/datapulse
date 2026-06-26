@@ -503,7 +503,7 @@ const API_CONNECTORS: ConnectorDef[] = [
       { key: "repo", label: "Repository (optional)", type: "text" },
     ],
     credentialFields: [
-      { key: "GITHUB_TOKEN", label: "GitHub Personal Access Token", type: "password", required: true, help: "Create at https://github.com/settings/tokens", placeholder: "ghp_xxxxxxxxxxxx" },
+      { key: "GITHUB_TOKEN", label: "GitHub Personal Access Token", type: "password", required: true, help: "Fine-grained (recommended): select repos + read Contents & Issues. Classic: enable repo scope.", placeholder: "ghp_xxxxxxxxxxxx" },
     ],
     sourceConfigFields: [
       { key: "repos", label: "Which repositories do you want to load?", type: "text", required: true, help: "Comma-separated list of repos in format owner/repo", placeholder: "my-org/my-repo, your-org/your-repo" },

@@ -12,6 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import { ConnectorIcon } from "@/components/marketing/connector-icon";
+import { CredentialFieldHelp } from "@/components/elt/credential-field-help";
 import { ConnectorCombobox } from "@/components/elt/connector-combobox";
 import { minimalSourceConfigurationForNewPipeline } from "@/lib/elt/minimal-source-configuration";
 import {
@@ -38,7 +39,12 @@ import { STARTER_WAREHOUSE_DEFAULT_DB } from "@/lib/elt/starter-warehouse";
 import { scenarioById, lakeStarterIdForScenario } from "@/lib/marketing/pipeline-scenarios";
 import { canvasStarterHref } from "@/lib/elt/lake-defaults";
 import { applyDiscoveryToSourceConfiguration } from "@/lib/elt/source-discover-catalog";
+import { QuickStartConnectionPicker } from "@/components/elt/quick-start-connection-picker";
 import { TablePicker, useSourceDiscovery } from "@/components/elt/table-picker";
+import {
+  matchingQuickStartConnections,
+  useQuickStartConnections,
+} from "@/lib/hooks/use-quick-start-connections";
 import { useWorkspaceDefaultDestination } from "@/lib/hooks/use-workspace-default-destination";
 import { WorkspaceLakeBanner } from "@/components/elt/workspace-lake-banner";
 
@@ -105,6 +111,14 @@ export function QuickStartWizard({
   const [discoverEnabled, setDiscoverEnabled] = useState(false);
 
   const workspaceDefault = useWorkspaceDefaultDestination();
+  const { connections, loaded: connectionsLoaded } = useQuickStartConnections();
+  const [sourceConnectionChoice, setSourceConnectionChoice] = useState<"reuse" | "new">("reuse");
+  const [selectedSourceConnectionId, setSelectedSourceConnectionId] = useState<string | null>(
+    null
+  );
+  const [destConnectionChoice, setDestConnectionChoice] = useState<"reuse" | "new">("reuse");
+  const [selectedDestConnectionId, setSelectedDestConnectionId] = useState<string | null>(null);
+
   const hasExplicitDestination = Boolean(
     initialDestination &&
       isQuickStartDestination(normalizeQuickStartDestination(initialDestination))
@@ -122,9 +136,59 @@ export function QuickStartWizard({
     hasExplicitDestination,
   ]);
 
+  const connectionSourceConnector = useMemo(() => quickStartConnectionConnector(source), [source]);
+
+  const matchingSourceConnections = useMemo(
+    () => matchingQuickStartConnections(connections, "source", connectionSourceConnector),
+    [connections, connectionSourceConnector]
+  );
+  const matchingDestConnections = useMemo(
+    () =>
+      usingWorkspaceDest
+        ? []
+        : matchingQuickStartConnections(connections, "destination", destination),
+    [connections, destination, usingWorkspaceDest]
+  );
+
+  useEffect(() => {
+    if (!connectionsLoaded) return;
+    if (matchingSourceConnections.length > 0) {
+      setSelectedSourceConnectionId((prev) =>
+        prev && matchingSourceConnections.some((c) => c.id === prev)
+          ? prev
+          : matchingSourceConnections[0].id
+      );
+      setSourceConnectionChoice("reuse");
+    } else {
+      setSourceConnectionChoice("new");
+      setSelectedSourceConnectionId(null);
+    }
+  }, [connectionsLoaded, connectionSourceConnector, connections]);
+
+  useEffect(() => {
+    if (!connectionsLoaded || usingWorkspaceDest) return;
+    if (matchingDestConnections.length > 0) {
+      setSelectedDestConnectionId((prev) =>
+        prev && matchingDestConnections.some((c) => c.id === prev)
+          ? prev
+          : matchingDestConnections[0].id
+      );
+      setDestConnectionChoice("reuse");
+    } else {
+      setDestConnectionChoice("new");
+      setSelectedDestConnectionId(null);
+    }
+  }, [connectionsLoaded, destination, usingWorkspaceDest, connections]);
+
+  const usingSavedSource =
+    sourceConnectionChoice === "reuse" && Boolean(selectedSourceConnectionId);
+  const usingSavedDest =
+    !usingWorkspaceDest && destConnectionChoice === "reuse" && Boolean(selectedDestConnectionId);
+
   const discovery = useSourceDiscovery({
     connector: quickStartDiscoverConnector(source),
-    secrets: sourceSecrets,
+    secrets: usingSavedSource ? undefined : sourceSecrets,
+    connectionId: usingSavedSource ? selectedSourceConnectionId : null,
     enabled: discoverEnabled && step === "tables",
   });
 
@@ -148,13 +212,27 @@ export function QuickStartWizard({
   const effectiveName = pipelineName.trim() || defaultName;
 
   const pipelineSourceType = useMemo(() => quickStartPipelineSourceType(source), [source]);
-  const connectionSourceConnector = useMemo(() => quickStartConnectionConnector(source), [source]);
 
-  const destFields = usingWorkspaceDest
+  const destFieldDefs = usingWorkspaceDest
     ? []
     : quickStartSecretFields("destination", destination);
-  const sourceFields = quickStartSecretFields("source", connectionSourceConnector);
-  const needsCredentials = destFields.length > 0 || sourceFields.length > 0;
+  const sourceFieldDefs = quickStartSecretFields("source", connectionSourceConnector);
+  const needsSourceCredentials = sourceFieldDefs.length > 0 && !usingSavedSource;
+  const needsDestCredentials = destFieldDefs.length > 0 && !usingSavedDest;
+  const needsCredentials = needsSourceCredentials || needsDestCredentials;
+
+  const sourceConnectorLabel =
+    sourceComboboxOptions.find((o) => o.slug === source)?.label ?? source;
+  const destConnectorLabel =
+    destComboboxOptions.find((o) => o.slug === destination)?.label ?? destination;
+
+  useEffect(() => {
+    if (!connectionsLoaded || step !== "credentials") return;
+    if (!needsCredentials) {
+      setDiscoverEnabled(true);
+      setStep("tables");
+    }
+  }, [connectionsLoaded, step, needsCredentials]);
 
   const effectiveDestination =
     usingWorkspaceDest && workspaceDefault.connector
@@ -184,7 +262,7 @@ export function QuickStartWizard({
     setError(null);
     try {
       const tests = [];
-      if (destFields.length > 0) {
+      if (needsDestCredentials) {
         tests.push(
           fetch("/api/elt/connections/test", {
             method: "POST",
@@ -199,7 +277,7 @@ export function QuickStartWizard({
           })
         );
       }
-      if (sourceFields.length > 0) {
+      if (needsSourceCredentials) {
         tests.push(
           fetch("/api/elt/connections/test", {
             method: "POST",
@@ -213,6 +291,12 @@ export function QuickStartWizard({
             }),
           })
         );
+      }
+      if (tests.length === 0) {
+        setTestOk(true);
+        setDiscoverEnabled(true);
+        setStep("tables");
+        return;
       }
       const results = await Promise.all(tests);
       for (const res of results) {
@@ -267,10 +351,19 @@ export function QuickStartWizard({
       let destConnId: string | null = usingWorkspaceDest ? workspaceDefault.connectionId : null;
       let sourceConnId: string | null = null;
 
-      if (sourceFields.length > 0) {
-        sourceConnId = await createConnection("source", connectionSourceConnector, `qs-${source}`, sourceSecrets);
+      if (usingSavedSource && selectedSourceConnectionId) {
+        sourceConnId = selectedSourceConnectionId;
+      } else if (sourceFieldDefs.length > 0) {
+        sourceConnId = await createConnection(
+          "source",
+          connectionSourceConnector,
+          `qs-${source}`,
+          sourceSecrets
+        );
       }
-      if (destFields.length > 0) {
+      if (usingSavedDest && selectedDestConnectionId) {
+        destConnId = selectedDestConnectionId;
+      } else if (destFieldDefs.length > 0) {
         destConnId = await createConnection(
           "destination",
           destination,
@@ -571,7 +664,51 @@ export function QuickStartWizard({
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Stored encrypted for managed runs. DuckDB-only setups can skip secrets on the destination.
           </p>
-          {destFields.length > 0 ? (
+          {sourceFieldDefs.length > 0 ? (
+            <QuickStartConnectionPicker
+              side="source"
+              connector={connectionSourceConnector}
+              connectorLabel={sourceConnectorLabel}
+              connections={matchingSourceConnections}
+              mode={sourceConnectionChoice}
+              selectedId={selectedSourceConnectionId}
+              onModeChange={setSourceConnectionChoice}
+              onSelectId={setSelectedSourceConnectionId}
+            />
+          ) : null}
+          {needsSourceCredentials ? (
+            <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <p className="text-xs font-semibold uppercase text-slate-500">Source ({source})</p>
+              <div className="mt-3 space-y-2">
+                {sourceFieldDefs.map((f) => (
+                  <label key={f.key} className="block">
+                    <span className="text-xs text-slate-600 dark:text-slate-400">{f.label}</span>
+                    <input
+                      type="password"
+                      value={sourceSecrets[f.key] ?? ""}
+                      onChange={(e) => setSourceSecrets((p) => ({ ...p, [f.key]: e.target.value }))}
+                      placeholder={f.placeholder}
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
+                    />
+                    <CredentialFieldHelp help={f.help} helpUrl={f.helpUrl} />
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {destFieldDefs.length > 0 ? (
+            <QuickStartConnectionPicker
+              side="destination"
+              connector={destination}
+              connectorLabel={destConnectorLabel}
+              connections={matchingDestConnections}
+              mode={destConnectionChoice}
+              selectedId={selectedDestConnectionId}
+              onModeChange={setDestConnectionChoice}
+              onSelectId={setSelectedDestConnectionId}
+            />
+          ) : null}
+          {needsDestCredentials ? (
             <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
               <p className="text-xs font-semibold uppercase text-slate-500">Destination ({destination})</p>
               <div className="mt-3 space-y-2">
@@ -585,46 +722,32 @@ export function QuickStartWizard({
                     />
                   </label>
                 ) : null}
-                {destFields.map((f) => (
+                {destFieldDefs.map((f) => (
                   <label key={f.key} className="block">
                     <span className="text-xs text-slate-600 dark:text-slate-400">{f.label}</span>
                     <input
                       type="password"
                       value={destSecrets[f.key] ?? ""}
                       onChange={(e) => setDestSecrets((p) => ({ ...p, [f.key]: e.target.value }))}
+                      placeholder={f.placeholder}
                       className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
                     />
+                    <CredentialFieldHelp help={f.help} helpUrl={f.helpUrl} />
                   </label>
                 ))}
               </div>
             </div>
           ) : null}
-          {sourceFields.length > 0 ? (
-            <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-              <p className="text-xs font-semibold uppercase text-slate-500">Source ({source})</p>
-              <div className="mt-3 space-y-2">
-                {sourceFields.map((f) => (
-                  <label key={f.key} className="block">
-                    <span className="text-xs text-slate-600 dark:text-slate-400">{f.label}</span>
-                    <input
-                      type="password"
-                      value={sourceSecrets[f.key] ?? ""}
-                      onChange={(e) => setSourceSecrets((p) => ({ ...p, [f.key]: e.target.value }))}
-                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
-                    />
-                  </label>
-                ))}
-              </div>
-            </div>
+          {needsSourceCredentials || needsDestCredentials ? (
+            <button
+              type="button"
+              onClick={() => void testCredentials()}
+              disabled={testing}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
+            >
+              {testing ? "Testing…" : "Test connections"}
+            </button>
           ) : null}
-          <button
-            type="button"
-            onClick={() => void testCredentials()}
-            disabled={testing}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
-          >
-            {testing ? "Testing…" : "Test connections"}
-          </button>
           {testOk === true ? (
             <p className="text-sm text-emerald-600">Connections look good.</p>
           ) : null}
@@ -652,7 +775,8 @@ export function QuickStartWizard({
               }}
               className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500"
             >
-              Continue <ArrowRight className="h-4 w-4" />
+              {usingSavedSource || usingSavedDest ? "Continue with saved connection" : "Continue"}{" "}
+              <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </section>

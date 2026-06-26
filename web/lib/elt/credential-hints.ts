@@ -10,7 +10,7 @@ export const CREDENTIAL_HINTS: Record<string, CredentialHint[]> = {
     {
       key: "GITHUB_TOKEN",
       label: "GitHub Personal Access Token",
-      help: "https://github.com/settings/tokens",
+      help: "Fine-grained (recommended): select repos + read Contents & Issues. Classic: enable repo scope.",
     },
   ],
   rest_api: [

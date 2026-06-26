@@ -222,6 +222,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
   const [runNowSubmitting, setRunNowSubmitting] = useState(false);
   const [runNowError, setRunNowError] = useState<string | null>(null);
   const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
+  const [kickingRunId, setKickingRunId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const selectAllRef = useRef<HTMLInputElement>(null);
   const [sortCol, setSortCol] = useState<SortCol>("startedAt");
@@ -411,6 +412,29 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
     };
   }, [runIdFromUrl]);
 
+  useEffect(() => {
+    if (!runIdFromUrl) return;
+    const status = detail?.run?.status;
+    if (!status || (status !== "pending" && status !== "running")) return;
+
+    let cancelled = false;
+    const poll = window.setInterval(async () => {
+      try {
+        const res = await fetch(`/api/elt/runs/${runIdFromUrl}`);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (!cancelled) setDetail({ run: data.run });
+      } catch {
+        /* ignore transient poll errors */
+      }
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(poll);
+    };
+  }, [runIdFromUrl, detail?.run?.status]);
+
   async function openDetail(id: string) {
     const q = new URLSearchParams(searchParams.toString());
     q.set("run", id);
@@ -421,6 +445,24 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
     const q = new URLSearchParams(searchParams.toString());
     q.delete("run");
     router.replace(runsPathWithQuery(q), { scroll: false });
+  }
+
+  async function kickManagedRun(id: string) {
+    setKickingRunId(id);
+    try {
+      const res = await fetch(`/api/elt/runs/${id}/kick`, {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      if (data.run) setDetail({ run: data.run });
+      await loadRuns();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not start managed run");
+    } finally {
+      setKickingRunId(null);
+    }
   }
 
   async function cancelRun(id: string) {
@@ -1144,6 +1186,30 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
                     <span className="text-slate-500">· Gateway: any</span>
                   )}
                 </div>
+
+                {detail.run.status === "pending" &&
+                (detail.run.ingestionExecutor === "eltpulse_managed" ||
+                  detail.run.ingestionExecutor === "datapulse_managed") ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2.5 dark:border-amber-900/50 dark:bg-amber-950/30">
+                    <p className="text-sm font-medium text-amber-950 dark:text-amber-100">
+                      Queued on eltPulse managed compute
+                    </p>
+                    <p className="mt-1 text-xs text-amber-900/90 dark:text-amber-200/90">
+                      Status should move to <strong>running</strong> within a few seconds once the worker
+                      claims the run. Real GitHub → MotherDuck sync can take a few minutes after that.
+                    </p>
+                    {Date.now() - new Date(detail.run.startedAt).getTime() > 20_000 ? (
+                      <button
+                        type="button"
+                        onClick={() => void kickManagedRun(detail.run.id)}
+                        disabled={kickingRunId === detail.run.id}
+                        className="mt-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950 hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+                      >
+                        {kickingRunId === detail.run.id ? "Starting…" : "Start now"}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 {/* Timing info */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

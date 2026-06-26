@@ -1,6 +1,7 @@
 "use client";
 
 import type { CatalogCredentialField } from "@/lib/elt/credentials-catalog";
+import { CredentialFieldHelp } from "@/components/elt/credential-field-help";
 
 function credentialShowIfMatches(showIf: Record<string, unknown>, values: Record<string, string>): boolean {
   return Object.entries(showIf).every(([k, expected]) => {
@@ -61,7 +62,7 @@ export function CatalogCredentialFields({ fields, values, onPatch }: Props) {
                   </option>
                 ))}
               </select>
-              {f.help ? <p className="mt-1 text-xs text-slate-500">{f.help}</p> : null}
+              <CredentialFieldHelp help={f.help} />
             </label>
           );
         }
@@ -78,7 +79,7 @@ export function CatalogCredentialFields({ fields, values, onPatch }: Props) {
                 spellCheck={false}
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 font-mono text-xs dark:border-slate-600 dark:bg-slate-950 dark:text-white"
               />
-              {f.help ? <p className="mt-1 text-xs text-slate-500">{f.help}</p> : null}
+              <CredentialFieldHelp help={f.help} />
             </label>
           );
         }
@@ -95,7 +96,7 @@ export function CatalogCredentialFields({ fields, values, onPatch }: Props) {
                 placeholder={f.placeholder}
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
               />
-              {f.help ? <p className="mt-1 text-xs text-slate-500">{f.help}</p> : null}
+              <CredentialFieldHelp help={f.help} />
               <p className="mt-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
                 Store this secret in{" "}
                 <a href="/connections" className="font-medium text-sky-600 underline hover:no-underline dark:text-sky-400">
@@ -118,7 +119,7 @@ export function CatalogCredentialFields({ fields, values, onPatch }: Props) {
               placeholder={f.placeholder}
               className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 font-mono text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
             />
-            {f.help ? <p className="mt-1 text-xs text-slate-500">{f.help}</p> : null}
+            <CredentialFieldHelp help={f.help} />
           </label>
         );
       })}

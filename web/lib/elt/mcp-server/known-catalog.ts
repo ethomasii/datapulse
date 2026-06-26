@@ -12,6 +12,8 @@ export type KnownMcpEnvVar = {
   name: string;
   label: string;
   description: string;
+  /** Optional direct link to vendor token / API key page. */
+  helpUrl?: string;
   required?: boolean;
   /** Hint for HTTP Bearer auth — prepend when saving secret. */
   bearerPrefix?: boolean;
@@ -105,7 +107,8 @@ export const KNOWN_MCP_SERVER_TEMPLATES: KnownMcpServerTemplate[] = [
       {
         name: "DAGSTER_PLUS_TOKEN",
         label: "User or service account token",
-        description: "Create in Dagster+ Admin → User settings (or a service account). Bearer prefix added automatically.",
+        description: "Dagster+ → your avatar → User settings → Tokens (or create a service account token).",
+        helpUrl: "https://docs.dagster.io/dagster-plus/account/authentication",
         required: true,
         bearerPrefix: true,
       },
@@ -136,12 +139,38 @@ export const KNOWN_MCP_SERVER_TEMPLATES: KnownMcpServerTemplate[] = [
       {
         name: "SERVICEPULSE_MCP_AUTH",
         label: "Personal API token",
-        description: "Bearer sp_… from ServicePulse → Developers. Team+ required for servicepulse_ask.",
+        description: "ServicePulse → Developers → Create token (sp_…). Team+ required for servicepulse_ask.",
+        helpUrl: "https://servicepulse.dev/docs#api-mcp",
         required: true,
         bearerPrefix: true,
       },
     ],
     runtimeNote: "Tool discovery works from this UI once the token is saved.",
+  },
+  {
+    id: "eltpulse-remote",
+    name: "eltPulse",
+    vendor: "eltPulse",
+    category: "platform",
+    description:
+      "Hosted eltPulse MCP — pipelines, runs, connections, and workspace MCP registry (Streamable HTTP + SSE).",
+    transport: "http",
+    config: {
+      url: "https://mcp.eltpulse.dev",
+      headers_env: { Authorization: "ELTPULSE_MCP_AUTH" },
+    },
+    docsUrl: "https://eltpulse.dev/docs",
+    envVars: [
+      {
+        name: "ELTPULSE_MCP_AUTH",
+        label: "Workspace API key",
+        description: "eltPulse → Account → Developers → Create API key (elt_…).",
+        helpUrl: "https://eltpulse.dev/account/developers",
+        required: true,
+        bearerPrefix: true,
+      },
+    ],
+    runtimeNote: "Tool discovery works from this UI once the API key is saved.",
   },
   {
     id: "stripe-remote",
@@ -159,7 +188,8 @@ export const KNOWN_MCP_SERVER_TEMPLATES: KnownMcpServerTemplate[] = [
       {
         name: "STRIPE_MCP_AUTH",
         label: "Authorization header",
-        description: "Restricted secret key or OAuth token. Use Bearer sk_test_… or Bearer rk_live_…",
+        description: "Restricted secret key (recommended) or OAuth token. sk_test_/sk_live_ or rk_ restricted key.",
+        helpUrl: "https://dashboard.stripe.com/test/apikeys",
         required: true,
         bearerPrefix: true,
       },
@@ -181,7 +211,8 @@ export const KNOWN_MCP_SERVER_TEMPLATES: KnownMcpServerTemplate[] = [
       {
         name: "STRIPE_SECRET_KEY",
         label: "Stripe secret key",
-        description: "sk_test_… or sk_live_… — stored encrypted, injected at worker runtime.",
+        description: "Stripe Dashboard → Developers → API keys.",
+        helpUrl: "https://dashboard.stripe.com/test/apikeys",
         required: true,
       },
     ],
@@ -203,7 +234,9 @@ export const KNOWN_MCP_SERVER_TEMPLATES: KnownMcpServerTemplate[] = [
       {
         name: "GITHUB_PERSONAL_ACCESS_TOKEN",
         label: "GitHub PAT",
-        description: "Fine-grained or classic token with repo scope.",
+        description:
+          "Fine-grained (recommended): select repos + read Contents/Issues/PRs. Classic: enable repo scope.",
+        helpUrl: "https://github.com/settings/personal-access-tokens",
         required: true,
       },
     ],
@@ -270,7 +303,8 @@ export const KNOWN_MCP_SERVER_TEMPLATES: KnownMcpServerTemplate[] = [
       {
         name: "BRAVE_API_KEY",
         label: "Brave API key",
-        description: "From https://brave.com/search/api/",
+        description: "Brave Search API subscription — create a key in the dashboard.",
+        helpUrl: "https://api.search.brave.com/app/keys",
         required: true,
       },
     ],
@@ -292,7 +326,8 @@ export const KNOWN_MCP_SERVER_TEMPLATES: KnownMcpServerTemplate[] = [
       {
         name: "SLACK_BOT_TOKEN",
         label: "Slack bot token",
-        description: "xoxb-… from your Slack app.",
+        description: "Slack app → OAuth & Permissions → Install app → Bot User OAuth Token (xoxb-…).",
+        helpUrl: "https://api.slack.com/apps",
         required: true,
       },
     ],
@@ -352,7 +387,8 @@ export const KNOWN_MCP_SERVER_TEMPLATES: KnownMcpServerTemplate[] = [
       {
         name: "SENTRY_AUTH_TOKEN",
         label: "Sentry auth token",
-        description: "Organization auth token with project read access.",
+        description: "Sentry → Settings → Account → Auth Tokens — org read + project read scopes.",
+        helpUrl: "https://sentry.io/settings/account/api/auth-tokens/",
         required: true,
       },
     ],

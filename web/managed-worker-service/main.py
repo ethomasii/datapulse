@@ -96,6 +96,7 @@ def _require_trigger(request: Request) -> None:
 class BatchBody(BaseModel):
     limit: int = Field(default=5, ge=1, le=20)
     deadline_ms: int = Field(default=_MAX_WALL_MS, alias="deadlineMs", ge=5_000, le=_MAX_WALL_MS)
+    run_id: str | None = Field(default=None, alias="runId")
     organization_id: str | None = Field(default=None, alias="organizationId")
     pool: str | None = None
 
@@ -671,6 +672,7 @@ async def batch(request: Request, body: BatchBody | None = None) -> dict[str, An
         return await run_managed_batch(
             b.limit,
             b.deadline_ms,
+            b.run_id,
             organization_id=b.organization_id,
             pool=b.pool,
         )

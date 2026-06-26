@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Bot, ExternalLink, Layers, Loader2, Plug, Plus, RefreshCw, Trash2, Sparkles } from "lucide-react";
 import { AppPage, AppPageHeader } from "@/components/layout/app-page";
+import { CredentialFieldHelp } from "@/components/elt/credential-field-help";
 import { RelatedLinks } from "@/components/ui/related-links";
 import {
   KNOWN_MCP_CATEGORY_LABELS,
@@ -361,7 +362,7 @@ export default function McpServersPage() {
                 className="mt-1 w-full rounded border border-slate-200 px-2 py-1.5 font-mono text-sm dark:border-slate-700 dark:bg-slate-900"
                 placeholder={ev.bearerPrefix ? "sk_test_… (Bearer added automatically)" : ev.name}
               />
-              <span className="mt-0.5 block text-[10px] text-slate-400">{ev.description}</span>
+              <CredentialFieldHelp help={ev.description} helpUrl={ev.helpUrl} />
             </label>
           ))}
         </div>

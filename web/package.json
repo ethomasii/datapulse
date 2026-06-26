@@ -5,7 +5,7 @@
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "prisma generate && next dev",
-    "build": "prisma migrate deploy && prisma generate && next build",
+    "build": "npm run build --prefix ../integrations/mcp-server && prisma migrate deploy && prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "export-elt-catalog": "python ../scripts/export-credentials-catalog.py",
@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
+    "@eltpulse/mcp-server": "file:../integrations/mcp-server",
     "@aws-sdk/client-s3": "^3.758.0",
     "@aws-sdk/client-sqs": "^3.758.0",
     "@clerk/nextjs": "^5.7.5",

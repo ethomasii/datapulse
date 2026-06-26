@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { getDestinationCredentials, getSourceCredentials } from "@/lib/elt/credentials-catalog";
+import { CredentialFieldHelp } from "@/components/elt/credential-field-help";
 
 type ConnectionType = "source" | "destination";
 
@@ -61,9 +62,7 @@ export function ConnectionStoredSecretsForm({
               onChange={(e) => onDraftChange({ ...draftSecrets, [f.key]: e.target.value })}
               className="mt-1 w-full rounded border border-violet-200 bg-white px-2 py-1.5 font-mono text-sm dark:border-violet-800 dark:bg-slate-950 dark:text-white"
             />
-            {f.help && !f.help.startsWith("http") ? (
-              <span className="mt-0.5 block text-[10px] text-violet-800/80 dark:text-violet-300/80">{f.help}</span>
-            ) : null}
+            <CredentialFieldHelp help={f.help} className="text-violet-800/80 dark:text-violet-300/80" />
           </label>
         ))}
       </div>

@@ -215,6 +215,8 @@ export async function runManagedWorkerBatchHttp(options: {
   secret: string;
   limit: number;
   deadlineMs: number;
+  /** When set, worker processes this run directly (used right after enqueue). */
+  runId?: string;
 }): Promise<ManagedWorkerBatchResult> {
   const mode = resolveManagedExecutorMode();
   if (mode === "local") {
@@ -234,6 +236,7 @@ export async function runManagedWorkerBatchHttp(options: {
     const result = await dispatchManagedWorkerCron({
       limit: options.limit,
       deadlineMs: options.deadlineMs,
+      runId: options.runId,
     });
     return {
       processed: result.processed,

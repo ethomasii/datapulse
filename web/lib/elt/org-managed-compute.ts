@@ -78,6 +78,8 @@ export type ManagedCronDispatchResult = {
 export async function dispatchManagedWorkerCron(options: {
   limit: number;
   deadlineMs: number;
+  /** Process one run immediately (e.g. right after quick-start enqueue). */
+  runId?: string;
 }): Promise<ManagedCronDispatchResult> {
   const sharedConfig = resolveManagedDelegateConfig();
   if (!sharedConfig) {
@@ -87,6 +89,29 @@ export async function dispatchManagedWorkerCron(options: {
   const errors: string[] = [];
   let sharedProcessed = 0;
   let dedicatedProcessed = 0;
+
+  if (options.runId?.trim()) {
+    try {
+      const result = await runManagedWorkerDelegateBatchHttp({
+        batchUrl: sharedConfig.url,
+        secret: sharedConfig.secret,
+        limit: 1,
+        deadlineMs: options.deadlineMs,
+        runId: options.runId.trim(),
+      });
+      sharedProcessed = result.processed;
+      errors.push(...result.errors);
+    } catch (e) {
+      errors.push(`immediate:${e instanceof Error ? e.message : String(e)}`);
+    }
+    return {
+      processed: sharedProcessed,
+      errors,
+      sharedProcessed,
+      dedicatedProcessed: 0,
+      dedicatedOrgs: 0,
+    };
+  }
 
   const dedicatedOrgs = await loadDedicatedOrganizations();
 

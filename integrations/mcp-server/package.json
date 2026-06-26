@@ -1,0 +1,33 @@
+{
+  "name": "@eltpulse/mcp-server",
+  "version": "0.1.0",
+  "description": "Model Context Protocol server for eltPulse — wraps the workspace REST API",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./handler": {
+      "types": "./dist/handler.d.ts",
+      "import": "./dist/handler.js"
+    }
+  },
+  "files": ["dist"],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5.4.5"
+  }
+}

@@ -23,6 +23,9 @@ import {
   upgradeMessageForFeature,
 } from "@/lib/plans/tier-features";
 
+/** Allow managed worker dispatch to complete during quick-start create-and-run. */
+export const maxDuration = 300;
+
 export async function GET(req: Request) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
@@ -192,8 +195,8 @@ export async function POST(req: Request) {
   if (isManaged) {
     try {
       await processManagedRunImmediately(run.id);
-    } catch {
-      /* cron picks up pending runs if immediate processing fails */
+    } catch (e) {
+      console.error("[elt/runs] managed immediate processing failed", run.id, e);
     }
   }
 

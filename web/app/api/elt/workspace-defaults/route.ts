@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentDbUser } from "@/lib/auth/server";
+import {
+  API_SCOPES,
+  hasScope,
+  resolveApiUser,
+  scopeForbiddenResponse,
+  unauthorizedResponse,
+} from "@/lib/auth/api-user";
 import { getActiveOrganizationForSession } from "@/lib/auth/active-org";
 import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
 import { db } from "@/lib/db/client";
@@ -15,12 +22,13 @@ const patchSchema = z.object({
  * GET /api/elt/workspace-defaults — default destination for `destination: @workspace` pipelines.
  * PATCH — set or clear workspace default destination connection id.
  */
-export async function GET() {
-  const user = await getCurrentDbUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function GET(req: Request) {
+  const auth = await resolveApiUser(req);
+  if (!auth) return unauthorizedResponse();
+  if (!hasScope(auth, API_SCOPES.CONNECTIONS_READ)) return scopeForbiddenResponse();
 
   try {
-    const defaults = await loadWorkspaceDefaults(user.id);
+    const defaults = await loadWorkspaceDefaults(auth.user.id);
     return NextResponse.json({
       defaultDestinationConnectionId: defaults.defaultDestinationConnectionId,
       defaultDestinationConnector: defaults.defaultDestinationConnector,

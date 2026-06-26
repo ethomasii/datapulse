@@ -9,6 +9,8 @@ import {
 export async function runManagedWorkerDelegateBatchHttp(options: {
   limit: number;
   deadlineMs: number;
+  /** Process this run first (skips pending queue fetch). */
+  runId?: string;
   /** Explicit batch URL (dedicated org worker). Defaults to platform delegate config. */
   batchUrl?: string;
   secret?: string;
@@ -30,6 +32,9 @@ export async function runManagedWorkerDelegateBatchHttp(options: {
     limit: options.limit,
     deadlineMs,
   };
+  if (options.runId?.trim()) {
+    body.runId = options.runId.trim();
+  }
   if (options.organizationId?.trim()) {
     body.organizationId = options.organizationId.trim();
   } else if (options.pool === "shared") {
