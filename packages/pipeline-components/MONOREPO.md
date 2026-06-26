@@ -4,6 +4,8 @@ The canonical **customer-facing** repo is [github.com/ethomasii/eltpulse-pipelin
 
 Until that standalone repo exists, catalog publishes to branch `pipeline-components-catalog` on [ethomasii/datapulse](https://github.com/ethomasii/datapulse) as a fallback.
 
+That branch contains **component packages only** (no Next.js app). CI copies a minimal `web/` stub with `git.deploymentEnabled: false` so Vercel’s Root Directory setting does not fail on catalog-only pushes.
+
 Executable compilers live in the datapulse monorepo (`web/lib/elt/native-components/definitions/`). This folder holds **exported metadata** (`components/*/component.json`) for discovery and external tooling.
 
 ## Publish workflow

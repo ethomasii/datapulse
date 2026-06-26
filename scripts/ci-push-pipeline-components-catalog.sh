@@ -9,6 +9,8 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 cp -R "$ROOT/packages/pipeline-components/." "$TMP/"
+mkdir -p "$TMP/web"
+cp -R "$ROOT/packages/pipeline-components/.vercel-stub/." "$TMP/web/"
 cd "$TMP"
 git init -b main
 git config user.name "${GIT_AUTHOR_NAME:-github-actions[bot]}"
