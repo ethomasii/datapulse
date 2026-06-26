@@ -111,10 +111,37 @@ export async function upsertPipelineDefinition(
   body: CreatePipelineBody,
   options?: PersistPipelineOptions
 ): Promise<PersistPipelineSuccess | PersistPipelineFailure> {
-  const prep = await prepareWrite(userId, body);
+  const perms = await getWorkspacePermissions(userId);
+  if (!perms.canWrite) {
+    return { ok: false, status: 403, message: "View-only access — you cannot create pipelines." };
+  }
+  const resourceUserId = workspaceResourceUserId(perms, userId);
+
+  const prep = await prepareWrite(resourceUserId, body);
   if (isPersistFailure(prep)) return prep;
 
-  const gw = await resolveDefaultGateway(userId, body);
+  const existing = await db.eltPipeline.findUnique({
+    where: {
+      userId_name_tool: {
+        userId: resourceUserId,
+        name: prep.bodyForArtifacts.name,
+        tool: prep.resolvedTool,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    const account = await db.user.findUnique({
+      where: { id: resourceUserId },
+      select: { subscription: { select: { tier: true } } },
+    });
+    const tier = account?.subscription?.tier ?? "free";
+    const limitMsg = await assertCanCreatePipeline(resourceUserId, tier);
+    if (limitMsg) return { ok: false, status: 403, message: limitMsg };
+  }
+
+  const gw = await resolveDefaultGateway(resourceUserId, body);
   if (isGatewayFailure(gw)) return gw;
 
   let runsWebhookUrl: string | null;
@@ -124,17 +151,6 @@ export async function upsertPipelineDefinition(
     const msg = e instanceof Error ? e.message : "Invalid webhook URL";
     return { ok: false, status: 400, message: msg };
   }
-
-  const existing = await db.eltPipeline.findUnique({
-    where: {
-      userId_name_tool: {
-        userId,
-        name: prep.bodyForArtifacts.name,
-        tool: prep.resolvedTool,
-      },
-    },
-    select: { id: true },
-  });
 
   const data = {
     name: prep.bodyForArtifacts.name,
@@ -162,9 +178,9 @@ export async function upsertPipelineDefinition(
       where: { id: existing.id },
       data,
     });
-    void maybeAutoPushPipelineToGit(userId, pipeline.id);
+    void maybeAutoPushPipelineToGit(resourceUserId, pipeline.id);
     void recordWorkspaceAuditForUser({
-      userId,
+      userId: resourceUserId,
       action: "pipeline.updated",
       detail: { pipelineId: pipeline.id, name: pipeline.name, tool: pipeline.tool },
     });
@@ -173,13 +189,13 @@ export async function upsertPipelineDefinition(
 
   const pipeline = await db.eltPipeline.create({
     data: {
-      userId,
+      userId: resourceUserId,
       ...data,
     },
   });
-  void maybeAutoPushPipelineToGit(userId, pipeline.id);
+  void maybeAutoPushPipelineToGit(resourceUserId, pipeline.id);
   void recordWorkspaceAuditForUser({
-    userId,
+    userId: resourceUserId,
     action: "pipeline.created",
     detail: { pipelineId: pipeline.id, name: pipeline.name, tool: pipeline.tool },
   });

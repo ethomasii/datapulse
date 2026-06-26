@@ -101,6 +101,7 @@ export function QuickStartWizard({
   const [error, setError] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [createdPipelineName, setCreatedPipelineName] = useState<string | null>(null);
+  const [pipelineWasUpdated, setPipelineWasUpdated] = useState(false);
   const [runTriggered, setRunTriggered] = useState(false);
   const scenarioStarterId = useMemo(() => {
     if (!scenarioId) return undefined;
@@ -469,9 +470,14 @@ export function QuickStartWizard({
           sourceConfiguration,
           sourceConnectionId: sourceConnId,
           destinationConnectionId: destConnId,
+          upsert: true,
         }),
       });
-      const data = (await res.json()) as { pipeline?: { id: string }; error?: unknown };
+      const data = (await res.json()) as {
+        pipeline?: { id: string };
+        created?: boolean;
+        error?: unknown;
+      };
       if (!res.ok) {
         const errMsg =
           typeof data.error === "string"
@@ -483,6 +489,7 @@ export function QuickStartWizard({
       if (!pipelineId) throw new Error("Pipeline created but no id returned");
       setCreatedId(pipelineId);
       setCreatedPipelineName(effectiveName);
+      setPipelineWasUpdated(data.created === false);
 
       const execRes = await fetch("/api/execution/mode", { credentials: "same-origin" });
       if (execRes.ok) {
@@ -953,7 +960,8 @@ export function QuickStartWizard({
         <section className="space-y-4">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Name your pipeline</h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            {source} → {effectiveDestination}. Credentials are linked — ready to run.
+            {source} → {effectiveDestination}. Credentials are linked — ready to run. Reusing an
+            existing pipeline name updates that pipeline instead of creating a duplicate.
           </p>
           <label className="block">
             <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Pipeline name</span>
@@ -989,7 +997,9 @@ export function QuickStartWizard({
       {step === "done" && (
         <section className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-8 text-center dark:border-emerald-900/40 dark:bg-emerald-950/20">
           <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600" aria-hidden />
-          <h2 className="mt-4 text-xl font-bold text-slate-900 dark:text-white">Pipeline created!</h2>
+          <h2 className="mt-4 text-xl font-bold text-slate-900 dark:text-white">
+            {pipelineWasUpdated ? "Pipeline updated!" : "Pipeline created!"}
+          </h2>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
             {runTriggered
               ? `Ingest started${executionLabel ? ` (${executionLabel})` : ""}. Open the canvas to add filters, joins, and marts — or link a dbt project for production.`

@@ -38,6 +38,8 @@ export const createPipelineBodySchema = z.object({
   destinationConnectionId: z.string().min(1).nullable().optional(),
   /** Link pipeline to a workspace DbtProject (null unlinks). */
   dbtProjectId: z.string().min(1).nullable().optional(),
+  /** When true, update an existing pipeline with the same name+tool instead of 409. */
+  upsert: z.boolean().optional(),
 });
 
 export type CreatePipelineBody = z.infer<typeof createPipelineBodySchema>;
