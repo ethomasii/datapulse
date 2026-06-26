@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import type { Prisma } from "@prisma/client";
 import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
 import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
@@ -993,7 +994,7 @@ async function toolRefreshMcpTools(userId: string, serverId: string) {
     });
     await db.mcpServer.update({
       where: { id: row.id },
-      data: { toolsCache: tools, toolsCachedAt: new Date() },
+      data: { toolsCache: tools as Prisma.InputJsonValue, toolsCachedAt: new Date() },
     });
     return { server_id: row.id, tools };
   } catch (e) {
