@@ -3,7 +3,16 @@ import { resolveComponentCompiler } from "@/lib/elt/component-packages";
 import { getNativeComponent, resolveNativeComponentId } from "./registry";
 import { resetMcpPreambleFlagForTests } from "./mcp-python-runtime";
 import { hydrateComponentMcpConfig, loadMcpServersForCompile } from "@/lib/elt/mcp-server/resolve";
-import type { CompiledPipelineComponents } from "./types";
+import type { CompiledPipelineComponents, NativeComponentCompileResult } from "./types";
+import { isDataframeExecution } from "./definitions/_sql-helpers";
+import {
+  canChainCtas,
+  flushFusedSqlSegment,
+  isFusibleCtasStatement,
+  isSqlFusionEnabled,
+  parseCtasStatement,
+  shouldMaterializeStep,
+} from "./fuse-warehouse-sql";
 
 function parseEltComponents(raw: unknown): PipelineComponentSpec[] {
   if (!Array.isArray(raw)) return [];
@@ -89,10 +98,20 @@ function compilePipelineComponentsSync(
 
   const pythonBlocks: string[] = [];
   const sqlStatements: string[] = [];
+  const sqlSegment: string[] = [];
   const testLines: string[] = [];
   const quality: CompiledPipelineComponents["quality"] = [];
   const warnings: string[] = [];
   let compiled = false;
+  const fusionEnabled = isSqlFusionEnabled(config);
+  const acc: SqlFusionAccumulator = {
+    pythonBlocks,
+    sqlStatements,
+    sqlSegment,
+    testLines,
+    quality,
+    warnings,
+  };
 
   for (const comp of components) {
     const cfg = { ...(comp.config ?? {}), template_id: comp.config?.template_id ?? comp.id };
@@ -104,9 +123,11 @@ function compilePipelineComponentsSync(
     }
 
     const out = native.compile(cfg);
-    applyCompileOutput(config, out, { pythonBlocks, sqlStatements, testLines, quality, warnings });
+    ingestCompileOutput(config, cfg, out, acc, fusionEnabled);
     compiled = true;
   }
+
+  flushSqlFusionSegment(acc, fusionEnabled);
 
   finalizeCompiledConfig(config, { pythonBlocks, sqlStatements, testLines, quality, compiled });
   return {
@@ -134,10 +155,20 @@ export async function compilePipelineComponentsAsync(
 
   const pythonBlocks: string[] = [];
   const sqlStatements: string[] = [];
+  const sqlSegment: string[] = [];
   const testLines: string[] = [];
   const quality: CompiledPipelineComponents["quality"] = [];
   const warnings: string[] = [];
   let compiled = false;
+  const fusionEnabled = isSqlFusionEnabled(config);
+  const acc: SqlFusionAccumulator = {
+    pythonBlocks,
+    sqlStatements,
+    sqlSegment,
+    testLines,
+    quality,
+    warnings,
+  };
 
   for (const comp of components) {
     let cfg: Record<string, unknown> = {
@@ -157,7 +188,7 @@ export async function compilePipelineComponentsAsync(
 
     try {
       const out = await compiler.compile(cfg);
-      applyCompileOutput(config, out, { pythonBlocks, sqlStatements, testLines, quality, warnings });
+      ingestCompileOutput(config, cfg, out, acc, fusionEnabled);
       compiled = true;
       if (compiler.source === "package") {
         config.elt_components_package_sources = {
@@ -174,6 +205,8 @@ export async function compilePipelineComponentsAsync(
       );
     }
   }
+
+  flushSqlFusionSegment(acc, fusionEnabled);
 
   finalizeCompiledConfig(config, { pythonBlocks, sqlStatements, testLines, quality, compiled });
   return {
@@ -201,13 +234,83 @@ function applyCompileOutput(
   }
 ): void {
   if (out.python?.length) acc.pythonBlocks.push(...out.python);
-  if (out.sql?.length) acc.sqlStatements.push(...out.sql);
   if (out.tests?.length) acc.testLines.push(...out.tests);
   if (out.quality?.length) acc.quality.push(...out.quality);
   if (out.configPatch && Object.keys(out.configPatch).length) {
     mergeConfigPatch(config, out.configPatch);
   }
   if (out.warnings?.length) acc.warnings.push(...out.warnings);
+}
+
+type SqlFusionAccumulator = {
+  pythonBlocks: string[];
+  sqlStatements: string[];
+  sqlSegment: string[];
+  testLines: string[];
+  quality: CompiledPipelineComponents["quality"];
+  warnings: string[];
+};
+
+function flushSqlFusionSegment(acc: SqlFusionAccumulator, fusionEnabled: boolean): void {
+  if (!acc.sqlSegment.length) return;
+  if (fusionEnabled && acc.sqlSegment.length > 1) {
+    const { statements, fusedCount } = flushFusedSqlSegment(acc.sqlSegment);
+    acc.sqlStatements.push(...statements);
+    if (fusedCount > 1) {
+      acc.warnings.push(`Fused ${fusedCount} warehouse SQL steps into one CTAS.`);
+    }
+  } else {
+    acc.sqlStatements.push(...acc.sqlSegment);
+  }
+  acc.sqlSegment = [];
+}
+
+function appendCompiledSql(
+  cfg: Record<string, unknown>,
+  out: NativeComponentCompileResult,
+  acc: SqlFusionAccumulator,
+  fusionEnabled: boolean
+): void {
+  if (!out.sql?.length) return;
+
+  const materialize = shouldMaterializeStep(cfg);
+  if (materialize) flushSqlFusionSegment(acc, fusionEnabled);
+
+  for (const stmt of out.sql) {
+    const fusible =
+      fusionEnabled && !isDataframeExecution(cfg) && isFusibleCtasStatement(stmt);
+
+    if (!fusible) {
+      flushSqlFusionSegment(acc, fusionEnabled);
+      acc.sqlStatements.push(stmt);
+      continue;
+    }
+
+    if (acc.sqlSegment.length) {
+      const prev = parseCtasStatement(acc.sqlSegment[acc.sqlSegment.length - 1]!);
+      const next = parseCtasStatement(stmt);
+      if (!prev || !next || !canChainCtas(prev, next)) {
+        flushSqlFusionSegment(acc, fusionEnabled);
+      }
+    }
+    acc.sqlSegment.push(stmt);
+  }
+
+  if (materialize) flushSqlFusionSegment(acc, fusionEnabled);
+}
+
+function ingestCompileOutput(
+  config: Record<string, unknown>,
+  cfg: Record<string, unknown>,
+  out: NativeComponentCompileResult,
+  acc: SqlFusionAccumulator,
+  fusionEnabled: boolean
+): void {
+  if (out.python?.length) {
+    flushSqlFusionSegment(acc, fusionEnabled);
+  }
+  applyCompileOutput(config, out, acc);
+  appendCompiledSql(cfg, out, acc, fusionEnabled);
 }
 
 function finalizeCompiledConfig(

@@ -69,6 +69,79 @@ describe("native-components", () => {
     expect(pt.code).toContain("JOIN");
   });
 
+  it("fuses linear warehouse SQL steps into one CTAS", () => {
+    const { config, result } = compileNativePipelineComponents({
+      elt_components: [
+        {
+          id: "filter_1",
+          type: "python",
+          config: {
+            template_id: "filter_rows",
+            table: "staging.raw",
+            condition: "id > 0",
+            output_table: "staging.filtered",
+          },
+        },
+        {
+          id: "filter_2",
+          type: "python",
+          config: {
+            template_id: "filter_rows",
+            table: "staging.filtered",
+            condition: "amount > 10",
+            output_table: "staging.final",
+          },
+        },
+      ],
+    });
+    expect(result.sqlStatements).toHaveLength(1);
+    expect(result.warnings.some((w) => w.includes("Fused 2 warehouse SQL"))).toBe(true);
+    const pt = config.post_transform as { code: string };
+    expect(pt.code).toContain("amount > 10");
+    expect(pt.code).toContain("id > 0");
+    expect((pt.code.match(/CREATE OR REPLACE TABLE/gi) ?? []).length).toBe(1);
+  });
+
+  it("breaks SQL fusion at Python agent steps", () => {
+    const { result } = compileNativePipelineComponents({
+      elt_components: [
+        {
+          id: "filter_1",
+          type: "python",
+          config: {
+            template_id: "filter_rows",
+            table: "staging.raw",
+            condition: "id > 0",
+            output_table: "staging.filtered",
+          },
+        },
+        {
+          id: "agent",
+          type: "python",
+          config: {
+            template_id: "litellm_inference_asset",
+            table: "staging.filtered",
+            output_table: "staging.enriched",
+            prompt: "summarize",
+            model: "gpt-4o-mini",
+          },
+        },
+        {
+          id: "filter_2",
+          type: "python",
+          config: {
+            template_id: "filter_rows",
+            table: "staging.enriched",
+            condition: "score > 0",
+            output_table: "staging.final",
+          },
+        },
+      ],
+    });
+    expect(result.sqlStatements.length).toBeGreaterThanOrEqual(2);
+    expect(result.pythonBlocks.length).toBeGreaterThan(0);
+  });
+
   it("dagsterAttributesToFields skips partition metadata", () => {
     const fields = dagsterAttributesToFields({
       left_table: { type: "string", label: "Left table", required: true },
