@@ -8,8 +8,9 @@ export const PLAN_PRICES_USD = {
   team: { monthly: 149, annual: 149 * ANNUAL_MONTHS_CHARGED },
   dedicatedCompute: { monthly: 399, annual: 399 * ANNUAL_MONTHS_CHARGED },
   /**
-   * Self-hosted control plane + gateway (Enterprise sales).
-   * Floor aligned with mid-market data platforms (~13× Team annual self-serve).
+   * Self-hosted control plane platform license (Enterprise sales) — list floor only.
+   * Contracts often add metered entitlements (seats, rows, connections, support tier)
+   * even when the customer hosts the app; SaaS Team/Pro and dedicated compute are separate lines.
    */
   enterprise: { monthly: 2400, annual: 2400 * ANNUAL_MONTHS_CHARGED },
 } as const;

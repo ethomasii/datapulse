@@ -116,7 +116,7 @@ export const PRICING_FAQ = [
   },
   {
     q: "What is Enterprise vs Team?",
-    a: "Enterprise is a sales-assisted deployment — self-hosted control plane and gateway, custom SLAs, and contract pricing. Team is self-serve on Stripe with shared SaaS hosting.",
+    a: "Team is self-serve on Stripe — the full product runs on eltPulse SaaS; you can still run a customer gateway in your VPC for compute. Enterprise is sales-assisted: a future self-hosted control plane (entire app in your environment) plus custom SLAs. That packaging is on the roadmap; contact sales for early access conversations.",
   },
   {
     q: "What payment methods do you accept?",

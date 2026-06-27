@@ -79,16 +79,15 @@ const TIERS: TierDef[] = [
   },
   {
     key: "enterprise",
-    subtitle: "Self-hosted control plane in your VPC",
+    subtitle: "Self-hosted control plane in your VPC (sales-assisted — not self-serve yet)",
     monthlyUsd: null,
     features: [
       "Everything in Team",
-      "Self-hosted eltPulse control plane (Docker)",
-      "Unlimited gateways & air-gapped metadata",
+      "Full eltPulse app in your environment (roadmap: Docker/K8s kit)",
       "Annual platform license from $24k/yr",
-      "SLA-backed uptime commitment",
-      "Dedicated onboarding & security review",
-      "Custom connector development",
+      "Custom SLAs and security review",
+      "Air-gapped metadata options",
+      "Dedicated onboarding",
     ],
     cta: {
       href: "mailto:hello@eltpulse.dev?subject=eltPulse%20Enterprise%20—%20self-hosted%20control%20plane",
