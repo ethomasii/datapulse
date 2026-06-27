@@ -61,6 +61,24 @@ const SLING_INCREMENTAL: RunSliceCapability = {
   mechanism: "stream update_key: {col}, mode: incremental",
 };
 
+/** Verified sources with replace disposition and no partition wiring in codegen. */
+const FULL_REPLACE: RunSliceCapability = {
+  mode: "none_only",
+  label: "Full replace load only",
+  detail:
+    "This source loads with replace disposition and has no date or slice filter parameter in generated code.",
+  mechanism: "full replace — partition_key ignored",
+};
+
+/** Verified sources where partition_key is not wired yet (incremental upstream may exist). */
+const SLICE_NOT_WIRED: RunSliceCapability = {
+  mode: "none_only",
+  label: "No slice filter wired",
+  detail:
+    "The verified source does not expose start_date / since for run slices in codegen yet; partition_key is ignored.",
+  mechanism: "partition_key ignored in generated pipeline",
+};
+
 // ── Per-source registry ───────────────────────────────────────────────────────
 
 const CAPABILITIES: Record<string, RunSliceCapability> = {
@@ -70,6 +88,10 @@ const CAPABILITIES: Record<string, RunSliceCapability> = {
   },
   stripe: { ...DLT_SINCE, mechanism: "stripe_source(start_date=partition_key)" },
   shopify: { ...DLT_SINCE, mechanism: "shopify_source(start_date=partition_key)" },
+  pipedrive: {
+    ...DLT_SINCE,
+    mechanism: "pipedrive_source(since_timestamp=partition_key)",
+  },
   hubspot: {
     ...DLT_SINCE,
     mechanism: "hubspot(since=partition_key, until=next_day) via CRM search API",
@@ -79,6 +101,10 @@ const CAPABILITIES: Record<string, RunSliceCapability> = {
     mechanism: "salesforce incremental env bounds on merge resources (account, opportunity, …)",
   },
   google_analytics: { ...DLT_DATE_RANGE, mechanism: "google_analytics(start_date=partition_key)" },
+  matomo: {
+    ...DLT_DATE_RANGE,
+    mechanism: "matomo_source(start_date=partition_key, end_date=next_day)",
+  },
   facebook_ads: { ...DLT_DATE_RANGE, mechanism: "facebook_ads_source(start_date=partition_key)" },
   google_ads: { ...DLT_DATE_RANGE, mechanism: "google_ads(start_date=partition_key)" },
   slack: { ...DLT_SINCE, mechanism: "slack_source(start_date=partition_key)" },
@@ -110,6 +136,45 @@ const CAPABILITIES: Record<string, RunSliceCapability> = {
   asana: {
     ...DLT_SINCE,
     mechanism: "asana tasks modified_at incremental bounds via partition_key",
+  },
+  workable: {
+    ...DLT_SINCE,
+    mechanism: "workable_source(start_date=partition_key)",
+  },
+
+  google_sheets: {
+    ...FULL_REPLACE,
+    detail:
+      "Google Sheets loads named ranges with replace disposition; the API has no date filter for run slices.",
+    mechanism: "google_sheets_source() — no partition_key filter",
+  },
+  freshdesk: {
+    ...SLICE_NOT_WIRED,
+    mechanism: "freshdesk_source() — partition_key ignored",
+  },
+  bing_webmaster: {
+    ...FULL_REPLACE,
+    detail:
+      "Bing Webmaster loads site stats with replace disposition; no slice date parameter in verified codegen.",
+    mechanism: "bing_webmaster_source() — no partition_key filter",
+  },
+  inbox: {
+    ...FULL_REPLACE,
+    detail: "IMAP inbox sync loads messages by mailbox; run slices do not apply to email ingestion.",
+    mechanism: "inbox_source() — no partition_key filter",
+  },
+  personio: {
+    ...SLICE_NOT_WIRED,
+    mechanism: "personio_source() — partition_key ignored",
+  },
+  mux: {
+    ...FULL_REPLACE,
+    detail: "Mux video analytics loads with replace disposition; no date slice parameter in codegen.",
+    mechanism: "mux_source() — no partition_key filter",
+  },
+  strapi: {
+    ...SLICE_NOT_WIRED,
+    mechanism: "strapi_source() — partition_key ignored",
   },
 
   rest_api: { ...DLT_QUERY },

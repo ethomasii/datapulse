@@ -19,6 +19,9 @@ export function chooseTool(sourceType: string, destinationType: string): "dlt" |
     "intercom",
     "mixpanel",
     "segment",
+    "pipedrive",
+    "matomo",
+    "workable",
     "rest_api",
   ]);
 

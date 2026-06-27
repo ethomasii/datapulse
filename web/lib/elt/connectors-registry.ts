@@ -560,6 +560,21 @@ const API_CONNECTORS: ConnectorDef[] = [
     ],
   },
   {
+    slug: "pipedrive",
+    label: "Pipedrive",
+    connectionTypes: ["source"],
+    category: "APIs & SaaS",
+    credentialFields: [
+      {
+        key: "PIPEDRIVE_API_KEY",
+        label: "API Token",
+        type: "password",
+        required: true,
+        help: "Find in Pipedrive → Personal preferences → API",
+      },
+    ],
+  },
+  {
     slug: "hubspot",
     label: "HubSpot",
     connectionTypes: ["source"],
@@ -592,6 +607,19 @@ const API_CONNECTORS: ConnectorDef[] = [
     ],
   },
   {
+    slug: "matomo",
+    label: "Matomo",
+    connectionTypes: ["source"],
+    category: "APIs & SaaS",
+    credentialFields: [
+      { key: "MATOMO_URL", label: "Matomo URL", type: "text", required: true, placeholder: "https://analytics.example.com", help: "Base URL of your Matomo instance" },
+      { key: "MATOMO_TOKEN_AUTH", label: "Token Auth", type: "password", required: true, help: "Administration → Personal → Security → Auth tokens" },
+    ],
+    sourceConfigFields: [
+      { key: "site_id", label: "Site ID", type: "text", required: true, placeholder: "1", help: "Numeric site ID from Matomo" },
+    ],
+  },
+  {
     slug: "slack",
     label: "Slack",
     connectionTypes: ["source"],
@@ -620,6 +648,10 @@ const API_CONNECTORS: ConnectorDef[] = [
     category: "APIs & SaaS",
     credentialFields: [
       { key: "AIRTABLE_API_KEY", label: "API Key", type: "password", required: true, help: "Find in Account settings" },
+    ],
+    sourceConfigFields: [
+      { key: "base_id", label: "Base ID", type: "text", required: true, placeholder: "appXXXXXXXXXXXXXX", help: "From the Airtable base URL (starts with app)" },
+      { key: "table_names", label: "Table names (optional)", type: "text", required: false, placeholder: "Orders, Customers", help: "Comma-separated; leave empty to load all tables" },
     ],
   },
   {
@@ -717,6 +749,16 @@ const API_CONNECTORS: ConnectorDef[] = [
     category: "APIs & SaaS",
     credentialFields: [
       { key: "ASANA_ACCESS_TOKEN", label: "Personal Access Token", type: "password", required: true, help: "Create at: app.asana.com/0/my-apps" },
+    ],
+  },
+  {
+    slug: "workable",
+    label: "Workable",
+    connectionTypes: ["source"],
+    category: "APIs & SaaS",
+    credentialFields: [
+      { key: "WORKABLE_ACCESS_TOKEN", label: "API Token", type: "password", required: true, help: "Generate in Workable → Integrations → API" },
+      { key: "WORKABLE_SUBDOMAIN", label: "Account Subdomain", type: "text", required: true, placeholder: "acme", help: "From acme.workable.com" },
     ],
   },
 ];

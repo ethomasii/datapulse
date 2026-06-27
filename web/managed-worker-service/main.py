@@ -144,6 +144,12 @@ def _inject_dlt_secret_aliases(env: dict[str, str]) -> dict[str, str]:
     if workable_sub:
         out.setdefault("WORKABLE_SUBDOMAIN", workable_sub)
         out.setdefault("SOURCES__WORKABLE__SUBDOMAIN", workable_sub)
+    matomo_token = out.get("MATOMO_TOKEN_AUTH")
+    matomo_url = out.get("MATOMO_URL")
+    if matomo_token:
+        out.setdefault("SOURCES__MATOMO__TOKEN_AUTH", matomo_token)
+    if matomo_url:
+        out.setdefault("SOURCES__MATOMO__URL", matomo_url)
     notion = out.get("NOTION_TOKEN") or out.get("NOTION_API_KEY")
     if notion:
         out.setdefault("NOTION_TOKEN", notion)

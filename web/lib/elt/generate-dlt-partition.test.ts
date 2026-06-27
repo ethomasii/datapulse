@@ -72,4 +72,35 @@ describe("verified source run slice codegen", () => {
     expect(code).toContain('source_kwargs["since"] = pk');
     expect(code).toContain('source_kwargs["until"]');
   });
+
+  it("wires pipedrive since_timestamp from partition_key", () => {
+    const code = generateVerifiedSourcePipeline({
+      name: "pd_sync",
+      sourceType: "pipedrive",
+      destinationType: "motherduck",
+      sourceConfiguration: {},
+    } as PipelineRequest);
+    expect(code).toContain('source_kwargs["since_timestamp"] = pk');
+  });
+
+  it("wires matomo start_date and end_date from partition_key", () => {
+    const code = generateVerifiedSourcePipeline({
+      name: "matomo_sync",
+      sourceType: "matomo",
+      destinationType: "motherduck",
+      sourceConfiguration: { site_id: "1" },
+    } as PipelineRequest);
+    expect(code).toContain('source_kwargs["start_date"] = pk');
+    expect(code).toContain('source_kwargs["end_date"]');
+  });
+
+  it("wires workable start_date from partition_key", () => {
+    const code = generateVerifiedSourcePipeline({
+      name: "workable_sync",
+      sourceType: "workable",
+      destinationType: "motherduck",
+      sourceConfiguration: {},
+    } as PipelineRequest);
+    expect(code).toContain('source_kwargs["start_date"] = pk');
+  });
 });
