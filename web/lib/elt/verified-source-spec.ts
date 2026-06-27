@@ -370,10 +370,10 @@ function credentialsFromHub(slug: string): VerifiedCredentialSpec[] {
 }
 
 function heuristicVerifiedSpec(slug: string): VerifiedSourceSpec {
-  const module = VERIFIED_SLUG_ALIASES[slug] ?? slug;
-  const factory = module.includes(".") ? module : `${module.replace(/_dlt$/, "")}_source`;
+  const sourceModule = VERIFIED_SLUG_ALIASES[slug] ?? slug;
+  const factory = sourceModule.includes(".") ? sourceModule : `${sourceModule.replace(/_dlt$/, "")}_source`;
   return {
-    module,
+    module: sourceModule,
     factory,
     credentials: credentialsFromHub(slug),
   };
