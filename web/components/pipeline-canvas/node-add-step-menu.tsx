@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { Handle, Position } from "@xyflow/react";
 import { Bot, ChevronRight, Loader2, Plus, Sparkles, Wand2 } from "lucide-react";
 import clsx from "clsx";
 import type { ComponentListItem } from "@/components/elt/component-palette";
@@ -16,9 +17,14 @@ import { useCanvasGraphActions } from "@/components/pipeline-canvas/canvas-graph
 type Props = {
   node: CanvasNodeRef;
   className?: string;
+  /** Render as the right-edge React Flow handle (same spot/size as the blue dot). */
+  asHandle?: boolean;
 };
 
-export function NodeAddStepMenu({ node, className }: Props) {
+const handlePlusClass =
+  "connectionindicator nodrag nopan !pointer-events-auto !flex !h-3 !w-3 !items-center !justify-center !rounded-full !border-2 !border-violet-500 !bg-white !text-violet-700 shadow-sm transition hover:!bg-violet-50 dark:!border-violet-400 dark:!bg-slate-900 dark:!text-violet-200 dark:hover:!bg-violet-950/60";
+
+export function NodeAddStepMenu({ node, className, asHandle }: Props) {
   const actions = useCanvasGraphActions();
   const [open, setOpen] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
@@ -93,32 +99,18 @@ export function NodeAddStepMenu({ node, className }: Props) {
 
   if (!actions?.isDesigner) return null;
 
-  return (
-    <>
-      <div ref={rootRef} className={clsx("relative", className)}>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setOpen((v) => !v);
-          }}
-          className={clsx(
-            "nodrag nopan flex h-6 w-6 items-center justify-center rounded-full border-2 border-violet-500 bg-white text-violet-700 shadow-md transition hover:scale-105 hover:bg-violet-50 dark:border-violet-400 dark:bg-slate-900 dark:text-violet-200 dark:hover:bg-violet-950/60",
-            open && "ring-2 ring-violet-300 dark:ring-violet-700"
-          )}
-          aria-label={`Add step after ${node.label}`}
-          aria-expanded={open}
-          title="Add next step"
-        >
-          <Plus className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
-        </button>
+  const toggleOpen = (e: MouseEvent) => {
+    e.stopPropagation();
+    setOpen((v) => !v);
+  };
 
-        {open && !showPalette ? (
-          <div
-            role="menu"
-            className="absolute left-full top-1/2 z-[200] ml-2 w-[min(17rem,calc(100vw-2rem))] -translate-y-1/2 rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl dark:border-slate-700 dark:bg-slate-900"
-            onClick={(e) => e.stopPropagation()}
-          >
+  const menuPanel =
+    open && !showPalette ? (
+      <div
+        role="menu"
+        className="absolute left-full top-1/2 z-[200] ml-2 w-[min(17rem,calc(100vw-2rem))] -translate-y-1/2 rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+        onClick={(e) => e.stopPropagation()}
+      >
             <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
               After {node.label}
             </p>
@@ -197,7 +189,75 @@ export function NodeAddStepMenu({ node, className }: Props) {
               ))}
             </div>
           </div>
+    ) : null;
+
+  if (asHandle) {
+    return (
+      <>
+        <Handle
+          ref={rootRef}
+          type="source"
+          position={Position.Right}
+          className={clsx(handlePlusClass, open && "!ring-2 !ring-violet-300 dark:!ring-violet-700")}
+          aria-label={`Add step after ${node.label}`}
+          aria-expanded={open}
+          title="Add next step"
+          onClick={toggleOpen}
+        >
+          <Plus className="pointer-events-none h-2 w-2" strokeWidth={3} aria-hidden />
+          {menuPanel}
+        </Handle>
+
+        {showPalette ? (
+          <div
+            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 p-4"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => {
+              setShowPalette(false);
+              setOpen(false);
+            }}
+          >
+            <div
+              className="flex h-[min(90dvh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-950"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+                  Add transform after {node.label}
+                </h2>
+              </div>
+              <ComponentPalette
+                className="min-h-0 flex-1 border-0"
+                transformDesigner
+                nativeOnly
+                onSelect={(c) => pickComponent(c)}
+              />
+            </div>
+          </div>
         ) : null}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div ref={rootRef} className={clsx("relative", className)}>
+        <button
+          type="button"
+          onClick={toggleOpen}
+          className={clsx(
+            "nodrag nopan flex h-6 w-6 items-center justify-center rounded-full border-2 border-violet-500 bg-white text-violet-700 shadow-md transition hover:scale-105 hover:bg-violet-50 dark:border-violet-400 dark:bg-slate-900 dark:text-violet-200 dark:hover:bg-violet-950/60",
+            open && "ring-2 ring-violet-300 dark:ring-violet-700"
+          )}
+          aria-label={`Add step after ${node.label}`}
+          aria-expanded={open}
+          title="Add next step"
+        >
+          <Plus className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
+        </button>
+
+        {menuPanel}
       </div>
 
       {showPalette ? (

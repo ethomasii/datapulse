@@ -23,29 +23,13 @@ type Props = {
   allowAdd?: boolean;
 };
 
-/**
- * Right-edge source port — in designer mode the colored handle becomes a + menu
- * anchored exactly where React Flow connects edges (right: 0, top: 50%, translate 50%).
- */
+/** Right-edge source port — in designer mode the handle becomes a compact + menu. */
 export function NodeRightPort({ node, accent, allowAdd = true }: Props) {
   const actions = useCanvasGraphActions();
   const showAdd = Boolean(actions?.isDesigner && allowAdd);
 
   if (showAdd) {
-    return (
-      <>
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="source"
-          className="!pointer-events-none !h-6 !w-6 !border-0 !bg-transparent !opacity-0"
-        />
-        <NodeAddStepMenu
-          node={node}
-          className="pointer-events-auto absolute right-0 top-1/2 z-20 -translate-y-1/2 translate-x-1/2"
-        />
-      </>
-    );
+    return <NodeAddStepMenu node={node} asHandle />;
   }
 
   return <Handle type="source" position={Position.Right} className={handleClass(accent)} />;
