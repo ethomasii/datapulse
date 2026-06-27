@@ -23,6 +23,8 @@ export function chooseTool(sourceType: string, destinationType: string): "dlt" |
     "pipedrive",
     "matomo",
     "workable",
+    "personio",
+    "strapi",
     "rest_api",
   ]);
 

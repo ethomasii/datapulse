@@ -779,6 +779,36 @@ const API_CONNECTORS: ConnectorDef[] = [
     ],
   },
   {
+    slug: "personio",
+    label: "Personio",
+    connectionTypes: ["source"],
+    category: "APIs & SaaS",
+    credentialFields: [
+      { key: "PERSONIO_CLIENT_ID", label: "Client ID", type: "text", required: true },
+      { key: "PERSONIO_CLIENT_SECRET", label: "Client Secret", type: "password", required: true, help: "Developer credentials in Personio Settings" },
+    ],
+  },
+  {
+    slug: "strapi",
+    label: "Strapi",
+    connectionTypes: ["source"],
+    category: "APIs & SaaS",
+    credentialFields: [
+      { key: "STRAPI_API_TOKEN", label: "API Token", type: "password", required: true },
+      { key: "STRAPI_DOMAIN", label: "Domain", type: "text", required: true, placeholder: "cms.example.com", help: "Host only — no https://" },
+    ],
+    sourceConfigFields: [
+      {
+        key: "endpoints",
+        label: "Content types (collections)",
+        type: "text",
+        required: true,
+        placeholder: "articles, categories",
+        help: "Comma-separated Strapi collection API names",
+      },
+    ],
+  },
+  {
     slug: "workable",
     label: "Workable",
     connectionTypes: ["source"],

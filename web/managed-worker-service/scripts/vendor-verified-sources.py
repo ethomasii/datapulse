@@ -26,6 +26,8 @@ DEFAULT_SOURCES = (
   "notion",
   "airtable",
   "freshdesk",
+  "personio",
+  "strapi",
 )
 
 ROOT = Path(__file__).resolve().parents[1]

@@ -283,7 +283,7 @@ export function generateVerifiedSourcePipeline(request: PipelineRequest): string
     }
   }
 
-  const partitionBlock = buildVerifiedPartitionBlock(spec);
+  const partitionBlock = buildVerifiedPartitionBlock(spec, request.sourceType);
   const sourceInstantiation = buildVerifiedSourceInstantiation(spec, resourceBlock);
   const importLine = buildVerifiedImportLine(spec);
 

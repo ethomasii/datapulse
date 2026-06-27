@@ -1,5 +1,6 @@
 import { escapePyString } from "./escape-py";
 import type { VerifiedSourceSpec } from "./verified-source-spec";
+import { getIncrementalEnvConfig } from "./verified-incremental-env";
 
 /** Python block: apply partition_key to source_kwargs start/end date kwargs. */
 export function buildKwargPartitionBlock(spec: VerifiedSourceSpec): string {
@@ -101,12 +102,50 @@ export function buildVerifiedSourceInstantiation(
     source = ${factory}(**source_kwargs)${resourceBlock}`;
 }
 
-export function buildVerifiedPartitionBlock(spec: VerifiedSourceSpec): string {
+export function buildDltIncrementalEnvPartitionBlock(slug: string): string {
+  const cfg = getIncrementalEnvConfig(slug);
+  if (!cfg) return "";
+  const source = escapePyString(cfg.dltSourceName.toUpperCase());
+  const rows = cfg.resources
+    .map((r) => {
+      const dayRange = r.dateRangeParams ? "True" : "False";
+      return `        ("${escapePyString(r.name)}", "${escapePyString(r.cursorField)}", ${dayRange})`;
+    })
+    .join(",\n");
+  return `
+    if partition_key:
+        from datetime import date, timedelta
+        pk = partition_key.strip()
+        initial = pk if "T" in pk else f"{pk[:10]}T00:00:00Z"
+        end_val = None
+        if len(pk) >= 10 and pk[4:5] == "-" and pk[7:8] == "-":
+            try:
+                _day = date.fromisoformat(pk[:10])
+                end_val = f"{(_day + timedelta(days=1)).isoformat()}T00:00:00Z"
+            except ValueError:
+                pass
+        for _res, _cursor, _day_range in (
+${rows},
+        ):
+            _prefix = "SOURCES__${source}__" + _res.upper() + "__" + _cursor.upper() + "__"
+            os.environ.setdefault(_prefix + "INITIAL_VALUE", initial)
+            if end_val:
+                os.environ.setdefault(_prefix + "END_VALUE", end_val)
+            if _day_range and end_val:
+                _base = "SOURCES__${source}__" + _res.upper() + "__"
+                os.environ.setdefault(_base + "START_DATE", pk[:10])
+                os.environ.setdefault(_base + "END_DATE", end_val[:10])`;
+}
+
+export function buildVerifiedPartitionBlock(spec: VerifiedSourceSpec, slug?: string): string {
   if (spec.partitionSliceMode === "asana_tasks") {
     return buildAsanaPartitionBlock();
   }
   if (spec.partitionSliceMode === "salesforce_incremental") {
     return buildSalesforcePartitionBlock();
+  }
+  if (spec.partitionSliceMode === "dlt_incremental_env" && slug) {
+    return buildDltIncrementalEnvPartitionBlock(slug);
   }
   return buildKwargPartitionBlock(spec);
 }

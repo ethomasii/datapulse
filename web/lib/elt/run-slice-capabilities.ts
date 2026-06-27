@@ -3,6 +3,10 @@
  * Describes how `partition_key` (slice value) is passed into sources — used in UI copy only.
  */
 
+import { getDltHubSource } from "./dlt-hub-registry";
+import { hasVerifiedSliceWiring, resolveVerifiedSourceSpec } from "./verified-source-spec";
+import { getIncrementalEnvConfig } from "./verified-incremental-env";
+
 export type RunSliceCapabilityMode = "date_and_key" | "none_only";
 
 export type RunSliceCapability = {
@@ -163,18 +167,10 @@ const CAPABILITIES: Record<string, RunSliceCapability> = {
     detail: "IMAP inbox sync loads messages by mailbox; run slices do not apply to email ingestion.",
     mechanism: "inbox_source() — no partition_key filter",
   },
-  personio: {
-    ...SLICE_NOT_WIRED,
-    mechanism: "personio_source() — partition_key ignored",
-  },
   mux: {
     ...FULL_REPLACE,
     detail: "Mux video analytics loads with replace disposition; no date slice parameter in codegen.",
     mechanism: "mux_source() — no partition_key filter",
-  },
-  strapi: {
-    ...SLICE_NOT_WIRED,
-    mechanism: "strapi_source() — partition_key ignored",
   },
 
   rest_api: { ...DLT_QUERY },
@@ -209,17 +205,66 @@ const CAPABILITIES: Record<string, RunSliceCapability> = {
   sqlite: { ...SLING_INCREMENTAL, mechanism: "update_key: updated_at, mode: incremental" },
 };
 
+function inferVerifiedSliceCapability(slug: string): RunSliceCapability | null {
+  const spec = resolveVerifiedSourceSpec(slug);
+  if (!spec) return null;
+
+  if (hasVerifiedSliceWiring(spec, slug)) {
+    if (spec.partitionSliceMode === "dlt_incremental_env" || getIncrementalEnvConfig(slug)) {
+      const envCfg = getIncrementalEnvConfig(slug);
+      const resources = envCfg?.resources.map((r) => r.name).join(", ") ?? "resources";
+      return {
+        ...DLT_SINCE,
+        mechanism: `dlt incremental env bounds on ${resources} (${envCfg?.dltSourceName ?? slug})`,
+      };
+    }
+    if (spec.partitionSliceMode === "jira_jql") {
+      return { ...DLT_SINCE, mechanism: "jira_search JQL updated range for day slices" };
+    }
+    if (spec.partitionSliceMode === "asana_tasks") {
+      return { ...DLT_SINCE, mechanism: "asana tasks modified_at incremental env bounds" };
+    }
+    if (spec.partitionSliceMode === "salesforce_incremental") {
+      return { ...DLT_SINCE, mechanism: "salesforce incremental env bounds on merge resources" };
+    }
+    const start = spec.partitionKwarg ?? "start_date";
+    const end = spec.partitionEndKwarg ? `, ${spec.partitionEndKwarg}=next_day` : "";
+    return {
+      ...(spec.partitionEndKwarg ? DLT_DATE_RANGE : DLT_SINCE),
+      mechanism: `${spec.factory}(${start}=partition_key${end})`,
+    };
+  }
+
+  const hub = getDltHubSource(slug);
+  if (hub && !hub.incremental) {
+    return {
+      ...FULL_REPLACE,
+      detail: `${hub.name} loads with replace disposition; no date slice parameter in codegen.`,
+      mechanism: `${spec.factory}() — no partition_key filter`,
+    };
+  }
+
+  return {
+    ...SLICE_NOT_WIRED,
+    mechanism: `${spec.factory}() — partition_key ignored`,
+  };
+}
+
 export function getRunSliceCapability(sourceType: string): RunSliceCapability {
   const s = sourceType.toLowerCase().trim();
-  return (
-    CAPABILITIES[s] ?? {
-      mode: "date_and_key",
-      label: "Date & key slices supported",
-      detail:
-        "The slice value is passed into the generated run entrypoint; wire it into your source filter for incremental backfills.",
-      mechanism: "run(partition_key=partition_key)",
-    }
-  );
+  const explicit = CAPABILITIES[s];
+  if (explicit) return explicit;
+
+  const inferred = inferVerifiedSliceCapability(s);
+  if (inferred) return inferred;
+
+  return {
+    mode: "none_only",
+    label: "No slice filter wired",
+    detail:
+      "This source has no verified slice wiring in codegen; partition_key is ignored unless you use REST API advanced mode.",
+    mechanism: "partition_key ignored",
+  };
 }
 
 export function runSlicesAllowed(sourceType: string): boolean {

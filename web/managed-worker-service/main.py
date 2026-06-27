@@ -171,6 +171,20 @@ def _inject_dlt_secret_aliases(env: dict[str, str]) -> dict[str, str]:
     if segment:
         out.setdefault("SEGMENT_ACCESS_TOKEN", segment)
         out.setdefault("SOURCES__SEGMENT__ACCESS_TOKEN", segment)
+    personio_id = out.get("PERSONIO_CLIENT_ID")
+    personio_secret = out.get("PERSONIO_CLIENT_SECRET")
+    if personio_id:
+        out.setdefault("SOURCES__PERSONIO__CLIENT_ID", personio_id)
+    if personio_secret:
+        out.setdefault("SOURCES__PERSONIO__CLIENT_SECRET", personio_secret)
+    strapi_token = out.get("STRAPI_API_TOKEN") or out.get("STRAPI_API_SECRET_KEY")
+    strapi_domain = out.get("STRAPI_DOMAIN") or out.get("STRAPI_BASE_URL")
+    if strapi_token:
+        out.setdefault("STRAPI_API_SECRET_KEY", strapi_token)
+        out.setdefault("SOURCES__STRAPI__API_SECRET_KEY", strapi_token)
+    if strapi_domain:
+        out.setdefault("STRAPI_DOMAIN", strapi_domain)
+        out.setdefault("SOURCES__STRAPI__DOMAIN", strapi_domain)
     return out
 
 

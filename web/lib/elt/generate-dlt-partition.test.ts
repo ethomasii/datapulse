@@ -115,4 +115,27 @@ describe("verified source run slice codegen", () => {
     expect(code).toContain('source_kwargs["until"]');
     expect(code).toContain("with_resources");
   });
+
+  it("sets personio incremental env bounds from partition_key", () => {
+    const code = generateVerifiedSourcePipeline({
+      name: "personio_sync",
+      sourceType: "personio",
+      destinationType: "motherduck",
+      sourceConfiguration: {},
+    } as PipelineRequest);
+    expect(code).toContain('"employees", "last_modified_at"');
+    expect(code).toContain('SOURCES__PERSONIO__" + _res.upper()');
+    expect(code).toContain('"START_DATE", pk[:10]');
+  });
+
+  it("wires strapi since/until from partition_key", () => {
+    const code = generateVerifiedSourcePipeline({
+      name: "strapi_sync",
+      sourceType: "strapi",
+      destinationType: "motherduck",
+      sourceConfiguration: { endpoints: ["articles"] },
+    } as PipelineRequest);
+    expect(code).toContain('source_kwargs["since"] = pk');
+    expect(code).toContain('source_kwargs["until"]');
+  });
 });

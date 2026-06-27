@@ -10,9 +10,7 @@ describe("run-slice-capabilities honesty", () => {
   });
 
   it("marks unwired incremental sources as none_only", () => {
-    for (const slug of ["personio", "strapi"]) {
-      expect(getRunSliceCapability(slug).mode).toBe("none_only");
-    }
+    expect(getRunSliceCapability("braze").mode).toBe("none_only");
   });
 
   it("allows slices for freshdesk", () => {
@@ -20,8 +18,17 @@ describe("run-slice-capabilities honesty", () => {
   });
 
   it("allows slices for newly exposed verified sources", () => {
-    for (const slug of ["pipedrive", "matomo", "workable"]) {
+    for (const slug of ["pipedrive", "matomo", "workable", "personio", "strapi"]) {
       expect(runSlicesAllowed(slug)).toBe(true);
     }
+  });
+
+  it("defaults unknown sources to none_only instead of optimistic slices", () => {
+    expect(getRunSliceCapability("some_unknown_saas").mode).toBe("none_only");
+  });
+
+  it("infers mux as full replace from verified spec + hub metadata", () => {
+    expect(runSlicesAllowed("mux")).toBe(false);
+    expect(getRunSliceCapability("mux").mode).toBe("none_only");
   });
 });

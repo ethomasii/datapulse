@@ -4,6 +4,8 @@
  */
 
 import type { SourceResourceNormalizer } from "./source-resource-mappings";
+import { getDltHubSource } from "./dlt-hub-registry";
+import { getIncrementalEnvConfig } from "./verified-incremental-env";
 import {
   normalizeHubspotResources,
   normalizeJiraResources,
@@ -42,7 +44,7 @@ export type VerifiedSourceSpec = {
   /** Optional end bound kwarg for day slices (e.g. end_date). */
   partitionEndKwarg?: string;
   /** How partition_key is applied when the factory has no single start_date arg. */
-  partitionSliceMode?: "jira_jql" | "asana_tasks" | "salesforce_incremental";
+  partitionSliceMode?: "jira_jql" | "asana_tasks" | "salesforce_incremental" | "dlt_incremental_env";
   /** Config key holding selected resource ids */
   resourceConfigKey?: string;
   alternateResourceConfigKeys?: string[];
@@ -277,6 +279,7 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
   personio: {
     module: "personio",
     factory: "personio_source",
+    partitionSliceMode: "dlt_incremental_env",
     credentials: [
       { param: "client_id", envKeys: ["PERSONIO_CLIENT_ID"] },
       { param: "client_secret", envKeys: ["PERSONIO_CLIENT_SECRET"] },
@@ -297,24 +300,60 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
       { param: "api_secret_key", envKeys: ["STRAPI_API_SECRET_KEY", "STRAPI_API_TOKEN"] },
       { param: "domain", envKeys: ["STRAPI_DOMAIN", "STRAPI_BASE_URL"] },
     ],
+    partitionKwarg: "since",
+    partitionEndKwarg: "until",
+    resourceConfigKey: "endpoints",
+    defaultResources: ["articles"],
   },
 };
+
+function enrichPartitionDefaults(slug: string, spec: VerifiedSourceSpec): VerifiedSourceSpec {
+  let next = spec;
+  if (getIncrementalEnvConfig(slug) && !next.partitionKwarg && !next.partitionSliceMode) {
+    next = { ...next, partitionSliceMode: "dlt_incremental_env" };
+  }
+  if (next.partitionKwarg || next.partitionSliceMode) {
+    return next;
+  }
+  const hub =
+    getDltHubSource(slug) ??
+    getDltHubSource(VERIFIED_SLUG_ALIASES[slug] ?? "") ??
+    getDltHubSource(Object.entries(VERIFIED_SLUG_ALIASES).find(([, v]) => v === slug)?.[0] ?? "");
+  if (!hub?.incremental) {
+    return next;
+  }
+  if (hub.params.includes("start_date")) {
+    return { ...next, partitionKwarg: "start_date", partitionEndKwarg: "end_date" };
+  }
+  if (hub.params.includes("since")) {
+    return { ...next, partitionKwarg: "since", partitionEndKwarg: "until" };
+  }
+  if (hub.params.includes("since_timestamp")) {
+    return { ...next, partitionKwarg: "since_timestamp" };
+  }
+  return next;
+}
+
+export function hasVerifiedSliceWiring(spec: VerifiedSourceSpec, slug: string): boolean {
+  if (spec.partitionKwarg || spec.partitionSliceMode) return true;
+  return Boolean(getIncrementalEnvConfig(slug));
+}
 
 export function resolveVerifiedSourceSpec(slug: string): VerifiedSourceSpec | null {
   const raw = slug.toLowerCase().trim();
   if (VERIFIED_GOLDEN_SLUGS.has(raw) || VERIFIED_SKIP_SLUGS.has(raw)) return null;
   const key = VERIFIED_SLUG_ALIASES[raw] ?? raw;
   const explicit = VERIFIED_SOURCE_SPECS[key];
-  if (explicit) return explicit;
+  if (explicit) return enrichPartitionDefaults(key, explicit);
   // Heuristic for verified packages without an explicit row yet.
   const importModule = key;
   const factory = key.includes(".") ? key : `${key.replace(/_dlt$/, "")}_source`;
   const prefix = key.toUpperCase().replace(/-/g, "_");
-  return {
+  return enrichPartitionDefaults(key, {
     module: importModule,
     factory,
     credentials: [{ param: "api_key", envKeys: [`${prefix}_API_KEY`, `${prefix}_ACCESS_TOKEN`, "API_KEY"] }],
-  };
+  });
 }
 
 export function isVerifiedPackageSource(slug: string): boolean {
