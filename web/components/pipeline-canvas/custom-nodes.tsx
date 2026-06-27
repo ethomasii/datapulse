@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { displayConnectorNodeHint } from "@/lib/elt/canvas-node-hints";
 import { useCanvasBindings } from "./canvas-bindings-context";
 import { TRANSFORM_TOOLS, transformToolBadge } from "./transform-tools";
-import { NodeAddStepMenu } from "./node-add-step-menu";
+import { NodeRightPort } from "./node-right-port";
 import type { CanvasNodeRef } from "./canvas-graph-actions-context";
 import { canAddStepAfterNode } from "@/lib/elt/canvas-node-append-after";
 
@@ -148,10 +148,11 @@ export function SourceNode({ id, data }: NodeProps) {
         accent="emerald"
         placeholder="Notes — scope, owner, credentials…"
       />
-      <Handle type="source" position={Position.Right} className={handleClass("emerald")} />
-      {canAddStepAfterNode({ id, type: "sourceNode", data, position: { x: 0, y: 0 } }) ? (
-        <NodeAddStepMenu node={nodeRef(id, "sourceNode", data as Record<string, unknown>)} className="absolute -right-3 top-1/2 z-10 -translate-y-1/2" />
-      ) : null}
+      <NodeRightPort
+        node={nodeRef(id, "sourceNode", data as Record<string, unknown>)}
+        accent="emerald"
+        allowAdd={canAddStepAfterNode({ id, type: "sourceNode", data, position: { x: 0, y: 0 } })}
+      />
     </div>
   );
 }
@@ -164,7 +165,7 @@ export function TransformNode({ id, data }: NodeProps) {
   const transformTool = String(data.transformTool ?? "");
 
   return (
-    <div className="relative min-w-[210px] max-w-[240px] shrink-0 rounded-xl border-2 border-amber-500/90 bg-white px-2 py-2 shadow-md dark:border-amber-600 dark:bg-amber-950/40">
+    <div className="relative min-w-[210px] max-w-[240px] shrink-0 overflow-visible rounded-xl border-2 border-amber-500/90 bg-white px-2 py-2 shadow-md dark:border-amber-600 dark:bg-amber-950/40">
       <Handle type="target" position={Position.Left} className={handleClass("amber")} />
       <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-amber-900 dark:text-amber-100">
         <ArrowRightLeft className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -228,10 +229,11 @@ export function TransformNode({ id, data }: NodeProps) {
         accent="amber"
         placeholder="Models, layers, tests…"
       />
-      <Handle type="source" position={Position.Right} className={handleClass("amber")} />
-      {canAddStepAfterNode({ id, type: "transformNode", data, position: { x: 0, y: 0 } }) ? (
-        <NodeAddStepMenu node={nodeRef(id, "transformNode", data as Record<string, unknown>)} className="absolute -right-3 top-1/2 z-10 -translate-y-1/2" />
-      ) : null}
+      <NodeRightPort
+        node={nodeRef(id, "transformNode", data as Record<string, unknown>)}
+        accent="amber"
+        allowAdd={canAddStepAfterNode({ id, type: "transformNode", data, position: { x: 0, y: 0 } })}
+      />
     </div>
   );
 }
@@ -274,10 +276,11 @@ export function DestinationNode({ id, data }: NodeProps) {
         accent="sky"
         placeholder="Notes — scope, owner, credentials…"
       />
-      <Handle type="source" position={Position.Right} className={handleClass("sky")} />
-      {canAddStepAfterNode({ id, type: "destNode", data, position: { x: 0, y: 0 } }) ? (
-        <NodeAddStepMenu node={nodeRef(id, "destNode", data as Record<string, unknown>)} className="absolute -right-3 top-1/2 z-10 -translate-y-1/2" />
-      ) : null}
+      <NodeRightPort
+        node={nodeRef(id, "destNode", data as Record<string, unknown>)}
+        accent="sky"
+        allowAdd={canAddStepAfterNode({ id, type: "destNode", data, position: { x: 0, y: 0 } })}
+      />
     </div>
   );
 }
@@ -340,13 +343,10 @@ export function ComponentNode({ id, data }: NodeProps) {
         </p>
       ) : null}
       {ports?.right !== false ? (
-        <Handle type="source" position={Position.Right} className={handleClass(accent)} />
-      ) : null}
-      {canAddStepAfterNode({ id, type: "componentNode", data: d, position: { x: 0, y: 0 } }) &&
-      ports?.right !== false ? (
-        <NodeAddStepMenu
+        <NodeRightPort
           node={nodeRef(id, "componentNode", d)}
-          className="absolute -right-3 top-1/2 z-10 -translate-y-1/2"
+          accent={accent}
+          allowAdd={canAddStepAfterNode({ id, type: "componentNode", data: d, position: { x: 0, y: 0 } })}
         />
       ) : null}
     </div>

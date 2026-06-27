@@ -6,7 +6,6 @@ import { createHash, createHmac, createPrivateKey, createPublicKey, createSign, 
 import { fetchGcpAccessToken } from "@/lib/elt/gcp-access-token";
 import { resolveDuckdbDatabaseLocation } from "@/lib/elt/duckdb-destination";
 import { readFetchJsonBody } from "@/lib/elt/fetch-json-body";
-import { openDuckdbReadOnly } from "@/lib/elt/duckdb-native";
 import { buildMotherduckDsn, motherduckDatabaseName, motherduckToken } from "@/lib/elt/motherduck-dsn";
 import { runMotherduckMcpQuery } from "@/lib/elt/motherduck-mcp-client";
 import { runMotherduckPostgresQuery } from "@/lib/elt/motherduck-pg-client";
@@ -1010,6 +1009,7 @@ async function introspectDuckdbFile(
   }
 
   try {
+    const { openDuckdbReadOnly } = await import("@/lib/elt/duckdb-native");
     const { db, conn } = await openDuckdbReadOnly(dbPath);
     const rows = await new Promise<string[][]>((resolve, reject) => {
       conn.all(
@@ -1051,6 +1051,7 @@ export async function runDuckdbFileReadOnlyQuery(
     throw new Error("Set a database path or location to query DuckDB/SQLite.");
   }
 
+  const { openDuckdbReadOnly } = await import("@/lib/elt/duckdb-native");
   const { db, conn } = await openDuckdbReadOnly(dbPath);
   try {
     const result = await new Promise<Record<string, unknown>[]>((resolve, reject) => {
