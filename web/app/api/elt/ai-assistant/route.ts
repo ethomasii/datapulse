@@ -45,6 +45,7 @@ import {
   type TransformBuildStep,
 } from "@/lib/elt/ai-transform-build";
 import { extractComponentsFromCanvas } from "@/lib/elt/canvas-component-sync";
+import { AI_COMPONENT_ROUTING_PROMPT, matchAiComponentIntent } from "@/lib/elt/ai-component-routing";
 import { getCanvasFromSourceConfig } from "@/lib/elt/canvas-source-config";
 import { validatePipelineCanvasGraph } from "@/lib/elt/validate-pipeline-canvas-graph";
 import type { Edge, Node } from "@xyflow/react";
@@ -105,7 +106,8 @@ When the user mentions monitors, sensors, quality checks, or data validation:
    - **data_cleansing** — trim strings, optional lowercase, drop all-null rows only. Does **not** fill nulls with literals.
    - When the user wants both string cleanup **and** null imputation, add **two** steps chained: \`data_cleansing\` then \`fill_nulls\` (pass both in one \`components[]\` or two \`add_component\` actions).
    - **sql_transform** (SQL Transform) — **fallback only** when **search_components** / **get_component_details** show no native operator fits. Use one \`sql_transform\` step with \`config.sql\` (CTAS/SELECT referencing the upstream table). Do **not** default to raw SQL when a native id exists (e.g. fill nulls → fill_nulls, not SQL).
-7. **AI / MCP** — use **list_mcp_server_catalog** for known integrations (Stripe, GitHub, **Dagster+**, **FastMCP**, **Prefect Horizon**, …); **list_mcp_servers** for workspace registrations. Custom tools: build with [FastMCP](https://gofastmcp.com), deploy via [Horizon](https://www.prefect.io/horizon), register the HTTP URL here, wire **litellm_agent**. Dagster+: \`https://mcp.agent.dagster.cloud/mcp/\` with Bearer token + \`Dagster-Cloud-Organization\` header. Native ids: **mcp_tool_call**, **litellm_agent**, **litellm_inference_asset**, **llm_evaluator**. See [agent family demo](https://dagster-component-ui.vercel.app/examples/agent_family).
+7. **AI / MCP** — ${AI_COMPONENT_ROUTING_PROMPT.replace(/\n/g, "\n   ")}
+   Use **list_mcp_server_catalog** for known integrations; **list_mcp_servers** for workspace registrations. See [agent family demo](https://dagster-component-ui.vercel.app/examples/agent_family).
 
 ## Curated playbooks (use list_pipeline_playbooks)
 ${listPlaybooksForPrompt()}
@@ -932,9 +934,25 @@ function toolSearchComponents(query: string, category?: string, compileTarget?: 
     compileTarget: compileTarget as ComponentCompileTarget | undefined,
     limit: 15,
   });
+  const intent = matchAiComponentIntent(query);
+  let components = items;
+  if (intent) {
+    const match = getComponentById(intent.componentId);
+    if (match && !components.some((c) => c.id === match.id)) {
+      components = [match, ...components];
+    }
+  }
+  const intentHint = intent
+    ? `Intent match: **${intent.componentId}** — ${intent.reason}${
+        intent.configHints ? ` Suggested config keys: ${Object.keys(intent.configHints).join(", ")}.` : ""
+      }`
+    : null;
   return {
     total,
-    components: items.map((c) => ({
+    intent: intent
+      ? { component_id: intent.componentId, reason: intent.reason, config_hints: intent.configHints ?? null }
+      : null,
+    components: components.map((c) => ({
       id: c.id,
       name: c.name,
       category: c.category,
@@ -944,9 +962,10 @@ function toolSearchComponents(query: string, category?: string, compileTarget?: 
       monitor_pair: c.monitorPair ?? null,
     })),
     hint:
-      items.length > 0
-        ? `Best match: ${items[0].name} (${items[0].id}) → compiles to ${items[0].compileTarget}. Use get_component_details for schema fields.`
-        : "No components matched — try search_sources for connector slugs or generate_pipeline directly.",
+      intentHint ??
+      (components.length > 0
+        ? `Best match: ${components[0].name} (${components[0].id}) → compiles to ${components[0].compileTarget}. Use get_component_details for schema fields.`
+        : "No components matched — try search_sources for connector slugs or generate_pipeline directly."),
   };
 }
 
@@ -1671,6 +1690,10 @@ When they describe a brand-new pipeline instead, use **generate_pipeline** witho
 3. **Edit a step's settings** — rename columns, change filter, etc.:
    - **edit_pipeline_canvas** with \`update_node_config\` on the target node id
 4. **Connect / rewire** — \`connect\` / \`disconnect\` actions only when asked
+5. **AI / structured extraction / RAG / agents** — follow the AI component picker table in the system prompt. Examples:
+   - "extract name and company from email body" → **litellm_structured_output** with \`text_column\`, \`schema_definition\`, \`output_table\`
+   - "run MCP agent on each support ticket" → **litellm_agent** with \`table\`, \`prompt_column\`, \`output_table\`, \`mcp_server_ids\`
+   - "summarize each row" → **litellm_inference_asset** (not agent unless tools/MCP needed)
 
 Do **NOT** call generate_pipeline, build_lake_pipeline, or build_transform_steps on this open pipeline unless the user explicitly asks to replace the entire pipeline.`;
       }

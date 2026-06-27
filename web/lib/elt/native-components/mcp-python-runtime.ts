@@ -196,6 +196,45 @@ def _eltpulse_dispatch_mcp_tool(servers, prefixed_name, args):
     if not srv_cfg:
         raise ValueError(f"No MCP server named {srv_name!r}")
     return asyncio.run(_eltpulse_mcp_call_tool_async(srv_cfg, tool_name, args, "text"))
+
+def _eltpulse_run_litellm_agent(user_prompt, system_prompt, model, api_key, max_iterations, servers, tools):
+    import litellm
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": user_prompt})
+    final = None
+    for _agent_i in range(max_iterations):
+        kwargs = {"model": model, "messages": messages, "api_key": api_key}
+        if tools:
+            kwargs["tools"] = tools
+        resp = litellm.completion(**kwargs)
+        msg = resp.choices[0].message
+        tool_calls = getattr(msg, "tool_calls", None) or []
+        if tool_calls:
+            messages.append({
+                "role": "assistant",
+                "content": msg.content or "",
+                "tool_calls": [
+                    {"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments or "{}"}}
+                    for tc in tool_calls
+                ],
+            })
+            for tc in tool_calls:
+                fn = tc.function.name
+                try:
+                    args = json.loads(tc.function.arguments or "{}")
+                except Exception:
+                    args = {}
+                try:
+                    tool_out = _eltpulse_dispatch_mcp_tool(servers, fn, args)
+                except Exception as tool_err:
+                    tool_out = f"tool error: {tool_err}"
+                messages.append({"role": "tool", "tool_call_id": tc.id, "content": str(tool_out)})
+            continue
+        final = msg.content
+        break
+    return final if final is not None else ""
 `.trim();
 
 let preambleInjected = false;
@@ -294,50 +333,78 @@ export function emitLitellmAgentPython(opts: {
     '    raise RuntimeError("litellm package required for agent components") from _e',
     "_agent_servers = " + serversPy,
     "_agent_tools = _eltpulse_mcp_tools_for_litellm(_agent_servers)",
-    "_agent_messages = []",
-    opts.systemPrompt
-      ? "_agent_messages.append({'role': 'system', 'content': " + JSON.stringify(opts.systemPrompt) + "})"
-      : "",
-    "_agent_messages.append({'role': 'user', 'content': " + JSON.stringify(opts.prompt) + "})",
     opts.apiKeyEnv
       ? `_agent_api_key = os.environ.get(${JSON.stringify(opts.apiKeyEnv)})`
       : "_agent_api_key = None",
-    "_agent_final = None",
-    "for _agent_i in range(" + String(opts.maxIterations) + "):",
-    "    _agent_kwargs = {",
-    "        'model': " + JSON.stringify(opts.model) + ",",
-    "        'messages': _agent_messages,",
-    "        'api_key': _agent_api_key,",
-    "    }",
-    "    if _agent_tools:",
-    "        _agent_kwargs['tools'] = _agent_tools",
-    "    _resp = litellm.completion(**_agent_kwargs)",
-    "    _msg = _resp.choices[0].message",
-    "    _tool_calls = getattr(_msg, 'tool_calls', None) or []",
-    "    if _tool_calls:",
-    "        _agent_messages.append({",
-    "            'role': 'assistant',",
-    "            'content': _msg.content or '',",
-    "            'tool_calls': [",
-    "                {'id': _tc.id, 'type': 'function', 'function': {'name': _tc.function.name, 'arguments': _tc.function.arguments or '{}'}}",
-    "                for _tc in _tool_calls",
-    "            ],",
-    "        })",
-    "        for _tc in _tool_calls:",
-    "            _fn = _tc.function.name",
-    "            try:",
-    "                _args = json.loads(_tc.function.arguments or '{}')",
-    "            except Exception:",
-    "                _args = {}",
-    "            try:",
-    "                _tool_out = _eltpulse_dispatch_mcp_tool(_agent_servers, _fn, _args)",
-    "            except Exception as _tool_err:",
-    "                _tool_out = f'tool error: {_tool_err}'",
-    "            _agent_messages.append({'role': 'tool', 'tool_call_id': _tc.id, 'content': str(_tool_out)})",
-    "        continue",
-    "    _agent_final = _msg.content",
-    "    break",
+    "_agent_system = " + JSON.stringify(opts.systemPrompt ?? ""),
+    "_agent_final = _eltpulse_run_litellm_agent("
+      + JSON.stringify(opts.prompt)
+      + ", _agent_system, "
+      + JSON.stringify(opts.model)
+      + ", _agent_api_key, "
+      + String(opts.maxIterations)
+      + ", _agent_servers, _agent_tools)",
     "print(f'[litellm_agent] {opts.label}: ' + str(_agent_final)[:200])",
+  ];
+}
+
+export function emitLitellmAgentPerRowPython(opts: {
+  label: string;
+  table: string;
+  promptColumn: string;
+  outputColumn: string;
+  promptPrefix?: string;
+  systemPrompt?: string;
+  model: string;
+  apiKeyEnv?: string;
+  maxIterations: number;
+  mcpServers: Array<Record<string, unknown>>;
+  outputTable: string;
+}): string[] {
+  const serversPy = JSON.stringify(
+    opts.mcpServers.map((s, idx) => {
+      const resolved = (s as { _resolved?: ResolvedMcpServer })._resolved ?? (s as ResolvedMcpServer);
+      const cfg = JSON.parse(resolvedServerToPythonCfg(resolved)) as Record<string, unknown>;
+      const wrapperName = (s as { name?: string }).name;
+      if (wrapperName) cfg.name = wrapperName;
+      else if (!cfg.name || cfg.name === "mcp") cfg.name = resolved.name ?? `mcp_${idx}`;
+      return cfg;
+    })
+  );
+
+  return [
+    `# ── litellm_agent (per-row): ${opts.label} ──`,
+    "import pandas as pd",
+    "try:",
+    "    import litellm",
+    "    _dest_client = pipeline._get_destination_clients(pipeline.state)[0]",
+    "    _sql = _dest_client.sql_client()",
+    `    _df = pd.read_sql('SELECT * FROM ${escapePyString(opts.table)}', _sql._engine)`,
+    `    _prompt_col = ${JSON.stringify(opts.promptColumn)}`,
+    `    _out_col = ${JSON.stringify(opts.outputColumn)}`,
+    "    _agent_servers = " + serversPy,
+    "    _agent_tools = _eltpulse_mcp_tools_for_litellm(_agent_servers)",
+    opts.apiKeyEnv
+      ? `    _agent_api_key = os.environ.get(${JSON.stringify(opts.apiKeyEnv)})`
+      : "    _agent_api_key = None",
+    "    _agent_system = " + JSON.stringify(opts.systemPrompt ?? ""),
+    opts.promptPrefix
+      ? `    _agent_prefix = ${JSON.stringify(opts.promptPrefix)}`
+      : "    _agent_prefix = None",
+    "    _out_vals = []",
+    "    for _, _row in _df.iterrows():",
+    "        _text = str(_row[_prompt_col])",
+    "        _user = f'{_agent_prefix}\\n\\n{_text}' if _agent_prefix else _text",
+    "        _out_vals.append(_eltpulse_run_litellm_agent("
+      + "_user, _agent_system, "
+      + JSON.stringify(opts.model)
+      + ", _agent_api_key, "
+      + String(opts.maxIterations)
+      + ", _agent_servers, _agent_tools))",
+    "    _df[_out_col] = _out_vals",
+    ...warehouseWriteLines(opts.outputTable).map((l) => "    " + l.trim()),
+    "except Exception as _agent_row_err:",
+    '    print(f"[litellm_agent] per-row warning: {_agent_row_err}")',
   ].filter(Boolean);
 }
 

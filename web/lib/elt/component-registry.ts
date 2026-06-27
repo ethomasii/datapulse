@@ -73,6 +73,20 @@ export const CATALOG_EXCLUDED_COMPONENT_IDS = new Set<string>(["freshness_check"
 /** Extra search phrases → component id (helps Pulse AI match natural language). */
 const COMPONENT_SEARCH_ALIASES: Record<string, string[]> = {
   alter_row: ["alter row", "alter rows", "alterrow", "cdc marker", "change type", "adf alter row"],
+  fill_nulls: ["fill nulls", "fill null", "impute nulls", "replace nulls", "null with n/a"],
+  litellm_structured_output: [
+    "structured output",
+    "extract fields",
+    "extract json",
+    "pydantic",
+    "json schema extraction",
+    "parse entities",
+  ],
+  litellm_function_calling: ["function calling", "tool calling per row", "openai tools"],
+  rag_pipeline: ["rag", "retrieval augmented", "vector search", "retrieve and generate"],
+  litellm_inference_asset: ["llm per row", "enrich column", "summarize each row", "llm enrichment"],
+  litellm_agent: ["llm agent", "mcp agent", "agent per row"],
+  mcp_tool_call: ["mcp tool", "deterministic mcp", "stripe refund"],
 };
 
 function searchQueryVariants(q: string): string[] {

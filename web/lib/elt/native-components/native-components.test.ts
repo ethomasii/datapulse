@@ -195,6 +195,33 @@ describe("native-components", () => {
     expect(listNativeComponents().length).toBe(77);
   });
 
+  it("litellm_agent per-row emits dataframe agent loop", () => {
+    const def = getNativeComponent("litellm_agent");
+    const out = def!.compile({
+      table: "staging.tickets",
+      prompt_column: "body",
+      output_table: "staging.agent_out",
+      output_column: "agent_output",
+      prompt: "",
+      _resolved_mcp_servers: [
+        {
+          name: "mock",
+          _resolved: {
+            id: "x",
+            name: "mock",
+            transport: "http",
+            config: { url: "https://example.com" },
+            secretEnvKeys: [],
+          },
+        },
+      ],
+    });
+    const code = out.python?.join("\n") ?? "";
+    expect(code).toContain("per-row");
+    expect(code).toContain("_eltpulse_run_litellm_agent");
+    expect(code).toContain("prompt_col");
+  });
+
   it("litellm_structured_output emits per-row extraction python", () => {
     const def = getNativeComponent("litellm_structured_output");
     const out = def!.compile({
