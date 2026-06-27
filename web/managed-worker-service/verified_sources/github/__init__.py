@@ -10,6 +10,67 @@ from dlt.sources import DltResource
 from .helpers import get_reactions_data, get_rest_pages, get_stargazers
 
 
+def _reactions_resource(
+    node_type: str,
+    resource_name: str,
+    owner: str,
+    name: str,
+    access_token: str,
+    items_per_page: int,
+    max_items: Optional[int],
+    since: Optional[str],
+    until: Optional[str],
+) -> DltResource:
+    """Build issues or pull_requests resource with merge + optional slice window."""
+
+    if since is not None:
+        @dlt.resource(
+            name=resource_name,
+            primary_key="number",
+            write_disposition="merge",
+        )
+        def _slice_resource() -> Iterator[TDataItems]:
+            for page in get_reactions_data(
+                node_type,
+                owner,
+                name,
+                access_token,
+                items_per_page,
+                max_items,
+                since=since,
+                until=until,
+            ):
+                yield page
+
+        return _slice_resource
+
+    @dlt.resource(
+        name=resource_name,
+        primary_key="number",
+        write_disposition="merge",
+    )
+    def _incremental_resource(
+        updated_at: dlt.sources.incremental[str] = dlt.sources.incremental(
+            "updatedAt",
+            initial_value="1970-01-01T00:00:00Z",
+            last_value_func=max,
+        ),
+    ) -> Iterator[TDataItems]:
+        for page in get_reactions_data(
+            node_type,
+            owner,
+            name,
+            access_token,
+            items_per_page,
+            max_items,
+            since=updated_at.start_value,
+            until=None,
+        ):
+            yield page
+
+    return _incremental_resource
+
+
 @dlt.source
 def github_reactions(
     owner: str,
@@ -17,32 +78,32 @@ def github_reactions(
     access_token: str = dlt.secrets.value,
     items_per_page: int = 100,
     max_items: Optional[int] = None,
+    since: Optional[str] = None,
+    until: Optional[str] = None,
 ) -> Sequence[DltResource]:
     """Get reactions associated with issues, pull requests and comments in the repo `name` with owner `owner`."""
     return (
-        dlt.resource(
-            get_reactions_data(
-                "issues",
-                owner,
-                name,
-                access_token,
-                items_per_page,
-                max_items,
-            ),
-            name="issues",
-            write_disposition="replace",
+        _reactions_resource(
+            "issues",
+            "issues",
+            owner,
+            name,
+            access_token,
+            items_per_page,
+            max_items,
+            since,
+            until,
         ),
-        dlt.resource(
-            get_reactions_data(
-                "pullRequests",
-                owner,
-                name,
-                access_token,
-                items_per_page,
-                max_items,
-            ),
-            name="pull_requests",
-            write_disposition="replace",
+        _reactions_resource(
+            "pullRequests",
+            "pull_requests",
+            owner,
+            name,
+            access_token,
+            items_per_page,
+            max_items,
+            since,
+            until,
         ),
     )
 
@@ -94,6 +155,6 @@ def github_stargazers(
                 max_items,
             ),
             name="stargazers",
-            write_disposition="replace",
+            write_disposition="merge",
         ),
     )

@@ -64,7 +64,10 @@ const SLING_INCREMENTAL: RunSliceCapability = {
 // ── Per-source registry ───────────────────────────────────────────────────────
 
 const CAPABILITIES: Record<string, RunSliceCapability> = {
-  github: { ...DLT_SINCE, mechanism: "github_reactions(since=partition_key)" },
+  github: {
+    ...DLT_SINCE,
+    mechanism: "github_reactions(since=partition_key, until=next_day for YYYY-MM-DD slices)",
+  },
   stripe: { ...DLT_SINCE, mechanism: "stripe_source(start_date=partition_key)" },
   shopify: { ...DLT_SINCE, mechanism: "shopify_source(start_date=partition_key)" },
   hubspot: { ...DLT_SINCE, mechanism: "hubspot_source(start_date=partition_key)" },

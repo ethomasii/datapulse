@@ -92,4 +92,21 @@ describe("generateDltPipeline github", () => {
     expect(code).not.toContain("commits");
     expect(code).not.toContain("workflows");
   });
+
+  it("wires partition_key to since/until for day slices and defaults merge", () => {
+    const code = generateDltPipeline({
+      name: "github_slice",
+      sourceType: "github",
+      destinationType: "motherduck",
+      sourceConfiguration: {
+        repo_owner: "dlt-hub",
+        repo_name: "dlt",
+        resources: ["issues"],
+      },
+    } as PipelineRequest);
+    expect(code).toContain("if partition_key:");
+    expect(code).toContain('source_kwargs["since"] = pk');
+    expect(code).toContain("timedelta(days=1)");
+    expect(code).toContain('write_disposition="merge"');
+  });
 });

@@ -93,9 +93,9 @@ import dlt
 from github import github_reactions, github_repo_events, github_stargazers
 
 def run(partition_key: str = None):
-    # partition_key: optional ISO date string, e.g. 2024-01-01
-    # When provided it is passed as the 'since' arg to github_reactions so only items
-    # updated on or after that date are fetched (date-based incremental load).
+    # partition_key: optional ISO date (YYYY-MM-DD) from Run slices / monitors.
+    # Passed as github_reactions(since=..., until=next_day) for bounded day backfills,
+    # or omitted for dlt incremental on updatedAt (daily cron / manual runs).
 
     # Resolve the GitHub PAT from the linked source connection (GITHUB_TOKEN env var)
     github_token = (
@@ -125,8 +125,21 @@ def run(partition_key: str = None):
         access_token=github_token,
     )
 
+    if partition_key:
+        from datetime import date, timedelta
+
+        pk = partition_key.strip()
+        source_kwargs["since"] = pk
+        # Day slice (YYYY-MM-DD): load items updated that calendar day only.
+        if len(pk) >= 10 and pk[4:5] == "-" and pk[7:8] == "-":
+            try:
+                day = date.fromisoformat(pk[:10])
+                source_kwargs["until"] = (day + timedelta(days=1)).isoformat()
+            except ValueError:
+                pass
+
     run_kwargs = dict(
-        write_disposition="${escapePyString(request.writeDisposition ?? "append")}",
+        write_disposition="${escapePyString(request.writeDisposition ?? "merge")}",
         loader_file_format="${escapePyString(request.fileFormat ?? "parquet")}",
     )
 
