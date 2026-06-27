@@ -7,6 +7,7 @@ import { generateDltPipeline } from "./generate-dlt";
 import { generateSlingReplication, slingReplicationToYaml } from "./generate-sling";
 import { generateTransformOnlyPipeline } from "./generate-transform-only";
 import { generateEltpulseWorkspaceYaml } from "./generate-eltpulse-workspace";
+import { wrapDltPipelineCodeForLiveTelemetry } from "./generate-eltpulse-run-reporting";
 import { isTransformOnlyPipeline } from "./pipeline-mode";
 import { normalizeSourceConfigurationForCodegen } from "./normalize-source-configuration";
 import type { CreatePipelineBody, PipelineRequest } from "./types";
@@ -101,7 +102,7 @@ export async function generatePipelineArtifacts(
   const tool = resolveTool(body);
 
   if (tool === "dlt") {
-    const pipelineCode = generateDltPipeline(req);
+    const pipelineCode = wrapDltPipelineCodeForLiveTelemetry(generateDltPipeline(req));
     const configData: Record<string, unknown> = {
       source_type: req.sourceType,
       destination_type: req.destinationType,

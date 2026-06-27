@@ -280,6 +280,16 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
     void loadRuns();
   }, [loadRuns]);
 
+  const hasActiveRuns = runs.some((r) => r.status === "pending" || r.status === "running");
+
+  useEffect(() => {
+    if (!hasActiveRuns) return;
+    const poll = window.setInterval(() => {
+      void loadRuns();
+    }, 3000);
+    return () => window.clearInterval(poll);
+  }, [hasActiveRuns, loadRuns]);
+
   useEffect(() => {
     if (initialPipelines.length === 0) {
       setRunNowPipelineId("");
@@ -423,7 +433,10 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
         const res = await fetch(`/api/elt/runs/${runIdFromUrl}`);
         if (!res.ok || cancelled) return;
         const data = await res.json();
-        if (!cancelled) setDetail({ run: data.run });
+        if (!cancelled) {
+          setDetail({ run: data.run });
+          void loadRuns();
+        }
       } catch {
         /* ignore transient poll errors */
       }
@@ -433,7 +446,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
       cancelled = true;
       window.clearInterval(poll);
     };
-  }, [runIdFromUrl, detail?.run?.status]);
+  }, [runIdFromUrl, detail?.run?.status, loadRuns]);
 
   async function openDetail(id: string) {
     const q = new URLSearchParams(searchParams.toString());

@@ -116,6 +116,149 @@ export function eltpulseAgentSystemMetricsPython(): string {
 `;
 }
 
+/** Inline Python helpers: PATCH telemetry while pipeline.run() is in flight. */
+export function eltpulseLiveTelemetryHelpersPython(): string {
+  return `
+# --- eltPulse live run telemetry ---
+def _eltpulse_run_patch_auth():
+    import os as _ep_os
+    _run_id = _ep_os.environ.get("ELTPULSE_RUN_ID", "").strip()
+    _base = _ep_os.environ.get("ELTPULSE_CONTROL_PLANE_URL", "").strip().rstrip("/")
+    _agent = _ep_os.environ.get("ELTPULSE_AGENT_TOKEN", "").strip()
+    _internal = _ep_os.environ.get("ELTPULSE_INTERNAL_API_SECRET", "").strip()
+    if not _run_id or not _base:
+        return None, None
+    if _agent:
+        return f"{_base}/api/agent/runs/{_run_id}", _agent
+    if _internal:
+        return f"{_base}/api/internal/managed-runs/{_run_id}", _internal
+    return None, None
+
+def _eltpulse_patch_run(body):
+    try:
+        import json as _ep_json
+        import urllib.request as _ep_urllib
+        _url, _auth = _eltpulse_run_patch_auth()
+        if not _url:
+            return
+        body = dict(body)
+        body.setdefault("status", "running")
+        _req = _ep_urllib.Request(
+            _url,
+            data=_ep_json.dumps(body).encode("utf-8"),
+            headers={"Authorization": f"Bearer {_auth}", "Content-Type": "application/json"},
+            method="PATCH",
+        )
+        with _ep_urllib.urlopen(_req, timeout=15) as _resp:
+            _resp.read()
+    except Exception:
+        pass
+
+def _eltpulse_emit_phase(phase):
+    _progress = {"extract": 15, "load": 70, "dbt": 90, "done": 100, "failed": 100}.get(phase, 50)
+    print(f"[eltpulse] phase:{phase}", flush=True)
+    _eltpulse_patch_run({
+        "telemetrySummary": {"currentPhase": phase, "progress": _progress},
+        "appendTelemetrySample": {"phase": phase, "progress": _progress},
+    })
+
+def _eltpulse_emit_resource(resource, rows, bytes_loaded=None):
+    summary = {"currentResource": resource, "rowsLoaded": int(rows)}
+    sample = {"resource": resource, "rows": int(rows)}
+    if bytes_loaded is not None:
+        summary["bytesLoaded"] = int(bytes_loaded)
+        sample["bytes"] = int(bytes_loaded)
+    msg = f"[eltpulse] resource:{resource} rows:{rows}"
+    if bytes_loaded is not None:
+        msg += f" bytes:{bytes_loaded}"
+    print(msg, flush=True)
+    _eltpulse_patch_run({"telemetrySummary": summary, "appendTelemetrySample": sample})
+
+def _eltpulse_parse_log_line(msg):
+    import re as _ep_re
+    m = _ep_re.search(r"\\[eltpulse\\]\\s+phase:(\\w+)", msg, _ep_re.I)
+    if m:
+        _eltpulse_emit_phase(m.group(1).lower())
+        return
+    m = _ep_re.search(r"\\[eltpulse\\]\\s+resource:([^\\s]+)\\s+rows:([\\d,]+)", msg, _ep_re.I)
+    if m:
+        _eltpulse_emit_resource(m.group(1), int(m.group(2).replace(",", "")))
+        return
+    m = _ep_re.search(r"rows\\s+processed\\s+so\\s+far:\\s*([\\d,]+)", msg, _ep_re.I)
+    if m:
+        rows = int(m.group(1).replace(",", ""))
+        _eltpulse_emit_resource("_progress", rows)
+        return
+    m = _ep_re.search(r"^\\s*-\\s*([^:]+):\\s*([\\d,]+)\\s+row\\(s\\)", msg, _ep_re.I)
+    if m:
+        _eltpulse_emit_resource(m.group(1).strip(), int(m.group(2).replace(",", "")))
+        return
+    m = _ep_re.search(r"([\\d,]+)\\s*rows\\s+loaded", msg, _ep_re.I)
+    if m:
+        rows = int(m.group(1).replace(",", ""))
+        _eltpulse_patch_run({"telemetrySummary": {"rowsLoaded": rows}, "appendTelemetrySample": {"rows": rows}})
+
+def _eltpulse_run_pipeline(pipeline, source, **kwargs):
+    import logging as _ep_logging
+    import threading as _ep_threading
+
+    class _EltpulseLogHandler(_ep_logging.Handler):
+        def emit(self, record):
+            try:
+                _eltpulse_parse_log_line(record.getMessage())
+            except Exception:
+                pass
+
+    _eltpulse_emit_phase("extract")
+    _stop = _ep_threading.Event()
+    _handler = _EltpulseLogHandler()
+    _handler.setLevel(_ep_logging.INFO)
+    _loggers = ("dlt", "dlt.pipeline", "dlt.extract", "dlt.normalize", "dlt.load", "dlt.common", "dlt.sources")
+    for _name in _loggers:
+        _lg = _ep_logging.getLogger(_name)
+        _lg.addHandler(_handler)
+        if _lg.level > _ep_logging.INFO:
+            _lg.setLevel(_ep_logging.INFO)
+
+    def _heartbeat():
+        while not _stop.wait(20.0):
+            _eltpulse_patch_run({"appendTelemetrySample": {"phase": "load", "progress": 70}})
+
+    _hb = _ep_threading.Thread(target=_heartbeat, daemon=True)
+    try:
+        _eltpulse_emit_phase("load")
+        _hb.start()
+        return pipeline.run(source, **kwargs)
+    finally:
+        _stop.set()
+        for _name in _loggers:
+            try:
+                _ep_logging.getLogger(_name).removeHandler(_handler)
+            except Exception:
+                pass
+# --- end eltPulse live run telemetry ---
+`;
+}
+
+/** Wrap generated dlt pipeline.py so runs PATCH live telemetry during pipeline.run(). */
+export function wrapDltPipelineCodeForLiveTelemetry(code: string): string {
+  if (!code.includes("pipeline.run(") || code.includes("_eltpulse_run_pipeline")) {
+    return code;
+  }
+  const wrapped = code.replace(/pipeline\.run\(/g, "_eltpulse_run_pipeline(pipeline, ");
+  const defIdx = wrapped.indexOf("\ndef run");
+  const insertAt = defIdx >= 0 ? defIdx : wrapped.indexOf("def run");
+  if (insertAt < 0) {
+    return eltpulseLiveTelemetryHelpersPython() + "\n" + wrapped;
+  }
+  return (
+    wrapped.slice(0, insertAt) +
+    "\n" +
+    eltpulseLiveTelemetryHelpersPython() +
+    wrapped.slice(insertAt)
+  );
+}
+
 /** After dlt pipeline.run(), emit resource markers + optional telemetry PATCH from load_info. */
 export function eltpulseReportLoadInfoPython(infoVar = "info"): string {
   const varName = infoVar.trim() || "info";
@@ -185,15 +328,26 @@ export function eltpulseReportLoadInfoPython(infoVar = "info"): string {
                                     _total_bytes += int(_fs)
 
             for _table, _r in _by_table.items():
-                print(f"[eltpulse] resource:{_table} rows:{_r}", flush=True)
+                if "_eltpulse_emit_resource" in globals():
+                    _eltpulse_emit_resource(_table, _r)
+                else:
+                    print(f"[eltpulse] resource:{_table} rows:{_r}", flush=True)
             if _total_rows > 0:
-                if _total_bytes > 0:
+                if "_eltpulse_emit_resource" in globals():
+                    _eltpulse_emit_resource("_total", _total_rows, _total_bytes if _total_bytes > 0 else None)
+                elif _total_bytes > 0:
                     print(f"[eltpulse] resource:_total rows:{_total_rows} bytes:{_total_bytes}", flush=True)
                 else:
                     print(f"[eltpulse] resource:_total rows:{_total_rows}", flush=True)
             elif _total_bytes > 0:
-                print(f"[eltpulse] resource:_total rows:0 bytes:{_total_bytes}", flush=True)
-            print("[eltpulse] phase:done", flush=True)
+                if "_eltpulse_emit_resource" in globals():
+                    _eltpulse_emit_resource("_total", 0, _total_bytes)
+                else:
+                    print(f"[eltpulse] resource:_total rows:0 bytes:{_total_bytes}", flush=True)
+            if "_eltpulse_emit_phase" in globals():
+                _eltpulse_emit_phase("done")
+            else:
+                print("[eltpulse] phase:done", flush=True)
         _eltpulse_report_load_info(${varName})
     except Exception as _elt_e:
         print(f"[eltpulse] load_info report skipped: {_elt_e}", flush=True)

@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import { getUserFromAgentToken } from "@/lib/agent/auth";
 import { db } from "@/lib/db/client";
-import { parseStoredConnectionSecrets } from "@/lib/elt/connection-secrets-store";
+import { resolveConnectionRuntimeSecrets } from "@/lib/elt/warehouse-destination-secrets";
 
 export async function GET(req: Request) {
   const user = await getUserFromAgentToken(req);
@@ -31,7 +31,12 @@ export async function GET(req: Request) {
       const { connectionSecretsEnc, ...rest } = r;
       return {
         ...rest,
-        secrets: parseStoredConnectionSecrets(connectionSecretsEnc),
+        secrets: resolveConnectionRuntimeSecrets(
+          r.connectionType as "source" | "destination",
+          r.connector,
+          connectionSecretsEnc,
+          r.config
+        ),
       };
     });
 

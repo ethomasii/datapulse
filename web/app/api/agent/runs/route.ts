@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
 import { getAgentAuthContext } from "@/lib/agent/auth";
 import { agentPollRunsWhere } from "@/lib/agent/gateway-routing";
+import { resolveExecutionPipelineCode } from "@/lib/elt/refresh-pipeline-artifacts-for-execution";
 
 /** Customer gateways must not pick runs reserved for eltPulse-operated workers. */
 const NOT_CUSTOMER_GATEWAY_POLL: RunIngestionExecutor[] = [
@@ -54,10 +55,35 @@ export async function GET(req: Request) {
           pipelineCode: true,
           configYaml: true,
           workspaceYaml: true,
+          description: true,
+          groupName: true,
         },
       },
     },
   });
 
-  return NextResponse.json({ runs });
+  const hydrated = await Promise.all(
+    runs.map(async (run) => {
+      if (!run.pipeline || (run.pipeline.tool !== "dlt" && run.pipeline.tool !== "sling")) {
+        return run;
+      }
+      const pipelineCode = await resolveExecutionPipelineCode(user.id, {
+        id: run.pipeline.id,
+        name: run.pipeline.name,
+        tool: run.pipeline.tool,
+        sourceType: run.pipeline.sourceType,
+        destinationType: run.pipeline.destinationType,
+        sourceConfiguration: run.pipeline.sourceConfiguration,
+        pipelineCode: run.pipeline.pipelineCode ?? "",
+        description: run.pipeline.description,
+        groupName: run.pipeline.groupName,
+      });
+      return {
+        ...run,
+        pipeline: { ...run.pipeline, pipelineCode },
+      };
+    })
+  );
+
+  return NextResponse.json({ runs: hydrated });
 }

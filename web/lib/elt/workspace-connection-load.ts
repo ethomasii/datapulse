@@ -1,7 +1,6 @@
 import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
-import { parseStoredConnectionSecrets } from "@/lib/elt/connection-secrets-store";
-import { mergeConnectionRuntimeSecrets } from "@/lib/elt/duckdb-destination";
+import { resolveConnectionRuntimeSecrets } from "@/lib/elt/warehouse-destination-secrets";
 
 export type LoadedWorkspaceConnection = {
   id: string;
@@ -36,10 +35,10 @@ export async function loadWorkspaceConnectionById(
     row.config && typeof row.config === "object" && !Array.isArray(row.config)
       ? (row.config as Record<string, unknown>)
       : {};
-  const secrets = mergeConnectionRuntimeSecrets(
+  const secrets = resolveConnectionRuntimeSecrets(
     row.connectionType as "source" | "destination",
     row.connector,
-    parseStoredConnectionSecrets(row.connectionSecretsEnc),
+    row.connectionSecretsEnc,
     config
   );
 

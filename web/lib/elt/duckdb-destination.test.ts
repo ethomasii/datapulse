@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mergeConnectionRuntimeSecrets, resolveDuckdbDatabaseLocation } from "./duckdb-destination";
+import { resolveConnectionRuntimeSecrets } from "./warehouse-destination-secrets";
 
 describe("resolveDuckdbDatabaseLocation", () => {
   it("prefers legacy env secrets", () => {
@@ -37,6 +38,17 @@ describe("mergeConnectionRuntimeSecrets", () => {
       MOTHERDUCK_TOKEN: "t",
       MOTHERDUCK_DATABASE: "my_db",
       DESTINATION__MOTHERDUCK__CREDENTIALS__DATABASE: "my_db",
+    });
+  });
+});
+
+describe("resolveConnectionRuntimeSecrets", () => {
+  it("maps motherduck config.database through agent-style resolution", () => {
+    expect(
+      resolveConnectionRuntimeSecrets("destination", "motherduck", null, { database: "analytics" })
+    ).toEqual({
+      MOTHERDUCK_DATABASE: "analytics",
+      DESTINATION__MOTHERDUCK__CREDENTIALS__DATABASE: "analytics",
     });
   });
 });
