@@ -10,6 +10,8 @@ const RESOURCE_MARKER = /\[eltpulse\]\s+resource:([^\s]+)\s+rows:(\d+)(?:\s+byte
 const ROWS_LOADED = /\b([\d,]+)\s*rows\s+loaded\b/i;
 const ROWS_SO_FAR = /rows\s+processed\s+so\s+far:\s*([\d,]+)/i;
 const BYTES_LOADED = /\b([\d,]+)\s*bytes\s+loaded\b/i;
+/** dlt normalize stdout: "- issues: 500 row(s)" */
+const DLT_TABLE_ROWS = /^\s*-\s*([^:]+):\s*([\d,]+)\s+row\(s\)\s*$/i;
 
 const PHASE_PROGRESS: Record<string, number> = {
   extract: 15,
@@ -100,6 +102,20 @@ export function parseLogLineForTelemetry(line: string): ParsedLogTelemetry | nul
         patch: {
           telemetrySummary: { bytesLoaded: bytes },
           appendTelemetrySample: { bytes },
+        },
+      };
+    }
+  }
+
+  const dltTableRows = trimmed.match(DLT_TABLE_ROWS);
+  if (dltTableRows) {
+    const resource = dltTableRows[1].trim();
+    const rows = parseIntLoose(dltTableRows[2]);
+    if (resource && rows !== undefined) {
+      return {
+        patch: {
+          telemetrySummary: { currentResource: resource, rowsLoaded: rows },
+          appendTelemetrySample: { resource, rows },
         },
       };
     }

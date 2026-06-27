@@ -63,6 +63,7 @@ import { EltLoadingState } from "@/components/elt/elt-loading-state";
 import { PipelineCodeModal } from "@/components/elt/pipeline-code-modal";
 import { getRunSliceCapability } from "@/lib/elt/run-slice-capabilities";
 import { PartitionConfigEditor } from "@/components/elt/partition-config-editor";
+import { PipelineRunButton } from "@/components/elt/pipeline-run-button";
 import { PipelineRunPanel } from "@/components/elt/pipeline-run-panel";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NewPipelineForm, PipelineKindPicker, type NewPipelineKind } from "@/components/elt/new-pipeline-form";
@@ -802,8 +803,10 @@ export function BuilderClient({
         }
       />
       <p className="-mt-4 max-w-3xl text-sm text-slate-500 dark:text-slate-400">
-          When you edit a pipeline, open <strong className="font-medium text-slate-600 dark:text-slate-300">Canvas</strong>{" "}
-          from the table row or the Form / Canvas tabs — same pipeline record either way.
+          Use <strong className="font-medium text-slate-600 dark:text-slate-300">Run</strong> on any row to queue a sync,
+          or open <strong className="font-medium text-slate-600 dark:text-slate-300">Edit</strong> for the full config and
+          canvas. <strong className="font-medium text-slate-600 dark:text-slate-300">History</strong> opens run logs on
+          the Runs page.
         </p>
 
       {canvasPickHint ? (
@@ -911,6 +914,12 @@ export function BuilderClient({
                       </button>
                     </td>
                     <td className="px-4 py-2 text-right">
+                      <PipelineRunButton
+                        pipelineId={p.id}
+                        pipelineName={p.name}
+                        inline
+                        className="mr-2 inline-block align-middle"
+                      />
                       <button
                         type="button"
                         onClick={() => startEdit(p.id)}
@@ -927,9 +936,9 @@ export function BuilderClient({
                       <Link
                         href={`/runs?pipeline=${encodeURIComponent(p.id)}`}
                         className="mr-2 inline-flex items-center gap-1 text-amber-700 hover:underline dark:text-amber-400"
-                        title="Chronological run log (every slice attempt)"
+                        title="Run history and logs (every slice attempt)"
                       >
-                        <History className="h-4 w-4" /> Runs
+                        <History className="h-4 w-4" /> History
                       </Link>
                       <Link
                         href={`/run-slices?pipeline=${encodeURIComponent(p.id)}`}

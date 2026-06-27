@@ -642,12 +642,14 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
         title="Runs"
         description={
           <>
-            Filter and inspect pipeline executions. Jump from{" "}
+            Filter, trigger, and inspect pipeline executions. Use{" "}
+            <strong className="font-medium text-slate-800 dark:text-slate-200">Run on demand</strong> below, or{" "}
+            <strong className="font-medium text-slate-800 dark:text-slate-200">Run</strong> on the{" "}
             <Link href="/builder" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
               Pipelines
             </Link>{" "}
-            with <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">?pipeline=…</code> for one
-            line&apos;s history. Open <strong className="font-medium text-slate-800 dark:text-slate-200">Details</strong>{" "}
+            page. Filter one line with <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">?pipeline=…</code>.
+            Open <strong className="font-medium text-slate-800 dark:text-slate-200">Details</strong>{" "}
             for correlation ID, full telemetry, and logs. Schedules live under{" "}
             <Link href="/orchestration" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
               Orchestration

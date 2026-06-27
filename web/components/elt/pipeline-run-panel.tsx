@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, CheckCircle2, Loader2, Play, XCircle } from "lucide-react";
 import { hintsForRunFailure } from "@/lib/elt/run-error-hints";
+import { triggerPipelineRun } from "@/lib/elt/trigger-pipeline-run";
 
 type RunRow = {
   id: string;
@@ -73,21 +74,7 @@ export function PipelineRunPanel({ pipelineId }: { pipelineId: string | null }) 
     setTriggering(true);
     setError(null);
     try {
-      const res = await fetch("/api/elt/runs", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pipelineId,
-          environment: "default",
-          status: "pending",
-          triggeredBy: "manual",
-        }),
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(typeof data.error === "string" ? data.error : `HTTP ${res.status}`);
-      }
+      await triggerPipelineRun({ pipelineId });
       await loadRuns();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to start run");

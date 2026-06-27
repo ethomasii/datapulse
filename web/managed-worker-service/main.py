@@ -48,6 +48,7 @@ _RESOURCE_MARKER = re.compile(
 _ROWS_LOADED = re.compile(r"\b([\d,]+)\s*rows\s+loaded\b", re.IGNORECASE)
 _ROWS_SO_FAR = re.compile(r"rows\s+processed\s+so\s+far:\s*([\d,]+)", re.IGNORECASE)
 _BYTES_LOADED = re.compile(r"\b([\d,]+)\s*bytes\s+loaded\b", re.IGNORECASE)
+_DLT_TABLE_ROWS = re.compile(r"^\s*-\s*([^:]+):\s*([\d,]+)\s+row\(s\)\s*$", re.IGNORECASE)
 _PHASE_PROGRESS = {"extract": 15, "load": 70, "dbt": 90, "done": 100, "failed": 100}
 
 _VERIFIED_SOURCES_ROOT = Path(__file__).resolve().parent / "verified_sources"
@@ -419,6 +420,19 @@ async def _append_log(
                         nbytes = int(bytes_loaded.group(1).replace(",", ""))
                         body["telemetrySummary"] = {"bytesLoaded": nbytes}
                         body["appendTelemetrySample"] = {"bytes": nbytes}
+                    else:
+                        dlt_table = _DLT_TABLE_ROWS.search(line)
+                        if dlt_table:
+                            resource = dlt_table.group(1).strip()
+                            rows = int(dlt_table.group(2).replace(",", ""))
+                            body["telemetrySummary"] = {
+                                "currentResource": resource,
+                                "rowsLoaded": rows,
+                            }
+                            body["appendTelemetrySample"] = {
+                                "resource": resource,
+                                "rows": rows,
+                            }
 
     await _patch(client, base, internal, run_id, body)
 

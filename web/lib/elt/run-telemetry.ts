@@ -185,6 +185,7 @@ export function deriveTelemetrySummaryFromLogEntries(rawLogs: unknown): Telemetr
   let rowsFinal: number | undefined;
   let maxRowsSoFar = 0;
   let sawSoFar = false;
+  let bytesFinal: number | undefined;
   let lastAt: string | undefined;
 
   for (const entry of rawLogs) {
@@ -194,6 +195,19 @@ export function deriveTelemetrySummaryFromLogEntries(rawLogs: unknown): Telemetr
       typeof (entry as { message?: unknown }).message === "string" ? (entry as { message: string }).message : "";
     if (!message) continue;
     if (at) lastAt = at;
+
+    const eltpulseTotal = message.match(
+      /\[eltpulse\]\s+resource:_total\s+rows:(\d+)(?:\s+bytes:(\d+))?/i
+    );
+    if (eltpulseTotal) {
+      const n = Number.parseInt(eltpulseTotal[1].replace(/,/g, ""), 10);
+      if (Number.isFinite(n) && n >= 0) rowsFinal = n;
+      if (eltpulseTotal[2]) {
+        const b = Number.parseInt(eltpulseTotal[2].replace(/,/g, ""), 10);
+        if (Number.isFinite(b) && b >= 0) bytesFinal = b;
+      }
+      continue;
+    }
 
     const completed = message.match(/\b([\d,]+)\s*rows\s+loaded\b/i);
     if (completed) {
@@ -208,11 +222,22 @@ export function deriveTelemetrySummaryFromLogEntries(rawLogs: unknown): Telemetr
         maxRowsSoFar = Math.max(maxRowsSoFar, n);
       }
     }
+
+    const dltTable = message.match(/^\s*\[stdout\]\s*-\s*([^:]+):\s*([\d,]+)\s+row\(s\)/i)
+      ?? message.match(/^\s*-\s*([^:]+):\s*([\d,]+)\s+row\(s\)/i);
+    if (dltTable) {
+      const n = Number.parseInt(dltTable[2].replace(/,/g, ""), 10);
+      if (Number.isFinite(n) && n >= 0) {
+        maxRowsSoFar = Math.max(maxRowsSoFar, n);
+        sawSoFar = true;
+      }
+    }
   }
 
   const out: TelemetrySummary = {};
   if (rowsFinal !== undefined) out.rowsLoaded = rowsFinal;
   else if (sawSoFar) out.rowsLoaded = maxRowsSoFar;
+  if (bytesFinal !== undefined) out.bytesLoaded = bytesFinal;
   if (lastAt) out.updatedAt = lastAt;
   return Object.keys(out).length > 0 ? out : null;
 }

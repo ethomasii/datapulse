@@ -127,26 +127,72 @@ export function eltpulseReportLoadInfoPython(infoVar = "info"): string {
                 return
             _total_rows = 0
             _total_bytes = 0
-            _loads = getattr(_info, "loads_ids", None) or []
+            _by_table = {}
+
+            def _add_table(_table, _rows):
+                nonlocal _total_rows
+                if not _table or not isinstance(_rows, (int, float)) or _rows <= 0:
+                    return
+                _r = int(_rows)
+                _key = str(_table)
+                _by_table[_key] = _by_table.get(_key, 0) + _r
+                _total_rows += _r
+
+            # Primary: normalize step row counts (dlt pipeline.run → LoadInfo with .pipeline.last_trace)
+            _pipeline = getattr(_info, "pipeline", None)
+            if _pipeline is not None:
+                _trace = getattr(_pipeline, "last_trace", None)
+                if _trace is not None:
+                    _norm = getattr(_trace, "last_normalize_info", None)
+                    if _norm is not None:
+                        _counts = getattr(_norm, "row_counts", None) or {}
+                        if isinstance(_counts, dict):
+                            for _table, _cnt in _counts.items():
+                                _add_table(_table, _cnt)
+
+            # Bytes from completed load jobs
+            for _pkg in (getattr(_info, "load_packages", None) or []):
+                _jobs = getattr(_pkg, "jobs", None)
+                if not isinstance(_jobs, dict):
+                    continue
+                for _job in (_jobs.get("completed_jobs") or []):
+                    _fs = int(getattr(_job, "file_size", 0) or 0)
+                    if _fs > 0:
+                        _total_bytes += _fs
+
+            # Fallback: table_metrics on step metrics (older/alternate dlt shapes)
             _metrics = getattr(_info, "metrics", None)
-            if _metrics is not None:
-                for _k, _v in (getattr(_metrics, "__dict__", {}) or {}).items():
-                    if "row" in str(_k).lower() and isinstance(_v, (int, float)) and _v >= 0:
-                        _total_rows = max(_total_rows, int(_v))
-            _job = getattr(_info, "load_packages", None)
-            if _job:
-                for _pkg in _job:
-                    for _table, _tbl_info in (getattr(_pkg, "jobs", None) or {}).items():
-                        _rows = getattr(_tbl_info, "row_counts", None)
-                        if isinstance(_rows, dict):
-                            _r = sum(int(v) for v in _rows.values() if isinstance(v, (int, float)))
+            if isinstance(_metrics, dict):
+                for _mlist in _metrics.values():
+                    for _m in (_mlist or []):
+                        _table_metrics = None
+                        if isinstance(_m, dict):
+                            _table_metrics = _m.get("table_metrics")
                         else:
-                            _r = int(getattr(_tbl_info, "rows_count", 0) or 0)
-                        if _r > 0:
-                            print(f"[eltpulse] resource:{_table} rows:{_r}", flush=True)
-                            _total_rows = max(_total_rows, _r)
+                            _table_metrics = getattr(_m, "table_metrics", None) if hasattr(_m, "table_metrics") else None
+                        if not isinstance(_table_metrics, dict):
+                            continue
+                        for _tname, _tm in _table_metrics.items():
+                            _ic = getattr(_tm, "items_count", None)
+                            if _ic is None and isinstance(_tm, dict):
+                                _ic = _tm.get("items_count")
+                            if _ic:
+                                _add_table(_tname, _ic)
+                                _fs = getattr(_tm, "file_size", None)
+                                if _fs is None and isinstance(_tm, dict):
+                                    _fs = _tm.get("file_size")
+                                if _fs:
+                                    _total_bytes += int(_fs)
+
+            for _table, _r in _by_table.items():
+                print(f"[eltpulse] resource:{_table} rows:{_r}", flush=True)
             if _total_rows > 0:
-                print(f"[eltpulse] resource:_total rows:{_total_rows}", flush=True)
+                if _total_bytes > 0:
+                    print(f"[eltpulse] resource:_total rows:{_total_rows} bytes:{_total_bytes}", flush=True)
+                else:
+                    print(f"[eltpulse] resource:_total rows:{_total_rows}", flush=True)
+            elif _total_bytes > 0:
+                print(f"[eltpulse] resource:_total rows:0 bytes:{_total_bytes}", flush=True)
             print("[eltpulse] phase:done", flush=True)
         _eltpulse_report_load_info(${varName})
     except Exception as _elt_e:

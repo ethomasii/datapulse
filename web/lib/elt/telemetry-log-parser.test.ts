@@ -19,4 +19,10 @@ describe("parseLogLineForTelemetry", () => {
     const r = parseLogLineForTelemetry("Finished: 1,234 rows loaded into warehouse");
     expect(r?.patch.telemetrySummary?.rowsLoaded).toBe(1234);
   });
+
+  it("parses dlt normalize table row lines", () => {
+    const r = parseLogLineForTelemetry("- issues: 500 row(s)");
+    expect(r?.patch.telemetrySummary?.rowsLoaded).toBe(500);
+    expect(r?.patch.telemetrySummary?.currentResource).toBe("issues");
+  });
 });
