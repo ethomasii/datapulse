@@ -23,9 +23,10 @@ type PreviewPaneProps = {
   pipelineId: string;
   config: Record<string, unknown>;
   className?: string;
+  onDiagnosticChange?: (message: string | null) => void;
 };
 
-function PreviewPane({ title, table, pipelineId, config, className }: PreviewPaneProps) {
+function PreviewPane({ title, table, pipelineId, config, className, onDiagnosticChange }: PreviewPaneProps) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PreviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +35,7 @@ function PreviewPane({ title, table, pipelineId, config, className }: PreviewPan
     if (!table) return;
     setLoading(true);
     setError(null);
+    onDiagnosticChange?.(null);
     try {
       const res = await fetch(`/api/elt/pipelines/${encodeURIComponent(pipelineId)}/preview`, {
         method: "POST",
@@ -45,13 +47,16 @@ function PreviewPane({ title, table, pipelineId, config, className }: PreviewPan
       if (!res.ok) throw new Error(data.error ?? "Preview failed");
       if (data.ok === false) throw new Error(data.message ?? data.error ?? "Preview failed");
       setResult(data);
+      onDiagnosticChange?.(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Preview failed");
+      const msg = e instanceof Error ? e.message : "Preview failed";
+      setError(msg);
+      onDiagnosticChange?.(msg);
       setResult(null);
     } finally {
       setLoading(false);
     }
-  }, [pipelineId, config, table]);
+  }, [pipelineId, config, table, onDiagnosticChange]);
 
   const configKey = JSON.stringify(config);
 
@@ -59,11 +64,12 @@ function PreviewPane({ title, table, pipelineId, config, className }: PreviewPan
     if (!table) {
       setResult(null);
       setError(null);
+      onDiagnosticChange?.(null);
       return;
     }
     const t = setTimeout(() => void load(), 350);
     return () => clearTimeout(t);
-  }, [table, load, configKey]);
+  }, [table, load, configKey, onDiagnosticChange]);
 
   return (
     <div className={clsx("flex min-h-0 min-w-0 flex-1 flex-col border-r border-slate-200 last:border-r-0 dark:border-slate-800", className)}>
@@ -118,10 +124,19 @@ type Props = {
   /** Live config from inspector (may be ahead of focus snapshot). */
   liveConfig?: Record<string, unknown> | null;
   className?: string;
+  onInputDiagnosticChange?: (message: string | null) => void;
+  onOutputDiagnosticChange?: (message: string | null) => void;
 };
 
 /** Lakeflow-style bottom strip — input vs output sample rows for the selected step. */
-export function CanvasPreviewPanel({ pipelineId, focus, liveConfig, className }: Props) {
+export function CanvasPreviewPanel({
+  pipelineId,
+  focus,
+  liveConfig,
+  className,
+  onInputDiagnosticChange,
+  onOutputDiagnosticChange,
+}: Props) {
   if (focus.kind !== "component") {
     return (
       <section
@@ -149,8 +164,20 @@ export function CanvasPreviewPanel({ pipelineId, focus, liveConfig, className }:
       )}
       aria-label="Data preview"
     >
-      <PreviewPane title="Input data preview" table={inputTable} pipelineId={pipelineId} config={config} />
-      <PreviewPane title="Output data preview" table={outputTable} pipelineId={pipelineId} config={config} />
+      <PreviewPane
+        title="Input data preview"
+        table={inputTable}
+        pipelineId={pipelineId}
+        config={config}
+        onDiagnosticChange={onInputDiagnosticChange}
+      />
+      <PreviewPane
+        title="Output data preview"
+        table={outputTable}
+        pipelineId={pipelineId}
+        config={config}
+        onDiagnosticChange={onOutputDiagnosticChange}
+      />
     </section>
   );
 }

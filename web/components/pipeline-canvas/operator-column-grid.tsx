@@ -18,6 +18,7 @@ type Props = {
   config: Record<string, unknown>;
   readOnly?: boolean;
   onChange: (next: Record<string, unknown>) => void;
+  onDiagnosticChange?: (message: string | null) => void;
 };
 
 function parseMapping(raw: unknown): Record<string, string> {
@@ -65,6 +66,7 @@ export function OperatorColumnGrid({
   config,
   readOnly = false,
   onChange,
+  onDiagnosticChange,
 }: Props) {
   const [columns, setColumns] = useState<ColumnMeta[]>([]);
   const [loading, setLoading] = useState(false);
@@ -76,10 +78,12 @@ export function OperatorColumnGrid({
     const tableRef = inputTable ? stripDuckdbCatalogPrefix(inputTable) : null;
     if (!tableRef) {
       setColumns([]);
+      onDiagnosticChange?.(null);
       return;
     }
     setLoading(true);
     setError(null);
+    onDiagnosticChange?.(null);
     try {
       const res = await fetch(`/api/elt/pipelines/${encodeURIComponent(pipelineId)}/preview`, {
         method: "POST",
@@ -105,25 +109,28 @@ export function OperatorColumnGrid({
             ? Object.keys(data.rows[0])
             : [];
       if (!names.length) {
-        setColumns([]);
-        setError(
-          friendlyColumnLoadError(
-            data.message ??
-              `No columns found for ${data.table ?? tableRef}. Run a sync and confirm your MotherDuck connection Database (e.g. my_db) matches where dlt wrote data.`,
-            data.table ?? tableRef
-          )
+        const msg = friendlyColumnLoadError(
+          data.message ??
+            `No columns found for ${data.table ?? tableRef}. Run a sync and confirm your MotherDuck connection Database (e.g. my_db) matches where dlt wrote data.`,
+          data.table ?? tableRef
         );
+        setColumns([]);
+        setError(msg);
+        onDiagnosticChange?.(msg);
         return;
       }
       setColumns(names.map((name) => ({ name })));
+      onDiagnosticChange?.(null);
     } catch (e) {
       const raw = e instanceof Error ? e.message : "Column load failed";
-      setError(friendlyColumnLoadError(raw, tableRef));
+      const msg = friendlyColumnLoadError(raw, tableRef);
+      setError(msg);
+      onDiagnosticChange?.(msg);
       setColumns([]);
     } finally {
       setLoading(false);
     }
-  }, [pipelineId, inputTable]);
+  }, [pipelineId, inputTable, onDiagnosticChange]);
 
   useEffect(() => {
     const t = setTimeout(() => void loadColumns(), 250);

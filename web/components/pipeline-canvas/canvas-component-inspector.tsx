@@ -42,6 +42,7 @@ type Props = {
   hideInlinePreview?: boolean;
   /** Debounced auto-apply config patches to the canvas node (live preview). */
   autoApply?: boolean;
+  onColumnDiagnosticChange?: (message: string | null) => void;
 };
 
 export function CanvasComponentInspector({
@@ -52,6 +53,7 @@ export function CanvasComponentInspector({
   onPatch,
   hideInlinePreview = false,
   autoApply = false,
+  onColumnDiagnosticChange,
 }: Props) {
   const componentId = String(initialData.componentId ?? "");
   const [detail, setDetail] = useState<ComponentDetail | null>(null);
@@ -219,6 +221,7 @@ export function CanvasComponentInspector({
           config={config}
           readOnly={readOnly}
           onChange={(next) => applyConfig(next, true)}
+          onDiagnosticChange={onColumnDiagnosticChange}
         />
       ) : null}
 

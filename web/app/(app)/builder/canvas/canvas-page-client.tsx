@@ -21,6 +21,12 @@ import { GuidedSourceBlock } from "@/components/elt/guided-source-block";
 import { useLinkedConnectionMeta } from "@/lib/hooks/use-linked-connection-meta";
 import { CanvasTransformInspector } from "@/components/pipeline-canvas/canvas-transform-inspector";
 import { CanvasComponentInspector } from "@/components/pipeline-canvas/canvas-component-inspector";
+import { OperatorDiagnosticsPanel } from "@/components/pipeline-canvas/operator-diagnostics-panel";
+import {
+  buildOperatorDiagnostic,
+  mergeOperatorDiagnostics,
+  type OperatorDiagnostic,
+} from "@/lib/elt/operator-diagnostics";
 import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 import { builderUrl, parseBuilderCanvasTab, type BuilderCanvasTab } from "@/lib/elt/builder-nav";
 import type { DbtTransformNodeData } from "@/lib/elt/dbt-canvas";
@@ -162,6 +168,26 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
 
   const canvasControlRef = useRef<PipelineCanvasControl | null>(null);
   const [inspectorFocus, setInspectorFocus] = useState<CanvasInspectorFocus>({ kind: "none" });
+  const [stepDiagnostics, setStepDiagnostics] = useState<OperatorDiagnostic[]>([]);
+
+  const reportStepDiagnostic = useCallback(
+    (id: OperatorDiagnostic["id"], source: OperatorDiagnostic["source"], message: string | null) => {
+      setStepDiagnostics((prev) =>
+        mergeOperatorDiagnostics(
+          prev,
+          id,
+          message
+            ? buildOperatorDiagnostic(id, { source, severity: "error", message })
+            : null
+        )
+      );
+    },
+    []
+  );
+
+  useEffect(() => {
+    setStepDiagnostics([]);
+  }, [inspectorFocus.kind === "component" ? inspectorFocus.nodeId : ""]);
 
   const selectedStepLabel = useMemo(() => {
     if (inspectorFocus.kind === "component") {
@@ -787,6 +813,9 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
               Tables and step settings in one place — wire upstream nodes on the graph to auto-fill inputs.
             </p>
           </div>
+          {stepDiagnostics.length ? (
+            <OperatorDiagnosticsPanel diagnostics={stepDiagnostics} />
+          ) : null}
           <CanvasComponentInspector
             key={focus.nodeId}
             nodeId={focus.nodeId}
@@ -795,6 +824,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
             readOnly={!canWrite}
             hideInlinePreview
             autoApply
+            onColumnDiagnosticChange={(msg) => reportStepDiagnostic("columns", "columns", msg)}
             onPatch={(p) => canvasControlRef.current?.patchNodeData(focus.nodeId, p)}
           />
         </div>
@@ -1105,12 +1135,19 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
             onReplaceGraph={(nodes, edges) => canvasControlRef.current?.replaceGraph(nodes, edges)}
             onPipelinePatched={() => void loadPipelineGraph(selectedId)}
           />
-          <CanvasPreviewPanel
-            pipelineId={selectedId}
-            focus={inspectorFocus}
-            liveConfig={liveStepConfig}
-            className="h-48 shrink-0 xl:h-56 2xl:h-64"
-          />
+          <div className="flex shrink-0 flex-col">
+            {stepDiagnostics.length ? (
+              <OperatorDiagnosticsPanel variant="strip" diagnostics={stepDiagnostics} />
+            ) : null}
+            <CanvasPreviewPanel
+              pipelineId={selectedId}
+              focus={inspectorFocus}
+              liveConfig={liveStepConfig}
+              className="h-48 shrink-0 xl:h-56 2xl:h-64"
+              onInputDiagnosticChange={(msg) => reportStepDiagnostic("input_preview", "input_preview", msg)}
+              onOutputDiagnosticChange={(msg) => reportStepDiagnostic("output_preview", "output_preview", msg)}
+            />
+          </div>
           <DesignerMobileChrome
             operators={
               <OperatorsSidebar
