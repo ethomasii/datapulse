@@ -144,6 +144,27 @@ def _inject_dlt_secret_aliases(env: dict[str, str]) -> dict[str, str]:
     if workable_sub:
         out.setdefault("WORKABLE_SUBDOMAIN", workable_sub)
         out.setdefault("SOURCES__WORKABLE__SUBDOMAIN", workable_sub)
+    notion = out.get("NOTION_TOKEN") or out.get("NOTION_API_KEY")
+    if notion:
+        out.setdefault("NOTION_TOKEN", notion)
+        out.setdefault("NOTION_API_KEY", notion)
+        out.setdefault("SOURCES__NOTION__API_KEY", notion)
+    airtable = out.get("AIRTABLE_API_KEY") or out.get("AIRTABLE_ACCESS_TOKEN")
+    if airtable:
+        out.setdefault("AIRTABLE_API_KEY", airtable)
+        out.setdefault("AIRTABLE_ACCESS_TOKEN", airtable)
+        out.setdefault("SOURCES__AIRTABLE__ACCESS_TOKEN", airtable)
+    intercom = out.get("INTERCOM_ACCESS_TOKEN")
+    if intercom:
+        out.setdefault("SOURCES__INTERCOM__ACCESS_TOKEN", intercom)
+    mixpanel = out.get("MIXPANEL_API_SECRET") or out.get("MIXPANEL_SECRET")
+    if mixpanel:
+        out.setdefault("MIXPANEL_API_SECRET", mixpanel)
+        out.setdefault("SOURCES__MIXPANEL__API_SECRET", mixpanel)
+    segment = out.get("SEGMENT_ACCESS_TOKEN") or out.get("SEGMENT_API_TOKEN")
+    if segment:
+        out.setdefault("SEGMENT_ACCESS_TOKEN", segment)
+        out.setdefault("SOURCES__SEGMENT__ACCESS_TOKEN", segment)
     return out
 
 

@@ -24,6 +24,7 @@ DEFAULT_SOURCES = (
   "salesforce",
   "zendesk",
   "notion",
+  "airtable",
 )
 
 ROOT = Path(__file__).resolve().parents[1]

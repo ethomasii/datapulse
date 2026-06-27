@@ -42,6 +42,8 @@ def notion_pages(
 def notion_databases(
     database_ids: Optional[List[Dict[str, str]]] = None,
     api_key: str = dlt.secrets.value,
+    since: Optional[str] = None,
+    until: Optional[str] = None,
 ) -> Iterator[DltResource]:
     """
     Retrieves data from Notion databases.
@@ -57,6 +59,8 @@ def notion_databases(
         DltResource: Data resources from Notion databases.
     """
     notion_client = NotionClient(api_key)
+    time_filter = _notion_time_filter(since, until)
+    write_disposition = "merge" if time_filter else "replace"
 
     if database_ids is None:
         search_results = notion_client.search(
@@ -77,8 +81,30 @@ def notion_databases(
 
         notion_database = NotionDatabase(database["id"], notion_client)
         yield dlt.resource(  # type: ignore
-            notion_database.query(),
+            notion_database.query(filter_criteria=time_filter),
             primary_key="id",
             name=database["use_name"],
-            write_disposition="replace",
+            write_disposition=write_disposition,
         )
+
+
+def _notion_time_filter(
+    since: Optional[str], until: Optional[str]
+) -> Optional[Dict[str, object]]:
+    """Build Notion database query filter on last_edited_time for run slices."""
+    parts: List[Dict[str, object]] = []
+    if since:
+        iso = since if "T" in since else f"{since[:10]}T00:00:00.000Z"
+        parts.append(
+            {"timestamp": "last_edited_time", "last_edited_time": {"on_or_after": iso}}
+        )
+    if until:
+        iso = until if "T" in until else f"{until[:10]}T00:00:00.000Z"
+        parts.append(
+            {"timestamp": "last_edited_time", "last_edited_time": {"before": iso}}
+        )
+    if not parts:
+        return None
+    if len(parts) == 1:
+        return parts[0]
+    return {"and": parts}

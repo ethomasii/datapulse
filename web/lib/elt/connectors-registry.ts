@@ -445,6 +445,7 @@ const STORAGE_CONNECTORS: ConnectorDef[] = [
       { key: "warehouse", label: "Warehouse URI", type: "text", required: true, placeholder: "s3://my-lake/warehouse/" },
       { key: "namespace", label: "Namespace", type: "text", required: false },
       { key: "table", label: "Table name", type: "text", required: false, help: "Optional — omit to sync all tables in namespace" },
+      { key: "slice_column", label: "Slice column", type: "text", required: false, help: "Column for run-slice row filters (e.g. event_date). Omit for full table scans." },
       { key: "table_format", label: "Table format", type: "text", default: "iceberg" },
     ],
   },
@@ -679,6 +680,13 @@ const API_CONNECTORS: ConnectorDef[] = [
     credentialFields: [
       { key: "INTERCOM_ACCESS_TOKEN", label: "Access Token", type: "password", required: true, help: "Find in Intercom Developer Hub" },
     ],
+    sourceConfigFields: [
+      { key: "region", label: "Data region", type: "select", default: "us", options: [
+        { value: "us", label: "US (api.intercom.io)" },
+        { value: "eu", label: "EU (api.eu.intercom.io)" },
+        { value: "au", label: "AU (api.au.intercom.io)" },
+      ]},
+    ],
   },
   {
     slug: "mixpanel",
@@ -688,6 +696,9 @@ const API_CONNECTORS: ConnectorDef[] = [
     credentialFields: [
       { key: "MIXPANEL_API_SECRET", label: "API Secret", type: "password", required: true, help: "Find in Project Settings" },
     ],
+    sourceConfigFields: [
+      { key: "project_id", label: "Project ID", type: "text", required: true, help: "Numeric project ID from Mixpanel project settings" },
+    ],
   },
   {
     slug: "segment",
@@ -695,7 +706,8 @@ const API_CONNECTORS: ConnectorDef[] = [
     connectionTypes: ["source"],
     category: "APIs & SaaS",
     credentialFields: [
-      { key: "SEGMENT_WRITE_KEY", label: "Write Key", type: "password", required: true, help: "Find in Source Settings" },
+      { key: "SEGMENT_ACCESS_TOKEN", label: "Config API Token", type: "password", required: true, help: "Workspace token for Segment Public API (not the source write key)" },
+      { key: "SEGMENT_WRITE_KEY", label: "Write Key (optional)", type: "password", required: false, help: "For event ingestion only — not used by this connector" },
     ],
   },
   {

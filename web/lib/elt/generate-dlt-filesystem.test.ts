@@ -79,3 +79,59 @@ describe("generateDltPipeline postgres dlt slices", () => {
     expect(code).toContain("SOURCES__SQL_DATABASE__");
   });
 });
+
+describe("generateDltPipeline context REST sources", () => {
+  it("generates intercom REST pipeline with partition override", () => {
+    const code = generateDltPipeline({
+      name: "intercom_sync",
+      sourceType: "intercom",
+      destinationType: "motherduck",
+      sourceConfiguration: {},
+    } as PipelineRequest);
+    expect(code).toContain("INTERCOM_ACCESS_TOKEN");
+    expect(code).toContain("rest_api_source(config)");
+    expect(code).toContain('inc["initial_value"] = pk');
+  });
+
+  it("generates mixpanel export with from_date when partition_key set", () => {
+    const code = generateDltPipeline({
+      name: "mixpanel_events",
+      sourceType: "mixpanel",
+      destinationType: "motherduck",
+      sourceConfiguration: { project_id: "12345" },
+    } as PipelineRequest);
+    expect(code).toContain("MIXPANEL_API_SECRET");
+    expect(code).toContain("data.mixpanel.com/api/2.0/export");
+    expect(code).toContain("from_date = pk[:10]");
+  });
+
+  it("generates segment Config API pipeline", () => {
+    const code = generateDltPipeline({
+      name: "segment_catalog",
+      sourceType: "segment",
+      destinationType: "motherduck",
+      sourceConfiguration: {},
+    } as PipelineRequest);
+    expect(code).toContain("SEGMENT_ACCESS_TOKEN");
+    expect(code).toContain("api.segmentapis.com");
+  });
+});
+
+describe("generateDltPipeline iceberg source", () => {
+  it("generates pyiceberg scan pipeline with slice column", () => {
+    const code = generateDltPipeline({
+      name: "iceberg_sync",
+      sourceType: "iceberg",
+      destinationType: "motherduck",
+      sourceConfiguration: {
+        warehouse: "s3://lake/warehouse/",
+        namespace: "analytics",
+        table: "events",
+        slice_column: "event_date",
+      },
+    } as PipelineRequest);
+    expect(code).toContain("from pyiceberg.catalog import load_catalog");
+    expect(code).toContain('slice_column = "event_date"');
+    expect(code).toContain("row_filter");
+  });
+});

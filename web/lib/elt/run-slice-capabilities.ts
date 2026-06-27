@@ -83,41 +83,29 @@ const CAPABILITIES: Record<string, RunSliceCapability> = {
   google_ads: { ...DLT_DATE_RANGE, mechanism: "google_ads(start_date=partition_key)" },
   slack: { ...DLT_SINCE, mechanism: "slack_source(start_date=partition_key)" },
   notion: {
-    mode: "none_only",
-    label: "Full replace load only",
-    detail:
-      "Notion databases load with replace disposition; the verified source has no start_date / slice filter parameter.",
-    mechanism: "notion_databases() — no partition_key filter",
+    ...DLT_SINCE,
+    mechanism: "notion_databases(since=partition_key, until=next_day) filters last_edited_time",
   },
   airtable: {
-    mode: "none_only",
-    label: "Full replace load only",
-    detail:
-      "Airtable tables load with replace disposition; the verified source has no incremental date parameter.",
-    mechanism: "airtable_source() — no partition_key filter",
+    ...DLT_SINCE,
+    mechanism: "airtable_source(since/until) via LAST_MODIFIED_TIME() formula filter",
   },
   jira: { ...DLT_SINCE, mechanism: "jira_search JQL updated range for day slices" },
   zendesk: { ...DLT_SINCE, mechanism: "zendesk_support(start_date=partition_key)" },
   intercom: {
-    mode: "none_only",
-    label: "Heuristic template only",
-    detail:
-      "Intercom uses generic verified codegen without a confirmed slice parameter; configure a custom REST or verified source before using run slices.",
-    mechanism: "generic — no partition_key filter",
+    ...DLT_SINCE,
+    mechanism: "rest_api incremental on updated_at; partition_key sets initial_value / end_value",
   },
   mixpanel: {
-    mode: "none_only",
-    label: "Heuristic template only",
-    detail:
-      "Mixpanel uses generic verified codegen without a confirmed slice parameter; configure a custom REST or verified source before using run slices.",
-    mechanism: "generic — no partition_key filter",
+    ...DLT_DATE_RANGE,
+    mechanism: "Mixpanel export API from_date / to_date (YYYY-MM-DD day slices)",
   },
   segment: {
     mode: "none_only",
-    label: "Heuristic template only",
+    label: "Config catalog sync",
     detail:
-      "Segment uses generic verified codegen without a confirmed slice parameter; configure a custom REST or verified source before using run slices.",
-    mechanism: "generic — no partition_key filter",
+      "Segment Config API loads sources and destinations (full replace). Event history is not available via the write key — use a warehouse destination for event slices.",
+    mechanism: "rest_api Config API — no date filter",
   },
   asana: {
     ...DLT_SINCE,
@@ -132,6 +120,14 @@ const CAPABILITIES: Record<string, RunSliceCapability> = {
   csv: { ...DLT_PREFIX, mechanism: "filesystem(file_glob=f'*{partition_key}*.csv')" },
   json: { ...DLT_PREFIX, mechanism: "filesystem(file_glob=f'*{partition_key}*.json')" },
   parquet: { ...DLT_PREFIX, mechanism: "filesystem(file_glob=f'*{partition_key}*')" },
+
+  iceberg: {
+    ...DLT_PREFIX,
+    label: "Date slice via row filter",
+    detail:
+      "PyIceberg scan with optional slice_column row filter when partition_key is set. Omit slice_column for full table scans.",
+    mechanism: "pyiceberg scan(row_filter=f'{slice_column} >= partition_key')",
+  },
 
   postgres: {
     ...SLING_INCREMENTAL,

@@ -6,6 +6,8 @@ import { postTransformBeforeReturn } from "./generate-post-transform";
 import { generateRestApiAdvanced, generateRestApiPipeline } from "./generate-dlt-rest";
 import { generatePostgresDltPipeline, generateStripePipeline } from "./generate-dlt-golden";
 import { generateFilesystemPipeline, isFilesystemSource } from "./generate-dlt-filesystem";
+import { generateContextRestPipeline, isContextRestSource } from "./generate-dlt-context-sources";
+import { generateIcebergPipeline, isIcebergSource } from "./generate-dlt-iceberg";
 import { generateVerifiedSourcePipeline } from "./generate-dlt-verified";
 import { isVerifiedPackageSource } from "./verified-source-spec";
 import { eltpulsePythonModuleHeader, ELTPULSE_PIPELINES_DOCS } from "./codegen-branding";
@@ -24,6 +26,8 @@ export function generateDltPipeline(request: PipelineRequest): string {
   if (sourceType === "github") return generateGithubPipeline(request);
   if (sourceType === "stripe" || sourceType === "stripe_analytics") return generateStripePipeline(request);
   if (sourceType === "postgres" || sourceType === "postgresql") return generatePostgresDltPipeline(request);
+  if (isIcebergSource(sourceType)) return generateIcebergPipeline(request);
+  if (isContextRestSource(sourceType)) return generateContextRestPipeline(request);
   if (isVerifiedPackageSource(sourceType)) return generateVerifiedSourcePipeline(request);
   if (isFilesystemSource(sourceType)) return generateFilesystemPipeline(request);
   if (sourceType === "rest_api") {

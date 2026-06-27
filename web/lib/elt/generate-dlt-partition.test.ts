@@ -50,4 +50,26 @@ describe("verified source run slice codegen", () => {
     expect(code).toContain('"SOURCES__SALESFORCE__" + _res.upper() + "__LAST_TIMESTAMP__"');
     expect(code).toContain('"account", "opportunity"');
   });
+
+  it("wires notion since/until from partition_key", () => {
+    const code = generateVerifiedSourcePipeline({
+      name: "notion_sync",
+      sourceType: "notion",
+      destinationType: "motherduck",
+      sourceConfiguration: {},
+    } as PipelineRequest);
+    expect(code).toContain('source_kwargs["since"] = pk');
+    expect(code).toContain('source_kwargs["until"]');
+  });
+
+  it("wires airtable since/until from partition_key", () => {
+    const code = generateVerifiedSourcePipeline({
+      name: "airtable_sync",
+      sourceType: "airtable",
+      destinationType: "motherduck",
+      sourceConfiguration: { base_id: "appXXX" },
+    } as PipelineRequest);
+    expect(code).toContain('source_kwargs["since"] = pk');
+    expect(code).toContain('source_kwargs["until"]');
+  });
 });
