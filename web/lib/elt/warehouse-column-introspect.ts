@@ -360,7 +360,7 @@ async function fetchMotherduckColumns(
   const resolvedDb =
     (await resolveMotherduckDatabaseForTable(secrets, config, schema, table, catalogFromRef)) ??
     catalogFromRef ??
-    (await resolveMotherduckAttachDatabase(secrets, config, catalogFromRef).catch(() => undefined)) ??
+    (await resolveMotherduckAttachDatabase(secrets, config, catalogFromRef).catch(() => null)) ??
     configuredDb;
 
   const queryConfig = { ...config, database: resolvedDb };

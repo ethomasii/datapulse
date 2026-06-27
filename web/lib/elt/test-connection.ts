@@ -135,10 +135,12 @@ export async function testConnection(input: ConnectionTestInput): Promise<Connec
     };
   }
   if (connector === "motherduck") {
-    const { motherduckToken, runMotherduckReadOnlyQuery, motherduckDatabaseName } = await import(
+    const { motherduckToken, executeMotherduckSql, motherduckDatabaseName } = await import(
       "@/lib/elt/warehouse-introspect-connectors"
     );
-    const { resolveMotherduckAttachDatabase } = await import("@/lib/elt/motherduck-warehouse");
+    const { listMotherduckDatabases, resolveMotherduckAttachDatabase } = await import(
+      "@/lib/elt/motherduck-warehouse"
+    );
     const token = motherduckToken(secrets);
     if (!token.trim()) {
       if (input.connectionSecretsEnc?.trim()) {
@@ -153,20 +155,28 @@ export async function testConnection(input: ConnectionTestInput): Promise<Connec
     const configuredDb = motherduckDatabaseName(secrets, input.config);
     try {
       const attachDb = await resolveMotherduckAttachDatabase(secrets, input.config);
-      await runMotherduckReadOnlyQuery(secrets, { ...input.config, database: attachDb }, "SELECT 1 AS ok");
-      if (attachDb !== configuredDb) {
+      await executeMotherduckSql(secrets, "SELECT 1 AS ok", attachDb ?? configuredDb);
+      const listed = await listMotherduckDatabases(secrets, input.config);
+      const catalogList = listed.length ? listed.join(", ") : "(could not list catalogs)";
+      if (attachDb && attachDb !== configuredDb) {
         return {
           ok: true,
-          message: `MotherDuck connected via database "${attachDb}". Update the connection Database field from "${configuredDb}" to "${attachDb}".`,
+          message: `MotherDuck connected via "${attachDb}". Update Database from "${configuredDb}" to "${attachDb}". Visible catalogs: ${catalogList}.`,
+        };
+      }
+      if (!attachDb) {
+        return {
+          ok: true,
+          message: `MotherDuck token works (default attach). Visible catalogs: ${catalogList}. Set Database to where dlt loaded data (often "my_db").`,
         };
       }
       return {
         ok: true,
-        message: `MotherDuck connected — database "${attachDb}" is reachable.`,
+        message: `MotherDuck connected — database "${attachDb}". Visible catalogs: ${catalogList}.`,
       };
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
-      return { ok: false, message: detail.slice(0, 240) };
+      return { ok: false, message: detail.slice(0, 280) };
     }
   }
   if (connector === "stripe" || connector === "stripe_analytics") {

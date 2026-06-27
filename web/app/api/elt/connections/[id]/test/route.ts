@@ -1,20 +1,28 @@
 import { NextResponse } from "next/server";
-import { getCurrentDbUser } from "@/lib/auth/server";
+import {
+  API_SCOPES,
+  hasScope,
+  resolveApiUser,
+  scopeForbiddenResponse,
+  unauthorizedResponse,
+} from "@/lib/auth/api-user";
+import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
+import { connectionOwnerWhere } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
 import { testConnection } from "@/lib/elt/test-connection";
-import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
 import { resolveRouteParamId } from "@/lib/server/route-params";
 
 type Ctx = { params: { id: string } | Promise<{ id: string }> };
 
 export async function POST(_req: Request, ctx: Ctx) {
-  const user = await getCurrentDbUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await resolveApiUser(_req);
+  if (!auth) return unauthorizedResponse();
+  if (!hasScope(auth, API_SCOPES.CONNECTIONS_READ)) return scopeForbiddenResponse();
 
   const id = await resolveRouteParamId(ctx.params);
-  const ownerIds = await getAccessibleResourceOwnerIds(user.id);
+  const ownerIds = (await getWorkspacePermissions(auth.user.id)).resourceOwnerIds;
   const row = await db.connection.findFirst({
-    where: { id, userId: { in: ownerIds } },
+    where: { id, ...connectionOwnerWhere(ownerIds) },
     select: {
       connectionType: true,
       connector: true,
@@ -22,7 +30,12 @@ export async function POST(_req: Request, ctx: Ctx) {
       connectionSecretsEnc: true,
     },
   });
-  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!row) {
+    return NextResponse.json(
+      { ok: false, message: "Connection not found or not accessible in this workspace." },
+      { status: 404 }
+    );
+  }
 
   const result = await testConnection({
     connectionType: row.connectionType as "source" | "destination",

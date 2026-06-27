@@ -7,6 +7,10 @@ import { fetchGcpAccessToken } from "@/lib/elt/gcp-access-token";
 import { resolveDuckdbDatabaseLocation } from "@/lib/elt/duckdb-destination";
 import { readFetchJsonBody } from "@/lib/elt/fetch-json-body";
 import { STARTER_WAREHOUSE_DEFAULT_DB } from "@/lib/elt/starter-warehouse";
+import {
+  isMotherduckCredentialError,
+  isMotherduckDatabaseAttachError,
+} from "@/lib/elt/warehouse-column-errors";
 import type { WarehouseIntrospectionResult, WarehouseTableRef } from "@/lib/elt/warehouse-introspect";
 
 const TABLE_LIMIT = 5000;
@@ -957,17 +961,62 @@ async function postMotherduckSql(
   }
   if (!res.ok || body.errMessage || body.error) {
     const detail = body.errMessage ?? body.error ?? body.message ?? body.detail;
-    if (res.status === 404 || body.mdFriendlyStatusCode === "NOT_FOUND") {
+    const statusCode = body.mdFriendlyStatusCode ?? (res.status === 404 ? "NOT_FOUND" : undefined);
+    if (statusCode === "AUTHENTICATION_ERROR" || res.status === 401 || res.status === 403) {
+      throw new Error(
+        detail ??
+          "MotherDuck rejected the token — create a Read/Write token at app.motherduck.com → Settings → API Tokens and re-save MOTHERDUCK_TOKEN."
+      );
+    }
+    if (res.status === 404 || statusCode === "NOT_FOUND") {
       const db = payload.database?.trim();
       throw new Error(
         db
-          ? `MotherDuck database "${db}" was not found (HTTP 404). Set Database on your destination connection to the catalog where dlt loaded data (often "${STARTER_WAREHOUSE_DEFAULT_DB}").`
+          ? `MotherDuck database "${db}" was not found (HTTP 404). Set Database on your destination connection to an existing catalog (e.g. "${STARTER_WAREHOUSE_DEFAULT_DB}").`
           : `MotherDuck SQL API returned 404: ${detail ?? "NOT_FOUND"}.`
       );
     }
     throw new Error(detail ?? `MotherDuck API returned ${res.status}.`);
   }
   return parseMotherduckSqlResponse(body);
+}
+
+export type MotherduckSqlResult = {
+  rowset: MotherduckQueryRowset;
+  /** Named catalog attached via API `database`, or undefined when using token default attach. */
+  attachDatabase?: string;
+};
+
+/**
+ * Run SQL against MotherDuck. When `database` is set, tries named attach first, then token-default attach.
+ */
+export async function executeMotherduckSql(
+  secrets: Record<string, string>,
+  sql: string,
+  database?: string
+): Promise<MotherduckSqlResult> {
+  const token = motherduckToken(secrets);
+  if (!token) throw new Error("Set MOTHERDUCK_TOKEN to query MotherDuck.");
+
+  const db = database?.trim();
+  const payloads: { sql: string; database?: string }[] = db ? [{ sql, database: db }, { sql }] : [{ sql }];
+
+  let lastError: string | undefined;
+  for (let i = 0; i < payloads.length; i++) {
+    const payload = payloads[i]!;
+    try {
+      const rowset = await postMotherduckSql(token, payload);
+      return { rowset, attachDatabase: payload.database };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      lastError = msg;
+      if (isMotherduckCredentialError(msg)) throw e;
+      const hasFallback = db && i === 0 && payloads.length > 1;
+      if (hasFallback && isMotherduckDatabaseAttachError(msg)) continue;
+      throw e;
+    }
+  }
+  throw new Error(lastError ?? "MotherDuck query failed.");
 }
 
 /** Run a read-only SQL statement against MotherDuck via the HTTP API. */
@@ -977,11 +1026,9 @@ export async function runMotherduckReadOnlyQuery(
   sql: string,
   options?: MotherduckQueryOptions
 ): Promise<MotherduckQueryRowset> {
-  const token = motherduckToken(secrets);
-  const database = motherduckDatabaseName(secrets, config);
-  if (!token) throw new Error("Set MOTHERDUCK_TOKEN to query MotherDuck.");
-
-  return postMotherduckSql(token, motherduckQueryPayload(database, sql, options));
+  const database = options?.omitDatabase ? undefined : motherduckDatabaseName(secrets, config);
+  const { rowset } = await executeMotherduckSql(secrets, sql, database);
+  return rowset;
 }
 
 export async function introspectMotherduck(

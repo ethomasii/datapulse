@@ -10,8 +10,9 @@ import {
   isMotherduckMissingObjectError,
 } from "@/lib/elt/warehouse-column-errors";
 import {
+  executeMotherduckSql,
   motherduckDatabaseName,
-  runMotherduckReadOnlyQuery,
+  motherduckToken,
   type WarehouseQueryRowset,
 } from "@/lib/elt/warehouse-introspect-connectors";
 
@@ -22,7 +23,6 @@ export function motherduckDatabaseCandidates(
 ): string[] {
   const configured = motherduckDatabaseName(secrets, config);
   const out: string[] = [];
-  // Prefer my_db before the configured catalog — dlt often lands in my_db while connections default to eltpulse.
   for (const db of [catalogFromRef, "my_db", configured, STARTER_WAREHOUSE_DEFAULT_DB]) {
     const d = db?.trim();
     if (d && !out.includes(d)) out.push(d);
@@ -32,6 +32,24 @@ export function motherduckDatabaseCandidates(
 
 function escapeSqlLiteral(value: string): string {
   return value.replace(/'/g, "''");
+}
+
+function rowsetFirstColumnValues(rowset: WarehouseQueryRowset, columnName: string): string[] {
+  const nameIdx = rowset.columns.findIndex((c) => c.toLowerCase() === columnName.toLowerCase());
+  const idx = nameIdx >= 0 ? nameIdx : 0;
+  return rowset.rows
+    .map((row) => String(row[idx] ?? "").trim())
+    .filter(Boolean);
+}
+
+function findTableCatalogSql(schema: string, table: string): string {
+  const s = escapeSqlLiteral(schema);
+  const t = escapeSqlLiteral(table);
+  return `SELECT DISTINCT database_name FROM duckdb_tables()
+    WHERE lower(schema_name) = lower('${s}')
+      AND lower(table_name) = lower('${t}')
+    ORDER BY 1
+    LIMIT 20`;
 }
 
 function tableExistsSql(schema: string, table: string): string {
@@ -52,29 +70,37 @@ function duckdbTableExistsSqlAttached(schema: string, table: string): string {
     LIMIT 1`;
 }
 
-/** First MotherDuck catalog the token can attach to (MotherDuck API requires `database`). */
+/**
+ * Best attach target: named catalog when attach works, otherwise null (token-default / cross-catalog SQL).
+ */
 export async function resolveMotherduckAttachDatabase(
   secrets: Record<string, string>,
   config: Record<string, unknown>,
   catalogFromRef?: string
-): Promise<string> {
-  let lastError: string | undefined;
-  for (const database of motherduckDatabaseCandidates(secrets, config, catalogFromRef)) {
+): Promise<string | null> {
+  if (!motherduckToken(secrets)) {
+    throw new Error("Set MOTHERDUCK_TOKEN to query MotherDuck.");
+  }
+
+  await executeMotherduckSql(secrets, "SELECT 1 AS ok");
+
+  const listed = await listMotherduckDatabases(secrets, config);
+  const candidates = motherduckDatabaseCandidates(secrets, config, catalogFromRef).filter(
+    (d) => listed.length === 0 || listed.some((n) => n.toLowerCase() === d.toLowerCase())
+  );
+  const toTry = candidates.length ? candidates : listed;
+
+  for (const database of toTry) {
     try {
-      await runMotherduckReadOnlyQuery(secrets, { ...config, database }, "SELECT 1 AS ok");
+      await executeMotherduckSql(secrets, "SELECT 1 AS ok", database);
       return database;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      lastError = msg;
-      if (!isMotherduckDatabaseAttachError(msg) && !isMotherduckMissingObjectError(msg)) {
-        throw e;
-      }
+      if (!isMotherduckDatabaseAttachError(msg)) throw e;
     }
   }
-  throw new Error(
-    lastError ??
-      `No accessible MotherDuck database. Set Database on your connection to an existing catalog (e.g. "${STARTER_WAREHOUSE_DEFAULT_DB}").`
-  );
+
+  return null;
 }
 
 async function motherduckTableExists(
@@ -85,7 +111,11 @@ async function motherduckTableExists(
 ): Promise<boolean> {
   for (const sql of [duckdbTableExistsSqlAttached(schema, table), tableExistsSql(schema, table)]) {
     try {
-      const rowset = await runMotherduckReadOnlyQuery(secrets, config, sql);
+      const { rowset } = await executeMotherduckSql(
+        secrets,
+        sql,
+        motherduckDatabaseName(secrets, config)
+      );
       if (rowset.rows.length > 0) return true;
     } catch {
       /* try next metadata source */
@@ -100,17 +130,11 @@ export async function listMotherduckDatabases(
   config: Record<string, unknown>
 ): Promise<string[]> {
   try {
-    const attachDb = await resolveMotherduckAttachDatabase(secrets, config);
-    const rowset = await runMotherduckReadOnlyQuery(
+    const { rowset } = await executeMotherduckSql(
       secrets,
-      { ...config, database: attachDb },
       "SELECT database_name FROM duckdb_databases() ORDER BY 1"
     );
-    const nameIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "database_name");
-    const idx = nameIdx >= 0 ? nameIdx : 0;
-    return rowset.rows
-      .map((row) => String(row[idx] ?? "").trim())
-      .filter(Boolean);
+    return rowsetFirstColumnValues(rowset, "database_name");
   } catch {
     return [];
   }
@@ -124,6 +148,24 @@ export async function resolveMotherduckDatabaseForTable(
   table: string,
   catalogFromRef?: string
 ): Promise<string | null> {
+  try {
+    const { rowset } = await executeMotherduckSql(secrets, findTableCatalogSql(schema, table));
+    const found = rowsetFirstColumnValues(rowset, "database_name");
+    if (found.length) {
+      if (catalogFromRef && found.some((d) => d.toLowerCase() === catalogFromRef.toLowerCase())) {
+        return catalogFromRef;
+      }
+      const configured = motherduckDatabaseName(secrets, config);
+      const configuredMatch = found.find((d) => d.toLowerCase() === configured.toLowerCase());
+      if (configuredMatch) return configuredMatch;
+      const myDb = found.find((d) => d.toLowerCase() === "my_db");
+      if (myDb) return myDb;
+      return found[0]!;
+    }
+  } catch {
+    /* fall through */
+  }
+
   const tried = new Set<string>();
 
   async function tryDatabase(database: string): Promise<boolean> {
@@ -180,7 +222,7 @@ export async function runMotherduckQueryWithDatabaseFallback(
 
   for (const database of candidates) {
     try {
-      const rowset = await runMotherduckReadOnlyQuery(secrets, { ...config, database }, sql);
+      const { rowset } = await executeMotherduckSql(secrets, sql, database);
       return { rowset, database };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -191,7 +233,14 @@ export async function runMotherduckQueryWithDatabaseFallback(
     }
   }
 
-  throw new Error(lastError ?? `MotherDuck query failed for database "${configured}".`);
+  try {
+    const { rowset } = await executeMotherduckSql(secrets, sql);
+    return { rowset, database: configured };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    lastError = msg;
+    throw new Error(lastError ?? `MotherDuck query failed for database "${configured}".`);
+  }
 }
 
 export function motherduckDatabaseMismatchHint(
