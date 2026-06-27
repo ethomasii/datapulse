@@ -54,6 +54,11 @@ function sampleValue(field: NativeComponentField): unknown {
     return '{"email":{"method":"hash"}}';
   }
   if (k === "tool_args") return "{}";
+  if (k === "schema_definition") return '{"name":{"type":"string"},"company":{"type":"string"}}';
+  if (k === "tools") {
+    return '[{"type":"function","function":{"name":"lookup","description":"Lookup a record","parameters":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}}}]';
+  }
+  if (k === "collection_name") return "documents";
   if (k === "prompt") return "Summarize the row in one sentence.";
   if (k === "feedback") return "answer_relevance";
   if (k === "dtypes" || k === "casts" || k === "column_types") {

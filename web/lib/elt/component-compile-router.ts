@@ -55,6 +55,21 @@ export const TOP_COMPONENT_ROUTES: Record<string, ComponentRoute> = {
   anthropic_agent: { target: "python", badge: "native", hint: "Anthropic agent — routes to litellm_agent native" },
   gemini_agent: { target: "python", badge: "native", hint: "Gemini agent — routes to litellm_agent native" },
   litellm_inference_asset: { target: "python", badge: "native", hint: "Per-row LLM enrichment via LiteLLM" },
+  litellm_structured_output: {
+    target: "python",
+    badge: "native",
+    hint: "Per-row structured JSON extraction — expands schema fields into columns",
+  },
+  litellm_function_calling: {
+    target: "python",
+    badge: "native",
+    hint: "Per-row LiteLLM tool calling — JSON tool calls column (no loop)",
+  },
+  rag_pipeline: {
+    target: "python",
+    badge: "native",
+    hint: "Retrieve from vector store + generate answer per row",
+  },
   llm_evaluator: { target: "python", badge: "native", hint: "LLM-as-judge evaluation step" },
   dbt_docs_enriched_project: { target: "dbt", badge: "native", hint: "Linked transform project + catalog enrichment" },
   filter_rows: { target: "warehouse", badge: "native", hint: "Warehouse SQL filter (CTAS) — dataframe optional" },

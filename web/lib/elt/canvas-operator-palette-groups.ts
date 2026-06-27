@@ -122,7 +122,15 @@ export const CANVAS_AI_PALETTE_GROUP: CanvasOperatorPaletteGroup = {
   id: "ai",
   title: "AI & MCP",
   subtitle: "LLM enrichment, agents, and tool calls on asset rows",
-  ids: ["mcp_tool_call", "litellm_agent", "litellm_inference_asset", "llm_evaluator"],
+  ids: [
+    "mcp_tool_call",
+    "litellm_inference_asset",
+    "litellm_structured_output",
+    "litellm_function_calling",
+    "rag_pipeline",
+    "litellm_agent",
+    "llm_evaluator",
+  ],
 };
 
 const OTHER_TRANSFORMS_GROUP: CanvasOperatorPaletteGroup = {

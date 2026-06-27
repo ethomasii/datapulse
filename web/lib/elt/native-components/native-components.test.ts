@@ -191,8 +191,49 @@ describe("native-components", () => {
     expect(sensors.length).toBe(1);
   });
 
-  it("lists 74 native components", () => {
-    expect(listNativeComponents().length).toBe(74);
+  it("lists 77 native components", () => {
+    expect(listNativeComponents().length).toBe(77);
+  });
+
+  it("litellm_structured_output emits per-row extraction python", () => {
+    const def = getNativeComponent("litellm_structured_output");
+    const out = def!.compile({
+      table: "staging.emails",
+      text_column: "body",
+      schema_definition: '{"name":{"type":"string"}}',
+      output_table: "staging.extracted",
+      model: "gpt-4o-mini",
+    });
+    const code = out.python?.join("\n") ?? "";
+    expect(code).toContain("litellm_structured_output");
+    expect(code).toContain("response_format");
+    expect(code).toContain('_out_name = "extracted"');
+  });
+
+  it("litellm_function_calling emits tool call python", () => {
+    const def = getNativeComponent("litellm_function_calling");
+    const out = def!.compile({
+      table: "staging.queries",
+      text_column: "query",
+      tools: '[{"type":"function","function":{"name":"search","parameters":{"type":"object","properties":{}}}}]',
+      output_table: "staging.routed",
+    });
+    const code = out.python?.join("\n") ?? "";
+    expect(code).toContain("litellm_function_calling");
+    expect(code).toContain("tool_calls");
+  });
+
+  it("rag_pipeline emits retrieve-and-generate python", () => {
+    const def = getNativeComponent("rag_pipeline");
+    const out = def!.compile({
+      table: "staging.questions",
+      collection_name: "docs",
+      llm_model: "gpt-4o-mini",
+      output_table: "staging.answers",
+    });
+    const code = out.python?.join("\n") ?? "";
+    expect(code).toContain("rag_pipeline");
+    expect(code).toContain("chromadb");
   });
 
   it("every native component compile() emits output without throwing", () => {

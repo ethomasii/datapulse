@@ -4,6 +4,9 @@ import { dqCheckComponent } from "./definitions/dq-check";
 import { mcpToolCallComponent } from "./definitions/mcp-tool-call";
 import { litellmAgentComponent } from "./definitions/litellm-agent";
 import { litellmInferenceComponent } from "./definitions/litellm-inference";
+import { litellmStructuredOutputComponent } from "./definitions/litellm-structured-output";
+import { litellmFunctionCallingComponent } from "./definitions/litellm-function-calling";
+import { ragPipelineComponent } from "./definitions/rag-pipeline";
 import { llmEvaluatorComponent } from "./definitions/llm-evaluator";
 import { sqlTransformComponent } from "./definitions/sql-transform";
 import { selectColumnsComponent } from "./definitions/select-columns";
@@ -84,6 +87,9 @@ const ALL_NATIVE: NativeComponentDefinition[] = [
   mcpToolCallComponent,
   litellmAgentComponent,
   litellmInferenceComponent,
+  litellmStructuredOutputComponent,
+  litellmFunctionCallingComponent,
+  ragPipelineComponent,
   llmEvaluatorComponent,
   sqlTransformComponent,
   selectColumnsComponent,

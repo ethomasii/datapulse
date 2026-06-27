@@ -399,3 +399,252 @@ export function emitLlmEvaluatorPython(opts: {
     '    print(f"[llm_evaluator] warning: {_eval_err}")',
   ];
 }
+
+function warehouseWriteLines(outputTable: string): string[] {
+  const outSchema = outputTable.includes(".") ? outputTable.split(".")[0] : "public";
+  const outName = outputTable.includes(".") ? outputTable.split(".").pop()! : outputTable;
+  return [
+    `    _out_schema = ${JSON.stringify(outSchema)}`,
+    `    _out_name = ${JSON.stringify(outName)}`,
+    "    _df.to_sql(_out_name, _sql._engine, schema=_out_schema, if_exists='replace', index=False)",
+  ];
+}
+
+export function emitLitellmStructuredOutputPython(opts: {
+  label: string;
+  table: string;
+  textColumn: string;
+  schemaDefinition: Record<string, unknown>;
+  model: string;
+  promptPrefix?: string;
+  outputPrefix: string;
+  onError: string;
+  apiKeyEnv?: string;
+  outputTable: string;
+}): string[] {
+  const fieldNames = Object.keys(opts.schemaDefinition);
+  const columnNames = fieldNames.map((f) => `${opts.outputPrefix}${f}`);
+  return [
+    `# ── litellm_structured_output: ${opts.label} ──`,
+    "import json",
+    "import os",
+    "import pandas as pd",
+    "try:",
+    "    import litellm",
+    "    _dest_client = pipeline._get_destination_clients(pipeline.state)[0]",
+    "    _sql = _dest_client.sql_client()",
+    `    _df = pd.read_sql('SELECT * FROM ${escapePyString(opts.table)}', _sql._engine)`,
+    `    _text_col = ${JSON.stringify(opts.textColumn)}`,
+    `    _schema_def = ${JSON.stringify(opts.schemaDefinition)}`,
+    `    _field_names = ${JSON.stringify(fieldNames)}`,
+    `    _col_names = ${JSON.stringify(columnNames)}`,
+    `    _out_prefix = ${JSON.stringify(opts.outputPrefix)}`,
+    `    _on_error = ${JSON.stringify(opts.onError)}`,
+    "    _schema_str = json.dumps(_schema_def, indent=2)",
+    "    _kwargs = {'model': " + JSON.stringify(opts.model) + ", 'response_format': {'type': 'json_object'}}",
+    opts.apiKeyEnv
+      ? `    _kwargs['api_key'] = os.environ.get(${JSON.stringify(opts.apiKeyEnv)})`
+      : "",
+    opts.promptPrefix
+      ? `    _prompt_prefix = ${JSON.stringify(opts.promptPrefix)}`
+      : "    _prompt_prefix = None",
+    "    _rows_to_drop = []",
+    "    _extracted_rows = []",
+    "    for _i, _row in _df.iterrows():",
+    "        _text = str(_row[_text_col])",
+    "        if _prompt_prefix:",
+    "            _user_content = f'{_prompt_prefix}\\n\\n{_text}'",
+    "        else:",
+    "            _user_content = (",
+    "                'Extract the following fields from the text below as a JSON object.\\n'",
+    "                f'Schema: {_schema_str}\\n\\nText: {_text}'",
+    "            )",
+    "        try:",
+    "            _resp = litellm.completion(messages=[{'role': 'user', 'content': _user_content}], **_kwargs)",
+    "            _content = _resp.choices[0].message.content or '{}'",
+    "            _parsed = json.loads(_content)",
+    "            _extracted_rows.append({_out_prefix + k: _parsed.get(k) for k in _field_names})",
+    "        except Exception as _ext_err:",
+    "            if _on_error == 'raise':",
+    "                raise",
+    "            elif _on_error == 'skip':",
+    "                _rows_to_drop.append(_i)",
+    "                _extracted_rows.append(None)",
+    "                print(f'[litellm_structured_output] row {_i} skipped: {_ext_err}')",
+    "            else:",
+    "                _extracted_rows.append({c: None for c in _col_names})",
+    "                print(f'[litellm_structured_output] row {_i} null-filled: {_ext_err}')",
+    "    _extracted_df = pd.DataFrame(",
+    "        [_r if _r is not None else {c: None for c in _col_names} for _r in _extracted_rows],",
+    "        index=_df.index,",
+    "    )",
+    "    _df = pd.concat([_df, _extracted_df], axis=1)",
+    "    if _rows_to_drop:",
+    "        _df = _df.drop(index=_rows_to_drop).reset_index(drop=True)",
+    ...warehouseWriteLines(opts.outputTable).map((l) => l),
+    "except Exception as _struct_err:",
+    '    print(f"[litellm_structured_output] warning: {_struct_err}")',
+  ].filter(Boolean);
+}
+
+export function emitLitellmFunctionCallingPython(opts: {
+  label: string;
+  table: string;
+  textColumn: string;
+  tools: unknown[];
+  model: string;
+  outputColumn: string;
+  systemPrompt?: string;
+  apiKeyEnv?: string;
+  outputTable: string;
+}): string[] {
+  return [
+    `# ── litellm_function_calling: ${opts.label} ──`,
+    "import json",
+    "import os",
+    "import pandas as pd",
+    "try:",
+    "    import litellm",
+    "    _dest_client = pipeline._get_destination_clients(pipeline.state)[0]",
+    "    _sql = _dest_client.sql_client()",
+    `    _df = pd.read_sql('SELECT * FROM ${escapePyString(opts.table)}', _sql._engine)`,
+    `    _text_col = ${JSON.stringify(opts.textColumn)}`,
+    `    _out_col = ${JSON.stringify(opts.outputColumn)}`,
+    `    _tools = ${JSON.stringify(opts.tools)}`,
+    "    _kwargs = {'model': " + JSON.stringify(opts.model) + ", 'tools': _tools}",
+    opts.apiKeyEnv
+      ? `    _kwargs['api_key'] = os.environ.get(${JSON.stringify(opts.apiKeyEnv)})`
+      : "",
+    opts.systemPrompt
+      ? `    _system_prompt = ${JSON.stringify(opts.systemPrompt)}`
+      : "    _system_prompt = None",
+    "    _results = []",
+    "    for _, _row in _df.iterrows():",
+    "        _text = str(_row[_text_col])",
+    "        _messages = []",
+    "        if _system_prompt:",
+    "            _messages.append({'role': 'system', 'content': _system_prompt})",
+    "        _messages.append({'role': 'user', 'content': _text})",
+    "        _resp = litellm.completion(messages=_messages, **_kwargs)",
+    "        _msg = _resp.choices[0].message",
+    "        _tool_calls = getattr(_msg, 'tool_calls', None) or []",
+    "        if _tool_calls:",
+    "            _tc_data = [",
+    "                {'id': _tc.id, 'type': _tc.type, 'function': {'name': _tc.function.name, 'arguments': _tc.function.arguments}}",
+    "                for _tc in _tool_calls",
+    "            ]",
+    "            _results.append(json.dumps(_tc_data))",
+    "        else:",
+    "            _results.append(json.dumps([]))",
+    "    _df[_out_col] = _results",
+    ...warehouseWriteLines(opts.outputTable).map((l) => l),
+    "except Exception as _fn_err:",
+    '    print(f"[litellm_function_calling] warning: {_fn_err}")',
+  ].filter(Boolean);
+}
+
+export function emitRagPipelinePython(opts: {
+  label: string;
+  table: string;
+  queryColumn: string;
+  answerColumn: string;
+  sourcesColumn: string;
+  vectorStoreProvider: string;
+  collectionName: string;
+  vectorStoreConnection?: string;
+  llmProvider: string;
+  llmModel: string;
+  llmApiKeyEnv?: string;
+  embeddingProvider: string;
+  embeddingModel: string;
+  embeddingApiKeyEnv?: string;
+  topK: number;
+  temperature: number;
+  includeSources: boolean;
+  outputTable: string;
+}): string[] {
+  return [
+    `# ── rag_pipeline: ${opts.label} ──`,
+    "import json",
+    "import os",
+    "import pandas as pd",
+    "try:",
+    "    _dest_client = pipeline._get_destination_clients(pipeline.state)[0]",
+    "    _sql = _dest_client.sql_client()",
+    `    _df = pd.read_sql('SELECT * FROM ${escapePyString(opts.table)}', _sql._engine)`,
+    `    _query_col = ${JSON.stringify(opts.queryColumn)}`,
+    `    _answer_col = ${JSON.stringify(opts.answerColumn)}`,
+    `    _sources_col = ${JSON.stringify(opts.sourcesColumn)}`,
+    `    _vs_provider = ${JSON.stringify(opts.vectorStoreProvider)}`,
+    `    _collection = ${JSON.stringify(opts.collectionName)}`,
+    `    _vs_conn = ${JSON.stringify(opts.vectorStoreConnection ?? "./chroma_db")}`,
+    `    _llm_provider = ${JSON.stringify(opts.llmProvider)}`,
+    `    _llm_model = ${JSON.stringify(opts.llmModel)}`,
+    `    _embed_provider = ${JSON.stringify(opts.embeddingProvider)}`,
+    `    _embed_model = ${JSON.stringify(opts.embeddingModel)}`,
+    `    _top_k = ${opts.topK}`,
+    `    _temperature = ${opts.temperature}`,
+    `    _include_sources = ${opts.includeSources ? "True" : "False"}`,
+    opts.llmApiKeyEnv
+      ? `    _llm_api_key = os.environ.get(${JSON.stringify(opts.llmApiKeyEnv)})`
+      : "    _llm_api_key = None",
+    opts.embeddingApiKeyEnv
+      ? `    _embed_api_key = os.environ.get(${JSON.stringify(opts.embeddingApiKeyEnv)})`
+      : "    _embed_api_key = _llm_api_key",
+    "    if _query_col not in _df.columns:",
+    "        raise ValueError(f'Query column {_query_col!r} not in dataframe')",
+    "    def _query_embedding(_query):",
+    "        if _embed_provider == 'openai':",
+    "            import openai",
+    "            _client = openai.OpenAI(api_key=_embed_api_key)",
+    "            _resp = _client.embeddings.create(model=_embed_model, input=[_query])",
+    "            return _resp.data[0].embedding",
+    "        raise ValueError(f'Unsupported embedding provider: {_embed_provider}')",
+    "    def _retrieve(_embedding):",
+    "        _docs = []",
+    "        if _vs_provider == 'chromadb':",
+    "            import chromadb",
+    "            _client = chromadb.PersistentClient(path=_vs_conn)",
+    "            _coll = _client.get_collection(name=_collection)",
+    "            _res = _coll.query(query_embeddings=[_embedding], n_results=_top_k)",
+    "            for _j in range(len(_res['ids'][0])):",
+    "                _docs.append({'text': (_res.get('documents') or [['']])[0][_j], 'metadata': (_res.get('metadatas') or [[{}]])[0][_j]})",
+    "        elif _vs_provider == 'pinecone':",
+    "            from pinecone import Pinecone",
+    "            _pc = Pinecone(api_key=_embed_api_key)",
+    "            _index = _pc.Index(_collection)",
+    "            _res = _index.query(vector=_embedding, top_k=_top_k, include_metadata=True)",
+    "            for _match in _res.get('matches', []):",
+    "                _docs.append({'text': (_match.get('metadata') or {}).get('text', ''), 'metadata': _match.get('metadata') or {}})",
+    "        else:",
+    "            raise ValueError(f'Unsupported vector store: {_vs_provider}')",
+    "        return _docs",
+    "    def _generate(_query, _docs):",
+    "        _ctx = '\\n\\n'.join([d['text'] for d in _docs])",
+    "        _prompt = f'Answer based on context.\\n\\nContext:\\n{_ctx}\\n\\nQuestion: {_query}\\n\\nAnswer:'",
+    "        if _llm_provider == 'openai':",
+    "            import openai",
+    "            _client = openai.OpenAI(api_key=_llm_api_key)",
+    "            _resp = _client.chat.completions.create(model=_llm_model, messages=[{'role': 'user', 'content': _prompt}], temperature=_temperature)",
+    "            return _resp.choices[0].message.content",
+    "        if _llm_provider == 'anthropic':",
+    "            import anthropic",
+    "            _client = anthropic.Anthropic(api_key=_llm_api_key)",
+    "            _msg = _client.messages.create(model=_llm_model, max_tokens=4096, temperature=_temperature, messages=[{'role': 'user', 'content': _prompt}])",
+    "            return _msg.content[0].text",
+    "        raise ValueError(f'Unsupported LLM provider: {_llm_provider}')",
+    "    _answers, _sources = [], []",
+    "    for _, _row in _df.iterrows():",
+    "        _q = str(_row[_query_col])",
+    "        _emb = _query_embedding(_q)",
+    "        _docs = _retrieve(_emb)",
+    "        _answers.append(_generate(_q, _docs))",
+    "        _sources.append(_docs if _include_sources else [])",
+    "    _df[_answer_col] = _answers",
+    "    if _include_sources:",
+    "        _df[_sources_col] = _sources",
+    ...warehouseWriteLines(opts.outputTable).map((l) => l),
+    "except Exception as _rag_err:",
+    '    print(f"[rag_pipeline] warning: {_rag_err}")',
+  ].filter(Boolean);
+}
