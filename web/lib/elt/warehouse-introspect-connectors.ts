@@ -6,9 +6,10 @@ import { createHash, createHmac, createPrivateKey, createPublicKey, createSign, 
 import { fetchGcpAccessToken } from "@/lib/elt/gcp-access-token";
 import { resolveDuckdbDatabaseLocation } from "@/lib/elt/duckdb-destination";
 import { readFetchJsonBody } from "@/lib/elt/fetch-json-body";
-import { isDuckdbNativeFallbackError, openDuckdbReadOnly } from "@/lib/elt/duckdb-native";
+import { openDuckdbReadOnly } from "@/lib/elt/duckdb-native";
 import { buildMotherduckDsn, motherduckDatabaseName, motherduckToken } from "@/lib/elt/motherduck-dsn";
 import { runMotherduckMcpQuery } from "@/lib/elt/motherduck-mcp-client";
+import { runMotherduckPostgresQuery } from "@/lib/elt/motherduck-pg-client";
 import type { WarehouseIntrospectionResult, WarehouseTableRef } from "@/lib/elt/warehouse-introspect";
 
 const TABLE_LIMIT = 5000;
@@ -928,7 +929,7 @@ export type MotherduckSqlResult = {
   attachDatabase?: string;
 };
 
-/** Run SQL against MotherDuck via native DuckDB md: DSN (MCP fallback if duckdb is unavailable). */
+/** Run SQL against MotherDuck via Postgres wire endpoint (Vercel-safe), MCP fallback. */
 export async function executeMotherduckSql(
   secrets: Record<string, string>,
   sql: string,
@@ -939,17 +940,20 @@ export async function executeMotherduckSql(
   const token = motherduckToken(secrets);
   if (!token) throw new Error("Set MOTHERDUCK_TOKEN to query MotherDuck.");
 
-  const dsn = buildMotherduckDsn(secrets, { database: catalog });
   try {
-    const rowset = await runDuckdbFileReadOnlyQuery(dsn, sql);
+    const rowset = await runMotherduckPostgresQuery(token, catalog, sql, secrets);
     return { rowset, attachDatabase: catalog };
-  } catch (e) {
-    const detail = e instanceof Error ? e.message : String(e);
-    if (isDuckdbNativeFallbackError(detail)) {
+  } catch (pgError) {
+    const pgDetail = pgError instanceof Error ? pgError.message : String(pgError);
+    try {
       const rowset = await runMotherduckMcpQuery(token, catalog, sql);
       return { rowset, attachDatabase: catalog };
+    } catch (mcpError) {
+      const mcpDetail = mcpError instanceof Error ? mcpError.message : String(mcpError);
+      throw new Error(
+        `MotherDuck query failed (Postgres endpoint: ${pgDetail.slice(0, 120)}; MCP: ${mcpDetail.slice(0, 120)}).`
+      );
     }
-    throw e;
   }
 }
 
