@@ -103,4 +103,16 @@ describe("verified source run slice codegen", () => {
     } as PipelineRequest);
     expect(code).toContain('source_kwargs["start_date"] = pk');
   });
+
+  it("wires freshdesk since/until from partition_key", () => {
+    const code = generateVerifiedSourcePipeline({
+      name: "freshdesk_sync",
+      sourceType: "freshdesk",
+      destinationType: "motherduck",
+      sourceConfiguration: { endpoints: ["tickets"] },
+    } as PipelineRequest);
+    expect(code).toContain('source_kwargs["since"] = pk');
+    expect(code).toContain('source_kwargs["until"]');
+    expect(code).toContain("with_resources");
+  });
 });

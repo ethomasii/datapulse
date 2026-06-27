@@ -10,9 +10,13 @@ describe("run-slice-capabilities honesty", () => {
   });
 
   it("marks unwired incremental sources as none_only", () => {
-    for (const slug of ["freshdesk", "personio", "strapi"]) {
+    for (const slug of ["personio", "strapi"]) {
       expect(getRunSliceCapability(slug).mode).toBe("none_only");
     }
+  });
+
+  it("allows slices for freshdesk", () => {
+    expect(runSlicesAllowed("freshdesk")).toBe(true);
   });
 
   it("allows slices for newly exposed verified sources", () => {

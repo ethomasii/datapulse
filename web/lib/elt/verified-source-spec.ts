@@ -135,6 +135,10 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
       { param: "api_secret_key", envKeys: ["FRESHDESK_API_KEY"] },
       { param: "domain", envKeys: ["FRESHDESK_DOMAIN"] },
     ],
+    partitionKwarg: "since",
+    partitionEndKwarg: "until",
+    resourceConfigKey: "endpoints",
+    defaultResources: ["tickets", "contacts", "agents", "companies"],
   },
   zendesk: {
     module: "zendesk",

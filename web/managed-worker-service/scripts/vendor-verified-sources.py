@@ -25,6 +25,7 @@ DEFAULT_SOURCES = (
   "zendesk",
   "notion",
   "airtable",
+  "freshdesk",
 )
 
 ROOT = Path(__file__).resolve().parents[1]

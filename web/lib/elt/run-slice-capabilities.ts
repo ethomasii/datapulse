@@ -149,8 +149,8 @@ const CAPABILITIES: Record<string, RunSliceCapability> = {
     mechanism: "google_sheets_source() — no partition_key filter",
   },
   freshdesk: {
-    ...SLICE_NOT_WIRED,
-    mechanism: "freshdesk_source() — partition_key ignored",
+    ...DLT_SINCE,
+    mechanism: "freshdesk_source(since/until) scopes updated_at incremental per endpoint",
   },
   bing_webmaster: {
     ...FULL_REPLACE,

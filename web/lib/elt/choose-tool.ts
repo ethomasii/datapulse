@@ -16,6 +16,7 @@ export function chooseTool(sourceType: string, destinationType: string): "dlt" |
     "asana",
     "jira",
     "zendesk",
+    "freshdesk",
     "intercom",
     "mixpanel",
     "segment",

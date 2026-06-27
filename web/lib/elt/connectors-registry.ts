@@ -669,6 +669,33 @@ const API_CONNECTORS: ConnectorDef[] = [
     ],
   },
   {
+    slug: "freshdesk",
+    label: "Freshdesk",
+    connectionTypes: ["source"],
+    category: "APIs & SaaS",
+    credentialFields: [
+      { key: "FRESHDESK_DOMAIN", label: "Domain", type: "text", required: true, placeholder: "mycompany", help: "From mycompany.freshdesk.com" },
+      { key: "FRESHDESK_API_KEY", label: "API Key", type: "password", required: true, help: "Profile Settings → View API Key" },
+    ],
+    sourceConfigFields: [
+      {
+        key: "endpoints",
+        label: "Endpoints to load",
+        type: "multiselect",
+        required: false,
+        options: [
+          { value: "tickets", label: "Tickets" },
+          { value: "contacts", label: "Contacts" },
+          { value: "agents", label: "Agents" },
+          { value: "companies", label: "Companies" },
+          { value: "groups", label: "Groups" },
+          { value: "roles", label: "Roles" },
+        ],
+        default: ["tickets", "contacts"],
+      },
+    ],
+  },
+  {
     slug: "jira",
     label: "Jira",
     connectionTypes: ["source"],
