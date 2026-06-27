@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentDbUser } from "@/lib/auth/server";
-import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
+import { getWorkspacePermissions, workspaceResourceUserId } from "@/lib/auth/org-permissions";
 import {
   encryptDeploymentEnvOverrides,
   listWorkspaceDeployments,
   parseDeploymentEnvOverrides,
 } from "@/lib/elt/deployments";
 import { db } from "@/lib/db/client";
-import { workspaceResourceUserId } from "@/lib/auth/workspace-access";
 
 export async function GET() {
   const user = await getCurrentDbUser();

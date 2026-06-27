@@ -5,6 +5,7 @@ import type { CanvasInspectorFocus } from "@/components/pipeline-canvas/pipeline
 import { DataPreviewPane } from "@/components/pipeline-canvas/data-preview-pane";
 import type { PipelineComponentSpec } from "@/lib/elt/declarative-pipeline-spec";
 import {
+  inputPreviewSourcesFromConfig,
   isRouterConfig,
   previewTableFromConfig,
   routerOutputPreviewSourcesFromConfig,

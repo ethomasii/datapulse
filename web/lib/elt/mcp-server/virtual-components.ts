@@ -5,7 +5,7 @@
 import { db } from "@/lib/db/client";
 import { canvasPortsForCategory } from "@/lib/elt/component-canvas-io";
 import type { ComponentListItem } from "@/lib/elt/component-registry";
-import { getNativeComponent } from "@/lib/elt/native-components";
+import { getNativeComponent } from "@/lib/elt/native-components/registry";
 import type { NativeComponentField } from "@/lib/elt/native-components/types";
 import { toPublicMcpServer } from "./public";
 import type { McpToolDescriptor } from "./types";

@@ -218,7 +218,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
   const [detailLoading, setDetailLoading] = useState(false);
   const [gatewayOptions, setGatewayOptions] = useState<{ id: string; name: string }[]>([]);
   const [runNowPipelineId, setRunNowPipelineId] = useState("");
-  const [runNowEnvironment, setRunNowEnvironment] = useState(DEFAULT_PIPELINE_RUN_ENVIRONMENT);
+  const [runNowEnvironment, setRunNowEnvironment] = useState<string>(DEFAULT_PIPELINE_RUN_ENVIRONMENT);
   const [runNowPartitionValue, setRunNowPartitionValue] = useState("");
   const [runNowGateway, setRunNowGateway] = useState("");
   const [runNowSubmitting, setRunNowSubmitting] = useState(false);

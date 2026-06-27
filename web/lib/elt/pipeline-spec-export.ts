@@ -1,3 +1,5 @@
+import "server-only";
+
 import YAML from "yaml";
 import type { EltPipeline } from "@prisma/client";
 import {
@@ -7,7 +9,6 @@ import {
 } from "@/lib/elt/declarative-pipeline-spec";
 import { readMedallionHints } from "@/lib/elt/compile-declarative-pipeline";
 import { db } from "@/lib/db/client";
-import { exportDeploymentBindingsToSpec } from "@/lib/elt/deployments";
 
 function tablesFromSourceConfig(sourceType: string, cfg: Record<string, unknown>): string[] | undefined {
   const slug = sourceType.toLowerCase();
@@ -152,6 +153,7 @@ export async function eltPipelineToDeclarativeYamlString(
 ): Promise<string> {
   const spec = await eltPipelineToDeclarativeSpec(row);
   if (opts?.includeDeployments && opts.actingUserId) {
+    const { exportDeploymentBindingsToSpec } = await import("@/lib/elt/deployments");
     const deployments = await exportDeploymentBindingsToSpec(opts.actingUserId, row.id);
     if (deployments) {
       (spec as Record<string, unknown>).deployments = deployments;

@@ -40,7 +40,7 @@ function toArtifactBody(
     sourceConfiguration: (overrides?.sourceConfiguration ??
       pipeline.sourceConfiguration ??
       {}) as Record<string, unknown>,
-    tool: pipeline.tool === "sling" ? "sling" : pipeline.tool === "dbt" ? "dbt" : "dlt",
+    tool: pipeline.tool === "sling" ? "sling" : "dlt",
     description: pipeline.description ?? undefined,
     groupName: pipeline.groupName ?? undefined,
   };

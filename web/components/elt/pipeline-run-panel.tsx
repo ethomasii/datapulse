@@ -22,7 +22,7 @@ export function PipelineRunPanel({ pipelineId }: { pipelineId: string | null }) 
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [triggering, setTriggering] = useState(false);
-  const [environment, setEnvironment] = useState(DEFAULT_PIPELINE_RUN_ENVIRONMENT);
+  const [environment, setEnvironment] = useState<string>(DEFAULT_PIPELINE_RUN_ENVIRONMENT);
   const [error, setError] = useState<string | null>(null);
   const [execLabel, setExecLabel] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);

@@ -41,6 +41,9 @@ export async function getGithubConnectionForUser(userId: string): Promise<Github
             defaultRepoOwner: true;
             defaultRepoName: true;
             defaultBranch: true;
+            developmentBranch: true;
+            productionDefinitionSource: true;
+            developmentDefinitionSource: true;
           };
         }) => Promise<GithubConnectionSummary | null>;
       };

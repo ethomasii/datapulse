@@ -23,10 +23,8 @@ import { isTransformOnlyPipeline } from "@/lib/elt/pipeline-mode";
 import { normalizeRunWebhookUrl } from "@/lib/elt/validate-run-webhook-url";
 import { mergeSourceConfigurationForSourceTypeChange } from "@/lib/elt/merge-source-config-on-type-change";
 import { syncDltDbtWithCanvas } from "@/lib/elt/dbt-canvas";
-import {
-  extractComponentsFromCanvas,
-  syncCanvasToPipelineSpec,
-} from "@/lib/elt/canvas-component-sync";
+import { extractComponentsFromCanvas } from "@/lib/elt/canvas-component-sync";
+import { syncCanvasToPipelineSpec } from "@/lib/elt/canvas-component-sync-server";
 import { applyCanvasSensorMonitors } from "@/lib/elt/apply-canvas-component-monitors";
 import { recordPipelineRevision, pushPipelineToGitBranch } from "@/lib/elt/pipeline-git-sync";
 import { linkDbtProjectToPipeline, unlinkDbtProjectFromPipeline } from "@/lib/elt/dbt-projects";

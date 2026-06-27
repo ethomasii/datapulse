@@ -28,6 +28,7 @@ const actionSchema = z.discriminatedUnion("action", [
     body: z.string().max(8000).optional(),
     pushFirst: z.boolean().optional(),
   }),
+  z.object({ action: z.literal("sync_from_production") }),
   z.object({ action: z.literal("push"), branch: z.enum(["production", "development"]).optional() }),
   z.object({ action: z.literal("restore_git"), commitSha: z.string().min(7).max(64) }),
   z.object({ action: z.literal("restore_revision"), revisionId: z.string().min(1) }),

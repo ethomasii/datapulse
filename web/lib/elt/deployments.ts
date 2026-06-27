@@ -1,7 +1,9 @@
+import "server-only";
+
 import { decryptSecret, encryptSecret } from "@/lib/crypto/token-encryption";
 import { db } from "@/lib/db/client";
-import { getAccessibleResourceOwnerIds, workspaceResourceUserId } from "@/lib/auth/workspace-access";
-import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
+import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
+import { getWorkspacePermissions, workspaceResourceUserId } from "@/lib/auth/org-permissions";
 import { loadWorkspaceConnectionById } from "@/lib/elt/workspace-connection-load";
 import type { DeploymentBindingSpec } from "@/lib/elt/declarative-pipeline-spec";
 
@@ -242,7 +244,11 @@ export async function loadDestinationForPipelineEnvironment(
   },
   environment: string
 ) {
-  const resolved = await resolvePipelineConnectionsForEnvironment(userId, pipeline, environment);
+  const resolved = await resolvePipelineConnectionsForEnvironment(userId, {
+    id: pipeline.id,
+    sourceConnectionId: null,
+    destinationConnectionId: pipeline.destinationConnectionId,
+  }, environment);
   return loadWorkspaceConnectionById(userId, resolved.destinationConnectionId);
 }
 

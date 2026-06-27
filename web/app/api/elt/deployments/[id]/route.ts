@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentDbUser } from "@/lib/auth/server";
-import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
+import { getWorkspacePermissions, workspaceResourceUserId } from "@/lib/auth/org-permissions";
 import {
   encryptDeploymentEnvOverrides,
   parseDeploymentEnvOverrides,
 } from "@/lib/elt/deployments";
 import { db } from "@/lib/db/client";
-import { workspaceResourceUserId } from "@/lib/auth/workspace-access";
-
 const patchSchema = z.object({
   label: z.string().min(1).max(64).optional(),
   envOverrides: z.record(z.string(), z.string()).optional(),
