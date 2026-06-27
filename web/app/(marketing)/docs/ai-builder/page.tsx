@@ -20,7 +20,7 @@ export default function AiBuilderDocsPage() {
         and {PULSE_AI_NAME} generates a save-ready definition with inline credential fields where needed.
       </p>
       <p>
-        Lakeflow-style visual design with AI-assisted editing — on <strong>any warehouse</strong>, tied to real dlt,
+        Visual pipeline design with AI-assisted editing — on <strong>any warehouse</strong>, tied to real dlt,
         Sling, and dbt codegen you can export to Git.
       </p>
 

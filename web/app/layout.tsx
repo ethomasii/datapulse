@@ -25,14 +25,14 @@ export const metadata: Metadata = {
     template: "%s | eltPulse",
   },
   description:
-    "Lakeflow-style visual canvas and Pulse AI for EL+T — on Snowflake, BigQuery, MotherDuck, and more. Fivetran-grade connectors, run slices, Git-native code export.",
+    "Visual pipeline canvas and Pulse AI for EL+T — on Snowflake, BigQuery, MotherDuck, and more. Fivetran-grade connectors, run slices, Git-native code export.",
   openGraph: {
     type: "website",
     locale: "en_US",
     siteName: "eltPulse",
     title: "eltPulse — Visual ELT for any warehouse",
     description:
-      "Visual pipeline canvas, Pulse AI, and 111+ connectors. The Lakeflow designer experience without Databricks lock-in.",
+      "Visual pipeline canvas, Pulse AI, and 111+ connectors. Designer-grade EL+T without warehouse lock-in.",
   },
 };
 

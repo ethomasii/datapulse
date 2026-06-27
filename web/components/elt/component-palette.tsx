@@ -5,6 +5,7 @@ import { Loader2, Search } from "lucide-react";
 import { compileTargetLabel } from "@/lib/elt/compile-target-labels";
 import { ELTPULSE_COMPONENT_DRAG_MIME } from "@/lib/elt/canvas-drag";
 import { ComponentIcon } from "@/components/elt/component-icon";
+import { filterCanvasOperatorComponents, isCanvasOperatorCategory } from "@/lib/elt/canvas-operator-scope";
 import { cn } from "@/lib/utils";
 
 export type ComponentListItem = {
@@ -45,14 +46,14 @@ const ALL_PALETTE_TABS = [
   { id: "transformation", label: "Transform" },
   { id: "check", label: "Validate" },
   { id: "sensor", label: "Monitor" },
+  { id: "ai", label: "AI & MCP" },
 ] as const;
 
+/** Canvas designer — asset operators only (no ingest/monitor templates). */
 const TRANSFORM_PALETTE_TABS = [
   { id: "transformation", label: "Transform" },
   { id: "check", label: "Validate" },
-  { id: "ingestion", label: "Ingest" },
-  { id: "sensor", label: "Monitor" },
-  { id: "", label: "All" },
+  { id: "ai", label: "AI & MCP" },
 ] as const;
 
 /** Searchable palette fed by GET /api/elt/components — builder + canvas. */
@@ -95,13 +96,20 @@ export function ComponentPalette({
         categories: { category: string; count: number }[];
       };
       let components = data.components ?? [];
+      if (transformDesigner) {
+        components = filterCanvasOperatorComponents(components);
+      }
       setItems(components);
-      setTotal(data.total ?? components.length);
-      setCategories(data.categories ?? []);
+      setTotal(transformDesigner ? components.length : (data.total ?? components.length));
+      setCategories(
+        transformDesigner
+          ? (data.categories ?? []).filter((c) => isCanvasOperatorCategory(c.category))
+          : (data.categories ?? [])
+      );
     } finally {
       setLoading(false);
     }
-  }, [q, category, compileTargetFilter, executableOnly, nativeOnly]);
+  }, [q, category, compileTargetFilter, executableOnly, nativeOnly, transformDesigner]);
 
   useEffect(() => {
     const t = setTimeout(() => void load(), 200);
@@ -133,16 +141,16 @@ export function ComponentPalette({
     >
       <div className="shrink-0 border-b border-slate-200 p-3 dark:border-slate-700">
         <p className="text-sm font-semibold text-slate-900 dark:text-white">
-          {nativeOnly ? "Native transforms" : "Component catalog"}
+          {transformDesigner ? "Asset operators" : nativeOnly ? "Native transforms" : "Component catalog"}
         </p>
         <p className="mt-0.5 text-xs text-slate-500">
-          {nativeOnly
+          {transformDesigner
+            ? `${total} asset steps — Transform · Validate · AI (EL source/dest handles ingest)`
+            : nativeOnly
             ? `${total} native compilers — Transform · Validate · Ingest · Monitor`
-            : transformDesigner
-              ? `${total} components — Transform (inline) · Validate (terminal) · Ingest · Monitor`
-              : executableOnly
-                ? `${total} executable components — faithful compilers only`
-                : `${total} templates — drag onto canvas or click to add`}
+            : executableOnly
+              ? `${total} executable components — faithful compilers only`
+              : `${total} templates — drag onto canvas or click to add`}
         </p>
         <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
           <input

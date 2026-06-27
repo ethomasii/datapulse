@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Database,
-  Eye,
   Layers,
   Loader2,
   Search,
@@ -37,6 +36,7 @@ const FEATURED_NATIVE_IDS = [
   "sort_rows",
   "fill_nulls",
   "replace_values",
+  "alter_row",
 ] as const;
 
 const FEATURED_AI_IDS = [
@@ -126,30 +126,22 @@ function OperatorRow({
   );
 }
 
-/** Lakeflow-style left rail — grouped operators to drag onto the canvas. */
+/** Left rail — transform & validate assets (EL source/dest handles ingest; monitors live in orchestration). */
 export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, className }: Props) {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [transformItems, setTransformItems] = useState<ComponentListItem[]>([]);
   const [validateItems, setValidateItems] = useState<ComponentListItem[]>([]);
-  const [ingestItems, setIngestItems] = useState<ComponentListItem[]>([]);
-  const [monitorItems, setMonitorItems] = useState<ComponentListItem[]>([]);
   const [aiItems, setAiItems] = useState<ComponentListItem[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [transformRes, validateRes, ingestRes, monitorRes, aiRes] = await Promise.all([
+      const [transformRes, validateRes, aiRes] = await Promise.all([
         fetch("/api/elt/components?nativeOnly=1&executableOnly=1&category=transformation&limit=120", {
           credentials: "same-origin",
         }),
         fetch("/api/elt/components?nativeOnly=1&executableOnly=1&category=check&limit=40", {
-          credentials: "same-origin",
-        }),
-        fetch("/api/elt/components?nativeOnly=1&executableOnly=1&category=ingestion&limit=40", {
-          credentials: "same-origin",
-        }),
-        fetch("/api/elt/components?nativeOnly=1&executableOnly=1&category=sensor&limit=40", {
           credentials: "same-origin",
         }),
         fetch("/api/elt/components?nativeOnly=1&executableOnly=1&category=ai&limit=40", {
@@ -163,14 +155,6 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
       if (validateRes.ok) {
         const data = (await validateRes.json()) as { components: ComponentListItem[] };
         setValidateItems(data.components ?? []);
-      }
-      if (ingestRes.ok) {
-        const data = (await ingestRes.json()) as { components: ComponentListItem[] };
-        setIngestItems(data.components ?? []);
-      }
-      if (monitorRes.ok) {
-        const data = (await monitorRes.json()) as { components: ComponentListItem[] };
-        setMonitorItems(data.components ?? []);
       }
       if (aiRes.ok) {
         const data = (await aiRes.json()) as { components: ComponentListItem[] };
@@ -186,8 +170,8 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
   }, [load]);
 
   const allItems = useMemo(
-    () => [...transformItems, ...validateItems, ...ingestItems, ...monitorItems, ...aiItems],
-    [transformItems, validateItems, ingestItems, monitorItems, aiItems]
+    () => [...transformItems, ...validateItems, ...aiItems],
+    [transformItems, validateItems, aiItems]
   );
 
   const featured = useMemo(() => {
@@ -197,11 +181,10 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
   }, [transformItems]);
 
   const featuredAi = useMemo(() => {
-    const pool = [...aiItems, ...ingestItems.filter((c) => c.id === "mcp_tool_call")];
-    const byId = new Map(pool.map((c) => [c.id, c]));
+    const byId = new Map(aiItems.map((c) => [c.id, c]));
     const ordered = FEATURED_AI_IDS.map((id) => byId.get(id)).filter(Boolean) as ComponentListItem[];
     return ordered.length ? ordered : aiItems.slice(0, 6);
-  }, [aiItems, ingestItems]);
+  }, [aiItems]);
 
   const filteredSearch = useMemo(() => {
     const ql = q.trim().toLowerCase();
@@ -228,14 +211,14 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
         : [
             {
               id: "transforms",
-              title: "Transform",
-              subtitle: "Inline steps — read and write tables",
+              title: "Transform assets",
+              subtitle: "Inline steps on tables already in the pipeline",
               icon: Workflow,
               items: featured,
             },
             {
               id: "validate",
-              title: "Validate",
+              title: "Validate assets",
               subtitle: "Terminal checks — assert only, no output",
               icon: ShieldCheck,
               items: validateItems,
@@ -243,26 +226,12 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
             {
               id: "ai",
               title: "AI & MCP",
-              subtitle: "Agents, tool calls, row enrichment, evaluators",
+              subtitle: "Row enrichment and tool calls on asset data",
               icon: Sparkles,
               items: featuredAi,
             },
-            {
-              id: "ingest",
-              title: "Ingest",
-              subtitle: "Source-side load hints (dlt / Sling)",
-              icon: Database,
-              items: ingestItems.slice(0, 8),
-            },
-            {
-              id: "monitors",
-              title: "Monitor",
-              subtitle: "Parallel sensors off the source",
-              icon: Eye,
-              items: monitorItems.slice(0, 6),
-            },
           ],
-    [featured, featuredAi, filteredSearch, validateItems, ingestItems, monitorItems, q]
+    [featured, featuredAi, filteredSearch, validateItems, q]
   );
 
   function onQuickAction(action: "source" | "dest") {
@@ -276,17 +245,20 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
         "flex h-full min-h-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950",
         className
       )}
-      aria-label="Available operators"
+      aria-label="Asset operators"
     >
       <div className="shrink-0 border-b border-slate-200 p-3 dark:border-slate-800">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Available operators</p>
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Asset operators</p>
+        <p className="mt-0.5 text-[9px] leading-snug text-slate-400">
+          Transforms &amp; checks on the graph — use Source/Output for EL ingest and landing.
+        </p>
         <div className="relative mt-2">
           <Search className="pointer-events-none absolute left-2 top-2 h-3.5 w-3.5 text-slate-400" aria-hidden />
           <input
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search operators…"
+            placeholder="Search assets…"
             className="w-full rounded-md border border-slate-200 py-1.5 pl-7 pr-2 text-xs dark:border-slate-700 dark:bg-slate-900"
           />
         </div>
@@ -297,16 +269,16 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
           <section className="mb-3">
             <h3 className="mb-1 flex items-center gap-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
               <Layers className="h-3 w-3" aria-hidden />
-              Source and output
+              EL nodes
             </h3>
             <OperatorRow
-              item={{ id: "__source", name: "Source", description: "Import data into the pipeline", action: "source" }}
+              item={{ id: "__source", name: "Source", description: "EL extract — connectors & run slices", action: "source" }}
               onSelect={onSelect}
               onQuickAction={onQuickAction}
               fallbackIcon={Database}
             />
             <OperatorRow
-              item={{ id: "__dest", name: "Output", description: "Land data in the warehouse", action: "dest" }}
+              item={{ id: "__dest", name: "Output", description: "EL load — warehouse destination", action: "dest" }}
               onSelect={onSelect}
               onQuickAction={onQuickAction}
               fallbackIcon={Target}

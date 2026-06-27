@@ -95,7 +95,7 @@ export default function DocsOverviewPage() {
     <DocsProse>
       <h1>Documentation</h1>
       <p className="text-lg text-slate-600 dark:text-slate-400">
-        eltPulse is a <strong>visual ELT control plane</strong> for any warehouse — Lakeflow-style canvas and Pulse AI,
+        eltPulse is a <strong>visual ELT control plane</strong> for any warehouse — drag-and-drop canvas, Pulse AI,
         Fivetran-competitive connectors with <strong>run slices</strong>, and Git-native code you own. Use managed
         execution by default or deploy a gateway in your VPC. These guides cover the product end to end.
       </p>

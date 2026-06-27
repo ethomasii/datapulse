@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   Bot,
+  Combine,
   GitBranch,
   Key,
   Layers,
@@ -13,95 +14,152 @@ import {
   Zap,
 } from "lucide-react";
 import type { Metadata } from "next";
+import { ApiPreview } from "@/components/marketing/api-preview";
 import { CanvasPreview } from "@/components/marketing/canvas-preview";
+import { ConnectorsPreview } from "@/components/marketing/connectors-preview";
+import { GatewayPreview } from "@/components/marketing/gateway-preview";
+import { GitPreview } from "@/components/marketing/git-preview";
+import { OrchestrationPreview } from "@/components/marketing/orchestration-preview";
 import { PulseAiPreview } from "@/components/marketing/pulse-ai-preview";
 import { ProductPreview } from "@/components/marketing/product-preview";
 import { RunsPreview } from "@/components/marketing/runs-preview";
+import { TeamPreview } from "@/components/marketing/team-preview";
 import { PULSE_AI_NAME } from "@/lib/brand/pulse-ai";
+import { getSourceCount } from "@/lib/marketing/connector-catalog";
+
+const sourceCount = getSourceCount();
 
 export const metadata: Metadata = {
   title: "Features",
   description:
-    "eltPulse features — visual ELT canvas, Pulse AI assistant, Lakeflow-style designer for any warehouse, managed execution, observability, and Git-native workflows.",
+    "eltPulse features — visual ELT canvas, Pulse AI, Fivetran-grade connectors, managed execution, observability, and Git-native workflows on any warehouse.",
 };
 
-const FEATURES = [
+type PreviewKind =
+  | "quickstart"
+  | "canvas"
+  | "pulse-ai"
+  | "connectors"
+  | "runs"
+  | "git"
+  | "orchestration"
+  | "gateway"
+  | "api"
+  | "team";
+
+const FEATURES: {
+  icon: typeof PenLine;
+  title: string;
+  description: string;
+  preview: PreviewKind;
+  href: string;
+  linkLabel: string;
+}[] = [
   {
     icon: PenLine,
     title: "Visual ELT canvas",
     description:
-      "Drag-and-drop pipeline designer — sources, native transforms, dbt, and any warehouse on one graph. The Lakeflow experience without Databricks lock-in.",
-    preview: "canvas" as const,
+      "Drag-and-drop pipeline designer — wire sources, native transforms, dbt, and any warehouse on one graph. The visual EL+T experience without platform lock-in.",
+    preview: "canvas",
+    href: "/docs/pipelines",
+    linkLabel: "Canvas & pipelines docs",
   },
   {
     icon: Bot,
     title: "Pulse AI",
     description:
       "Describe changes in plain English. Pulse AI patches the canvas graph, component configs, and generated pipeline code — then you review and save.",
-    preview: "pulse-ai" as const,
+    preview: "pulse-ai",
+    href: "/docs/ai-builder",
+    linkLabel: `${PULSE_AI_NAME} docs`,
   },
   {
     icon: Layers,
-    title: "111+ connectors",
+    title: `${sourceCount}+ connectors`,
     description:
       "Snowflake, BigQuery, Postgres, Stripe, Salesforce, and more. Run slices, managed workers, and production-ready codegen.",
-    preview: "canvas" as const,
+    preview: "connectors",
+    href: "/connectors",
+    linkLabel: "Browse connector catalog",
   },
   {
     icon: Zap,
     title: "Quick start & managed runs",
     description:
       "Destination → source → run in under a minute. eltPulse-managed compute by default — gateway only when you need private network access.",
-    preview: "quickstart" as const,
+    preview: "quickstart",
+    href: "/docs/getting-started",
+    linkLabel: "Getting started guide",
   },
   {
     icon: LineChart,
     title: "Runs & observability",
     description:
       "Live telemetry, row counts, logs, and activity charts. Webhooks when runs finish — the visibility Fivetran users expect, without lock-in.",
-    preview: "runs" as const,
+    preview: "runs",
+    href: "/docs/runs",
+    linkLabel: "Runs & telemetry docs",
   },
   {
     icon: GitBranch,
     title: "Git-native artifacts",
     description:
       "Export pipeline projects to your repo. Pipeline YAML auto-pushes on save when GitHub is connected — review in PRs.",
-    preview: "canvas" as const,
+    preview: "git",
+    href: "/docs/repositories",
+    linkLabel: "Repositories docs",
   },
   {
     icon: Users,
     title: "Team workspaces",
     description:
       "Invite colleagues by email, accept invites with one click, and share the org owner's pipelines. Team plan on Stripe.",
-    preview: "quickstart" as const,
+    preview: "team",
+    href: "/pricing",
+    linkLabel: "Team pricing",
   },
   {
     icon: Key,
     title: "Public API (beta)",
     description:
       "Workspace API keys for pipelines, runs, and connections. Automate CI/CD from your own runners — without self-hosting the control plane.",
-    preview: null,
+    preview: "api",
+    href: "/docs/integrations",
+    linkLabel: "Integrations & API keys",
   },
   {
     icon: Shield,
     title: "BYO infrastructure",
     description:
       "Self-hosted gateway, customer-operated execution, or air-gapped enterprise. Telemetry always lands in eltPulse for a single pane of glass.",
-    preview: null,
+    preview: "gateway",
+    href: "/docs/gateway",
+    linkLabel: "Gateway docs",
   },
   {
     icon: Workflow,
     title: "Schedules, monitors & slices",
     description:
       "Cron schedules, data quality monitors, and partition run slices — operational tooling Airbyte charges extra for, included in the builder.",
-    preview: "runs" as const,
+    preview: "orchestration",
+    href: "/docs/orchestration",
+    linkLabel: "Orchestration docs",
+  },
+  {
+    icon: Combine,
+    title: "EL + T in one plane",
+    description:
+      "Extract and load with dlt & Sling, transform with dbt on the same canvas — orchestration-ready from day one.",
+    preview: "canvas",
+    href: "/docs/dbt",
+    linkLabel: "dbt transforms docs",
   },
 ];
 
 const CASE_STUDIES = [
   {
     quote:
-      "We wanted Lakeflow's canvas on Snowflake. eltPulse gave us the designer and Pulse AI without a Databricks migration.",
+      "We wanted a visual pipeline designer on Snowflake. eltPulse gave us the canvas and Pulse AI without a platform migration.",
     role: "Data engineer",
     company: "Series B SaaS",
   },
@@ -119,12 +177,31 @@ const CASE_STUDIES = [
   },
 ];
 
-function FeaturePreview({ kind }: { kind: "quickstart" | "canvas" | "pulse-ai" | "runs" | null }) {
-  if (kind === "quickstart") return <ProductPreview />;
-  if (kind === "canvas") return <CanvasPreview />;
-  if (kind === "pulse-ai") return <PulseAiPreview />;
-  if (kind === "runs") return <RunsPreview />;
-  return null;
+function FeaturePreview({ kind }: { kind: PreviewKind }) {
+  switch (kind) {
+    case "quickstart":
+      return <ProductPreview />;
+    case "canvas":
+      return <CanvasPreview />;
+    case "pulse-ai":
+      return <PulseAiPreview />;
+    case "connectors":
+      return <ConnectorsPreview />;
+    case "runs":
+      return <RunsPreview />;
+    case "git":
+      return <GitPreview />;
+    case "orchestration":
+      return <OrchestrationPreview />;
+    case "gateway":
+      return <GatewayPreview />;
+    case "api":
+      return <ApiPreview />;
+    case "team":
+      return <TeamPreview />;
+    default:
+      return null;
+  }
 }
 
 export default function FeaturesPage() {
@@ -137,8 +214,8 @@ export default function FeaturesPage() {
             Visual EL+T for any warehouse — canvas, {PULSE_AI_NAME}, and code you own
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-slate-600 dark:text-slate-400">
-            Lakeflow-style designer, Fivetran-grade connectors, and open engines (dlt, Sling, dbt) — one control plane
-            for teams who refuse to pick between ease and ownership.
+            Drag-and-drop pipeline design, Fivetran-grade connectors, and open engines (dlt, Sling, dbt) — one control
+            plane for teams who refuse to pick between ease and ownership.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
@@ -148,10 +225,10 @@ export default function FeaturesPage() {
               Start free <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
-              href="/compare/vs-databricks-lakeflow"
+              href="/compare"
               className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
             >
-              vs Lakeflow
+              Compare platforms
             </Link>
           </div>
         </div>
@@ -173,22 +250,15 @@ export default function FeaturesPage() {
                   </div>
                   <h2 className="mt-4 text-2xl font-bold text-slate-900 dark:text-white">{feature.title}</h2>
                   <p className="mt-3 text-slate-600 dark:text-slate-400">{feature.description}</p>
-                  {feature.title.includes("connectors") ? (
-                    <Link
-                      href="/connectors"
-                      className="mt-3 inline-flex text-sm font-semibold text-sky-600 hover:underline dark:text-sky-400"
-                    >
-                      Browse connector catalog →
-                    </Link>
-                  ) : null}
+                  <Link
+                    href={feature.href}
+                    className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-sky-600 hover:underline dark:text-sky-400"
+                  >
+                    {feature.linkLabel}
+                    <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                  </Link>
                 </div>
-                {feature.preview ? (
-                  <FeaturePreview kind={feature.preview} />
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40">
-                    Configure in app → Account → Developers
-                  </div>
-                )}
+                <FeaturePreview kind={feature.preview} />
               </div>
             );
           })}

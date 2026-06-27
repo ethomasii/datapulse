@@ -63,7 +63,7 @@ export default function GettingStartedDocsPage() {
 
       <h2>Visual canvas</h2>
       <p>
-        The <Link href="/builder?view=canvas">canvas</Link> is a Lakeflow-style graph editor for the same pipeline as
+        The <Link href="/builder?view=canvas">canvas</Link> is a visual graph editor for the same pipeline as
         the form builder. Drag source, transform, and destination nodes; wire edges; inspect dbt and post-transform
         settings on transform nodes. Pulse AI can patch the graph from chat — see{" "}
         <Link href="/docs/ai-builder">Pulse AI</Link>.

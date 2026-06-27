@@ -11,7 +11,7 @@ const VIEWS = [
     id: "canvas",
     label: "Visual canvas",
     icon: Layers,
-    caption: "Drag-and-drop ELT designer — sources, transforms, and any warehouse on one graph.",
+    caption: "Full designer — graph nodes, row previews, and Pulse AI on one screen.",
   },
   {
     id: "pulse-ai",

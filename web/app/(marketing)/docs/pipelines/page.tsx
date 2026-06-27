@@ -32,7 +32,7 @@ export default function PipelinesDocsPage() {
 
       <h2>Visual canvas</h2>
       <p>
-        The <Link href="/builder?view=canvas">visual canvas</Link> is eltPulse&apos;s Lakeflow-style designer — the
+        The <Link href="/builder?view=canvas">visual canvas</Link> is eltPulse&apos;s drag-and-drop pipeline designer — the
         same pipeline as the form builder, optimized for graph editing:
       </p>
       <ul>
