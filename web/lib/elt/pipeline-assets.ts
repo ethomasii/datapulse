@@ -406,6 +406,29 @@ function resolvePostTransformAssets(
   ];
 }
 
+/** Config-derived raw landing tables (schema.table) for canvas wire autofill. */
+export function inferRawLandingTables(input: {
+  name: string;
+  sourceType: string;
+  destinationType: string;
+  tool: string;
+  sourceConfiguration: unknown;
+}): string[] {
+  const bundle = derivePipelineAssets({
+    id: "wire",
+    name: input.name,
+    tool: input.tool,
+    enabled: true,
+    sourceType: input.sourceType,
+    destinationType: input.destinationType,
+    sourceConfiguration: input.sourceConfiguration,
+    updatedAt: new Date().toISOString(),
+  });
+  return bundle.rawAssets
+    .map((a) => a.landingQualified?.trim())
+    .filter((q): q is string => Boolean(q));
+}
+
 /** Derive asset bundle for a single pipeline row. */
 export function derivePipelineAssets(pipeline: PipelineAssetInput): PipelineAssetBundle {
   const config = asConfig(pipeline.sourceConfiguration);

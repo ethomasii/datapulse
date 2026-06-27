@@ -56,6 +56,8 @@ import {
 } from "@/lib/elt/pipeline-mode";
 import { ensureGithubReposForForm } from "@/lib/elt/normalize-source-configuration";
 import { hydrateCanvasFromSourceConfiguration, extractSpecComponents, defaultPipelineCanvasBackbone } from "@/lib/elt/spec-components-to-canvas";
+import { type WireInputContext } from "@/lib/elt/canvas-wire-input";
+import { inferRawLandingTables } from "@/lib/elt/pipeline-assets";
 import { TransformDagPanel } from "@/components/pipeline-canvas/transform-dag-panel";
 import { IngestPanel } from "@/components/pipeline-canvas/ingest-panel";
 import { lakeStarterCanvasGraph } from "@/lib/elt/lake-pipeline-starters";
@@ -1022,6 +1024,26 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
     [sourceCfg, loadedSig, selectedId]
   );
 
+  const wireInputContext = useMemo((): WireInputContext => {
+    if (!selectedId) return {};
+    return {
+      rawLandingTables: inferRawLandingTables({
+        name: selectedName || "pipeline",
+        sourceType: pipelineSourceType || "github",
+        destinationType: pipelineDestinationType || "motherduck",
+        tool: pipelineTool,
+        sourceConfiguration: lineageSourceConfig,
+      }),
+    };
+  }, [
+    selectedId,
+    selectedName,
+    pipelineSourceType,
+    pipelineDestinationType,
+    pipelineTool,
+    lineageSourceConfig,
+  ]);
+
   function renderDesignerWorkspace() {
     return (
       <div className="flex h-full min-h-0 flex-col overflow-hidden lg:flex-row">
@@ -1046,6 +1068,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
               pipelineSourceType={pipelineSourceType}
               pipelineDestinationType={pipelineDestinationType}
               transformOnly={transformOnlyMode}
+              wireInputContext={wireInputContext}
               onPickSourceType={(t) => void patchPipelineBindings({ sourceType: t })}
               onPickDestinationType={(t) => void patchPipelineBindings({ destinationType: t })}
               bindingsBusy={bindingsBusy}

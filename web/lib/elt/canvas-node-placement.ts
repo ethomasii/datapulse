@@ -5,6 +5,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import { isValidPipelineCanvasEdge } from "@/lib/elt/canvas-component-sync";
 import { isTerminalComponentData, isTerminalComponentNode } from "@/lib/elt/component-canvas-io";
+import { resolveCanvasAutoWireSourceId } from "@/lib/elt/canvas-wire-input";
 
 /** Space between upstream right edge and next node left edge. */
 export const CANVAS_HORIZONTAL_GAP = 88;
@@ -219,6 +220,6 @@ export function findCanvasAppendTarget(
 
   return {
     position: positionForAppend(nodes, wireFrom, append),
-    upstreamId: wireFrom.id,
+    upstreamId: resolveCanvasAutoWireSourceId(nodes, edges, wireFrom, append),
   };
 }

@@ -35,7 +35,7 @@ import { enrichCanvasComponentNodes } from "@/lib/elt/component-canvas-io";
 import { findCanvasAppendTarget } from "@/lib/elt/canvas-node-placement";
 import { autoLayoutPipelineCanvas } from "@/lib/elt/canvas-auto-layout";
 import { findNearestEdge, insertNodeOnEdge } from "@/lib/elt/canvas-edge-insert";
-import { wireInputFromUpstreamEdge } from "@/lib/elt/canvas-wire-input";
+import { wireInputFromUpstreamEdge, rewireAllComponentInputs, type WireInputContext } from "@/lib/elt/canvas-wire-input";
 import { dashedAnimatedEdgeStyle, resolveCanvasEdges } from "./canvas-edge-defaults";
 import { pipelineNodeTypes } from "./custom-nodes";
 
@@ -145,6 +145,8 @@ export type PipelineCanvasProps = {
   variant?: "default" | "designer";
   /** Warehouse-native pipeline — no extract source required. */
   transformOnly?: boolean;
+  /** Pipeline landing tables for auto-filling transform input when wired from Source. */
+  wireInputContext?: WireInputContext;
 };
 
 function FlowCanvas({
@@ -168,6 +170,7 @@ function FlowCanvas({
   showEmptyStateOverlay = false,
   variant = "default",
   transformOnly = false,
+  wireInputContext,
 }: PipelineCanvasProps) {
   const isDesigner = variant === "designer";
   const { resolvedTheme } = useTheme();
@@ -201,17 +204,18 @@ function FlowCanvas({
   useEffect(() => {
     if (!pipelineId) return;
     const hasGraph = loadedGraph && Array.isArray(loadedGraph.nodes);
-    const nextNodes = enrichCanvasComponentNodes(hasGraph ? loadedGraph.nodes : demoNodes);
+    const baseNodes = enrichCanvasComponentNodes(hasGraph ? loadedGraph.nodes : demoNodes);
     const nextEdges = hasGraph
-      ? resolveCanvasEdges(nextNodes, loadedGraph.edges)
+      ? resolveCanvasEdges(baseNodes, loadedGraph.edges)
       : resolveCanvasEdges(demoNodes, demoEdges);
+    const nextNodes = rewireAllComponentInputs(baseNodes, nextEdges, wireInputContext);
     setNodes(nextNodes);
     setEdges(nextEdges);
     const t = setTimeout(() => rfRef.current?.fitView({ padding: 0.2 }), 80);
     return () => clearTimeout(t);
     // graphRevision drives re-sync; omit loadedGraph/setters from deps to prevent load/fit loops with @xyflow/react.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadedGraph read from latest render when graphRevision changes
-  }, [pipelineId, graphRevision]);
+  }, [pipelineId, graphRevision, wireInputContext]);
 
   useEffect(() => {
     setMounted(true);
@@ -266,7 +270,7 @@ function FlowCanvas({
         );
         if (params.target) {
           setNodes((nds) => {
-            const wired = wireInputFromUpstreamEdge(nds, nextEdges, params.target!);
+            const wired = wireInputFromUpstreamEdge(nds, nextEdges, params.target!, wireInputContext);
             if (!wired) return nds;
             return nds.map((n) =>
               n.id === wired.nodeId
@@ -284,7 +288,7 @@ function FlowCanvas({
         return nextEdges;
       });
     },
-    [setEdges, setNodes]
+    [setEdges, setNodes, wireInputContext]
   );
 
   const removeSelectedNodes = useCallback(() => {
@@ -411,7 +415,7 @@ function FlowCanvas({
           },
           edges
         );
-        const wired = wireInputFromUpstreamEdge([...nodes, newNode], nextEdges, id);
+        const wired = wireInputFromUpstreamEdge([...nodes, newNode], nextEdges, id, wireInputContext);
         if (wired) {
           newNode = {
             ...newNode,
@@ -517,7 +521,7 @@ function FlowCanvas({
             isValidPipelineCanvasEdge(newNode, tgt)
           ) {
             const result = insertNodeOnEdge(nodes, edges, edge, newNode);
-            const wired = wireInputFromUpstreamEdge(result.nodes, result.edges, newNode.id);
+            const wired = wireInputFromUpstreamEdge(result.nodes, result.edges, newNode.id, wireInputContext);
             const finalNodes = wired
               ? result.nodes.map((n) =>
                   n.id === wired.nodeId
@@ -536,7 +540,7 @@ function FlowCanvas({
         /* ignore malformed drag payload */
       }
     },
-    [nodes, edges, setNodes, setEdges]
+    [nodes, edges, setNodes, setEdges, wireInputContext]
   );
 
   const resetGraph = useCallback(() => {

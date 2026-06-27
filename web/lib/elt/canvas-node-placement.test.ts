@@ -29,7 +29,7 @@ describe("findCanvasAppendTarget", () => {
     const { position, upstreamId } = findCanvasAppendTarget(backbone, backboneEdges, {
       append: { type: "componentNode", data: { compileHint: "" } },
     });
-    expect(upstreamId).toBe("d");
+    expect(upstreamId).toBe("s");
     expect(position.x).toBe(360 + 200 + 88);
     expect(position.y + handleYOffset({ type: "componentNode", data: { compileHint: "" } })).toBeCloseTo(
       handleLine,
