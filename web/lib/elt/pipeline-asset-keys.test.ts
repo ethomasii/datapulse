@@ -1,8 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { enrichComponentListAssets, deriveStepAssetKey } from "@/lib/elt/pipeline-asset-keys";
+import {
+  enrichComponentListAssets,
+  deriveStepAssetKey,
+  inputPreviewSourcesFromConfig,
+} from "@/lib/elt/pipeline-asset-keys";
 import { buildCanvasFromDeclarativeSpec } from "@/lib/elt/spec-components-to-canvas";
 
 describe("pipeline-asset-keys", () => {
+  it("exposes left and right inputs for join config", () => {
+    const sources = inputPreviewSourcesFromConfig({
+      left_table: "staging.orders",
+      right_table: "staging.customers",
+      output_table: "staging.enriched",
+    });
+    expect(sources).toHaveLength(2);
+    expect(sources[0]?.table).toBe("staging.orders");
+    expect(sources[1]?.table).toBe("staging.customers");
+  });
+
   it("derives asset key from output_table", () => {
     const key = deriveStepAssetKey("orders_pipeline", "join_step", {
       output_table: "staging.orders_enriched",

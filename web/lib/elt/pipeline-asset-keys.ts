@@ -101,8 +101,35 @@ export function previewTableFromConfig(config: Record<string, unknown>): string 
 
 /** Upstream / input table for Lakeflow-style input preview. */
 export function inputTableFromConfig(config: Record<string, unknown>): string | null {
-  const table = String(
+  const sources = inputPreviewSourcesFromConfig(config);
+  return sources[0]?.table ?? null;
+}
+
+export type InputPreviewSource = {
+  id: string;
+  label: string;
+  table: string;
+};
+
+/** One or more wired input tables (join steps expose left + right). */
+export function inputPreviewSourcesFromConfig(
+  config: Record<string, unknown>
+): InputPreviewSource[] {
+  const left = String(config.left_table ?? config.left_asset_key ?? "").trim();
+  const right = String(config.right_table ?? config.right_asset_key ?? "").trim();
+  if (left && right) {
+    return [
+      { id: "left", label: "Left input", table: left },
+      { id: "right", label: "Right input", table: right },
+    ];
+  }
+  const single = String(
     config.input_table ?? config.table ?? config.left_table ?? config.source_table ?? ""
   ).trim();
-  return table || null;
+  if (single) return [{ id: "input", label: "Input", table: single }];
+  return [];
+}
+
+export function isJoinStepConfig(config: Record<string, unknown>): boolean {
+  return inputPreviewSourcesFromConfig(config).length >= 2;
 }
