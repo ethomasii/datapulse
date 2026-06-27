@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import type { CanvasInspectorFocus } from "@/components/pipeline-canvas/pipeline-canvas";
 import { DataPreviewPane } from "@/components/pipeline-canvas/data-preview-pane";
+import type { PipelineComponentSpec } from "@/lib/elt/declarative-pipeline-spec";
 import {
   inputPreviewSourcesFromConfig,
   previewTableFromConfig,
@@ -15,6 +16,8 @@ type Props = {
   className?: string;
   onInputDiagnosticChange?: (message: string | null) => void;
   onOutputDiagnosticChange?: (message: string | null) => void;
+  throughStepId?: string | null;
+  eltComponents?: PipelineComponentSpec[];
 };
 
 /** Lakeflow-style bottom strip — input vs output sample rows for the selected step. */
@@ -25,6 +28,8 @@ export function CanvasPreviewPanel({
   className,
   onInputDiagnosticChange,
   onOutputDiagnosticChange,
+  throughStepId = null,
+  eltComponents,
 }: Props) {
   if (focus.kind !== "component") {
     return (
@@ -67,6 +72,9 @@ export function CanvasPreviewPanel({
         pipelineId={pipelineId}
         config={config}
         onDiagnosticChange={onOutputDiagnosticChange}
+        fusedPreview
+        throughStepId={throughStepId}
+        eltComponents={eltComponents}
       />
     </section>
   );

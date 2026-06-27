@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { Edge, Node } from "@xyflow/react";
 import { Loader2 } from "lucide-react";
 import { CanvasPreviewPanel } from "@/components/pipeline-canvas/canvas-preview-panel";
+import { CanvasFusionPanel } from "@/components/pipeline-canvas/canvas-fusion-panel";
 import { DesignerFullscreenShell } from "@/components/pipeline-canvas/designer-fullscreen-shell";
 import { DesignerMobileChrome } from "@/components/pipeline-canvas/designer-mobile-chrome";
 import { PulseCanvasBar } from "@/components/pipeline-canvas/pulse-canvas-bar";
@@ -68,6 +69,8 @@ import { TransformDagPanel } from "@/components/pipeline-canvas/transform-dag-pa
 import { IngestPanel } from "@/components/pipeline-canvas/ingest-panel";
 import { lakeStarterCanvasGraph } from "@/lib/elt/lake-pipeline-starters";
 import { defaultSourceTable } from "@/lib/elt/lake-defaults";
+import { extractComponentsFromCanvas } from "@/lib/elt/canvas-component-sync";
+import { specIdFromCanvasNodeData } from "@/lib/elt/native-components/pipeline-fusion-preview";
 
 function pickConnectionSubset(values: Record<string, string>, keys: string[]): Record<string, string> {
   const out: Record<string, string> = {};
@@ -219,6 +222,27 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
     if (inspectorFocus.kind !== "component") return null;
     return (inspectorFocus.data.config as Record<string, unknown>) ?? {};
   }, [inspectorFocus]);
+
+  const throughStepId = useMemo(() => {
+    if (inspectorFocus.kind !== "component") return null;
+    return specIdFromCanvasNodeData(inspectorFocus.data as Record<string, unknown>);
+  }, [inspectorFocus]);
+
+  const liveEltComponents = useMemo(() => {
+    const g = loadedGraph;
+    if (!g?.nodes?.length) return [];
+    let nodes = g.nodes;
+    if (inspectorFocus.kind === "component" && liveStepConfig) {
+      nodes = g.nodes.map((n) =>
+        n.id === inspectorFocus.nodeId
+          ? { ...n, data: { ...(n.data as object), config: liveStepConfig } }
+          : n
+      );
+    }
+    return extractComponentsFromCanvas(nodes, g.edges, {
+      pipelineName: selectedName || "pipeline",
+    }).components;
+  }, [loadedGraph, inspectorFocus, liveStepConfig, selectedName]);
 
   const canvasPulseNode = useMemo(() => {
     if (inspectorFocus.kind !== "component") return null;
@@ -1155,10 +1179,16 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
             onPipelinePatched={() => void loadPipelineGraph(selectedId)}
           />
           <div className="flex shrink-0 flex-col">
+            <CanvasFusionPanel
+              pipelineId={selectedId}
+              eltComponents={liveEltComponents}
+            />
             <CanvasPreviewPanel
               pipelineId={selectedId}
               focus={inspectorFocus}
               liveConfig={liveStepConfig}
+              throughStepId={throughStepId}
+              eltComponents={liveEltComponents}
               className="h-56 shrink-0 xl:h-64 2xl:h-72"
               onInputDiagnosticChange={reportInputPreviewDiagnostic}
               onOutputDiagnosticChange={reportOutputPreviewDiagnostic}

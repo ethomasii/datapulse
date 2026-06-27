@@ -13,6 +13,12 @@ import {
   parseCtasStatement,
   shouldMaterializeStep,
 } from "./fuse-warehouse-sql";
+import {
+  dropScratchTableSql,
+  ensureScratchSchemaSql,
+  rewriteCtasToScratchTable,
+  scratchOutputTables,
+} from "./eltpulse-scratch";
 
 function parseEltComponents(raw: unknown): PipelineComponentSpec[] {
   if (!Array.isArray(raw)) return [];
@@ -104,10 +110,13 @@ function compilePipelineComponentsSync(
   const warnings: string[] = [];
   let compiled = false;
   const fusionEnabled = isSqlFusionEnabled(config);
+  const pipelineName = String(config.pipeline_name ?? config.name ?? "pipeline");
+  const scratchByLogical = scratchOutputTables(components, { pipelineName });
   const acc: SqlFusionAccumulator = {
     pythonBlocks,
     sqlStatements,
     sqlSegment,
+    scratchTables: new Set(),
     testLines,
     quality,
     warnings,
@@ -123,16 +132,27 @@ function compilePipelineComponentsSync(
     }
 
     const out = native.compile(cfg);
-    ingestCompileOutput(config, cfg, out, acc, fusionEnabled);
+    ingestCompileOutput(config, cfg, out, acc, fusionEnabled, scratchByLogical);
     compiled = true;
   }
 
-  flushSqlFusionSegment(acc, fusionEnabled);
+  flushSqlFusionSegment(acc, fusionEnabled, scratchByLogical);
 
-  finalizeCompiledConfig(config, { pythonBlocks, sqlStatements, testLines, quality, compiled });
+  if (acc.scratchTables.size) {
+    config.elt_scratch_tables = [...acc.scratchTables];
+  }
+
+  finalizeCompiledConfig(config, {
+    pythonBlocks,
+    sqlStatements: prependScratchPreamble([...sqlStatements], acc.scratchTables),
+    testLines,
+    quality,
+    compiled,
+  });
+  const finalSql = prependScratchPreamble([...sqlStatements], acc.scratchTables);
   return {
     config,
-    result: { pythonBlocks, sqlStatements, testLines, quality, warnings, compiled },
+    result: { pythonBlocks, sqlStatements: finalSql, testLines, quality, warnings, compiled },
   };
 }
 
@@ -161,10 +181,13 @@ export async function compilePipelineComponentsAsync(
   const warnings: string[] = [];
   let compiled = false;
   const fusionEnabled = isSqlFusionEnabled(config);
+  const pipelineName = String(config.pipeline_name ?? config.name ?? "pipeline");
+  const scratchByLogical = scratchOutputTables(components, { pipelineName });
   const acc: SqlFusionAccumulator = {
     pythonBlocks,
     sqlStatements,
     sqlSegment,
+    scratchTables: new Set(),
     testLines,
     quality,
     warnings,
@@ -188,7 +211,7 @@ export async function compilePipelineComponentsAsync(
 
     try {
       const out = await compiler.compile(cfg);
-      ingestCompileOutput(config, cfg, out, acc, fusionEnabled);
+      ingestCompileOutput(config, cfg, out, acc, fusionEnabled, scratchByLogical);
       compiled = true;
       if (compiler.source === "package") {
         config.elt_components_package_sources = {
@@ -206,13 +229,32 @@ export async function compilePipelineComponentsAsync(
     }
   }
 
-  flushSqlFusionSegment(acc, fusionEnabled);
+  flushSqlFusionSegment(acc, fusionEnabled, scratchByLogical);
 
-  finalizeCompiledConfig(config, { pythonBlocks, sqlStatements, testLines, quality, compiled });
+  if (acc.scratchTables.size) {
+    config.elt_scratch_tables = [...acc.scratchTables];
+  }
+
+  finalizeCompiledConfig(config, {
+    pythonBlocks,
+    sqlStatements: prependScratchPreamble([...sqlStatements], acc.scratchTables),
+    testLines,
+    quality,
+    compiled,
+  });
   return {
     config,
-    result: { pythonBlocks, sqlStatements, testLines, quality, warnings, compiled },
+    result: { pythonBlocks, sqlStatements: prependScratchPreamble([...sqlStatements], acc.scratchTables), testLines, quality, warnings, compiled },
   };
+}
+
+function prependScratchPreamble(statements: string[], scratchTables: Set<string>): string[] {
+  if (!scratchTables.size) return statements;
+  const preamble = [
+    ensureScratchSchemaSql(),
+    ...[...scratchTables].map((t) => dropScratchTableSql(t)),
+  ];
+  return [...preamble, ...statements];
 }
 
 function applyCompileOutput(
@@ -246,21 +288,45 @@ type SqlFusionAccumulator = {
   pythonBlocks: string[];
   sqlStatements: string[];
   sqlSegment: string[];
+  scratchTables: Set<string>;
   testLines: string[];
   quality: CompiledPipelineComponents["quality"];
   warnings: string[];
 };
 
-function flushSqlFusionSegment(acc: SqlFusionAccumulator, fusionEnabled: boolean): void {
+function applyScratchRewrite(
+  sql: string,
+  scratchByLogical: Map<string, string>
+): { sql: string; scratchTable: string | null } {
+  const parsed = parseCtasStatement(sql);
+  if (!parsed) return { sql, scratchTable: null };
+  const scratch = scratchByLogical.get(parsed.outputTable);
+  if (!scratch) return { sql, scratchTable: null };
+  return { sql: rewriteCtasToScratchTable(sql, scratch), scratchTable: scratch };
+}
+
+function flushSqlFusionSegment(
+  acc: SqlFusionAccumulator,
+  fusionEnabled: boolean,
+  scratchByLogical: Map<string, string>
+): void {
   if (!acc.sqlSegment.length) return;
+  let statements: string[];
+  let fusedCount = 0;
   if (fusionEnabled && acc.sqlSegment.length > 1) {
-    const { statements, fusedCount } = flushFusedSqlSegment(acc.sqlSegment);
-    acc.sqlStatements.push(...statements);
+    const flushed = flushFusedSqlSegment(acc.sqlSegment);
+    statements = flushed.statements;
+    fusedCount = flushed.fusedCount;
     if (fusedCount > 1) {
       acc.warnings.push(`Fused ${fusedCount} warehouse SQL steps into one CTAS.`);
     }
   } else {
-    acc.sqlStatements.push(...acc.sqlSegment);
+    statements = [...acc.sqlSegment];
+  }
+  for (const stmt of statements) {
+    const { sql: rewritten, scratchTable } = applyScratchRewrite(stmt, scratchByLogical);
+    acc.sqlStatements.push(rewritten);
+    if (scratchTable) acc.scratchTables.add(scratchTable);
   }
   acc.sqlSegment = [];
 }
@@ -269,20 +335,23 @@ function appendCompiledSql(
   cfg: Record<string, unknown>,
   out: NativeComponentCompileResult,
   acc: SqlFusionAccumulator,
-  fusionEnabled: boolean
+  fusionEnabled: boolean,
+  scratchByLogical: Map<string, string>
 ): void {
   if (!out.sql?.length) return;
 
   const materialize = shouldMaterializeStep(cfg);
-  if (materialize) flushSqlFusionSegment(acc, fusionEnabled);
+  if (materialize) flushSqlFusionSegment(acc, fusionEnabled, scratchByLogical);
 
   for (const stmt of out.sql) {
     const fusible =
       fusionEnabled && !isDataframeExecution(cfg) && isFusibleCtasStatement(stmt);
 
     if (!fusible) {
-      flushSqlFusionSegment(acc, fusionEnabled);
-      acc.sqlStatements.push(stmt);
+      flushSqlFusionSegment(acc, fusionEnabled, scratchByLogical);
+      const { sql: rewritten, scratchTable } = applyScratchRewrite(stmt, scratchByLogical);
+      acc.sqlStatements.push(rewritten);
+      if (scratchTable) acc.scratchTables.add(scratchTable);
       continue;
     }
 
@@ -290,13 +359,13 @@ function appendCompiledSql(
       const prev = parseCtasStatement(acc.sqlSegment[acc.sqlSegment.length - 1]!);
       const next = parseCtasStatement(stmt);
       if (!prev || !next || !canChainCtas(prev, next)) {
-        flushSqlFusionSegment(acc, fusionEnabled);
+        flushSqlFusionSegment(acc, fusionEnabled, scratchByLogical);
       }
     }
     acc.sqlSegment.push(stmt);
   }
 
-  if (materialize) flushSqlFusionSegment(acc, fusionEnabled);
+  if (materialize) flushSqlFusionSegment(acc, fusionEnabled, scratchByLogical);
 }
 
 function ingestCompileOutput(
@@ -304,13 +373,14 @@ function ingestCompileOutput(
   cfg: Record<string, unknown>,
   out: NativeComponentCompileResult,
   acc: SqlFusionAccumulator,
-  fusionEnabled: boolean
+  fusionEnabled: boolean,
+  scratchByLogical: Map<string, string>
 ): void {
   if (out.python?.length) {
-    flushSqlFusionSegment(acc, fusionEnabled);
+    flushSqlFusionSegment(acc, fusionEnabled, scratchByLogical);
   }
   applyCompileOutput(config, out, acc);
-  appendCompiledSql(cfg, out, acc, fusionEnabled);
+  appendCompiledSql(cfg, out, acc, fusionEnabled, scratchByLogical);
 }
 
 function finalizeCompiledConfig(

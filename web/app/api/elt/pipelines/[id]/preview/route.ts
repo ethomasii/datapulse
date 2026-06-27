@@ -14,6 +14,9 @@ import { resolveDestinationConnectionContext } from "@/lib/elt/warehouse-destina
 import { runReadOnlyQuery, type ReadOnlyQueryOptions } from "@/lib/elt/warehouse-readonly-query";
 import { fetchWarehouseColumnProfiles } from "@/lib/elt/warehouse-column-profile-server";
 import type { ColumnProfile } from "@/lib/elt/warehouse-column-profile";
+import { buildFusedPreviewSelect } from "@/lib/elt/native-components/pipeline-fusion-preview";
+import type { PipelineComponentSpec } from "@/lib/elt/declarative-pipeline-spec";
+import { assertReadOnlySql } from "@/lib/elt/warehouse-readonly-query";
 import { resolveRouteParamId } from "@/lib/server/route-params";
 
 const pipelineSelect = {
@@ -76,6 +79,10 @@ const bodySchema = z.object({
   columnsOnly: z.boolean().optional(),
   /** Column distribution stats under preview headers (default true). */
   includeProfiles: z.boolean().optional(),
+  /** Run fused SELECT through `throughStepId` instead of reading a materialized table. */
+  fusedPreview: z.boolean().optional(),
+  throughStepId: z.string().min(1).max(128).optional(),
+  elt_components: z.array(z.record(z.string(), z.unknown())).optional(),
 });
 
 /**
@@ -119,18 +126,68 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     );
   }
 
+  const conn = await db.connection.findFirst({
+    where: { id: pipeline.destinationConnectionId, connectionType: "destination" },
+    select: { id: true, connector: true, config: true, connectionSecretsEnc: true },
+  });
+  if (!conn) return NextResponse.json({ error: "Destination connection not found" }, { status: 404 });
+
+  const limit = body.limit ?? 10;
+  const configuredDatabase = motherduckConfiguredDatabase(conn);
+
+  if (body.fusedPreview && body.throughStepId) {
+    const rawComponents =
+      body.elt_components ??
+      (Array.isArray(
+        (pipeline.sourceConfiguration as Record<string, unknown> | null)?.elt_components
+      )
+        ? ((pipeline.sourceConfiguration as Record<string, unknown>).elt_components as PipelineComponentSpec[])
+        : []);
+    const preview = buildFusedPreviewSelect(
+      rawComponents as PipelineComponentSpec[],
+      body.throughStepId,
+      limit
+    );
+    if (preview?.sql) {
+      try {
+        assertReadOnlySql(preview.sql);
+        const result = await runReadOnlyQuery(conn, preview.sql, limit);
+        return NextResponse.json({
+          table: preview.outputTable ?? body.throughStepId,
+          configuredDatabase,
+          fusedPreview: true,
+          fusedSteps: preview.fusedSteps,
+          ...result,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return NextResponse.json({ error: msg, configuredDatabase }, { status: 400 });
+      }
+    }
+    if (preview?.message) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: preview.message,
+          table: preview.outputTable,
+          configuredDatabase,
+          fusedPreview: true,
+          columns: [],
+          rows: [],
+          rowCount: 0,
+          truncated: false,
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   const rawTable =
     body.table?.trim() ||
     (body.config ? previewTableFromConfig(body.config) : null);
   if (!rawTable) {
     return NextResponse.json({ error: "table or config with output_table/table required" }, { status: 400 });
   }
-
-  const conn = await db.connection.findFirst({
-    where: { id: pipeline.destinationConnectionId, connectionType: "destination" },
-    select: { id: true, connector: true, config: true, connectionSecretsEnc: true },
-  });
-  if (!conn) return NextResponse.json({ error: "Destination connection not found" }, { status: 404 });
 
   let warehouseTables: Array<{ schema: string; table: string; qualified: string }> | undefined;
   try {
@@ -152,13 +209,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const table = stripDuckdbCatalogPrefix(resolved);
   const warehouseRef = resolved.trim();
 
-  const limit = body.limit ?? 10;
   const quoted = quoteTableRef(table);
   if (!quoted) {
     return NextResponse.json({ error: "table must be schema.table format" }, { status: 400 });
   }
-
-  const configuredDatabase = motherduckConfiguredDatabase(conn);
 
   if (body.columnsOnly) {
     try {

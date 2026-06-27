@@ -12,6 +12,7 @@ import { OperatorStepIoPanel } from "@/components/pipeline-canvas/operator-step-
 import { resolveCanvasInspectorLayout } from "@/lib/elt/canvas-inspector-layout";
 import { inputTableFromConfig } from "@/lib/elt/pipeline-asset-keys";
 import type { NativeComponentField } from "@/lib/elt/native-components";
+import { materializationLabel } from "@/lib/elt/native-components/materialization-field";
 import { compileTargetLabel } from "@/lib/elt/compile-target-labels";
 
 type ComponentDetail = {
@@ -174,6 +175,12 @@ export function CanvasComponentInspector({
         <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
           {detail?.compilerTierHint ?? detail?.compileHint}
         </p>
+        {formFields.some((f) => f.key === "materialization") ? (
+          <p className="mt-1 text-[11px] text-violet-700 dark:text-violet-300">
+            Materialization:{" "}
+            {materializationLabel(String(config.materialization ?? config.elt_materialization ?? ""))}
+          </p>
+        ) : null}
       </div>
 
       {detail?.isExecutable ? (

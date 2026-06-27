@@ -10,6 +10,7 @@ import {
   enrichProfilesFromSampleRows,
   type ColumnProfile,
 } from "@/lib/elt/warehouse-column-profile";
+import type { PipelineComponentSpec } from "@/lib/elt/declarative-pipeline-spec";
 import {
   filterPreviewRows,
   sortPreviewRows,
@@ -27,6 +28,8 @@ type PreviewResult = {
   error?: string;
   table?: string;
   columnProfiles?: Record<string, ColumnProfile>;
+  fusedPreview?: boolean;
+  fusedSteps?: number;
 };
 
 type Props = {
@@ -38,6 +41,10 @@ type Props = {
   onDiagnosticChange?: (message: string | null) => void;
   /** Join steps: switch between left/right (or other) wired inputs. */
   inputSources?: InputPreviewSource[];
+  /** Fused SELECT preview for warehouse steps (output pane). */
+  fusedPreview?: boolean;
+  throughStepId?: string | null;
+  eltComponents?: PipelineComponentSpec[];
 };
 
 export function DataPreviewPane({
@@ -48,6 +55,9 @@ export function DataPreviewPane({
   className,
   onDiagnosticChange,
   inputSources,
+  fusedPreview = false,
+  throughStepId = null,
+  eltComponents,
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PreviewResult | null>(null);
@@ -72,7 +82,9 @@ export function DataPreviewPane({
   }, [inputSources, activeSourceId]);
 
   const load = useCallback(async () => {
-    if (!activeTable) return;
+    const useFused =
+      fusedPreview && throughStepId && eltComponents?.length && !inputSources?.length;
+    if (!useFused && !activeTable) return;
     setLoading(true);
     setError(null);
     try {
@@ -81,10 +93,13 @@ export function DataPreviewPane({
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          table: activeTable,
+          table: activeTable ?? undefined,
           config,
           limit: PREVIEW_ROW_LIMIT,
-          includeProfiles: true,
+          includeProfiles: !useFused,
+          fusedPreview: useFused,
+          throughStepId: useFused ? throughStepId : undefined,
+          elt_components: useFused ? eltComponents : undefined,
         }),
       });
       const data = await readClientFetchJson<PreviewResult & { error?: string }>(res);
@@ -100,12 +115,15 @@ export function DataPreviewPane({
     } finally {
       setLoading(false);
     }
-  }, [pipelineId, config, activeTable]);
+  }, [pipelineId, config, activeTable, fusedPreview, throughStepId, eltComponents, inputSources]);
 
   const configKey = JSON.stringify(config);
+  const componentsKey = JSON.stringify(eltComponents ?? []);
 
   useEffect(() => {
-    if (!activeTable) {
+    const useFused =
+      fusedPreview && throughStepId && eltComponents?.length && !inputSources?.length;
+    if (!useFused && !activeTable) {
       setResult(null);
       setError(null);
       onDiagnosticChangeRef.current?.(null);
@@ -113,7 +131,7 @@ export function DataPreviewPane({
     }
     const t = setTimeout(() => void load(), 350);
     return () => clearTimeout(t);
-  }, [activeTable, load, configKey]);
+  }, [activeTable, load, configKey, componentsKey, fusedPreview, throughStepId, inputSources]);
 
   const rows = result?.rows ?? [];
   const columnNames = useMemo(
@@ -242,11 +260,17 @@ export function DataPreviewPane({
             ))}
           </select>
         ) : null}
-        {activeTable ? (
-          <p className="min-w-0 truncate font-mono text-[10px] text-slate-400" title={activeTable}>
-            {sourceLabel ? `${sourceLabel}: ` : ""}
-            {activeTable}
-          </p>
+        {result?.fusedPreview ? (
+          <span
+            className="rounded bg-violet-100 px-1.5 py-0.5 text-[9px] font-semibold text-violet-800 dark:bg-violet-950/50 dark:text-violet-200"
+            title={
+              result.fusedSteps && result.fusedSteps > 1
+                ? `Fused ${result.fusedSteps} SQL steps — no intermediate table`
+                : "Fused SQL preview"
+            }
+          >
+            Fused preview
+          </span>
         ) : null}
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
           {activeTable ? (

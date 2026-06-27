@@ -5,6 +5,11 @@ import {
   hasComponentCompiler,
   resolvePackageComponent,
 } from "@/lib/elt/component-packages";
+import { routeComponent } from "@/lib/elt/component-compile-router";
+import {
+  appendMaterializationField,
+  isWarehouseMaterializationEligible,
+} from "@/lib/elt/native-components/materialization-field";
 import {
   dagsterAttributesToFields,
   getNativeComponent,
@@ -45,6 +50,13 @@ export async function GET(req: Request, ctx: Ctx) {
         native?.dagsterOnlyFields ?? pkg?.dagsterOnlyFields
       );
     }
+  }
+
+  const compileTarget =
+    component.compileTarget ??
+    routeComponent(component.id, component.category).target;
+  if (formFields && isWarehouseMaterializationEligible(compileTarget)) {
+    formFields = appendMaterializationField(formFields);
   }
 
   return NextResponse.json({

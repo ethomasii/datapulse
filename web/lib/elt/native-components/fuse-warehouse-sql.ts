@@ -137,3 +137,11 @@ export function flushFusedSqlSegment(segment: string[]): SqlFusionFlushResult {
   }
   return { statements: [...segment], fusedCount: 0 };
 }
+
+/** SELECT body from a CTAS (for preview without materializing). */
+export function ctasToSelectSql(sql: string, limit?: number): string | null {
+  const parsed = parseCtasStatement(sql);
+  if (!parsed) return null;
+  const lim = limit != null && limit > 0 ? `\nLIMIT ${Math.floor(limit)}` : "";
+  return `SELECT * FROM (\n${parsed.selectSql}\n) AS _elt_preview${lim}`;
+}
