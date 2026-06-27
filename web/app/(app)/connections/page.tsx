@@ -208,10 +208,10 @@ function ConnectionRow({
     setTestMsg(null);
     try {
       const res = await apiFetch(`/api/elt/connections/${conn.id}/test`, { method: "POST" });
-      const data = (await res.json()) as { ok?: boolean; message?: string };
-      setTestMsg(data.message ?? (data.ok ? "OK" : "Failed"));
+      const data = (await res.json()) as { ok?: boolean; message?: string; error?: string };
+      setTestMsg(data.message ?? data.error ?? (data.ok ? "OK" : `Test failed (HTTP ${res.status})`));
     } catch {
-      setTestMsg("Test failed");
+      setTestMsg("Test failed — network error");
     } finally {
       setTesting(false);
     }

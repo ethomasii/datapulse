@@ -5,10 +5,19 @@ import { STARTER_WAREHOUSE_DEFAULT_DB } from "@/lib/elt/starter-warehouse";
 export function isMotherduckMissingObjectError(message: string): boolean {
   const m = message.toLowerCase();
   return (
-    m === "not found" ||
     m.includes("does not exist") ||
+    m.includes("catalog error") ||
+    (m.includes("table") && m.includes("not found"))
+  );
+}
+
+/** HTTP/API attach to a named MotherDuck catalog failed (wrong Database field). */
+export function isMotherduckDatabaseAttachError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    (m.includes("database") && m.includes("not found")) ||
     m.includes("not_found") ||
-    m.includes("catalog error")
+    (m.includes("http 404") && m.includes("motherduck"))
   );
 }
 

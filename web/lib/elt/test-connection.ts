@@ -138,27 +138,35 @@ export async function testConnection(input: ConnectionTestInput): Promise<Connec
     const { motherduckToken, runMotherduckReadOnlyQuery, motherduckDatabaseName } = await import(
       "@/lib/elt/warehouse-introspect-connectors"
     );
+    const { resolveMotherduckAttachDatabase } = await import("@/lib/elt/motherduck-warehouse");
     const token = motherduckToken(secrets);
-    if (!token.trim()) return { ok: false, message: "Set MOTHERDUCK_TOKEN to test MotherDuck." };
-    const database = motherduckDatabaseName(secrets, input.config);
+    if (!token.trim()) {
+      if (input.connectionSecretsEnc?.trim()) {
+        return {
+          ok: false,
+          message:
+            "Stored MotherDuck token could not be read — re-enter MOTHERDUCK_TOKEN and save. If this persists, verify ELTPULSE_TOKEN_ENCRYPTION_KEY on the server.",
+        };
+      }
+      return { ok: false, message: "Set MOTHERDUCK_TOKEN to test MotherDuck." };
+    }
+    const configuredDb = motherduckDatabaseName(secrets, input.config);
     try {
-      const rowset = await runMotherduckReadOnlyQuery(
-        secrets,
-        input.config,
-        "SELECT database_name FROM duckdb_databases() LIMIT 5",
-        { omitDatabase: true }
-      );
-      const count = rowset.rows.length;
+      const attachDb = await resolveMotherduckAttachDatabase(secrets, input.config);
+      await runMotherduckReadOnlyQuery(secrets, { ...input.config, database: attachDb }, "SELECT 1 AS ok");
+      if (attachDb !== configuredDb) {
+        return {
+          ok: true,
+          message: `MotherDuck connected via database "${attachDb}". Update the connection Database field from "${configuredDb}" to "${attachDb}".`,
+        };
+      }
       return {
         ok: true,
-        message:
-          count > 0
-            ? `MotherDuck connected — ${count} database(s) visible. Connection database: "${database}".`
-            : `MotherDuck token accepted. Connection database: "${database}".`,
+        message: `MotherDuck connected — database "${attachDb}" is reachable.`,
       };
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
-      return { ok: false, message: detail.slice(0, 220) };
+      return { ok: false, message: detail.slice(0, 240) };
     }
   }
   if (connector === "stripe" || connector === "stripe_analytics") {

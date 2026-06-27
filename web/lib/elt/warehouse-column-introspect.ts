@@ -5,11 +5,13 @@
 import { parseDuckdbTableRef } from "@/lib/elt/duckdb-table-ref";
 import {
   motherduckDatabaseMismatchHint,
+  resolveMotherduckAttachDatabase,
   resolveMotherduckDatabaseForTable,
 } from "@/lib/elt/motherduck-warehouse";
 import {
   formatMotherduckColumnError,
   isMotherduckCredentialError,
+  isMotherduckDatabaseAttachError,
   isMotherduckMissingObjectError,
 } from "@/lib/elt/warehouse-column-errors";
 import { resolveDestinationConnectionContext } from "@/lib/elt/warehouse-destination-secrets";
@@ -358,31 +360,28 @@ async function fetchMotherduckColumns(
   const resolvedDb =
     (await resolveMotherduckDatabaseForTable(secrets, config, schema, table, catalogFromRef)) ??
     catalogFromRef ??
+    (await resolveMotherduckAttachDatabase(secrets, config, catalogFromRef).catch(() => undefined)) ??
     configuredDb;
 
   const queryConfig = { ...config, database: resolvedDb };
-  const omitDbRunner: RowsetRunner = (s, c, sql, opts) =>
-    runMotherduckReadOnlyQuery(s, c, sql, { omitDatabase: true, ...opts });
 
-  for (const runner of [omitDbRunner, runMotherduckReadOnlyQuery]) {
-    try {
-      const columns = await fetchMotherduckTableColumns(
-        runner,
-        secrets,
-        queryConfig,
-        schema,
-        table,
-        resolvedDb
-      );
-      if (columns.length) {
-        return { columns, database: resolvedDb };
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      lastError = msg;
-      if (!isMotherduckMissingObjectError(msg)) {
-        throw e;
-      }
+  try {
+    const columns = await fetchMotherduckTableColumns(
+      runMotherduckReadOnlyQuery,
+      secrets,
+      queryConfig,
+      schema,
+      table,
+      resolvedDb
+    );
+    if (columns.length) {
+      return { columns, database: resolvedDb };
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    lastError = msg;
+    if (!isMotherduckDatabaseAttachError(msg) && !isMotherduckMissingObjectError(msg)) {
+      throw e;
     }
   }
 

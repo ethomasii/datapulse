@@ -5,7 +5,10 @@
 
 import { parseDuckdbTableRef } from "@/lib/elt/duckdb-table-ref";
 import { STARTER_WAREHOUSE_DEFAULT_DB } from "@/lib/elt/starter-warehouse";
-import { isMotherduckMissingObjectError } from "@/lib/elt/warehouse-column-errors";
+import {
+  isMotherduckDatabaseAttachError,
+  isMotherduckMissingObjectError,
+} from "@/lib/elt/warehouse-column-errors";
 import {
   motherduckDatabaseName,
   runMotherduckReadOnlyQuery,
@@ -40,15 +43,6 @@ function tableExistsSql(schema: string, table: string): string {
     LIMIT 1`;
 }
 
-function duckdbTableExistsSql(schema: string, table: string): string {
-  const s = escapeSqlLiteral(schema);
-  const t = escapeSqlLiteral(table);
-  return `SELECT database_name FROM duckdb_tables()
-    WHERE lower(schema_name) = lower('${s}')
-      AND lower(table_name) = lower('${t}')
-    LIMIT 1`;
-}
-
 function duckdbTableExistsSqlAttached(schema: string, table: string): string {
   const s = escapeSqlLiteral(schema);
   const t = escapeSqlLiteral(table);
@@ -58,20 +52,37 @@ function duckdbTableExistsSqlAttached(schema: string, table: string): string {
     LIMIT 1`;
 }
 
+/** First MotherDuck catalog the token can attach to (MotherDuck API requires `database`). */
+export async function resolveMotherduckAttachDatabase(
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  catalogFromRef?: string
+): Promise<string> {
+  let lastError: string | undefined;
+  for (const database of motherduckDatabaseCandidates(secrets, config, catalogFromRef)) {
+    try {
+      await runMotherduckReadOnlyQuery(secrets, { ...config, database }, "SELECT 1 AS ok");
+      return database;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      lastError = msg;
+      if (!isMotherduckDatabaseAttachError(msg) && !isMotherduckMissingObjectError(msg)) {
+        throw e;
+      }
+    }
+  }
+  throw new Error(
+    lastError ??
+      `No accessible MotherDuck database. Set Database on your connection to an existing catalog (e.g. "${STARTER_WAREHOUSE_DEFAULT_DB}").`
+  );
+}
+
 async function motherduckTableExists(
   secrets: Record<string, string>,
   config: Record<string, unknown>,
   schema: string,
   table: string
 ): Promise<boolean> {
-  try {
-    const rowset = await runMotherduckReadOnlyQuery(secrets, config, duckdbTableExistsSql(schema, table), {
-      omitDatabase: true,
-    });
-    if (rowset.rows.length > 0) return true;
-  } catch {
-    /* fall through to attached lookup */
-  }
   for (const sql of [duckdbTableExistsSqlAttached(schema, table), tableExistsSql(schema, table)]) {
     try {
       const rowset = await runMotherduckReadOnlyQuery(secrets, config, sql);
@@ -88,13 +99,12 @@ export async function listMotherduckDatabases(
   secrets: Record<string, string>,
   config: Record<string, unknown>
 ): Promise<string[]> {
-  const configured = motherduckDatabaseName(secrets, config);
   try {
+    const attachDb = await resolveMotherduckAttachDatabase(secrets, config);
     const rowset = await runMotherduckReadOnlyQuery(
       secrets,
-      { ...config, database: configured },
-      "SELECT database_name FROM duckdb_databases() ORDER BY 1",
-      { omitDatabase: true }
+      { ...config, database: attachDb },
+      "SELECT database_name FROM duckdb_databases() ORDER BY 1"
     );
     const nameIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "database_name");
     const idx = nameIdx >= 0 ? nameIdx : 0;
@@ -114,26 +124,6 @@ export async function resolveMotherduckDatabaseForTable(
   table: string,
   catalogFromRef?: string
 ): Promise<string | null> {
-  try {
-    const rowset = await runMotherduckReadOnlyQuery(secrets, config, duckdbTableExistsSql(schema, table), {
-      omitDatabase: true,
-    });
-    const nameIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "database_name");
-    const idx = nameIdx >= 0 ? nameIdx : 0;
-    const found = rowset.rows
-      .map((row) => String(row[idx] ?? "").trim())
-      .filter(Boolean);
-    if (found.length) {
-      if (catalogFromRef && found.includes(catalogFromRef)) return catalogFromRef;
-      const configured = motherduckDatabaseName(secrets, config);
-      if (found.includes(configured)) return configured;
-      if (found.includes("my_db")) return "my_db";
-      return found[0]!;
-    }
-  } catch {
-    /* fall through to per-database attach */
-  }
-
   const tried = new Set<string>();
 
   async function tryDatabase(database: string): Promise<boolean> {
@@ -195,7 +185,7 @@ export async function runMotherduckQueryWithDatabaseFallback(
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       lastError = msg;
-      if (!isMotherduckMissingObjectError(msg)) {
+      if (!isMotherduckDatabaseAttachError(msg) && !isMotherduckMissingObjectError(msg)) {
         throw e;
       }
     }

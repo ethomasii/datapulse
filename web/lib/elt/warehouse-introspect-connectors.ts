@@ -833,11 +833,11 @@ export function motherduckScopedSql(database: string, sql: string): string {
 }
 
 export type MotherduckQueryOptions = {
-  /** Omit the API `database` attach field — use for cross-catalog SQL (3-part names, duckdb_*()). */
+  /** @deprecated MotherDuck HTTP API requires `database` for SQL — prefer attach + 3-part names. */
   omitDatabase?: boolean;
 };
 
-/** Request body for MotherDuck SQL API — single statement + optional database attach. */
+/** Request body for MotherDuck SQL API — single statement + database attach. */
 export function motherduckQueryPayload(
   database: string,
   sql: string,
@@ -845,21 +845,11 @@ export function motherduckQueryPayload(
 ): { sql: string; database?: string } {
   const db = database.trim();
   if (options?.omitDatabase || !db || /^\s*use\s+/i.test(sql)) return { sql };
-  // Do not prefix USE — multi-statement bodies often return 404/empty from the HTTP API.
   return { sql, database: db };
 }
 
 export function motherduckToken(secrets: Record<string, string>): string {
   return secret(secrets, "MOTHERDUCK_TOKEN", "DESTINATION__MOTHERDUCK__CREDENTIALS__PASSWORD");
-}
-
-function isMotherduckDatabaseAttachError(message: string): boolean {
-  const m = message.toLowerCase();
-  return (
-    (m.includes("database") && m.includes("not found")) ||
-    m.includes("not_found") ||
-    (m.includes("http 404") && m.includes("motherduck"))
-  );
 }
 
 function motherduckColumnNames(rawCols: Array<string | { name?: string }>): string[] {
@@ -991,16 +981,7 @@ export async function runMotherduckReadOnlyQuery(
   const database = motherduckDatabaseName(secrets, config);
   if (!token) throw new Error("Set MOTHERDUCK_TOKEN to query MotherDuck.");
 
-  const payload = motherduckQueryPayload(database, sql, options);
-  try {
-    return await postMotherduckSql(token, payload);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (!options?.omitDatabase && database && isMotherduckDatabaseAttachError(msg)) {
-      return postMotherduckSql(token, motherduckQueryPayload(database, sql, { omitDatabase: true }));
-    }
-    throw e;
-  }
+  return postMotherduckSql(token, motherduckQueryPayload(database, sql, options));
 }
 
 export async function introspectMotherduck(
