@@ -120,18 +120,12 @@ export function rewireAllComponentInputs(
   });
 }
 
-/** When auto-connecting a transform, never wire from Output — use upstream data steps instead. */
+/** Edge source when auto-connecting a new node — use the pipeline tail (usually Output). */
 export function resolveCanvasAutoWireSourceId(
-  nodes: Node[],
-  edges: Edge[],
+  _nodes: Node[],
+  _edges: Edge[],
   wireFrom: Node,
-  append: { type?: string; data?: Record<string, unknown> }
+  _append: { type?: string; data?: Record<string, unknown> }
 ): string {
-  const isTransformComponent =
-    append.type === "componentNode" && String(append.data?.category ?? "transformation") !== "check";
-  if (!isTransformComponent || wireFrom.type !== "destNode") return wireFrom.id;
-
-  const expanded = expandUpstreamSources(nodes, edges, wireFrom.id);
-  const dataUpstream = expanded.find((n) => n.type === "componentNode" || n.type === "sourceNode");
-  return dataUpstream?.id ?? wireFrom.id;
+  return wireFrom.id;
 }

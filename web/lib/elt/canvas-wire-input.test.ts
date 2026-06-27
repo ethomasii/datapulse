@@ -69,7 +69,7 @@ describe("canvas-wire-input", () => {
     expect(expanded.map((n) => n.id)).toEqual(["src"]);
   });
 
-  it("resolveCanvasAutoWireSourceId prefers source over output when appending transforms", () => {
+  it("resolveCanvasAutoWireSourceId wires from the pipeline tail (Output after load)", () => {
     const nodes: Node[] = [
       { id: "src", type: "sourceNode", position: { x: 0, y: 0 }, data: {} },
       { id: "dest", type: "destNode", position: { x: 200, y: 0 }, data: {} },
@@ -80,7 +80,7 @@ describe("canvas-wire-input", () => {
       type: "componentNode",
       data: { category: "transformation" },
     });
-    expect(upstreamId).toBe("src");
+    expect(upstreamId).toBe("dest");
   });
 
   it("rewireAllComponentInputs patches saved graphs with empty tables", () => {

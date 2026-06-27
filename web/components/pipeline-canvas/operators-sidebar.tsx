@@ -6,7 +6,6 @@ import {
   Layers,
   Loader2,
   Search,
-  Sparkles,
   Target,
   Workflow,
 } from "lucide-react";
@@ -14,6 +13,10 @@ import clsx from "clsx";
 import { ComponentIcon } from "@/components/elt/component-icon";
 import { ELTPULSE_COMPONENT_DRAG_MIME } from "@/lib/elt/canvas-drag";
 import type { ComponentListItem } from "@/components/elt/component-palette";
+import {
+  filterCanvasOperatorPaletteSections,
+  groupCanvasOperatorPalette,
+} from "@/lib/elt/canvas-operator-palette-groups";
 import { filterCanvasOperatorComponents } from "@/lib/elt/canvas-operator-scope";
 
 type Props = {
@@ -23,36 +26,7 @@ type Props = {
   className?: string;
 };
 
-const FEATURED_NATIVE_IDS = [
-  "group_aggregate",
-  "union_tables",
-  "filter_rows",
-  "join_tables",
-  "limit_rows",
-  "pivot",
-  "data_cleansing",
-  "drop_duplicates",
-  "select_columns",
-  "sort_rows",
-  "fill_nulls",
-  "replace_values",
-  "alter_row",
-] as const;
-
-const FEATURED_AI_IDS = [
-  "mcp_tool_call",
-  "litellm_agent",
-  "litellm_inference_asset",
-  "llm_evaluator",
-] as const;
-
-type Section = {
-  id: string;
-  title: string;
-  subtitle?: string;
-  icon: typeof Workflow;
-  items: ComponentListItem[];
-};
+const PALETTE_FETCH_LIMIT = 500;
 
 function OperatorRow({
   item,
@@ -88,7 +62,7 @@ function OperatorRow({
   }
 
   const c = item as ComponentListItem;
-  const isValidate = c.category === "check" || c.compileTarget === "quality";
+  const isAi = c.category === "ai";
   return (
     <button
       type="button"
@@ -100,9 +74,7 @@ function OperatorRow({
       onClick={() => onSelect(c)}
       className={clsx(
         "flex w-full cursor-grab items-start gap-2 rounded-md px-2 py-1.5 text-left active:cursor-grabbing",
-        isValidate
-          ? "hover:bg-amber-50 dark:hover:bg-amber-950/30"
-          : "hover:bg-violet-50 dark:hover:bg-violet-950/30"
+        isAi ? "hover:bg-fuchsia-50 dark:hover:bg-fuchsia-950/30" : "hover:bg-violet-50 dark:hover:bg-violet-950/30"
       )}
     >
       <ComponentIcon
@@ -113,7 +85,7 @@ function OperatorRow({
         size="sm"
         className={clsx(
           "mt-0.5",
-          isValidate ? "text-amber-600 dark:text-amber-300" : "text-violet-600 dark:text-violet-300"
+          isAi ? "text-fuchsia-600 dark:text-fuchsia-300" : "text-violet-600 dark:text-violet-300"
         )}
       />
       <span className="min-w-0">
@@ -126,7 +98,7 @@ function OperatorRow({
   );
 }
 
-/** Left rail — transform & validate assets (EL source/dest handles ingest; monitors live in orchestration). */
+/** Left rail — full transform & AI palette grouped by capability. */
 export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, className }: Props) {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
@@ -137,12 +109,14 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
     setLoading(true);
     try {
       const [transformRes, aiRes] = await Promise.all([
-        fetch("/api/elt/components?nativeOnly=1&executableOnly=1&category=transformation&limit=120", {
-          credentials: "same-origin",
-        }),
-        fetch("/api/elt/components?nativeOnly=1&executableOnly=1&category=ai&limit=40", {
-          credentials: "same-origin",
-        }),
+        fetch(
+          `/api/elt/components?nativeOnly=1&executableOnly=1&category=transformation&limit=${PALETTE_FETCH_LIMIT}`,
+          { credentials: "same-origin" }
+        ),
+        fetch(
+          `/api/elt/components?nativeOnly=1&executableOnly=1&category=ai&limit=${PALETTE_FETCH_LIMIT}`,
+          { credentials: "same-origin" }
+        ),
       ]);
       if (transformRes.ok) {
         const data = (await transformRes.json()) as { components: ComponentListItem[] };
@@ -161,60 +135,17 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
     void load();
   }, [load]);
 
-  const allItems = useMemo(() => [...transformItems, ...aiItems], [transformItems, aiItems]);
-
-  const featured = useMemo(() => {
-    const byId = new Map(transformItems.map((c) => [c.id, c]));
-    const ordered = FEATURED_NATIVE_IDS.map((id) => byId.get(id)).filter(Boolean) as ComponentListItem[];
-    return ordered.length ? ordered : transformItems.slice(0, 12);
-  }, [transformItems]);
-
-  const featuredAi = useMemo(() => {
-    const byId = new Map(aiItems.map((c) => [c.id, c]));
-    const ordered = FEATURED_AI_IDS.map((id) => byId.get(id)).filter(Boolean) as ComponentListItem[];
-    return ordered.length ? ordered : aiItems.slice(0, 6);
-  }, [aiItems]);
-
-  const filteredSearch = useMemo(() => {
-    const ql = q.trim().toLowerCase();
-    if (!ql) return [];
-    return allItems.filter(
-      (c) =>
-        c.id.toLowerCase().includes(ql) ||
-        c.name.toLowerCase().includes(ql) ||
-        c.description.toLowerCase().includes(ql)
-    );
-  }, [allItems, q]);
-
-  const sections: Section[] = useMemo(
-    () =>
-      q.trim()
-        ? [
-            {
-              id: "search",
-              title: "Search results",
-              icon: Search,
-              items: filteredSearch,
-            },
-          ]
-        : [
-            {
-              id: "transforms",
-              title: "Transform assets",
-              subtitle: "Inline steps on tables already in the pipeline",
-              icon: Workflow,
-              items: featured,
-            },
-            {
-              id: "ai",
-              title: "AI & MCP",
-              subtitle: "Row enrichment and tool calls on asset data",
-              icon: Sparkles,
-              items: featuredAi,
-            },
-          ],
-    [featured, featuredAi, filteredSearch, q]
+  const paletteSections = useMemo(
+    () => groupCanvasOperatorPalette(transformItems, aiItems),
+    [transformItems, aiItems]
   );
+
+  const sections = useMemo(
+    () => filterCanvasOperatorPaletteSections(paletteSections, q),
+    [paletteSections, q]
+  );
+
+  const totalOperators = transformItems.length + aiItems.length;
 
   function onQuickAction(action: "source" | "dest") {
     if (action === "source") onAddSource?.();
@@ -232,7 +163,9 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
       <div className="shrink-0 border-b border-slate-200 p-3 dark:border-slate-800">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Asset operators</p>
         <p className="mt-0.5 text-[9px] leading-snug text-slate-400">
-          Transforms on the graph — use Source/Output for EL ingest and landing.
+          {loading
+            ? "Loading catalog…"
+            : `${totalOperators} transforms & AI steps — drag onto the canvas or click to add.`}
         </p>
         <div className="relative mt-2">
           <Search className="pointer-events-none absolute left-2 top-2 h-3.5 w-3.5 text-slate-400" aria-hidden />
@@ -240,7 +173,7 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search assets…"
+            placeholder="Narrow the list…"
             className="w-full rounded-md border border-slate-200 py-1.5 pl-7 pr-2 text-xs dark:border-slate-700 dark:bg-slate-900"
           />
         </div>
@@ -272,32 +205,25 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
           <div className="flex justify-center py-8 text-slate-400">
             <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
           </div>
+        ) : sections.length === 0 ? (
+          <p className="px-2 py-4 text-[11px] text-slate-500">No operators match your search.</p>
         ) : (
-          sections.map((section) =>
-            section.items.length === 0 && section.id !== "search" ? null : (
-              <section key={section.id} className="mb-3">
-                <h3 className="mb-0.5 flex items-center gap-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                  <section.icon className="h-3 w-3" aria-hidden />
-                  {section.title}
-                </h3>
-                {section.subtitle ? (
-                  <p className="mb-1 px-1 text-[9px] leading-snug text-slate-400">{section.subtitle}</p>
-                ) : null}
-                {section.items.length === 0 ? (
-                  <p className="px-2 py-2 text-[11px] text-slate-500">No matches</p>
-                ) : (
-                  section.items.map((c) => <OperatorRow key={c.id} item={c} onSelect={onSelect} />)
-                )}
-              </section>
-            )
-          )
+          sections.map((section) => (
+            <section key={section.id} className="mb-3">
+              <h3 className="mb-0.5 flex items-center gap-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                <Workflow className="h-3 w-3 shrink-0" aria-hidden />
+                {section.title}
+                <span className="font-normal normal-case text-slate-400">({section.items.length})</span>
+              </h3>
+              {section.subtitle ? (
+                <p className="mb-1 px-1 text-[9px] leading-snug text-slate-400">{section.subtitle}</p>
+              ) : null}
+              {section.items.map((c) => (
+                <OperatorRow key={c.id} item={c} onSelect={onSelect} />
+              ))}
+            </section>
+          ))
         )}
-
-        {!q.trim() && !loading && transformItems.length > featured.length ? (
-          <p className="px-2 py-1 text-[10px] text-slate-400">
-            {transformItems.length - featured.length} more transforms — search to find them
-          </p>
-        ) : null}
       </div>
     </aside>
   );
