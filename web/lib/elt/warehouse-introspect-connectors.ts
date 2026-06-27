@@ -814,6 +814,10 @@ type MotherDuckSqlResponse = {
   rows?: unknown[][];
   data?: unknown[][];
   columns?: { name?: string }[] | string[];
+  columnNames?: string[];
+  schema?: { columns?: ({ name?: string } | string)[] };
+  success?: boolean;
+  result?: MotherDuckSqlResponse;
   error?: string;
   message?: string;
   errMessage?: string;
@@ -827,10 +831,26 @@ export function motherduckScopedSql(database: string, sql: string): string {
   return `USE "${db.replace(/"/g, '""')}";\n${sql}`;
 }
 
+/** Request body for MotherDuck SQL API — prefer `database` field over USE prefix. */
+export function motherduckQueryPayload(database: string, sql: string): { sql: string; database?: string } {
+  const db = database.trim();
+  if (!db || /^\s*use\s+/i.test(sql)) return { sql };
+  return { database: db, sql };
+}
+
 export function parseMotherduckSqlResponse(body: MotherDuckSqlResponse): MotherduckQueryRowset {
-  const rawRows = body.rows ?? body.data ?? [];
+  const payload =
+    body && typeof body === "object" && body.result && typeof body.result === "object"
+      ? (body.result as MotherDuckSqlResponse)
+      : body;
+
+  const rawRows = payload.rows ?? payload.data ?? [];
   const rows = rawRows.filter((r): r is unknown[] => Array.isArray(r));
-  const rawCols = body.columns ?? [];
+  type ColumnRef = string | { name?: string };
+  let rawCols: ColumnRef[] = payload.columns ?? (payload as { columnNames?: string[] }).columnNames ?? [];
+  if (rawCols.length === 0 && payload.schema?.columns) {
+    rawCols = payload.schema.columns;
+  }
   const columns = rawCols
     .map((c) => (typeof c === "string" ? c : String(c.name ?? "")))
     .filter(Boolean);
@@ -868,12 +888,15 @@ export async function runMotherduckReadOnlyQuery(
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ sql: motherduckScopedSql(database, sql) }),
+    body: JSON.stringify(motherduckQueryPayload(database, sql)),
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   const body = await readFetchJsonBody<
     MotherDuckSqlResponse & { detail?: string; errMessage?: string; mdFriendlyStatusCode?: string }
   >(res);
+  if (body.success === false) {
+    throw new Error(body.error ?? body.message ?? "MotherDuck query failed.");
+  }
   if (!res.ok || body.errMessage || body.error) {
     const detail = body.errMessage ?? body.error ?? body.message ?? body.detail;
     if (res.status === 404 || body.mdFriendlyStatusCode === "NOT_FOUND") {

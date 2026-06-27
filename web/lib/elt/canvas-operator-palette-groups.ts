@@ -135,16 +135,21 @@ function sortByPreferredOrder(items: ComponentListItem[], preferredIds: readonly
   });
 }
 
+/** One palette section with resolved catalog items. */
+export type CanvasOperatorPaletteSection = CanvasOperatorPaletteGroup & {
+  items: ComponentListItem[];
+};
+
 /** Bucket transform + AI catalog items into labeled palette sections. */
 export function groupCanvasOperatorPalette(
   transformItems: ComponentListItem[],
   aiItems: ComponentListItem[]
-): CanvasOperatorPaletteGroup & { items: ComponentListItem[] }[] {
+): CanvasOperatorPaletteSection[] {
   const byId = new Map<string, ComponentListItem>();
   for (const item of transformItems) byId.set(item.id, item);
 
   const assigned = new Set<string>();
-  const sections: (CanvasOperatorPaletteGroup & { items: ComponentListItem[] })[] = [];
+  const sections: CanvasOperatorPaletteSection[] = [];
 
   for (const group of CANVAS_TRANSFORM_PALETTE_GROUPS) {
     const items: ComponentListItem[] = [];
@@ -209,9 +214,9 @@ function inferTransformGroupId(item: ComponentListItem): string | null {
 
 /** Filter palette sections by search query (all sections, flat merge for display). */
 export function filterCanvasOperatorPaletteSections(
-  sections: (CanvasOperatorPaletteGroup & { items: ComponentListItem[] })[],
+  sections: CanvasOperatorPaletteSection[],
   query: string
-): (CanvasOperatorPaletteGroup & { items: ComponentListItem[] })[] {
+): CanvasOperatorPaletteSection[] {
   const ql = query.trim().toLowerCase();
   if (!ql) return sections;
 
@@ -233,6 +238,7 @@ export function filterCanvasOperatorPaletteSections(
       id: "search",
       title: "Search results",
       subtitle: `${merged.length} match${merged.length === 1 ? "" : "es"}`,
+      ids: [],
       items: merged,
     },
   ];

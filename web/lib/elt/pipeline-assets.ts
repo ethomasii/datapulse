@@ -19,6 +19,7 @@ import { enrichBundleFromDbtManifest } from "@/lib/elt/asset-dbt-enrich";
 import { readMedallionHints } from "@/lib/elt/compile-declarative-pipeline";
 import { inferMedallionLayer } from "@/lib/elt/medallion-layer";
 import type { MedallionLayer } from "@/lib/elt/declarative-pipeline-spec";
+import { normalizeSourceConfigurationForCodegen } from "@/lib/elt/normalize-source-configuration";
 
 export type PipelineSyncMode = "connector_sync" | "database_replication";
 
@@ -170,8 +171,9 @@ export function resolveLandingDataset(
 
   const st = sourceType.toLowerCase().trim();
   if (st === "github") {
-    const owner = String(config.repo_owner ?? "repo").replace(/[^a-zA-Z0-9_]/g, "_");
-    const repo = String(config.repo_name ?? "name").replace(/[^a-zA-Z0-9_]/g, "_");
+    const normalized = normalizeSourceConfigurationForCodegen("github", config);
+    const owner = String(normalized.repo_owner ?? "repo").replace(/[^a-zA-Z0-9_]/g, "_");
+    const repo = String(normalized.repo_name ?? "name").replace(/[^a-zA-Z0-9_]/g, "_");
     return `github_${owner}_${repo}`;
   }
   if (st === "rest_api") {
@@ -429,9 +431,78 @@ export function inferRawLandingTables(input: {
     .filter((q): q is string => Boolean(q));
 }
 
+/** Map stale canvas refs (pipeline name / staging.*) to config-derived landing schema.table. */
+export function remapStalePipelineTableRef(
+  tableRef: string,
+  pipelineName: string,
+  landingDataset: string
+): string {
+  const val = tableRef.trim();
+  if (!val || !landingDataset.trim()) return val;
+  const parts = val.split(".").filter(Boolean);
+  if (parts.length !== 2) return val;
+  const schemaLower = parts[0]!.toLowerCase();
+  const table = parts[1]!;
+  const landing = landingDataset.trim();
+  const pipeSchema = pipelineName.replace(/[^a-zA-Z0-9_]/g, "_").toLowerCase();
+  if (schemaLower === pipeSchema || schemaLower === "staging") {
+    return `${landing}.${table}`;
+  }
+  return val;
+}
+
+/** Resolve a UI/canvas table ref to the warehouse landing table for this pipeline. */
+export function resolvePreviewTableRef(input: {
+  name: string;
+  sourceType: string;
+  tool: string;
+  sourceConfiguration: unknown;
+  requested: string;
+}): string {
+  const requested = input.requested.trim();
+  if (!requested) return requested;
+
+  const bundle = derivePipelineAssets({
+    id: "preview",
+    name: input.name,
+    tool: input.tool,
+    enabled: true,
+    sourceType: input.sourceType,
+    destinationType: "unknown",
+    sourceConfiguration: input.sourceConfiguration,
+    updatedAt: new Date().toISOString(),
+  });
+
+  const candidates = bundle.rawAssets
+    .map((a) => a.landingQualified?.trim())
+    .filter((q): q is string => Boolean(q));
+
+  const lower = requested.toLowerCase();
+  const exact = candidates.find((c) => c.toLowerCase() === lower);
+  if (exact) return exact;
+
+  const reqTable = lower.split(".").pop() ?? lower;
+  const byTable = candidates.filter((c) => c.toLowerCase().endsWith(`.${reqTable}`));
+  if (byTable.length === 1) return byTable[0]!;
+  if (byTable.length > 1) {
+    const dataset = bundle.landingDataset.toLowerCase();
+    const match = byTable.find((c) => c.toLowerCase().startsWith(`${dataset}.`));
+    if (match) return match;
+    return byTable[0]!;
+  }
+
+  const remapped = remapStalePipelineTableRef(requested, input.name, bundle.landingDataset);
+  if (remapped.toLowerCase() !== lower) return remapped;
+
+  return requested;
+}
+
 /** Derive asset bundle for a single pipeline row. */
 export function derivePipelineAssets(pipeline: PipelineAssetInput): PipelineAssetBundle {
-  const config = asConfig(pipeline.sourceConfiguration);
+  const config = normalizeSourceConfigurationForCodegen(
+    pipeline.sourceType,
+    asConfig(pipeline.sourceConfiguration)
+  );
   const syncMode = pipelineSyncMode(pipeline.tool);
   const landingDataset =
     syncMode === "database_replication"

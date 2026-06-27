@@ -3,10 +3,15 @@
  */
 import type { Edge, Node } from "@xyflow/react";
 import { previewTableFromConfig } from "@/lib/elt/pipeline-asset-keys";
+import { remapStalePipelineTableRef } from "@/lib/elt/pipeline-assets";
 
 export type WireInputContext = {
   /** Raw landing tables from pipeline source config (github issues, etc.). */
   rawLandingTables?: string[];
+  /** dlt landing schema/dataset for this pipeline (e.g. github_owner_repo). */
+  landingDataset?: string;
+  /** Pipeline display name — used to fix stale schema refs from autofill. */
+  pipelineName?: string;
 };
 
 /** Walk through Output nodes to the real data producer (Source or transform). */
@@ -79,6 +84,16 @@ export function wireInputFromUpstreamEdge(
   const wasAutofill = Boolean(patch._wire_autofill_at);
   let changed = false;
 
+  function maybeRemapField(key: string) {
+    const raw = String(patch[key] ?? "").trim();
+    if (!raw || !ctx?.landingDataset || !ctx?.pipelineName) return;
+    const remapped = remapStalePipelineTableRef(raw, ctx.pipelineName, ctx.landingDataset);
+    if (remapped !== raw) {
+      patch[key] = remapped;
+      changed = true;
+    }
+  }
+
   if (tableEmpty || wasAutofill) {
     patch.table = primary;
     patch.input_table = primary;
@@ -86,6 +101,10 @@ export function wireInputFromUpstreamEdge(
     patch._wire_autofill_at = new Date().toISOString();
     patch._preview_nonce = Date.now();
     changed = true;
+  } else {
+    for (const key of ["table", "input_table", "left_table", "right_table"]) {
+      maybeRemapField(key);
+    }
   }
   if ((!String(patch.left_table ?? "").trim() || wasAutofill) && upstreamTables.length >= 1) {
     patch.left_table = upstreamTables[0];

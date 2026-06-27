@@ -10,7 +10,9 @@ import {
 
 describe("canvas-wire-input", () => {
   const ctx: WireInputContext = {
-    rawLandingTables: ["github_to_motherduck.issues", "github_to_motherduck.pull_requests"],
+    rawLandingTables: ["github_dlt_hub_dlt.issues", "github_dlt_hub_dlt.pull_requests"],
+    landingDataset: "github_dlt_hub_dlt",
+    pipelineName: "github_to_motherduck",
   };
 
   it("fills downstream table from upstream component output", () => {
@@ -41,8 +43,24 @@ describe("canvas-wire-input", () => {
     ];
     const edges: Edge[] = [{ id: "e1", source: "src", target: "sel" }];
     const wired = wireInputFromUpstreamEdge(nodes, edges, "sel", ctx);
-    expect(wired?.configPatch.table).toBe("github_to_motherduck.issues");
-    expect(wired?.configPatch.input_table).toBe("github_to_motherduck.issues");
+    expect(wired?.configPatch.table).toBe("github_dlt_hub_dlt.issues");
+    expect(wired?.configPatch.input_table).toBe("github_dlt_hub_dlt.issues");
+  });
+
+  it("remaps stale pipeline-name table refs when already wired", () => {
+    const nodes: Node[] = [
+      { id: "src", type: "sourceNode", position: { x: 0, y: 0 }, data: {} },
+      {
+        id: "sel",
+        type: "componentNode",
+        position: { x: 200, y: 0 },
+        data: { config: { table: "github_to_motherduck.issues", input_table: "github_to_motherduck.issues" } },
+      },
+    ];
+    const edges: Edge[] = [{ id: "e1", source: "src", target: "sel" }];
+    const wired = wireInputFromUpstreamEdge(nodes, edges, "sel", ctx);
+    expect(wired?.configPatch.table).toBe("github_dlt_hub_dlt.issues");
+    expect(wired?.configPatch.input_table).toBe("github_dlt_hub_dlt.issues");
   });
 
   it("skips Output node and resolves upstream Source for autofill", () => {
@@ -56,7 +74,7 @@ describe("canvas-wire-input", () => {
       { id: "e2", source: "dest", target: "sel" },
     ];
     const wired = wireInputFromUpstreamEdge(nodes, edges, "sel", ctx);
-    expect(wired?.configPatch.table).toBe("github_to_motherduck.issues");
+    expect(wired?.configPatch.table).toBe("github_dlt_hub_dlt.issues");
   });
 
   it("expandUpstreamSources walks through dest to source", () => {
@@ -97,7 +115,7 @@ describe("canvas-wire-input", () => {
     const rewired = rewireAllComponentInputs(nodes, edges, ctx);
     const sel = rewired.find((n) => n.id === "sel");
     expect((sel?.data as { config: Record<string, string> }).config.table).toBe(
-      "github_to_motherduck.issues"
+      "github_dlt_hub_dlt.issues"
     );
   });
 });

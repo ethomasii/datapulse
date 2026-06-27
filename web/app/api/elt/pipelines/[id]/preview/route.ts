@@ -4,6 +4,7 @@ import { getCurrentDbUser } from "@/lib/auth/server";
 import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
 import { previewTableFromConfig } from "@/lib/elt/pipeline-asset-keys";
+import { resolvePreviewTableRef } from "@/lib/elt/pipeline-assets";
 import { fetchWarehouseColumnsForAsset } from "@/lib/elt/warehouse-column-introspect";
 import { runReadOnlyQuery } from "@/lib/elt/warehouse-readonly-query";
 import { resolveRouteParamId } from "@/lib/server/route-params";
@@ -42,17 +43,18 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  const table =
-    body.table?.trim() ||
-    (body.config ? previewTableFromConfig(body.config) : null);
-  if (!table) {
-    return NextResponse.json({ error: "table or config with output_table/table required" }, { status: 400 });
-  }
-
   const ownerIds = await getAccessibleResourceOwnerIds(user.id);
+
   const pipeline = await db.eltPipeline.findFirst({
     where: { id: pipelineId, userId: { in: ownerIds } },
-    select: { id: true, destinationConnectionId: true },
+    select: {
+      id: true,
+      name: true,
+      tool: true,
+      sourceType: true,
+      sourceConfiguration: true,
+      destinationConnectionId: true,
+    },
   });
   if (!pipeline) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (!pipeline.destinationConnectionId) {
@@ -61,6 +63,21 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       { status: 400 }
     );
   }
+
+  const rawTable =
+    body.table?.trim() ||
+    (body.config ? previewTableFromConfig(body.config) : null);
+  if (!rawTable) {
+    return NextResponse.json({ error: "table or config with output_table/table required" }, { status: 400 });
+  }
+
+  const table = resolvePreviewTableRef({
+    name: pipeline.name,
+    sourceType: pipeline.sourceType,
+    tool: pipeline.tool,
+    sourceConfiguration: pipeline.sourceConfiguration,
+    requested: rawTable,
+  });
 
   const conn = await db.connection.findFirst({
     where: { id: pipeline.destinationConnectionId, userId: { in: ownerIds }, connectionType: "destination" },

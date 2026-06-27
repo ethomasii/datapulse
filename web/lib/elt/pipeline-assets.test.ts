@@ -3,6 +3,7 @@ import {
   buildWorkspaceAssets,
   derivePipelineAssets,
   resolveLandingDataset,
+  resolvePreviewTableRef,
 } from "./pipeline-assets";
 
 describe("resolveLandingDataset", () => {
@@ -16,6 +17,25 @@ describe("resolveLandingDataset", () => {
     expect(
       resolveLandingDataset("github", { repo_owner: "acme", repo_name: "app" }, "github_sync")
     ).toBe("github_acme_app");
+  });
+
+  it("builds github dataset from repos when owner/name omitted", () => {
+    expect(resolveLandingDataset("github", { repos: "dlt-hub/dlt" }, "github_to_motherduck")).toBe(
+      "github_dlt_hub_dlt"
+    );
+  });
+});
+
+describe("resolvePreviewTableRef", () => {
+  it("remaps pipeline-name schema to github landing dataset", () => {
+    const resolved = resolvePreviewTableRef({
+      name: "github_to_motherduck",
+      sourceType: "github",
+      tool: "dlt",
+      sourceConfiguration: { repos: "dlt-hub/dlt", resources: ["issues"] },
+      requested: "github_to_motherduck.issues",
+    });
+    expect(resolved).toBe("github_dlt_hub_dlt.issues");
   });
 });
 

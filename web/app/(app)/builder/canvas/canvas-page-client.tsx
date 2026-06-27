@@ -57,7 +57,7 @@ import {
 import { ensureGithubReposForForm } from "@/lib/elt/normalize-source-configuration";
 import { hydrateCanvasFromSourceConfiguration, extractSpecComponents, defaultPipelineCanvasBackbone } from "@/lib/elt/spec-components-to-canvas";
 import { type WireInputContext } from "@/lib/elt/canvas-wire-input";
-import { inferRawLandingTables } from "@/lib/elt/pipeline-assets";
+import { inferRawLandingTables, resolveLandingDataset } from "@/lib/elt/pipeline-assets";
 import { TransformDagPanel } from "@/components/pipeline-canvas/transform-dag-panel";
 import { IngestPanel } from "@/components/pipeline-canvas/ingest-panel";
 import { lakeStarterCanvasGraph } from "@/lib/elt/lake-pipeline-starters";
@@ -1026,6 +1026,11 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
 
   const wireInputContext = useMemo((): WireInputContext => {
     if (!selectedId) return {};
+    const landingDataset = resolveLandingDataset(
+      pipelineSourceType || "github",
+      lineageSourceConfig,
+      selectedName || "pipeline"
+    );
     return {
       rawLandingTables: inferRawLandingTables({
         name: selectedName || "pipeline",
@@ -1034,6 +1039,8 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
         tool: pipelineTool,
         sourceConfiguration: lineageSourceConfig,
       }),
+      landingDataset,
+      pipelineName: selectedName || "pipeline",
     };
   }, [
     selectedId,

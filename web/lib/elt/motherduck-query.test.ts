@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  motherduckQueryPayload,
   motherduckScopedSql,
   parseMotherduckSqlResponse,
 } from "@/lib/elt/warehouse-introspect-connectors";
@@ -41,5 +42,15 @@ describe("motherduckScopedSql", () => {
 
   it("does not double-prefix USE", () => {
     expect(motherduckScopedSql("eltpulse", "USE other; SELECT 1")).toBe("USE other; SELECT 1");
+  });
+});
+
+describe("motherduckQueryPayload", () => {
+  it("sends database field for scoped queries", () => {
+    expect(motherduckQueryPayload("my_db", "SELECT 1")).toEqual({ database: "my_db", sql: "SELECT 1" });
+  });
+
+  it("skips database when SQL already USEs", () => {
+    expect(motherduckQueryPayload("my_db", "USE other; SELECT 1")).toEqual({ sql: "USE other; SELECT 1" });
   });
 });
