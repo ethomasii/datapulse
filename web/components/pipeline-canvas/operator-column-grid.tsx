@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { operatorColumnGridMode } from "@/lib/elt/operator-column-grid-mode";
 import { readClientFetchJson } from "@/lib/elt/fetch-json-body";
 import { stripDuckdbCatalogPrefix } from "@/lib/elt/duckdb-table-ref";
+import { formatMotherduckColumnError } from "@/lib/elt/warehouse-column-introspect";
 
 type ColumnMeta = { name: string; type?: string };
 
@@ -42,6 +43,18 @@ function selectedColumns(config: Record<string, unknown>): string[] {
   if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
   if (typeof raw === "string") return raw.split(",").map((s) => s.trim()).filter(Boolean);
   return [];
+}
+
+function friendlyColumnLoadError(message: string, tableRef: string): string {
+  const trimmed = message.trim();
+  if (/^not found$/i.test(trimmed)) {
+    return formatMotherduckColumnError(
+      tableRef.split(".")[0] ?? "schema",
+      tableRef.split(".").pop() ?? "table",
+      "eltpulse"
+    );
+  }
+  return message;
 }
 
 /** Lakeflow-style column picker — checkboxes + rename inputs wired to native step config. */
@@ -94,14 +107,18 @@ export function OperatorColumnGrid({
       if (!names.length) {
         setColumns([]);
         setError(
-          data.message ??
-            `No columns found for ${data.table ?? tableRef}. Run a sync and confirm your MotherDuck connection Database (e.g. my_db) matches where dlt wrote data.`
+          friendlyColumnLoadError(
+            data.message ??
+              `No columns found for ${data.table ?? tableRef}. Run a sync and confirm your MotherDuck connection Database (e.g. my_db) matches where dlt wrote data.`,
+            data.table ?? tableRef
+          )
         );
         return;
       }
       setColumns(names.map((name) => ({ name })));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Column load failed");
+      const raw = e instanceof Error ? e.message : "Column load failed";
+      setError(friendlyColumnLoadError(raw, tableRef));
       setColumns([]);
     } finally {
       setLoading(false);

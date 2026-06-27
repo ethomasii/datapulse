@@ -86,7 +86,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   const conn = await db.connection.findFirst({
-    where: { id: pipeline.destinationConnectionId, userId: { in: ownerIds }, connectionType: "destination" },
+    where: { id: pipeline.destinationConnectionId, connectionType: "destination" },
     select: { id: true, connector: true, config: true, connectionSecretsEnc: true },
   });
   if (!conn) return NextResponse.json({ error: "Destination connection not found" }, { status: 404 });

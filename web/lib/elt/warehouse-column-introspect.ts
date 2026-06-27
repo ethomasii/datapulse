@@ -3,6 +3,7 @@
  */
 
 import { parseDuckdbTableRef } from "@/lib/elt/duckdb-table-ref";
+import { STARTER_WAREHOUSE_DEFAULT_DB } from "@/lib/elt/starter-warehouse";
 import { resolveDestinationConnectionContext } from "@/lib/elt/warehouse-destination-secrets";
 import type { AssetColumnDef } from "@/lib/elt/catalog-metadata";
 import { parseLandingQualified } from "@/lib/elt/warehouse-introspect";
@@ -85,19 +86,108 @@ async function fetchDuckdbFamilyColumns(
   const fromInfo = await fetchColumnsFromInformationSchema(runner, secrets, cfg, schema, table, connector);
   if (fromInfo.length) return fromInfo;
 
-  const rowset = await runner(secrets, cfg, `DESCRIBE ${quoteDuckdbTable(schema, table)}`);
-  const nameIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "column_name");
-  const typeIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "column_type");
-  if (nameIdx >= 0) {
-    return rowset.rows
-      .map((row) => ({
-        name: String(row[nameIdx] ?? ""),
-        type: typeIdx >= 0 && row[typeIdx] != null ? String(row[typeIdx]) : undefined,
-        source: "warehouse" as const,
-      }))
-      .filter((c) => c.name);
+  const qualified = quoteDuckdbTable(schema, table);
+  try {
+    const rowset = await runner(secrets, cfg, `DESCRIBE ${qualified}`);
+    const nameIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "column_name");
+    const typeIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "column_type");
+    if (nameIdx >= 0) {
+      return rowset.rows
+        .map((row) => ({
+          name: String(row[nameIdx] ?? ""),
+          type: typeIdx >= 0 && row[typeIdx] != null ? String(row[typeIdx]) : undefined,
+          source: "warehouse" as const,
+        }))
+        .filter((c) => c.name);
+    }
+    const fromDescribe = rowsetToColumnDefs(rowset);
+    if (fromDescribe.length) return fromDescribe;
+  } catch {
+    /* fall through to zero-row SELECT */
   }
-  return rowsetToColumnDefs(rowset);
+
+  const sample = await runner(secrets, cfg, `SELECT * FROM ${qualified} LIMIT 0`);
+  if (sample.columns.length) {
+    return sample.columns.map((name) => ({ name, source: "warehouse" as const }));
+  }
+
+  return [];
+}
+
+function isMotherduckMissingObjectError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m === "not found" ||
+    m.includes("does not exist") ||
+    m.includes("not_found") ||
+    m.includes("catalog error")
+  );
+}
+
+function motherduckDatabaseCandidates(
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  catalogFromRef?: string
+): string[] {
+  const configured = motherduckDatabaseName(secrets, config);
+  const out: string[] = [];
+  for (const db of [catalogFromRef, configured, "my_db", STARTER_WAREHOUSE_DEFAULT_DB]) {
+    const d = db?.trim();
+    if (d && !out.includes(d)) out.push(d);
+  }
+  return out;
+}
+
+async function fetchMotherduckColumns(
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  schema: string,
+  table: string,
+  catalogFromRef?: string
+): Promise<{ columns: AssetColumnDef[]; database?: string; lastError?: string }> {
+  const runner = runMotherduckReadOnlyQuery;
+  let lastError: string | undefined;
+
+  for (const database of motherduckDatabaseCandidates(secrets, config, catalogFromRef)) {
+    const queryConfig = { ...config, database };
+    try {
+      const columns = await fetchDuckdbFamilyColumns(
+        runner,
+        secrets,
+        config,
+        schema,
+        table,
+        "motherduck",
+        queryConfig
+      );
+      if (columns.length) {
+        return { columns, database };
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      lastError = msg;
+      if (!isMotherduckMissingObjectError(msg)) {
+        throw e;
+      }
+    }
+  }
+
+  return { columns: [], lastError };
+}
+
+export function formatMotherduckColumnError(
+  schema: string,
+  table: string,
+  configuredDatabase: string,
+  lastError?: string
+): string {
+  if (lastError && !isMotherduckMissingObjectError(lastError)) {
+    return lastError.slice(0, 200);
+  }
+  return (
+    `No columns found for ${schema}.${table} in MotherDuck database "${configuredDatabase}". ` +
+    `Set Database on your destination connection to where dlt wrote data (often "my_db", not "${STARTER_WAREHOUSE_DEFAULT_DB}"), then retry.`
+  );
 }
 
 function rowsetToColumnDefs(rowset: WarehouseQueryRowset): AssetColumnDef[] {
@@ -279,8 +369,29 @@ export async function fetchWarehouseColumnsForAsset(
 
     const runner = COLUMN_RUNNERS[connector];
     if (runner) {
+      if (connector === "motherduck") {
+        const catalogFromRef =
+          parseDuckdbTableRef(landingQualified ?? "", motherduckDatabaseName(secrets, config))?.database;
+        const { columns, database, lastError } = await fetchMotherduckColumns(
+          secrets,
+          config,
+          schema,
+          table,
+          catalogFromRef
+        );
+        const configuredDb = motherduckDatabaseName(secrets, config);
+        const resolvedDb = database ?? configuredDb;
+        return {
+          ok: columns.length > 0,
+          message: columns.length
+            ? `Found ${columns.length} column(s) in MotherDuck (${resolvedDb}).`
+            : formatMotherduckColumnError(schema, table, configuredDb, lastError),
+          columns,
+        };
+      }
+
       const columns =
-        connector === "motherduck" || connector === "duckdb" || connector === "sqlite"
+        connector === "duckdb" || connector === "sqlite"
           ? await fetchDuckdbFamilyColumns(runner, secrets, config, schema, table, connector, queryConfig)
           : await fetchColumnsFromInformationSchema(runner, secrets, config, schema, table, connector);
       const label = connector.charAt(0).toUpperCase() + connector.slice(1);
