@@ -40,18 +40,30 @@ function tableExistsSql(schema: string, table: string): string {
     LIMIT 1`;
 }
 
+function duckdbTableExistsSql(schema: string, table: string): string {
+  const s = escapeSqlLiteral(schema);
+  const t = escapeSqlLiteral(table);
+  return `SELECT 1 AS ok FROM duckdb_tables()
+    WHERE lower(schema_name) = lower('${s}')
+      AND lower(table_name) = lower('${t}')
+    LIMIT 1`;
+}
+
 async function motherduckTableExists(
   secrets: Record<string, string>,
   config: Record<string, unknown>,
   schema: string,
   table: string
 ): Promise<boolean> {
-  try {
-    const rowset = await runMotherduckReadOnlyQuery(secrets, config, tableExistsSql(schema, table));
-    return rowset.rows.length > 0;
-  } catch {
-    return false;
+  for (const sql of [duckdbTableExistsSql(schema, table), tableExistsSql(schema, table)]) {
+    try {
+      const rowset = await runMotherduckReadOnlyQuery(secrets, config, sql);
+      if (rowset.rows.length > 0) return true;
+    } catch {
+      /* try next metadata source */
+    }
   }
+  return false;
 }
 
 /** List MotherDuck catalogs visible to the token (best-effort). */

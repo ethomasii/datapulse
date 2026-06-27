@@ -81,6 +81,118 @@ function quoteDuckdbTable(schema: string, table: string): string {
   return `${dq(schema)}.${dq(table)}`;
 }
 
+function quoteDuckdbCatalogTable(catalog: string, schema: string, table: string): string {
+  const dq = (part: string) => `"${part.replace(/"/g, '""')}"`;
+  return `${dq(catalog)}.${dq(schema)}.${dq(table)}`;
+}
+
+function catalogFromQueryConfig(config: Record<string, unknown>): string | undefined {
+  const db = config.database;
+  return typeof db === "string" && db.trim() ? db.trim() : undefined;
+}
+
+/** Primary MotherDuck/DuckDB column metadata query (scoped via API `database` / USE). */
+export function duckdbColumnsSql(schema: string, table: string): string {
+  const s = schema.replace(/'/g, "''");
+  const t = table.replace(/'/g, "''");
+  return `SELECT column_name, column_type AS data_type
+    FROM duckdb_columns()
+    WHERE lower(schema_name) = lower('${s}')
+      AND lower(table_name) = lower('${t}')
+    ORDER BY column_index
+    LIMIT ${COL_LIMIT}`;
+}
+
+function columnDefsFromSampleRowset(rowset: WarehouseQueryRowset): AssetColumnDef[] {
+  if (rowset.columns.length) {
+    return rowset.columns.map((name) => ({ name, source: "warehouse" as const }));
+  }
+  const first = rowset.rows[0];
+  if (first && typeof first === "object" && !Array.isArray(first)) {
+    return Object.keys(first as Record<string, unknown>).map((name) => ({
+      name,
+      source: "warehouse" as const,
+    }));
+  }
+  return [];
+}
+
+async function fetchColumnsFromDuckdbColumns(
+  runQuery: RowsetRunner,
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  schema: string,
+  table: string
+): Promise<AssetColumnDef[]> {
+  try {
+    const rowset = await runQuery(secrets, config, duckdbColumnsSql(schema, table));
+    return rowsetToColumnDefs(rowset);
+  } catch {
+    return [];
+  }
+}
+
+async function fetchColumnsFromPragmaTableInfo(
+  runQuery: RowsetRunner,
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  schema: string,
+  table: string
+): Promise<AssetColumnDef[]> {
+  const ref = `${schema.replace(/'/g, "''")}.${table.replace(/'/g, "''")}`;
+  try {
+    const rowset = await runQuery(secrets, config, `PRAGMA table_info('${ref}')`);
+    const nameIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "name");
+    const typeIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "type");
+    if (nameIdx < 0) return rowsetToColumnDefs(rowset);
+    return rowset.rows
+      .map((row) => ({
+        name: String(row[nameIdx] ?? ""),
+        type: typeIdx >= 0 && row[typeIdx] != null ? String(row[typeIdx]) : undefined,
+        source: "warehouse" as const,
+      }))
+      .filter((c) => c.name);
+  } catch {
+    return [];
+  }
+}
+
+async function fetchSampleColumnNames(
+  runQuery: RowsetRunner,
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  qualifiedRefs: string[]
+): Promise<AssetColumnDef[]> {
+  for (const qualified of qualifiedRefs) {
+    try {
+      const rowset = await runQuery(secrets, config, `SELECT * FROM ${qualified} LIMIT 1`);
+      const defs = columnDefsFromSampleRowset(rowset);
+      if (defs.length) return defs;
+    } catch {
+      /* try next ref shape */
+    }
+  }
+  return [];
+}
+
+/** MotherDuck: duckdb_columns() first, then SELECT * LIMIT 1 — no information_schema / LIMIT 0. */
+async function fetchMotherduckTableColumns(
+  runner: RowsetRunner,
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  schema: string,
+  table: string
+): Promise<AssetColumnDef[]> {
+  const fromDuckdbColumns = await fetchColumnsFromDuckdbColumns(runner, secrets, config, schema, table);
+  if (fromDuckdbColumns.length) return fromDuckdbColumns;
+
+  const catalog = catalogFromQueryConfig(config);
+  const qualifiedRefs = catalog
+    ? [quoteDuckdbTable(schema, table), quoteDuckdbCatalogTable(catalog, schema, table)]
+    : [quoteDuckdbTable(schema, table)];
+  return fetchSampleColumnNames(runner, secrets, config, qualifiedRefs);
+}
+
 async function fetchDuckdbFamilyColumns(
   runner: RowsetRunner,
   secrets: Record<string, string>,
@@ -91,33 +203,73 @@ async function fetchDuckdbFamilyColumns(
   queryConfig?: Record<string, unknown>
 ): Promise<AssetColumnDef[]> {
   const cfg = queryConfig ?? config;
-  const fromInfo = await fetchColumnsFromInformationSchema(runner, secrets, cfg, schema, table, connector);
+  const catalog = catalogFromQueryConfig(cfg);
+
+  const fromDuckdbColumns = await fetchColumnsFromDuckdbColumns(runner, secrets, cfg, schema, table);
+  if (fromDuckdbColumns.length) return fromDuckdbColumns;
+
+  let fromInfo: AssetColumnDef[] = [];
+  try {
+    fromInfo = await fetchColumnsFromInformationSchema(runner, secrets, cfg, schema, table, connector);
+  } catch {
+    /* MotherDuck information_schema can be empty for dlt schemas — fall through */
+  }
   if (fromInfo.length) return fromInfo;
 
-  const qualified = quoteDuckdbTable(schema, table);
+  const fromPragma = await fetchColumnsFromPragmaTableInfo(runner, secrets, cfg, schema, table);
+  if (fromPragma.length) return fromPragma;
+
+  const qualifiedTwo = quoteDuckdbTable(schema, table);
+  const qualifiedRefs = catalog
+    ? [qualifiedTwo, quoteDuckdbCatalogTable(catalog, schema, table)]
+    : [qualifiedTwo];
+
   try {
-    const rowset = await runner(secrets, cfg, `DESCRIBE ${qualified}`);
+    const rowset = await runner(secrets, cfg, `DESCRIBE ${qualifiedTwo}`);
     const nameIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "column_name");
     const typeIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "column_type");
     if (nameIdx >= 0) {
-      return rowset.rows
+      const fromDescribe = rowset.rows
         .map((row) => ({
           name: String(row[nameIdx] ?? ""),
           type: typeIdx >= 0 && row[typeIdx] != null ? String(row[typeIdx]) : undefined,
           source: "warehouse" as const,
         }))
         .filter((c) => c.name);
+      if (fromDescribe.length) return fromDescribe;
     }
     const fromDescribe = rowsetToColumnDefs(rowset);
     if (fromDescribe.length) return fromDescribe;
   } catch {
-    /* fall through to zero-row SELECT */
+    /* fall through to row sample */
   }
 
-  const sample = await runner(secrets, cfg, `SELECT * FROM ${qualified} LIMIT 0`);
-  if (sample.columns.length) {
-    return sample.columns.map((name) => ({ name, source: "warehouse" as const }));
+  if (catalog) {
+    try {
+      const rowset = await runner(
+        secrets,
+        cfg,
+        `DESCRIBE ${quoteDuckdbCatalogTable(catalog, schema, table)}`
+      );
+      const nameIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "column_name");
+      const typeIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "column_type");
+      if (nameIdx >= 0) {
+        const fromDescribe = rowset.rows
+          .map((row) => ({
+            name: String(row[nameIdx] ?? ""),
+            type: typeIdx >= 0 && row[typeIdx] != null ? String(row[typeIdx]) : undefined,
+            source: "warehouse" as const,
+          }))
+          .filter((c) => c.name);
+        if (fromDescribe.length) return fromDescribe;
+      }
+    } catch {
+      /* fall through */
+    }
   }
+
+  const fromSample = await fetchSampleColumnNames(runner, secrets, cfg, qualifiedRefs);
+  if (fromSample.length) return fromSample;
 
   return [];
 }
@@ -147,14 +299,12 @@ async function fetchMotherduckColumns(
   for (const database of databases) {
     const queryConfig = { ...config, database };
     try {
-      const columns = await fetchDuckdbFamilyColumns(
+      const columns = await fetchMotherduckTableColumns(
         runner,
         secrets,
-        config,
+        queryConfig,
         schema,
-        table,
-        "motherduck",
-        queryConfig
+        table
       );
       if (columns.length) {
         return { columns, database };
@@ -172,6 +322,23 @@ async function fetchMotherduckColumns(
 }
 
 function rowsetToColumnDefs(rowset: WarehouseQueryRowset): AssetColumnDef[] {
+  const nameIdx = rowset.columns.findIndex((c) => {
+    const k = c.toLowerCase();
+    return k === "column_name" || k === "name";
+  });
+  const typeIdx = rowset.columns.findIndex((c) => {
+    const k = c.toLowerCase();
+    return k === "column_type" || k === "data_type" || k === "type";
+  });
+  if (nameIdx >= 0) {
+    return rowset.rows
+      .map((row) => ({
+        name: String(row[nameIdx] ?? ""),
+        type: typeIdx >= 0 && row[typeIdx] != null ? String(row[typeIdx]) : undefined,
+        source: "warehouse" as const,
+      }))
+      .filter((c) => c.name);
+  }
   return rowset.rows
     .map((row) => ({
       name: String(row[0] ?? ""),

@@ -33,6 +33,29 @@ describe("parseMotherduckSqlResponse", () => {
     expect(parsed.columns).toEqual(["col_0", "col_1"]);
     expect(parsed.rows[0]).toEqual([10, 20]);
   });
+
+  it("reads fields metadata when rows are empty", () => {
+    const parsed = parseMotherduckSqlResponse({
+      fields: [{ name: "number" }, { name: "title" }],
+      rows: [],
+    });
+    expect(parsed.columns).toEqual(["number", "title"]);
+  });
+
+  it("normalizes object-shaped rows from information_schema-style responses", () => {
+    const parsed = parseMotherduckSqlResponse({
+      columns: ["column_name", "data_type"],
+      rows: [
+        { column_name: "number", data_type: "BIGINT" },
+        { column_name: "title", data_type: "VARCHAR" },
+      ],
+    });
+    expect(parsed.columns).toEqual(["column_name", "data_type"]);
+    expect(parsed.rows).toEqual([
+      ["number", "BIGINT"],
+      ["title", "VARCHAR"],
+    ]);
+  });
 });
 
 describe("motherduckScopedSql", () => {

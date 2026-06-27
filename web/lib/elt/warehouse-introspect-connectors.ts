@@ -838,6 +838,39 @@ export function motherduckQueryPayload(database: string, sql: string): { sql: st
   return { database: db, sql };
 }
 
+function motherduckColumnNames(rawCols: Array<string | { name?: string }>): string[] {
+  return rawCols
+    .map((c) => (typeof c === "string" ? c : String(c.name ?? "")))
+    .filter(Boolean);
+}
+
+/** MotherDuck HTTP API may return rows as arrays or JSON objects — normalize to arrays. */
+export function normalizeMotherduckRows(rawRows: unknown[], columnNames: string[]): unknown[][] {
+  const out: unknown[][] = [];
+  for (const row of rawRows) {
+    if (Array.isArray(row)) {
+      out.push(row);
+      continue;
+    }
+    if (row && typeof row === "object") {
+      const obj = row as Record<string, unknown>;
+      if (columnNames.length) {
+        const lower = new Map(columnNames.map((c) => [c.toLowerCase(), c]));
+        out.push(
+          columnNames.map((col) => {
+            if (col in obj) return obj[col];
+            const key = lower.get(col.toLowerCase());
+            return key ? obj[key] : undefined;
+          })
+        );
+        continue;
+      }
+      out.push(Object.values(obj));
+    }
+  }
+  return out;
+}
+
 export function parseMotherduckSqlResponse(body: MotherDuckSqlResponse): MotherduckQueryRowset {
   const payload =
     body && typeof body === "object" && body.result && typeof body.result === "object"
@@ -845,19 +878,29 @@ export function parseMotherduckSqlResponse(body: MotherDuckSqlResponse): Motherd
       : body;
 
   const rawRows = payload.rows ?? payload.data ?? [];
-  const rows = rawRows.filter((r): r is unknown[] => Array.isArray(r));
   type ColumnRef = string | { name?: string };
   let rawCols: ColumnRef[] = payload.columns ?? (payload as { columnNames?: string[] }).columnNames ?? [];
   if (rawCols.length === 0 && payload.schema?.columns) {
     rawCols = payload.schema.columns;
   }
-  const columns = rawCols
-    .map((c) => (typeof c === "string" ? c : String(c.name ?? "")))
-    .filter(Boolean);
+  let columns = motherduckColumnNames(rawCols);
+  let rows = normalizeMotherduckRows(Array.isArray(rawRows) ? rawRows : [], columns);
+
   if (columns.length === 0 && rows.length > 0) {
-    const width = rows[0]?.length ?? 0;
-    return { columns: Array.from({ length: width }, (_, i) => `col_${i}`), rows };
+    const first = rows[0];
+    if (Array.isArray(rawRows) && rawRows[0] && typeof rawRows[0] === "object" && !Array.isArray(rawRows[0])) {
+      columns = Object.keys(rawRows[0] as Record<string, unknown>);
+      rows = normalizeMotherduckRows(rawRows as unknown[], columns);
+    } else {
+      const width = first?.length ?? 0;
+      columns = Array.from({ length: width }, (_, i) => `col_${i}`);
+    }
   }
+
+  if (columns.length === 0 && rows.length === 0 && Array.isArray(payload.fields)) {
+    columns = motherduckColumnNames(payload.fields);
+  }
+
   return { columns, rows };
 }
 
