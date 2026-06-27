@@ -2,13 +2,20 @@
  * Fetch column metadata for a single warehouse table (asset detail / catalog enrichment).
  */
 
-import { parseStoredConnectionSecrets } from "@/lib/elt/connection-secrets-store";
+import { resolveDestinationConnectionContext } from "@/lib/elt/warehouse-destination-secrets";
 import type { AssetColumnDef } from "@/lib/elt/catalog-metadata";
 import { parseLandingQualified } from "@/lib/elt/warehouse-introspect";
 import {
   buildPostgresConnectionString,
+  runClickhouseReadOnlyQuery,
+  runDatabricksReadOnlyQuery,
+  runDuckdbReadOnlyQuery,
   runMotherduckReadOnlyQuery,
+  runMysqlReadOnlyQuery,
   runSnowflakeReadOnlyQuery,
+  runSqliteReadOnlyQuery,
+  runTrinoReadOnlyQuery,
+  type WarehouseQueryRowset,
 } from "@/lib/elt/warehouse-introspect-connectors";
 import type { DestinationConnectionRow } from "@/lib/elt/warehouse-introspect";
 
@@ -20,8 +27,83 @@ export type WarehouseColumnResult = {
 
 const COL_LIMIT = 500;
 
-function asConfig(raw: unknown): Record<string, unknown> {
-  return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+type RowsetRunner = (
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  sql: string
+) => Promise<WarehouseQueryRowset>;
+
+const COLUMN_RUNNERS: Record<string, RowsetRunner> = {
+  databricks: runDatabricksReadOnlyQuery,
+  clickhouse: runClickhouseReadOnlyQuery,
+  mysql: runMysqlReadOnlyQuery,
+  trino: runTrinoReadOnlyQuery,
+  duckdb: runDuckdbReadOnlyQuery,
+  sqlite: runSqliteReadOnlyQuery,
+  motherduck: runMotherduckReadOnlyQuery,
+};
+
+function normalizeConnector(connector: string): string {
+  const c = connector.toLowerCase().trim();
+  if (c === "gcp") return "bigquery";
+  if (c === "postgresql") return "postgres";
+  return c;
+}
+
+function informationSchemaColumnsSql(schema: string, table: string, connector: string): string {
+  const s = schema.replace(/'/g, "''");
+  const t = table.replace(/'/g, "''");
+  const c = normalizeConnector(connector);
+  const caseInsensitive = c === "motherduck" || c === "duckdb" || c === "sqlite";
+  const schemaMatch = caseInsensitive ? `lower(table_schema) = lower('${s}')` : `table_schema = '${s}'`;
+  const tableMatch = caseInsensitive ? `lower(table_name) = lower('${t}')` : `table_name = '${t}'`;
+  return `SELECT column_name, data_type
+    FROM information_schema.columns
+    WHERE ${schemaMatch}
+      AND ${tableMatch}
+    ORDER BY ordinal_position
+    LIMIT ${COL_LIMIT}`;
+}
+
+function quoteDuckdbTable(schema: string, table: string): string {
+  const dq = (part: string) => `"${part.replace(/"/g, '""')}"`;
+  return `${dq(schema)}.${dq(table)}`;
+}
+
+async function fetchDuckdbFamilyColumns(
+  runner: RowsetRunner,
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  schema: string,
+  table: string,
+  connector: string
+): Promise<AssetColumnDef[]> {
+  const fromInfo = await fetchColumnsFromInformationSchema(runner, secrets, config, schema, table, connector);
+  if (fromInfo.length) return fromInfo;
+
+  const rowset = await runner(secrets, config, `DESCRIBE ${quoteDuckdbTable(schema, table)}`);
+  const nameIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "column_name");
+  const typeIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "column_type");
+  if (nameIdx >= 0) {
+    return rowset.rows
+      .map((row) => ({
+        name: String(row[nameIdx] ?? ""),
+        type: typeIdx >= 0 && row[typeIdx] != null ? String(row[typeIdx]) : undefined,
+        source: "warehouse" as const,
+      }))
+      .filter((c) => c.name);
+  }
+  return rowsetToColumnDefs(rowset);
+}
+
+function rowsetToColumnDefs(rowset: WarehouseQueryRowset): AssetColumnDef[] {
+  return rowset.rows
+    .map((row) => ({
+      name: String(row[0] ?? ""),
+      type: row[1] ? String(row[1]) : undefined,
+      source: "warehouse" as const,
+    }))
+    .filter((c) => c.name);
 }
 
 async function fetchPostgresColumns(
@@ -92,6 +174,18 @@ async function fetchBigQueryColumns(
     .filter((c) => c.name);
 }
 
+async function fetchColumnsFromInformationSchema(
+  runQuery: RowsetRunner,
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  schema: string,
+  table: string,
+  connector: string
+): Promise<AssetColumnDef[]> {
+  const rowset = await runQuery(secrets, config, informationSchemaColumnsSql(schema, table, connector));
+  return rowsetToColumnDefs(rowset);
+}
+
 /** Resolve schema + table from asset landing target. */
 export function parseTableRef(landingQualified: string | undefined): { schema: string; table: string } | null {
   const parsed = parseLandingQualified(landingQualified);
@@ -112,12 +206,11 @@ export async function fetchWarehouseColumnsForAsset(
     return { ok: false, message: "No schema.table landing target on this asset.", columns: [] };
   }
 
-  const connector = connection.connector.toLowerCase().trim();
-  const secrets = parseStoredConnectionSecrets(connection.connectionSecretsEnc);
-  const config = asConfig(connection.config);
+  const connector = normalizeConnector(connection.connector);
+  const { secrets, config } = resolveDestinationConnectionContext(connection);
 
   try {
-    if (connector === "postgres" || connector === "postgresql" || connector === "redshift") {
+    if (connector === "postgres" || connector === "redshift") {
       const connStr = buildPostgresConnectionString(secrets, config);
       if (!connStr) return { ok: false, message: "Postgres connection incomplete.", columns: [] };
       const columns = await fetchPostgresColumns(connStr, ref.schema, ref.table);
@@ -160,31 +253,25 @@ export async function fetchWarehouseColumnsForAsset(
       };
     }
 
-    if (connector === "motherduck") {
-      const sql = `SELECT column_name, data_type
-        FROM information_schema.columns
-        WHERE table_schema = '${ref.schema.replace(/'/g, "''")}'
-          AND table_name = '${ref.table.replace(/'/g, "''")}'
-        ORDER BY ordinal_position
-        LIMIT ${COL_LIMIT}`;
-      const result = await runMotherduckReadOnlyQuery(secrets, config, sql);
-      const columns = result.rows
-        .map((row) => ({
-          name: String(row[0] ?? ""),
-          type: row[1] ? String(row[1]) : undefined,
-          source: "warehouse" as const,
-        }))
-        .filter((c) => c.name);
+    const runner = COLUMN_RUNNERS[connector];
+    if (runner) {
+      const columns =
+        connector === "motherduck" || connector === "duckdb" || connector === "sqlite"
+          ? await fetchDuckdbFamilyColumns(runner, secrets, config, ref.schema, ref.table, connector)
+          : await fetchColumnsFromInformationSchema(runner, secrets, config, ref.schema, ref.table, connector);
+      const label = connector.charAt(0).toUpperCase() + connector.slice(1);
       return {
         ok: columns.length > 0,
-        message: columns.length ? `Found ${columns.length} column(s) in MotherDuck.` : "Table not found or empty.",
+        message: columns.length
+          ? `Found ${columns.length} column(s) in ${label}.`
+          : `No columns found for ${ref.schema}.${ref.table}. The table may not exist yet — run a pipeline sync first.`,
         columns,
       };
     }
 
     return {
       ok: false,
-      message: `Column introspection is not supported for ${connector} yet. Use Postgres, BigQuery, Snowflake, or MotherDuck destinations.`,
+      message: `Column introspection is not supported for ${connector} yet.`,
       columns: [],
     };
   } catch (e) {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import clsx from "clsx";
 import type { CanvasInspectorFocus } from "@/components/pipeline-canvas/pipeline-canvas";
+import { readClientFetchJson } from "@/lib/elt/fetch-json-body";
 import { inputTableFromConfig, previewTableFromConfig } from "@/lib/elt/pipeline-asset-keys";
 
 type PreviewResult = {
@@ -40,8 +41,9 @@ function PreviewPane({ title, table, pipelineId, config, className }: PreviewPan
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ table, config, limit: 8 }),
       });
-      const data = (await res.json()) as PreviewResult & { error?: string };
+      const data = await readClientFetchJson<PreviewResult & { error?: string }>(res);
       if (!res.ok) throw new Error(data.error ?? "Preview failed");
+      if (data.ok === false) throw new Error(data.message ?? data.error ?? "Preview failed");
       setResult(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Preview failed");

@@ -24,19 +24,19 @@ export function extractSpecComponents(sourceConfiguration: Record<string, unknow
   return [];
 }
 
-function defaultBackbone(sourceType: string, destType: string): { nodes: Node[]; edges: Edge[] } {
+function defaultBackbone(_sourceType: string, _destType: string): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [
     {
       id: "n_source",
       type: "sourceNode",
       position: { x: 40, y: 120 },
-      data: { hint: `Source: ${sourceType}` },
+      data: {},
     },
     {
       id: "n_dest",
       type: "destNode",
       position: { x: 360, y: 120 },
-      data: { hint: `Destination: ${destType}` },
+      data: {},
     },
   ];
   const edges: Edge[] = [

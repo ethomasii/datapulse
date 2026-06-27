@@ -123,7 +123,7 @@ function findOrCreateSourceDest(nodes: Node[], options: BuildPipelineCanvasOptio
       type: "sourceNode",
       position: { x: 40, y: 160 },
       data: {
-        hint: options.sourceHint ?? (options.sourceType ? `${options.sourceType} extract` : "Source"),
+        hint: options.sourceHint ?? "",
       },
     };
     next.push(source);
@@ -135,7 +135,7 @@ function findOrCreateSourceDest(nodes: Node[], options: BuildPipelineCanvasOptio
       type: "destNode",
       position: { x: 520, y: 160 },
       data: {
-        hint: options.destinationHint ?? (options.destinationType ? `${options.destinationType} load` : "Destination"),
+        hint: options.destinationHint ?? "",
       },
     };
     next.push(dest);

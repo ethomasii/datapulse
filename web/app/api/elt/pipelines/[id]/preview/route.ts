@@ -4,6 +4,7 @@ import { getCurrentDbUser } from "@/lib/auth/server";
 import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
 import { previewTableFromConfig } from "@/lib/elt/pipeline-asset-keys";
+import { fetchWarehouseColumnsForAsset } from "@/lib/elt/warehouse-column-introspect";
 import { runReadOnlyQuery } from "@/lib/elt/warehouse-readonly-query";
 import { resolveRouteParamId } from "@/lib/server/route-params";
 
@@ -20,6 +21,8 @@ const bodySchema = z.object({
   table: z.string().min(1).max(256).optional(),
   config: z.record(z.string(), z.unknown()).optional(),
   limit: z.number().int().min(1).max(25).optional(),
+  /** Skip row sample — only resolve column names (for Select Columns sidebar). */
+  columnsOnly: z.boolean().optional(),
 });
 
 /**
@@ -70,9 +73,50 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (!quoted) {
     return NextResponse.json({ error: "table must be schema.table format" }, { status: 400 });
   }
+
+  if (body.columnsOnly) {
+    try {
+      const columnMeta = await fetchWarehouseColumnsForAsset(conn, table);
+      return NextResponse.json({
+        table,
+        ok: columnMeta.columns.length > 0,
+        message: columnMeta.message,
+        columns: columnMeta.columns.map((c) => c.name),
+        rows: [],
+        rowCount: 0,
+        truncated: false,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return NextResponse.json({ error: msg, ok: false, message: msg, columns: [], rows: [], rowCount: 0, truncated: false }, { status: 400 });
+    }
+  }
+
   const sql = `SELECT * FROM ${quoted} LIMIT ${limit}`;
   try {
-    const result = await runReadOnlyQuery(conn, sql, limit);
+    let result = await runReadOnlyQuery(conn, sql, limit);
+    if (result.columns.length === 0) {
+      const columnMeta = await fetchWarehouseColumnsForAsset(conn, table);
+      if (columnMeta.columns.length > 0) {
+        result = {
+          ...result,
+          ok: true,
+          columns: columnMeta.columns.map((c) => c.name),
+          message:
+            result.rows.length > 0
+              ? result.message
+              : `Found ${columnMeta.columns.length} column(s)${result.rows.length === 0 ? " (table is empty — run sync to load rows)" : ""}.`,
+        };
+      } else if (result.ok && result.rows.length === 0) {
+        result = {
+          ...result,
+          ok: false,
+          message:
+            columnMeta.message ||
+            `No table or columns found for ${table}. Confirm the MotherDuck database on your connection matches where dlt wrote data, then run a sync.`,
+        };
+      }
+    }
     return NextResponse.json({ table, ...result });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

@@ -3,11 +3,18 @@
  * SELECT-only, row-capped, timeout-bounded.
  */
 
-import { parseStoredConnectionSecrets } from "@/lib/elt/connection-secrets-store";
+import { resolveDestinationConnectionContext } from "@/lib/elt/warehouse-destination-secrets";
 import {
   buildPostgresConnectionString,
+  runClickhouseReadOnlyQuery,
+  runDatabricksReadOnlyQuery,
+  runDuckdbReadOnlyQuery,
   runMotherduckReadOnlyQuery,
+  runMysqlReadOnlyQuery,
   runSnowflakeReadOnlyQuery,
+  runSqliteReadOnlyQuery,
+  runTrinoReadOnlyQuery,
+  type WarehouseQueryRowset,
 } from "@/lib/elt/warehouse-introspect-connectors";
 import type { DestinationConnectionRow } from "@/lib/elt/warehouse-introspect";
 import { parseTableRef } from "@/lib/elt/warehouse-column-introspect";
@@ -24,8 +31,31 @@ export type ReadOnlyQueryResult = {
 const MAX_ROWS = 25;
 const QUERY_TIMEOUT_MS = 15_000;
 
+type RowsetRunner = (
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  sql: string
+) => Promise<WarehouseQueryRowset>;
+
+const ROWSET_RUNNERS: Record<string, RowsetRunner> = {
+  databricks: runDatabricksReadOnlyQuery,
+  clickhouse: runClickhouseReadOnlyQuery,
+  mysql: runMysqlReadOnlyQuery,
+  trino: runTrinoReadOnlyQuery,
+  duckdb: runDuckdbReadOnlyQuery,
+  sqlite: runSqliteReadOnlyQuery,
+  motherduck: runMotherduckReadOnlyQuery,
+};
+
 function asConfig(raw: unknown): Record<string, unknown> {
   return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+}
+
+function normalizeConnector(connector: string): string {
+  const c = connector.toLowerCase().trim();
+  if (c === "gcp") return "bigquery";
+  if (c === "postgresql") return "postgres";
+  return c;
 }
 
 /** Reject non-SELECT statements. */
@@ -54,6 +84,41 @@ function rowsToObjects(columns: string[], rawRows: unknown[][]): Record<string, 
   });
 }
 
+function rowsetToResult(rowset: WarehouseQueryRowset, limit: number, label: string): ReadOnlyQueryResult {
+  const columns =
+    rowset.columns.length > 0
+      ? rowset.columns
+      : Array.from({ length: rowset.rows[0]?.length ?? 0 }, (_, i) => `col_${i}`);
+  const sliced = rowset.rows.slice(0, limit);
+  const rows = rowsToObjects(columns, sliced);
+  return {
+    ok: true,
+    message: rows.length ? `Returned ${rows.length} row(s) from ${label}.` : "No rows returned.",
+    columns,
+    rows,
+    rowCount: rowset.rows.length,
+    truncated: rowset.rows.length > limit,
+  };
+}
+
+export function quoteQualifiedTable(connector: string, schema: string, table: string): string {
+  const c = normalizeConnector(connector);
+  const dq = (s: string) => `"${s.replace(/"/g, '""')}"`;
+  const bt = (s: string) => `\`${s.replace(/`/g, "``")}\``;
+  if (c === "bigquery") return `\`${schema}.${table}\``;
+  if (c === "mysql" || c === "clickhouse") return `${bt(schema)}.${bt(table)}`;
+  if (c === "snowflake" || c === "databricks") return `${schema}.${table}`;
+  return `${dq(schema)}.${dq(table)}`;
+}
+
+export function sampleSelectSql(connector: string, schema: string, table: string, limit: number): string {
+  const c = normalizeConnector(connector);
+  if (c === "postgres" || c === "redshift") {
+    return `SELECT * FROM ${schema}.${table} LIMIT ${limit}`;
+  }
+  return `SELECT * FROM ${quoteQualifiedTable(c, schema, table)} LIMIT ${limit}`;
+}
+
 async function queryPostgres(connStr: string, sql: string, limit: number): Promise<ReadOnlyQueryResult> {
   const { Client } = await import("pg");
   const client = new Client({ connectionString: connStr, connectionTimeoutMillis: 12_000, query_timeout: QUERY_TIMEOUT_MS });
@@ -61,7 +126,6 @@ async function queryPostgres(connStr: string, sql: string, limit: number): Promi
   try {
     const res = await client.query(sql);
     const columns = res.fields.map((f) => f.name);
-    const rawRows = res.rows.slice(0, limit).map((r) => columns.map((c) => r[c]));
     return {
       ok: true,
       message: `Returned ${Math.min(res.rows.length, limit)} row(s).`,
@@ -136,25 +200,67 @@ async function queryBigQuerySample(
   };
 }
 
-async function queryMotherduck(
+async function queryRowsetConnector(
+  connector: string,
   secrets: Record<string, string>,
   config: Record<string, unknown>,
   sql: string,
   limit: number
 ): Promise<ReadOnlyQueryResult> {
-  const result = await runMotherduckReadOnlyQuery(secrets, config, sql);
-  const columns =
-    result.columns.length > 0
-      ? result.columns
-      : Array.from({ length: result.rows[0]?.length ?? 0 }, (_, i) => `col_${i}`);
-  const rows = rowsToObjects(columns, result.rows.slice(0, limit));
+  const runner = ROWSET_RUNNERS[connector];
+  if (!runner) {
+    return {
+      ok: false,
+      message: `Query not supported for ${connector}.`,
+      columns: [],
+      rows: [],
+      rowCount: 0,
+      truncated: false,
+    };
+  }
+  const rowset = await runner(secrets, config, sql);
+  return rowsetToResult(rowset, limit, connector);
+}
+
+async function executeReadOnlyQuery(
+  connection: DestinationConnectionRow,
+  sql: string,
+  limit: number
+): Promise<ReadOnlyQueryResult> {
+  const connector = normalizeConnector(connection.connector);
+  const { secrets, config } = resolveDestinationConnectionContext(connection);
+
+  if (connector === "postgres" || connector === "redshift") {
+    const connStr = buildPostgresConnectionString(secrets, config);
+    if (!connStr) {
+      return { ok: false, message: "Postgres connection incomplete.", columns: [], rows: [], rowCount: 0, truncated: false };
+    }
+    return await queryPostgres(connStr, sql, limit);
+  }
+  if (connector === "bigquery") {
+    return await queryBigQuerySample(secrets, config, sql, limit);
+  }
+  if (connector === "snowflake") {
+    const result = await runSnowflakeReadOnlyQuery(secrets, config, sql);
+    return rowsetToResult(
+      {
+        columns: Array.from({ length: result.rows[0]?.length ?? 0 }, (_, i) => `col_${i}`),
+        rows: result.rows,
+      },
+      limit,
+      "snowflake"
+    );
+  }
+  if (ROWSET_RUNNERS[connector]) {
+    return await queryRowsetConnector(connector, secrets, config, sql, limit);
+  }
   return {
-    ok: true,
-    message: rows.length ? `Returned ${rows.length} row(s) from MotherDuck.` : "No rows returned.",
-    columns: rows.length ? Object.keys(rows[0] ?? {}) : columns,
-    rows,
-    rowCount: result.rows.length,
-    truncated: result.rows.length > limit,
+    ok: false,
+    message: `Query not supported for ${connector}.`,
+    columns: [],
+    rows: [],
+    rowCount: 0,
+    truncated: false,
   };
 }
 
@@ -169,47 +275,13 @@ export async function sampleAssetData(
     return { ok: false, message: "No schema.table landing target.", columns: [], rows: [], rowCount: 0, truncated: false };
   }
 
-  const connector = connection.connector.toLowerCase().trim();
-  const secrets = parseStoredConnectionSecrets(connection.connectionSecretsEnc);
-  const config = asConfig(connection.config);
+  const connector = normalizeConnector(connection.connector);
   const capped = Math.min(MAX_ROWS, Math.max(1, limit));
-
-  const sql = `SELECT * FROM ${ref.schema}.${ref.table} LIMIT ${capped}`;
+  const sql = sampleSelectSql(connector, ref.schema, ref.table, capped);
   assertReadOnlySql(sql);
 
   try {
-    if (connector === "postgres" || connector === "postgresql" || connector === "redshift") {
-      const connStr = buildPostgresConnectionString(secrets, config);
-      if (!connStr) return { ok: false, message: "Postgres connection incomplete.", columns: [], rows: [], rowCount: 0, truncated: false };
-      return await queryPostgres(connStr, sql, capped);
-    }
-    if (connector === "bigquery") {
-      const bqSql = `SELECT * FROM \`${ref.schema}.${ref.table}\` LIMIT ${capped}`;
-      return await queryBigQuerySample(secrets, config, bqSql, capped);
-    }
-    if (connector === "snowflake") {
-      const sfSql = `SELECT * FROM ${ref.schema}.${ref.table} LIMIT ${capped}`;
-      const result = await runSnowflakeReadOnlyQuery(secrets, config, sfSql, { schema: ref.schema });
-      const columns = result.rows.length > 0 ? ["col_0", "col_1", "col_2", "col_3", "col_4"].slice(0, result.rows[0]?.length ?? 0) : [];
-      // First row might be headers in some cases - for SELECT * rowset is data
-      const rows = rowsToObjects(
-        columns.length ? columns : result.rows[0]?.map((_, i) => `col_${i}`) ?? [],
-        result.rows.slice(0, capped)
-      );
-      return {
-        ok: rows.length > 0,
-        message: rows.length ? `Sampled ${rows.length} row(s) from Snowflake.` : "No rows returned.",
-        columns: Object.keys(rows[0] ?? {}),
-        rows,
-        rowCount: rows.length,
-        truncated: false,
-      };
-    }
-    if (connector === "motherduck") {
-      const mdSql = `SELECT * FROM "${ref.schema.replace(/"/g, '""')}"."${ref.table.replace(/"/g, '""')}" LIMIT ${capped}`;
-      return await queryMotherduck(secrets, config, mdSql, capped);
-    }
-    return { ok: false, message: `Data preview not supported for ${connector}.`, columns: [], rows: [], rowCount: 0, truncated: false };
+    return await executeReadOnlyQuery(connection, sql, capped);
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
     return { ok: false, message: detail.slice(0, 300), columns: [], rows: [], rowCount: 0, truncated: false };
@@ -226,37 +298,8 @@ export async function runReadOnlyQuery(
   const capped = Math.min(MAX_ROWS, Math.max(1, limit));
   const limitedSql = /\blimit\s+\d+/i.test(sql) ? sql : `${sql.replace(/;\s*$/, "")} LIMIT ${capped}`;
 
-  const connector = connection.connector.toLowerCase().trim();
-  const secrets = parseStoredConnectionSecrets(connection.connectionSecretsEnc);
-  const config = asConfig(connection.config);
-
   try {
-    if (connector === "postgres" || connector === "postgresql" || connector === "redshift") {
-      const connStr = buildPostgresConnectionString(secrets, config);
-      if (!connStr) return { ok: false, message: "Postgres connection incomplete.", columns: [], rows: [], rowCount: 0, truncated: false };
-      return await queryPostgres(connStr, limitedSql, capped);
-    }
-    if (connector === "bigquery") {
-      return await queryBigQuerySample(secrets, config, limitedSql, capped);
-    }
-    if (connector === "snowflake") {
-      const result = await runSnowflakeReadOnlyQuery(secrets, config, limitedSql);
-      const colCount = result.rows[0]?.length ?? 0;
-      const columns = Array.from({ length: colCount }, (_, i) => `col_${i}`);
-      const rows = rowsToObjects(columns, result.rows.slice(0, capped));
-      return {
-        ok: true,
-        message: `Returned ${rows.length} row(s).`,
-        columns,
-        rows,
-        rowCount: rows.length,
-        truncated: result.rows.length > capped,
-      };
-    }
-    if (connector === "motherduck") {
-      return await queryMotherduck(secrets, config, limitedSql, capped);
-    }
-    return { ok: false, message: `Query not supported for ${connector}.`, columns: [], rows: [], rowCount: 0, truncated: false };
+    return await executeReadOnlyQuery(connection, limitedSql, capped);
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
     return { ok: false, message: detail.slice(0, 300), columns: [], rows: [], rowCount: 0, truncated: false };

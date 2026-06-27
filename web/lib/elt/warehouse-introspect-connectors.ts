@@ -5,10 +5,19 @@
 import { createHash, createHmac, createPrivateKey, createPublicKey, createSign, randomUUID } from "crypto";
 import { fetchGcpAccessToken } from "@/lib/elt/gcp-access-token";
 import { resolveDuckdbDatabaseLocation } from "@/lib/elt/duckdb-destination";
+import { readFetchJsonBody } from "@/lib/elt/fetch-json-body";
+import { STARTER_WAREHOUSE_DEFAULT_DB } from "@/lib/elt/starter-warehouse";
 import type { WarehouseIntrospectionResult, WarehouseTableRef } from "@/lib/elt/warehouse-introspect";
 
 const TABLE_LIMIT = 5000;
 const FETCH_TIMEOUT_MS = 20_000;
+
+export type WarehouseQueryRowset = {
+  columns: string[];
+  rows: unknown[][];
+};
+
+export type MotherduckQueryRowset = WarehouseQueryRowset;
 
 function fail(connector: string, message: string): WarehouseIntrospectionResult {
   return { ok: false, connector, message, tables: [] };
@@ -390,7 +399,11 @@ function databricksWarehouseId(httpPath: string): string | null {
   return match?.[1] ?? null;
 }
 
-async function pollDatabricksStatement(host: string, token: string, statementId: string): Promise<string[][]> {
+async function pollDatabricksStatement(
+  host: string,
+  token: string,
+  statementId: string
+): Promise<WarehouseQueryRowset> {
   const deadline = Date.now() + FETCH_TIMEOUT_MS;
   while (Date.now() < deadline) {
     const res = await fetch(`https://${host}/api/2.0/sql/statements/${statementId}`, {
@@ -399,12 +412,24 @@ async function pollDatabricksStatement(host: string, token: string, statementId:
     });
     const body = (await res.json()) as {
       status?: { state?: string; error?: { message?: string } };
-      manifest?: { schema?: { position: number }[] };
+      manifest?: { schema?: { columns?: { name?: string; position?: number }[] } };
       result?: { data_array?: string[][] };
     };
     const state = body.status?.state;
     if (state === "SUCCEEDED") {
-      return body.result?.data_array ?? [];
+      const columns = (body.manifest?.schema?.columns ?? [])
+        .slice()
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+        .map((c) => String(c.name ?? ""))
+        .filter(Boolean);
+      const rows = (body.result?.data_array ?? []) as unknown[][];
+      if (!columns.length && rows[0]?.length) {
+        return {
+          columns: Array.from({ length: rows[0].length }, (_, i) => `col_${i}`),
+          rows,
+        };
+      }
+      return { columns, rows };
     }
     if (state === "FAILED" || state === "CANCELED") {
       throw new Error(body.status?.error?.message ?? `Databricks statement ${state?.toLowerCase()}.`);
@@ -412,6 +437,40 @@ async function pollDatabricksStatement(host: string, token: string, statementId:
     await new Promise((r) => setTimeout(r, 800));
   }
   throw new Error("Databricks statement timed out.");
+}
+
+export async function runDatabricksReadOnlyQuery(
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  sql: string
+): Promise<WarehouseQueryRowset> {
+  const host = (secret(secrets, "DATABRICKS_HOST") || configString(config, "host")).replace(/^https?:\/\//, "");
+  const token = secret(secrets, "DATABRICKS_TOKEN");
+  const httpPath = secret(secrets, "DATABRICKS_HTTP_PATH") || configString(config, "http_path");
+  if (!host || !token || !httpPath) {
+    throw new Error("Databricks needs host, access token, and SQL warehouse HTTP path.");
+  }
+  const warehouseId = databricksWarehouseId(httpPath);
+  if (!warehouseId) throw new Error("Could not parse warehouse id from DATABRICKS_HTTP_PATH.");
+
+  const res = await fetch(`https://${host}/api/2.0/sql/statements`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      warehouse_id: warehouseId,
+      statement: sql,
+      wait_timeout: "30s",
+    }),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  const body = (await res.json()) as { statement_id?: string; status?: { state?: string } };
+  if (!res.ok || !body.statement_id) {
+    throw new Error(`Databricks SQL API returned ${res.status}.`);
+  }
+  return pollDatabricksStatement(host, token, body.statement_id);
 }
 
 export async function introspectDatabricks(
@@ -449,8 +508,8 @@ export async function introspectDatabricks(
     if (!res.ok || !body.statement_id) {
       return fail("databricks", `Databricks SQL API returned ${res.status}.`);
     }
-    const rows = await pollDatabricksStatement(host, token, body.statement_id);
-    const tables = rows.map((row) => ({
+    const rowset = await pollDatabricksStatement(host, token, body.statement_id);
+    const tables = rowset.rows.map((row) => ({
       schema: String(row[0] ?? ""),
       table: String(row[1] ?? ""),
       qualified: `${row[0]}.${row[1]}`,
@@ -503,6 +562,44 @@ export async function introspectClickhouse(
   }
 }
 
+export async function runClickhouseReadOnlyQuery(
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  sql: string
+): Promise<WarehouseQueryRowset> {
+  const host = secret(secrets, "CLICKHOUSE_HOST") || configString(config, "host");
+  const port = secret(secrets, "CLICKHOUSE_PORT") || configString(config, "port") || "8123";
+  const user = secret(secrets, "CLICKHOUSE_USER") || configString(config, "username") || "default";
+  const password = secret(secrets, "CLICKHOUSE_PASSWORD");
+  const database = secret(secrets, "CLICKHOUSE_DATABASE") || configString(config, "database");
+
+  if (!host) throw new Error("Set CLICKHOUSE_HOST to query ClickHouse.");
+
+  const query = /\bformat\s+json\b/i.test(sql) ? sql : `${sql.trim().replace(/;\s*$/, "")} FORMAT JSON`;
+  const url = new URL(`http://${host}:${port}/`);
+  url.searchParams.set("query", query);
+  if (database) url.searchParams.set("database", database);
+
+  const headers: Record<string, string> = {};
+  if (user) {
+    const auth = password ? `${user}:${password}` : user;
+    headers.Authorization = `Basic ${Buffer.from(auth).toString("base64")}`;
+  }
+
+  const res = await fetch(url, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+  if (!res.ok) throw new Error(`ClickHouse HTTP API returned ${res.status}.`);
+  const body = (await res.json()) as { meta?: { name?: string }[]; data?: unknown[][] };
+  const columns = (body.meta ?? []).map((m) => String(m.name ?? "")).filter(Boolean);
+  const rows = body.data ?? [];
+  if (!columns.length && rows[0]?.length) {
+    return {
+      columns: Array.from({ length: rows[0].length }, (_, i) => `col_${i}`),
+      rows,
+    };
+  }
+  return { columns, rows };
+}
+
 // ─── MySQL ───────────────────────────────────────────────────────────────────
 
 export async function introspectMysql(
@@ -551,31 +648,117 @@ export async function introspectMysql(
   }
 }
 
+export async function runMysqlReadOnlyQuery(
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  sql: string
+): Promise<WarehouseQueryRowset> {
+  const host = secret(secrets, "DEST_MYSQL_HOST", "MYSQL_HOST") || configString(config, "host");
+  const port = Number(secret(secrets, "DEST_MYSQL_PORT", "MYSQL_PORT") || configString(config, "port") || "3306");
+  const database = secret(secrets, "DEST_MYSQL_DATABASE", "MYSQL_DATABASE") || configString(config, "database");
+  const user = secret(secrets, "DEST_MYSQL_USER", "MYSQL_USER") || configString(config, "username");
+  const password = secret(secrets, "DEST_MYSQL_PASSWORD", "MYSQL_PASSWORD");
+
+  if (!host || !database || !user || !password) {
+    throw new Error("MySQL destination needs host, database, user, and password.");
+  }
+
+  const mysql = await import(/* webpackIgnore: true */ "mysql2/promise");
+  const conn = await mysql.createConnection({
+    host,
+    port,
+    database,
+    user,
+    password,
+    connectTimeout: 12_000,
+  });
+  try {
+    const [rows, fields] = await conn.query(sql);
+    const columns = Array.isArray(fields) ? fields.map((f) => String(f.name)) : [];
+    const dataRows = Array.isArray(rows)
+      ? (rows as Record<string, unknown>[]).map((r) => columns.map((c) => r[c] ?? null))
+      : [];
+    return { columns, rows: dataRows };
+  } finally {
+    await conn.end();
+  }
+}
+
 // ─── Trino ───────────────────────────────────────────────────────────────────
 
-async function trinoFetchAllRows(
-  startUrl: string,
-  user: string
-): Promise<string[][]> {
-  const rows: string[][] = [];
+async function trinoExecuteQuery(startUrl: string, user: string): Promise<WarehouseQueryRowset> {
+  let columns: string[] = [];
+  const rows: unknown[][] = [];
   let nextUri: string | null = startUrl;
+  let capturedColumns = false;
   while (nextUri) {
     const res = await fetch(nextUri, {
-      method: nextUri === startUrl ? "POST" : "GET",
+      method: "GET",
       headers: { "X-Trino-User": user, Accept: "application/json" },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     const body = (await res.json()) as {
       error?: { message?: string };
-      data?: string[][];
+      columns?: { name?: string }[];
+      data?: unknown[][];
       nextUri?: string | null;
     };
     if (body.error?.message) throw new Error(body.error.message);
+    if (!capturedColumns && body.columns?.length) {
+      columns = body.columns.map((c) => String(c.name ?? "")).filter(Boolean);
+      capturedColumns = true;
+    }
     if (body.data?.length) rows.push(...body.data);
     nextUri = body.nextUri ?? null;
-    if (rows.length >= TABLE_LIMIT) break;
   }
-  return rows.slice(0, TABLE_LIMIT);
+  if (!columns.length && rows[0]?.length) {
+    columns = Array.from({ length: rows[0].length }, (_, i) => `col_${i}`);
+  }
+  return { columns, rows };
+}
+
+async function trinoFetchAllRows(
+  startUrl: string,
+  user: string
+): Promise<string[][]> {
+  const rowset = await trinoExecuteQuery(startUrl, user);
+  return rowset.rows.slice(0, TABLE_LIMIT).map((row) => row.map(String));
+}
+
+export async function runTrinoReadOnlyQuery(
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  sql: string
+): Promise<WarehouseQueryRowset> {
+  const host = secret(secrets, "TRINO_HOST") || configString(config, "host");
+  const port = secret(secrets, "TRINO_PORT") || configString(config, "port") || "8080";
+  const user = secret(secrets, "TRINO_USER") || configString(config, "username") || "trino";
+  const catalog = secret(secrets, "TRINO_CATALOG") || configString(config, "catalog");
+  const schema = secret(secrets, "TRINO_SCHEMA") || configString(config, "schema") || "default";
+
+  if (!host || !catalog) {
+    throw new Error("Trino destination needs host and catalog.");
+  }
+
+  const statementUrl = `http://${host}:${port}/v1/statement`;
+  const res = await fetch(statementUrl, {
+    method: "POST",
+    headers: {
+      "X-Trino-User": user,
+      "X-Trino-Catalog": catalog,
+      "X-Trino-Schema": schema,
+      "Content-Type": "text/plain",
+    },
+    body: sql,
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  const first = (await res.json()) as { id?: string; nextUri?: string; error?: { message?: string } };
+  if (first.error?.message) throw new Error(first.error.message);
+  const start =
+    first.nextUri ??
+    (first.id ? `${statementUrl.replace(/\/statement$/, "")}/statement/${first.id}` : null);
+  if (!start) throw new Error("Trino returned no statement handle.");
+  return trinoExecuteQuery(start, user);
 }
 
 export async function introspectTrino(
@@ -630,20 +813,27 @@ export async function introspectTrino(
 type MotherDuckSqlResponse = {
   rows?: unknown[][];
   data?: unknown[][];
-  columns?: { name: string }[];
+  columns?: { name?: string }[] | string[];
   error?: string;
   message?: string;
+  errMessage?: string;
+  mdFriendlyStatusCode?: string;
 };
 
-export type MotherduckQueryRowset = {
-  columns: string[];
-  rows: unknown[][];
-};
+export function motherduckScopedSql(database: string, sql: string): string {
+  const db = database.trim();
+  if (!db) return sql;
+  if (/^\s*use\s+/i.test(sql)) return sql;
+  return `USE "${db.replace(/"/g, '""')}";\n${sql}`;
+}
 
 export function parseMotherduckSqlResponse(body: MotherDuckSqlResponse): MotherduckQueryRowset {
   const rawRows = body.rows ?? body.data ?? [];
   const rows = rawRows.filter((r): r is unknown[] => Array.isArray(r));
-  const columns = (body.columns ?? []).map((c) => String(c.name ?? "")).filter(Boolean);
+  const rawCols = body.columns ?? [];
+  const columns = rawCols
+    .map((c) => (typeof c === "string" ? c : String(c.name ?? "")))
+    .filter(Boolean);
   if (columns.length === 0 && rows.length > 0) {
     const width = rows[0]?.length ?? 0;
     return { columns: Array.from({ length: width }, (_, i) => `col_${i}`), rows };
@@ -655,7 +845,11 @@ export function motherduckDatabaseName(
   secrets: Record<string, string>,
   config: Record<string, unknown>
 ): string {
-  return secret(secrets, "MOTHERDUCK_DATABASE") || configString(config, "database") || "my_db";
+  return (
+    secret(secrets, "MOTHERDUCK_DATABASE") ||
+    configString(config, "database") ||
+    STARTER_WAREHOUSE_DEFAULT_DB
+  );
 }
 
 /** Run a read-only SQL statement against MotherDuck via the HTTP API. */
@@ -674,12 +868,20 @@ export async function runMotherduckReadOnlyQuery(
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ database, sql }),
+    body: JSON.stringify({ sql: motherduckScopedSql(database, sql) }),
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
-  const body = (await res.json()) as MotherDuckSqlResponse & { detail?: string };
-  if (!res.ok) {
-    throw new Error(body.error ?? body.message ?? body.detail ?? `MotherDuck API returned ${res.status}.`);
+  const body = await readFetchJsonBody<
+    MotherDuckSqlResponse & { detail?: string; errMessage?: string; mdFriendlyStatusCode?: string }
+  >(res);
+  if (!res.ok || body.errMessage || body.error) {
+    const detail = body.errMessage ?? body.error ?? body.message ?? body.detail;
+    if (res.status === 404 || body.mdFriendlyStatusCode === "NOT_FOUND") {
+      throw new Error(
+        `MotherDuck database "${database}" was not found. Set Database on your destination connection to the database where dlt loaded data (often "${STARTER_WAREHOUSE_DEFAULT_DB}" or "my_db").`
+      );
+    }
+    throw new Error(detail ?? `MotherDuck API returned ${res.status}.`);
   }
   return parseMotherduckSqlResponse(body);
 }
@@ -759,6 +961,54 @@ async function introspectDuckdbFile(
         : "";
     return fail(connector, `Could not introspect ${connector}: ${detail.slice(0, 160)}.${hint}`);
   }
+}
+
+export async function runDuckdbFileReadOnlyQuery(
+  dbPath: string,
+  sql: string
+): Promise<WarehouseQueryRowset> {
+  if (!dbPath.trim()) {
+    throw new Error("Set a database path or location to query DuckDB/SQLite.");
+  }
+
+  const duckdb = await import(/* webpackIgnore: true */ "duckdb");
+  const { Database } = duckdb.default ?? duckdb;
+  const db = new Database(dbPath, { access_mode: "READ_ONLY" });
+  const conn = db.connect();
+  try {
+    const result = await new Promise<Record<string, unknown>[]>((resolve, reject) => {
+      conn.all(sql, (err: Error | null, rows: unknown) => {
+        if (err) reject(err);
+        else resolve((rows ?? []) as Record<string, unknown>[]);
+      });
+    });
+    if (!result.length) return { columns: [], rows: [] };
+    const columns = Object.keys(result[0]!);
+    return {
+      columns,
+      rows: result.map((row) => columns.map((col) => row[col] ?? null)),
+    };
+  } finally {
+    conn.close();
+    db.close();
+  }
+}
+
+export async function runDuckdbReadOnlyQuery(
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  sql: string
+): Promise<WarehouseQueryRowset> {
+  return runDuckdbFileReadOnlyQuery(resolveDuckdbDatabaseLocation(secrets, config), sql);
+}
+
+export async function runSqliteReadOnlyQuery(
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  sql: string
+): Promise<WarehouseQueryRowset> {
+  const dbPath = secret(secrets, "DEST_SQLITE_PATH") || configString(config, "path");
+  return runDuckdbFileReadOnlyQuery(dbPath, sql);
 }
 
 export async function introspectDuckdb(

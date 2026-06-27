@@ -5,6 +5,7 @@ import { Loader2, Plus } from "lucide-react";
 import clsx from "clsx";
 
 import { operatorColumnGridMode } from "@/lib/elt/operator-column-grid-mode";
+import { readClientFetchJson } from "@/lib/elt/fetch-json-body";
 
 type ColumnMeta = { name: string; type?: string };
 
@@ -69,14 +70,17 @@ export function OperatorColumnGrid({
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ table: inputTable, limit: 1 }),
+        body: JSON.stringify({ table: inputTable, columnsOnly: true }),
       });
-      const data = (await res.json()) as {
+      const data = await readClientFetchJson<{
+        ok?: boolean;
+        message?: string;
         columns?: string[];
         rows?: Record<string, unknown>[];
         error?: string;
-      };
-      if (!res.ok) throw new Error(data.error ?? "Could not load columns");
+      }>(res);
+      if (!res.ok) throw new Error(data.error ?? data.message ?? "Could not load columns");
+      if (data.ok === false) throw new Error(data.message ?? "Could not load columns");
       const names =
         data.columns?.length
           ? data.columns
@@ -167,7 +171,10 @@ export function OperatorColumnGrid({
         ) : error ? (
           <p className="px-3 py-4 text-[11px] text-amber-700 dark:text-amber-300">{error}</p>
         ) : columns.length === 0 ? (
-          <p className="px-3 py-4 text-[11px] text-slate-500">No columns found for {inputTable}.</p>
+          <p className="px-3 py-4 text-[11px] text-slate-500">
+            No columns found for {inputTable}. The table may be empty or not synced yet — run the pipeline, or check the
+            destination database name on your connection.
+          </p>
         ) : (
           <table className="w-full text-left text-[11px]">
             <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900">

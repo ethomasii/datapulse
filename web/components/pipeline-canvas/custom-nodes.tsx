@@ -7,6 +7,7 @@ import { ComponentIcon } from "@/components/elt/component-icon";
 import { DESTINATION_OPTIONS, SOURCE_OPTIONS } from "@/lib/elt/catalog";
 import { ConnectorCombobox } from "@/components/elt/connector-combobox";
 import { cn } from "@/lib/utils";
+import { displayConnectorNodeHint } from "@/lib/elt/canvas-node-hints";
 import { useCanvasBindings } from "./canvas-bindings-context";
 import { TRANSFORM_TOOLS, transformToolBadge } from "./transform-tools";
 
@@ -101,17 +102,19 @@ const selectBase =
 export function SourceNode({ id, data }: NodeProps) {
   const patch = useNodeDataUpdater(id);
   const bindings = useCanvasBindings();
-  const hint = String(data.hint ?? "");
+  const storedHint = String(data.hint ?? "");
+  const hint = bindings
+    ? displayConnectorNodeHint("source", storedHint, bindings.pipelineSourceType)
+    : storedHint;
 
   return (
     <div className="w-[200px] max-w-[200px] shrink-0 overflow-visible rounded-xl border-2 border-emerald-500/90 bg-white px-2 py-2 shadow-md dark:border-emerald-600 dark:bg-emerald-950/50">
-      <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-200">
+      <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-200">
         <Database className="h-3.5 w-3.5 shrink-0" aria-hidden />
         Source
       </div>
       {bindings ? (
         <div className="nodrag mb-1">
-          <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-900 dark:text-emerald-100">Source type</p>
           <ConnectorCombobox
             options={SOURCE_OPTIONS}
             value={bindings.pipelineSourceType}
@@ -130,7 +133,7 @@ export function SourceNode({ id, data }: NodeProps) {
         value={hint}
         onChange={(v) => patch({ hint: v })}
         accent="emerald"
-        placeholder="Scope, owner, credentials / links…"
+        placeholder="Notes — scope, owner, credentials…"
       />
       <Handle type="source" position={Position.Right} className={handleClass("emerald")} />
     </div>
@@ -218,18 +221,20 @@ export function TransformNode({ id, data }: NodeProps) {
 export function DestinationNode({ id, data }: NodeProps) {
   const patch = useNodeDataUpdater(id);
   const bindings = useCanvasBindings();
-  const hint = String(data.hint ?? "");
+  const storedHint = String(data.hint ?? "");
+  const hint = bindings
+    ? displayConnectorNodeHint("destination", storedHint, bindings.pipelineDestinationType)
+    : storedHint;
 
   return (
     <div className="w-[200px] max-w-[200px] shrink-0 overflow-visible rounded-xl border-2 border-sky-500/90 bg-white px-2 py-2 shadow-md dark:border-sky-600 dark:bg-sky-950/40">
       <Handle type="target" position={Position.Left} className={handleClass("sky")} />
-      <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-sky-900 dark:text-sky-100">
+      <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-sky-900 dark:text-sky-100">
         <Target className="h-3.5 w-3.5 shrink-0" aria-hidden />
         Destination
       </div>
       {bindings ? (
         <div className="nodrag mb-1">
-          <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-sky-900 dark:text-sky-100">Destination type</p>
           <ConnectorCombobox
             options={DESTINATION_OPTIONS}
             value={bindings.pipelineDestinationType}
@@ -248,7 +253,7 @@ export function DestinationNode({ id, data }: NodeProps) {
         value={hint}
         onChange={(v) => patch({ hint: v })}
         accent="sky"
-        placeholder="Scope, owner, credentials / links…"
+        placeholder="Notes — scope, owner, credentials…"
       />
       <Handle type="source" position={Position.Right} className={handleClass("sky")} />
     </div>
