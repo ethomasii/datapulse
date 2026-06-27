@@ -2,6 +2,8 @@
 
 import { useCallback, useState } from "react";
 import { Loader2, MessageCircle, Sparkles } from "lucide-react";
+import { usePlanFeatures } from "@/lib/hooks/use-plan-features";
+import { PlanUpgradeHint } from "@/components/billing/plan-upgrade-hint";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -16,6 +18,8 @@ export function AssetCatalogAiPanel({
   onDescriptionGenerated?: (description: string) => void;
   variant?: "asset" | "catalog";
 }) {
+  const { features, loading: planLoading } = usePlanFeatures();
+  const aiAllowed = features.aiAssistant ?? false;
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -26,7 +30,7 @@ export function AssetCatalogAiPanel({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   const generateDocs = useCallback(async () => {
-    if (!assetKey) return;
+    if (!assetKey || !aiAllowed) return;
     setGenerating(true);
     setGenerateError(null);
     try {
@@ -50,11 +54,11 @@ export function AssetCatalogAiPanel({
     } finally {
       setGenerating(false);
     }
-  }, [assetKey, canEditCatalog, onDescriptionGenerated]);
+  }, [assetKey, canEditCatalog, onDescriptionGenerated, aiAllowed]);
 
   const ask = useCallback(async () => {
     const q = question.trim();
-    if (!q) return;
+    if (!q || !aiAllowed) return;
     setAsking(true);
     setAskError(null);
     const userMsg: ChatMessage = { role: "user", content: q };
@@ -84,10 +88,10 @@ export function AssetCatalogAiPanel({
     } finally {
       setAsking(false);
     }
-  }, [assetKey, messages, question]);
+  }, [assetKey, messages, question, aiAllowed]);
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+    <section className={`rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 ${!aiAllowed && !planLoading ? "opacity-95" : ""}`}>
       <div className="flex items-start gap-2">
         <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" aria-hidden />
         <div className="min-w-0 flex-1 space-y-4">
@@ -102,6 +106,14 @@ export function AssetCatalogAiPanel({
             </p>
           </div>
 
+          {!aiAllowed && !planLoading ? (
+            <PlanUpgradeHint
+              reason="Catalog AI assistant requires a Team plan — same as the Pipeline Builder AI."
+              minTier="team"
+            />
+          ) : null}
+
+          <div className={!aiAllowed && !planLoading ? "pointer-events-none opacity-50" : undefined}>
           {assetKey ? (
             <div className="space-y-2">
               <button
@@ -174,6 +186,7 @@ export function AssetCatalogAiPanel({
               </button>
             </div>
             {askError ? <p className="text-xs text-red-600 dark:text-red-400">{askError}</p> : null}
+          </div>
           </div>
         </div>
       </div>

@@ -28,8 +28,11 @@ import {
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
 import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
+import type { PlanTier } from "@prisma/client";
 import { useEffect, useState, Suspense } from "react";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { PlanGatePill } from "@/components/account/plan-gate-pill";
+import { meetsMinTier } from "@/lib/plans/plan-enforcement";
 
 const NAV_COLLAPSED_KEY = "eltpulse-nav-collapsed";
 
@@ -38,6 +41,8 @@ type NavItem = {
   label: string;
   icon: LucideIcon;
   soon?: boolean;
+  /** Show upgrade pill when the workspace is below this tier. */
+  minTier?: PlanTier;
 };
 
 type NavSection = {
@@ -84,7 +89,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: "Platform",
     items: [
       { href: "/gateway", label: "Gateway", icon: Waypoints },
-      { href: "/webhooks", label: "Webhooks", icon: Webhook },
+      { href: "/webhooks", label: "Webhooks", icon: Webhook, minTier: "pro" },
       { href: "/repos", label: "Repositories", icon: FolderGit2 },
       { href: "/help", label: "Help", icon: CircleHelp },
     ],
@@ -121,29 +126,34 @@ function NavLink({
   item,
   pathname,
   collapsed,
+  planTier,
 }: {
   item: NavItem;
   pathname: string;
   collapsed: boolean;
+  planTier: PlanTier;
 }) {
-  const { href, label, icon: Icon, soon } = item;
+  const { href, label, icon: Icon, soon, minTier } = item;
   const active = navLinkActive(pathname, href);
+  const gated = minTier != null && !meetsMinTier(planTier, minTier);
   return (
     <Link
       href={href}
-      title={collapsed ? label : undefined}
+      title={collapsed ? label : gated ? `${label} — ${minTier} plan feature` : undefined}
       className={clsx(
         "flex w-full items-center rounded-lg text-sm font-medium transition",
         collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
         active
           ? "bg-sky-50 text-sky-900 dark:bg-sky-950/50 dark:text-sky-100"
-          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100",
+        gated && !active && "opacity-80"
       )}
     >
       <Icon className="h-4 w-4 shrink-0" aria-hidden />
       {!collapsed && (
         <>
           <span className="min-w-0 flex-1 truncate">{label}</span>
+          {gated ? <PlanGatePill minTier={minTier!} /> : null}
           {soon ? (
             <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
               Soon
@@ -159,10 +169,12 @@ function NavSectionBlock({
   section,
   pathname,
   collapsed,
+  planTier,
 }: {
   section: NavSection;
   pathname: string;
   collapsed: boolean;
+  planTier: PlanTier;
 }) {
   return (
     <div>
@@ -175,7 +187,7 @@ function NavSectionBlock({
       <ul className="space-y-0.5">
         {section.items.map((item) => (
           <li key={item.href}>
-            <NavLink item={item} pathname={pathname} collapsed={collapsed} />
+            <NavLink item={item} pathname={pathname} collapsed={collapsed} planTier={planTier} />
           </li>
         ))}
       </ul>
@@ -215,7 +227,13 @@ function SuperAdminNavBlock({ pathname, collapsed }: { pathname: string; collaps
   );
 }
 
-function FloatingAiGate() {
+function FloatingAiGate({
+  showAiAssistant,
+  aiUpgradeReason,
+}: {
+  showAiAssistant: boolean;
+  aiUpgradeReason?: string;
+}) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const hide =
@@ -223,15 +241,26 @@ function FloatingAiGate() {
     searchParams.get("view") === "canvas" &&
     Boolean(searchParams.get("pipeline")?.trim());
   if (hide) return null;
-  return <AiPipelineAssistant />;
+  return (
+    <AiPipelineAssistant
+      planAllowed={showAiAssistant}
+      planUpgradeReason={aiUpgradeReason ?? "The Pipeline Builder AI requires a Team plan."}
+    />
+  );
 }
 
 export function AppShell({
   children,
   isSuperAdmin = false,
+  planTier = "free",
+  showAiAssistant = false,
+  aiUpgradeReason,
 }: {
   children: React.ReactNode;
   isSuperAdmin?: boolean;
+  planTier?: PlanTier;
+  showAiAssistant?: boolean;
+  aiUpgradeReason?: string;
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -305,12 +334,14 @@ export function AppShell({
               section={section}
               pathname={pathname}
               collapsed={collapsed}
+              planTier={planTier}
             />
           ))}
           <NavSectionBlock
             section={{ label: "Account", items: ACCOUNT_NAV }}
             pathname={pathname}
             collapsed={collapsed}
+            planTier={planTier}
           />
           {isSuperAdmin ? <SuperAdminNavBlock pathname={pathname} collapsed={collapsed} /> : null}
         </nav>
@@ -362,7 +393,7 @@ export function AppShell({
         <main className="min-h-0 min-w-0 w-full flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
       </div>
       <Suspense fallback={null}>
-        <FloatingAiGate />
+        <FloatingAiGate showAiAssistant={showAiAssistant} aiUpgradeReason={aiUpgradeReason} />
       </Suspense>
     </div>
   );

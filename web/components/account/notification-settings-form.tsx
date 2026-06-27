@@ -371,7 +371,7 @@ export function NotificationSettingsForm({ userEmail, prefs, access, delivery }:
                     {!ch.can ? (
                       <p className="text-sm text-slate-600 dark:text-slate-400">
                         {ch.upgradeReason}{" "}
-                        <Link href="/pricing" className="text-blue-600 hover:underline">
+                        <Link href="/account/billing" className="text-blue-600 hover:underline">
                           View plans
                         </Link>
                       </p>

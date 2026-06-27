@@ -13,6 +13,7 @@ import {
   tierAllowsOrgInvites,
   tierAllowsRunsApi,
   tierAllowsWebhookTriggers,
+  tierAllowsAiAssistant,
 } from "@/lib/plans/tier-features";
 import { getActiveOrganizationForSession } from "@/lib/auth/active-org";
 import {
@@ -49,6 +50,7 @@ export async function GET() {
       portal: Boolean(user.subscription?.stripeCustomerId),
       usageMeter: Boolean(process.env.STRIPE_USAGE_METER_EVENT_NAME),
       customerGateway: tierAllowsCustomerGateway(tier),
+      aiAssistant: tierAllowsAiAssistant(tier),
       webhookTriggers: tierAllowsWebhookTriggers(tier),
       gitArtifactExport: tierAllowsGitArtifactExport(tier),
       columnLineage: tierAllowsColumnLineage(tier),

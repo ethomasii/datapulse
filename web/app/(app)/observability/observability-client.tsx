@@ -19,6 +19,7 @@ import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 import type { PipelineMetricsResponse } from "@/lib/elt/pipeline-metrics";
 import { formatBytes, formatDurationMs, formatRows } from "@/lib/elt/run-telemetry";
 import { ObservabilityAlertRulesPanel } from "@/components/elt/observability-alert-rules";
+import type { PlanTier } from "@prisma/client";
 
 type ApiResponse = {
   metrics: PipelineMetricsResponse;
@@ -55,7 +56,15 @@ function KpiCard({
   );
 }
 
-export function ObservabilityClient() {
+export function ObservabilityClient({
+  alertDeliveryAllowed = true,
+  alertDeliveryReason,
+  alertDeliveryMinTier = "pro",
+}: {
+  alertDeliveryAllowed?: boolean;
+  alertDeliveryReason?: string;
+  alertDeliveryMinTier?: PlanTier;
+}) {
   const searchParams = useSearchParams();
   const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -412,7 +421,11 @@ export function ObservabilityClient() {
         </>
       ) : null}
 
-      <ObservabilityAlertRulesPanel />
+      <ObservabilityAlertRulesPanel
+        deliveryAllowed={alertDeliveryAllowed}
+        deliveryReason={alertDeliveryReason}
+        deliveryMinTier={alertDeliveryMinTier}
+      />
     </AppPage>
   );
 }

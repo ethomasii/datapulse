@@ -5,6 +5,7 @@ import {
   RUN_HISTORY_DAYS,
   runHistoryCutoff,
   tierAllowsCustomerGateway,
+  tierAllowsAiAssistant,
   tierAllowsOrgGatewayTokens,
   tierAllowsOrgInvites,
   tierAllowsRunsApi,
@@ -45,6 +46,12 @@ describe("tier-features", () => {
   it("gates team collaboration", () => {
     expect(tierAllowsOrgInvites("pro")).toBe(false);
     expect(tierAllowsOrgInvites("team")).toBe(true);
+  });
+
+  it("gates AI assistant to team", () => {
+    expect(tierAllowsAiAssistant("free")).toBe(false);
+    expect(tierAllowsAiAssistant("pro")).toBe(false);
+    expect(tierAllowsAiAssistant("team")).toBe(true);
   });
 
   it("defines run history windows", () => {

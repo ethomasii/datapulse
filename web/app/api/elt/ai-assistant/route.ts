@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import type { Prisma } from "@prisma/client";
 import { getCurrentDbUser } from "@/lib/auth/server";
+import { canAccessAiAssistant } from "@/lib/plans/plan-enforcement";
 import { db } from "@/lib/db/client";
 import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
 import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
@@ -1519,6 +1520,14 @@ export async function POST(request: Request) {
   const user = await getCurrentDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const planCheck = canAccessAiAssistant(user.subscription);
+  if (!planCheck.allowed) {
+    return NextResponse.json(
+      { error: planCheck.reason, upgradeRequired: planCheck.upgradeRequired },
+      { status: 403 }
+    );
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;

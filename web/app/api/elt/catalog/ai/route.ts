@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
+import { getCurrentDbUser } from "@/lib/auth/server";
 import {
   resolveApiUser,
   scopeForbiddenResponse,
   unauthorizedResponse,
 } from "@/lib/auth/api-user";
+import { canAccessAiAssistant } from "@/lib/plans/plan-enforcement";
 import { isPublicCatalogTags } from "@/lib/auth/catalog-access";
 import { connectionOwnerWhere, getAccessibleResourceOwnerIds, pipelineOwnerWhere } from "@/lib/auth/workspace-access";
 import {
@@ -170,6 +172,15 @@ export async function POST(req: Request) {
   const auth = await resolveApiUser(req);
   if (!auth) return unauthorizedResponse();
   if (!hasCatalogReadScope(auth)) return scopeForbiddenResponse();
+
+  const dbUser = await getCurrentDbUser();
+  const planCheck = canAccessAiAssistant(dbUser?.subscription ?? null);
+  if (!planCheck.allowed) {
+    return NextResponse.json(
+      { error: planCheck.reason, upgradeRequired: planCheck.upgradeRequired },
+      { status: 403 }
+    );
+  }
 
   const anthropic = getAnthropic();
   if (!anthropic) {

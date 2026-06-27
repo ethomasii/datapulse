@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
+import type { PlanTier } from "@prisma/client";
+import { PlanUpgradeHint } from "@/components/billing/plan-upgrade-hint";
 
 type AlertRule = {
   id: string;
@@ -17,7 +20,15 @@ type AlertRule = {
 
 type PipelineOption = { id: string; name: string };
 
-export function ObservabilityAlertRulesPanel() {
+export function ObservabilityAlertRulesPanel({
+  deliveryAllowed = true,
+  deliveryReason,
+  deliveryMinTier = "pro",
+}: {
+  deliveryAllowed?: boolean;
+  deliveryReason?: string;
+  deliveryMinTier?: PlanTier;
+}) {
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [pipelines, setPipelines] = useState<PipelineOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,8 +99,22 @@ export function ObservabilityAlertRulesPanel() {
     <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
       <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Alert rules</h2>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-        Thresholds on pipeline metrics — fires your account run webhook when breached.
+        Thresholds on pipeline metrics — evaluate on all plans. When breached, alerts dispatch to your{" "}
+        <Link href="/account/notifications" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+          notification channels
+        </Link>{" "}
+        and optional{" "}
+        <Link href="/webhooks" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
+          run webhook
+        </Link>
+        .
       </p>
+
+      {!deliveryAllowed && deliveryReason ? (
+        <div className="mt-4">
+          <PlanUpgradeHint reason={deliveryReason} minTier={deliveryMinTier} />
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="flex justify-center py-8">

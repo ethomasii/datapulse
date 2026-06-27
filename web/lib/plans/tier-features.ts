@@ -88,6 +88,11 @@ export function tierAllowsRunsApi(tier: PlanTier): boolean {
   return tierAtLeast(tier, "pro");
 }
 
+/** In-app Pipeline Builder AI and catalog AI — Team+ (same as ServicePulse aiAssistant). */
+export function tierAllowsAiAssistant(tier: PlanTier): boolean {
+  return tierAtLeast(tier, "team");
+}
+
 export function tierAllowsOrgInvites(tier: PlanTier): boolean {
   return tierAtLeast(tier, "team");
 }

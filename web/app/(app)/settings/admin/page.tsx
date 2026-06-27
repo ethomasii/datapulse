@@ -34,6 +34,19 @@ export default async function PlatformAdminPage() {
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-400">
+        <p className="font-medium text-slate-800 dark:text-slate-200">Plan gates (ServicePulse-aligned)</p>
+        <ul className="mt-2 list-inside list-disc space-y-1 text-xs">
+          <li>
+            <strong>Pipeline Builder AI</strong> and <strong>Catalog AI</strong> — Team+ (same as ServicePulse AI
+            assistant).
+          </li>
+          <li>
+            <strong>Incoming webhook triggers</strong> — Pro+; outgoing run webhooks work on all tiers.
+          </li>
+        </ul>
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-400">
         <p className="font-medium text-slate-800 dark:text-slate-200">Alert rules vs notifications</p>
         <ul className="mt-2 list-inside list-disc space-y-1 text-xs">
           <li>Alert rules on Metrics are available on all tiers; they evaluate on a schedule.</li>

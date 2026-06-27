@@ -21,10 +21,14 @@ import {
 } from 'lucide-react';
 import { RelatedLinks } from "@/components/ui/related-links";
 import { AppPage, AppPageHeader } from "@/components/layout/app-page";
+import { PlanUpgradeHint } from "@/components/billing/plan-upgrade-hint";
+import { usePlanFeatures } from "@/lib/hooks/use-plan-features";
 
 type PipelineRow = { id: string; name: string; webhookUrl: string | null };
 
 export default function WebhooksPage() {
+  const { features, loading: planLoading } = usePlanFeatures();
+  const incomingAllowed = features.webhookTriggers ?? false;
   // ── Outgoing webhooks ──────────────────────────────────────────────────────
   const [globalUrl, setGlobalUrl] = useState('');
   const [pipelines, setPipelines] = useState<PipelineRow[]>([]);
@@ -163,12 +167,18 @@ export default function WebhooksPage() {
       )}
 
       {/* ── Incoming webhook trigger ────────────────────────────────────────── */}
-      <section className="rounded-2xl border border-amber-200 bg-amber-50/40 p-6 dark:border-amber-800 dark:bg-amber-900/10">
+      <section
+        className={`rounded-2xl border p-6 ${
+          incomingAllowed
+            ? "border-amber-200 bg-amber-50/40 dark:border-amber-800 dark:bg-amber-900/10"
+            : "border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-900/40"
+        }`}
+      >
         <div className="flex items-center gap-2">
-          <Zap className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+          <Zap className={`h-5 w-5 ${incomingAllowed ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`} />
           <h2 className="text-base font-semibold text-slate-900 dark:text-white">Incoming trigger</h2>
           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-            New
+            {incomingAllowed || planLoading ? "New" : "Pro"}
           </span>
         </div>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
@@ -177,7 +187,16 @@ export default function WebhooksPage() {
           Make, curl — can launch a pipeline run without a Clerk session. The token is the only auth; keep it secret.
         </p>
 
-        <div className="mt-4 flex flex-wrap gap-3">
+        {!incomingAllowed && !planLoading ? (
+          <div className="mt-4">
+            <PlanUpgradeHint
+              reason="Incoming webhook triggers require a Pro or Team plan. Outgoing run webhooks below work on all plans."
+              minTier="pro"
+            />
+          </div>
+        ) : null}
+
+        <div className={`mt-4 flex flex-wrap gap-3 ${!incomingAllowed && !planLoading ? "pointer-events-none opacity-50" : ""}`}>
           <button
             type="button"
             onClick={() => void generateToken()}

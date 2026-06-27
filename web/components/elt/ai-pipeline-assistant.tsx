@@ -11,8 +11,11 @@ import type { Edge, Node } from '@xyflow/react';
 import type { CreatePipelineBody } from '@/lib/elt/types';
 import type { InlineField, PatchPipelinePayload } from '@/app/api/elt/ai-assistant/route';
 import { useWorkspacePermissions } from '@/lib/hooks/use-workspace-permissions';
+import { usePlanFeatures } from '@/lib/hooks/use-plan-features';
 import { builderUrl } from '@/lib/elt/builder-nav';
 import { PULSE_AI_NAME } from '@/lib/brand/pulse-ai';
+import { PlanUpgradeHint } from '@/components/billing/plan-upgrade-hint';
+import { Lock } from 'lucide-react';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -383,6 +386,8 @@ export function AiPipelineAssistant({
   getCanvasSnapshot,
   onPatchNode,
   onReplaceGraph,
+  planAllowed,
+  planUpgradeReason = "The Pipeline Builder AI requires a Team plan.",
 }: {
   onPipelineSaved?: (name: string) => void;
   onPipelinePatched?: () => void;
@@ -401,10 +406,17 @@ export function AiPipelineAssistant({
   getCanvasSnapshot?: () => { nodes: Node[]; edges: Edge[] } | null;
   onPatchNode?: (nodeId: string, patch: Record<string, unknown>) => void;
   onReplaceGraph?: (nodes: Node[], edges: Edge[]) => void;
+  /** When false, show upgrade hint instead of chat (defaults from billing API). */
+  planAllowed?: boolean;
+  planUpgradeReason?: string;
 }) {
   const router = useRouter();
   const { permissions, loading: permsLoading } = useWorkspacePermissions();
+  const { features, loading: planLoading } = usePlanFeatures();
+  const aiAllowed = planAllowed ?? features.aiAssistant ?? false;
+  const planGateReady = planAllowed != null || !planLoading;
   const canWrite = permissions?.canWrite ?? true;
+  const canUseAi = aiAllowed && canWrite;
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -425,7 +437,7 @@ export function AiPipelineAssistant({
   }, [open]);
 
   const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || loading || !canWrite) return;
+    if (!text.trim() || loading || !canUseAi) return;
     const scoped =
       canvasNodeContext && canvasMode
         ? `[Selected canvas step: ${canvasNodeContext.label ?? canvasNodeContext.componentId ?? canvasNodeContext.nodeId} (node_id=${canvasNodeContext.nodeId})]\n` +
@@ -492,7 +504,7 @@ export function AiPipelineAssistant({
     } finally {
       setLoading(false);
     }
-  }, [messages, loading, canWrite, pipelineId, canvasNodeContext, canvasMode, getCanvasSnapshot, onPatchNode, onReplaceGraph]);
+  }, [messages, loading, canUseAi, pipelineId, canvasNodeContext, canvasMode, getCanvasSnapshot, onPatchNode, onReplaceGraph]);
 
   const patchPipeline = useCallback(async (id: string, patch: PatchPipelinePayload, key: string) => {
     if (!canWrite) return;
@@ -579,12 +591,20 @@ export function AiPipelineAssistant({
     </div>
   ) : null;
 
+  const planUpgradeBanner =
+    planGateReady && !aiAllowed ? (
+      <div className="mb-3">
+        <PlanUpgradeHint reason={planUpgradeReason} minTier="team" />
+      </div>
+    ) : null;
+
   // ── Inline variant: embedded in the builder page ─────────────────────────────
   if (inline) {
     return (
       <div className={clsx('flex flex-col', canvasMode ? 'h-[320px]' : '')} style={canvasMode ? undefined : { height: '420px' }}>
+        {planUpgradeBanner}
         {readOnlyBanner}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 pr-1">
+        <div ref={scrollRef} className={clsx('flex-1 overflow-y-auto space-y-3 pr-1', !aiAllowed && planGateReady && 'opacity-60 pointer-events-none')}>
           {messages.length === 0 && (
             <div className="space-y-3">
               <div className="flex items-start gap-2">
@@ -655,7 +675,7 @@ export function AiPipelineAssistant({
           />
           <button
             onClick={() => void sendMessage(input)}
-            disabled={!input.trim() || loading || !canWrite}
+            disabled={!input.trim() || loading || !canUseAi}
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-40 transition-colors"
           >
             <Send className="h-3.5 w-3.5" />
@@ -671,10 +691,15 @@ export function AiPipelineAssistant({
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-teal-500 to-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-lg hover:from-teal-400 hover:to-sky-400 transition-all"
-          title={PULSE_AI_NAME}
+          className={clsx(
+            "fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all",
+            aiAllowed
+              ? "bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-400 hover:to-sky-400"
+              : "bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-500 hover:to-slate-600"
+          )}
+          title={aiAllowed ? PULSE_AI_NAME : planUpgradeReason}
         >
-          <Sparkles className="h-4 w-4" />
+          {aiAllowed ? <Sparkles className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
           <span>{PULSE_AI_NAME}</span>
         </button>
       )}
@@ -700,8 +725,9 @@ export function AiPipelineAssistant({
 
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+            {planUpgradeBanner}
             {readOnlyBanner}
-            {messages.length === 0 && (
+            {messages.length === 0 && aiAllowed && (
               <div className="space-y-3">
                 <div className="flex items-start gap-2">
                   <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-sky-500">
@@ -791,7 +817,7 @@ export function AiPipelineAssistant({
               />
               <button
                 onClick={() => void sendMessage(input)}
-                disabled={!input.trim() || loading || !canWrite}
+                disabled={!input.trim() || loading || !canUseAi}
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-40 transition-colors"
               >
                 <Send className="h-3.5 w-3.5" />
