@@ -1,6 +1,6 @@
 /** Starter warehouse onboarding — MotherDuck as default "no warehouse yet" path. */
 
-export const STARTER_WAREHOUSE_DEFAULT_DB = "eltpulse";
+export const STARTER_WAREHOUSE_DEFAULT_DB = "my_db";
 
 export const MOTHERDUCK_SIGNUP_URL = "https://app.motherduck.com/";
 

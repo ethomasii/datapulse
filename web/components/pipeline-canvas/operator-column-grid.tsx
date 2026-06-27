@@ -6,7 +6,6 @@ import clsx from "clsx";
 
 import { operatorColumnGridMode } from "@/lib/elt/operator-column-grid-mode";
 import { readClientFetchJson } from "@/lib/elt/fetch-json-body";
-import { stripDuckdbCatalogPrefix } from "@/lib/elt/duckdb-table-ref";
 import { formatMotherduckColumnError } from "@/lib/elt/warehouse-column-errors";
 
 type ColumnMeta = { name: string; type?: string };
@@ -75,7 +74,7 @@ export function OperatorColumnGrid({
   const mode = useMemo(() => operatorColumnGridMode(componentId), [componentId]);
 
   const loadColumns = useCallback(async () => {
-    const tableRef = inputTable ? stripDuckdbCatalogPrefix(inputTable) : null;
+    const tableRef = inputTable?.trim() || null;
     if (!tableRef) {
       setColumns([]);
       onDiagnosticChange?.(null);

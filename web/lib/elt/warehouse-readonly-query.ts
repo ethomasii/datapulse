@@ -4,8 +4,14 @@
  */
 
 import { resolveDestinationConnectionContext } from "@/lib/elt/warehouse-destination-secrets";
+import { parseDuckdbTableRef } from "@/lib/elt/duckdb-table-ref";
+import {
+  motherduckDatabaseMismatchHint,
+  runMotherduckQueryWithDatabaseFallback,
+} from "@/lib/elt/motherduck-warehouse";
 import {
   buildPostgresConnectionString,
+  motherduckDatabaseName,
   runClickhouseReadOnlyQuery,
   runDatabricksReadOnlyQuery,
   runDuckdbReadOnlyQuery,
@@ -26,6 +32,12 @@ export type ReadOnlyQueryResult = {
   rows: Record<string, unknown>[];
   rowCount: number;
   truncated: boolean;
+};
+
+export type ReadOnlyQueryOptions = {
+  schema?: string;
+  table?: string;
+  catalogFromRef?: string;
 };
 
 const MAX_ROWS = 25;
@@ -225,7 +237,8 @@ async function queryRowsetConnector(
 async function executeReadOnlyQuery(
   connection: DestinationConnectionRow,
   sql: string,
-  limit: number
+  limit: number,
+  options?: ReadOnlyQueryOptions
 ): Promise<ReadOnlyQueryResult> {
   const connector = normalizeConnector(connection.connector);
   const { secrets, config } = resolveDestinationConnectionContext(connection);
@@ -251,6 +264,25 @@ async function executeReadOnlyQuery(
       "snowflake"
     );
   }
+  if (connector === "motherduck") {
+    const configured = motherduckDatabaseName(secrets, config);
+    try {
+      const { rowset, database } = await runMotherduckQueryWithDatabaseFallback(secrets, config, sql, {
+        catalogFromRef: options?.catalogFromRef,
+        schema: options?.schema,
+        table: options?.table,
+      });
+      const result = rowsetToResult(rowset, limit, `motherduck (${database})`);
+      const hint = motherduckDatabaseMismatchHint(configured, database);
+      return {
+        ...result,
+        message: hint ? `${result.message} ${hint}` : result.message,
+      };
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e);
+      return { ok: false, message: detail.slice(0, 300), columns: [], rows: [], rowCount: 0, truncated: false };
+    }
+  }
   if (ROWSET_RUNNERS[connector]) {
     return await queryRowsetConnector(connector, secrets, config, sql, limit);
   }
@@ -270,18 +302,43 @@ export async function sampleAssetData(
   landingQualified: string | undefined,
   limit = 5
 ): Promise<ReadOnlyQueryResult> {
-  const ref = parseTableRef(landingQualified);
-  if (!ref) {
-    return { ok: false, message: "No schema.table landing target.", columns: [], rows: [], rowCount: 0, truncated: false };
+  const connector = normalizeConnector(connection.connector);
+  const { secrets, config } = resolveDestinationConnectionContext(connection);
+
+  let schema: string;
+  let table: string;
+  let catalogFromRef: string | undefined;
+
+  if (connector === "motherduck") {
+    const duckRef = parseDuckdbTableRef(
+      landingQualified ?? "",
+      motherduckDatabaseName(secrets, config)
+    );
+    if (!duckRef) {
+      return { ok: false, message: "No schema.table landing target.", columns: [], rows: [], rowCount: 0, truncated: false };
+    }
+    schema = duckRef.schema;
+    table = duckRef.table;
+    catalogFromRef = duckRef.database;
+  } else {
+    const ref = parseTableRef(landingQualified);
+    if (!ref) {
+      return { ok: false, message: "No schema.table landing target.", columns: [], rows: [], rowCount: 0, truncated: false };
+    }
+    schema = ref.schema;
+    table = ref.table;
   }
 
-  const connector = normalizeConnector(connection.connector);
   const capped = Math.min(MAX_ROWS, Math.max(1, limit));
-  const sql = sampleSelectSql(connector, ref.schema, ref.table, capped);
+  const sql = sampleSelectSql(connector, schema, table, capped);
   assertReadOnlySql(sql);
 
   try {
-    return await executeReadOnlyQuery(connection, sql, capped);
+    return await executeReadOnlyQuery(connection, sql, capped, {
+      schema,
+      table,
+      catalogFromRef,
+    });
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
     return { ok: false, message: detail.slice(0, 300), columns: [], rows: [], rowCount: 0, truncated: false };
@@ -292,14 +349,15 @@ export async function sampleAssetData(
 export async function runReadOnlyQuery(
   connection: DestinationConnectionRow,
   sql: string,
-  limit = 25
+  limit = 25,
+  options?: ReadOnlyQueryOptions
 ): Promise<ReadOnlyQueryResult> {
   assertReadOnlySql(sql);
   const capped = Math.min(MAX_ROWS, Math.max(1, limit));
   const limitedSql = /\blimit\s+\d+/i.test(sql) ? sql : `${sql.replace(/;\s*$/, "")} LIMIT ${capped}`;
 
   try {
-    return await executeReadOnlyQuery(connection, limitedSql, capped);
+    return await executeReadOnlyQuery(connection, limitedSql, capped, options);
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
     return { ok: false, message: detail.slice(0, 300), columns: [], rows: [], rowCount: 0, truncated: false };

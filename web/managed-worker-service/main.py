@@ -195,6 +195,10 @@ def _inject_dlt_secret_aliases(env: dict[str, str]) -> dict[str, str]:
     if strapi_domain:
         out.setdefault("STRAPI_DOMAIN", strapi_domain)
         out.setdefault("SOURCES__STRAPI__DOMAIN", strapi_domain)
+    md_db = out.get("MOTHERDUCK_DATABASE") or out.get("DESTINATION__MOTHERDUCK__CREDENTIALS__DATABASE")
+    if md_db:
+        out.setdefault("MOTHERDUCK_DATABASE", md_db)
+        out.setdefault("DESTINATION__MOTHERDUCK__CREDENTIALS__DATABASE", md_db)
     return out
 
 

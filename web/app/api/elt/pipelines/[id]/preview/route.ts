@@ -5,10 +5,12 @@ import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
 import { previewTableFromConfig } from "@/lib/elt/pipeline-asset-keys";
 import { resolvePreviewTableRefWithWarehouse } from "@/lib/elt/pipeline-assets";
-import { stripDuckdbCatalogPrefix } from "@/lib/elt/duckdb-table-ref";
+import { stripDuckdbCatalogPrefix, parseDuckdbTableRef } from "@/lib/elt/duckdb-table-ref";
 import { fetchWarehouseColumnsForAsset } from "@/lib/elt/warehouse-column-introspect";
 import { introspectDestinationConnection } from "@/lib/elt/warehouse-introspect";
-import { runReadOnlyQuery } from "@/lib/elt/warehouse-readonly-query";
+import { motherduckDatabaseName } from "@/lib/elt/warehouse-introspect-connectors";
+import { resolveDestinationConnectionContext } from "@/lib/elt/warehouse-destination-secrets";
+import { runReadOnlyQuery, type ReadOnlyQueryOptions } from "@/lib/elt/warehouse-readonly-query";
 import { resolveRouteParamId } from "@/lib/server/route-params";
 
 const pipelineSelect = {
@@ -19,6 +21,17 @@ const pipelineSelect = {
   sourceConfiguration: true,
   destinationConnectionId: true,
 } as const;
+
+function motherduckPreviewQueryOptions(
+  conn: { connector: string; config: unknown; connectionSecretsEnc: string | null },
+  table: string
+): ReadOnlyQueryOptions | undefined {
+  if (conn.connector?.toLowerCase() !== "motherduck") return undefined;
+  const { secrets, config } = resolveDestinationConnectionContext(conn);
+  const ref = parseDuckdbTableRef(table, motherduckDatabaseName(secrets, config));
+  if (!ref) return undefined;
+  return { schema: ref.schema, table: ref.table, catalogFromRef: ref.database };
+}
 
 function quoteTableRef(table: string): string | null {
   const t = table.trim();
@@ -99,16 +112,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     /* introspection optional — fall back to config-derived refs */
   }
 
-  const table = stripDuckdbCatalogPrefix(
-    resolvePreviewTableRefWithWarehouse({
+  const resolved = resolvePreviewTableRefWithWarehouse({
       name: pipeline.name,
       sourceType: pipeline.sourceType,
       tool: pipeline.tool,
       sourceConfiguration: pipeline.sourceConfiguration,
       requested: rawTable,
       warehouseTables,
-    })
-  );
+    });
+
+  const table = stripDuckdbCatalogPrefix(resolved);
+  const warehouseRef = resolved.trim();
 
   const limit = body.limit ?? 10;
   const quoted = quoteTableRef(table);
@@ -118,7 +132,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   if (body.columnsOnly) {
     try {
-      const columnMeta = await fetchWarehouseColumnsForAsset(conn, table);
+      const columnMeta = await fetchWarehouseColumnsForAsset(conn, warehouseRef);
       return NextResponse.json({
         table,
         ok: columnMeta.columns.length > 0,
@@ -135,10 +149,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   const sql = `SELECT * FROM ${quoted} LIMIT ${limit}`;
+  const queryOptions = motherduckPreviewQueryOptions(conn, warehouseRef);
   try {
-    let result = await runReadOnlyQuery(conn, sql, limit);
+    let result = await runReadOnlyQuery(conn, sql, limit, queryOptions);
     if (result.columns.length === 0) {
-      const columnMeta = await fetchWarehouseColumnsForAsset(conn, table);
+      const columnMeta = await fetchWarehouseColumnsForAsset(conn, warehouseRef);
       if (columnMeta.columns.length > 0) {
         result = {
           ...result,

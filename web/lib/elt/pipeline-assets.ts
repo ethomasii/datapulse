@@ -3,7 +3,7 @@
  * inferred from persisted pipeline rows (no warehouse introspection in v1).
  */
 
-import { stripDuckdbCatalogPrefix } from "@/lib/elt/duckdb-table-ref";
+import { stripDuckdbCatalogPrefix, duckdbCatalogFromRef, attachDuckdbCatalog } from "@/lib/elt/duckdb-table-ref";
 import { readDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
 import { dbtHubPackageDisplayName, resolveDbtHubPackage } from "@/lib/elt/dbt-hub-packages";
 import type { DbtRunManifest } from "@/lib/elt/dbt-run-manifest";
@@ -541,6 +541,7 @@ export function resolvePreviewTableRefWithWarehouse(input: {
   requested: string;
   warehouseTables?: Array<{ schema: string; table: string; qualified: string }>;
 }): string {
+  const catalogHint = duckdbCatalogFromRef(input.requested.trim());
   const requested = stripDuckdbCatalogPrefix(input.requested.trim());
   const configResolved = stripDuckdbCatalogPrefix(
     resolvePreviewTableRef({
@@ -552,7 +553,9 @@ export function resolvePreviewTableRefWithWarehouse(input: {
     })
   );
 
-  if (!input.warehouseTables?.length) return configResolved;
+  if (!input.warehouseTables?.length) {
+    return attachDuckdbCatalog(configResolved, catalogHint);
+  }
 
   const bundle = derivePipelineAssets({
     id: "preview",
@@ -569,7 +572,7 @@ export function resolvePreviewTableRefWithWarehouse(input: {
     matchWarehouseTableRef(configResolved, input.warehouseTables, bundle.landingDataset) ??
     matchWarehouseTableRef(requested, input.warehouseTables, bundle.landingDataset);
 
-  return fromWarehouse ?? configResolved;
+  return attachDuckdbCatalog(fromWarehouse ?? configResolved, catalogHint);
 }
 
 /** Derive asset bundle for a single pipeline row. */

@@ -22,9 +22,21 @@ describe("mergeConnectionRuntimeSecrets", () => {
     ).toEqual({ DEST_DUCKDB_PATH: "s3://b/w.duckdb" });
   });
 
-  it("maps motherduck database config to MOTHERDUCK_DATABASE", () => {
+  it("maps motherduck database config to MOTHERDUCK_DATABASE and dlt env", () => {
     expect(
       mergeConnectionRuntimeSecrets("destination", "motherduck", { MOTHERDUCK_TOKEN: "t" }, { database: "analytics" })
-    ).toEqual({ MOTHERDUCK_TOKEN: "t", MOTHERDUCK_DATABASE: "analytics" });
+    ).toEqual({
+      MOTHERDUCK_TOKEN: "t",
+      MOTHERDUCK_DATABASE: "analytics",
+      DESTINATION__MOTHERDUCK__CREDENTIALS__DATABASE: "analytics",
+    });
+  });
+
+  it("defaults motherduck database to my_db for dlt and app", () => {
+    expect(mergeConnectionRuntimeSecrets("destination", "motherduck", { MOTHERDUCK_TOKEN: "t" }, {})).toEqual({
+      MOTHERDUCK_TOKEN: "t",
+      MOTHERDUCK_DATABASE: "my_db",
+      DESTINATION__MOTHERDUCK__CREDENTIALS__DATABASE: "my_db",
+    });
   });
 });

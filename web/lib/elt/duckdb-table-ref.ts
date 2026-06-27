@@ -48,3 +48,22 @@ export function stripDuckdbCatalogPrefix(tableRef: string): string {
   const parts = tableRef.trim().split(".").filter(Boolean);
   return parts.length >= 3 ? parsed.qualified : tableRef.trim();
 }
+
+/** Catalog from an explicit database.schema.table ref (undefined for schema.table only). */
+export function duckdbCatalogFromRef(tableRef: string): string | undefined {
+  const parts = tableRef.trim().split(".").filter(Boolean);
+  if (parts.length < 3) return undefined;
+  return parts[0]!.trim() || undefined;
+}
+
+/** Reattach catalog to schema.table when the caller resolved a 2-part ref but had a 3-part hint. */
+export function attachDuckdbCatalog(tableRef: string, catalog?: string): string {
+  const trimmed = tableRef.trim();
+  if (!trimmed) return trimmed;
+  if (duckdbCatalogFromRef(trimmed)) return trimmed;
+  const cat = catalog?.trim();
+  if (!cat) return trimmed;
+  const parsed = parseDuckdbTableRef(trimmed);
+  if (!parsed) return trimmed;
+  return `${cat}.${parsed.qualified}`;
+}

@@ -3,7 +3,11 @@
  */
 
 import { parseDuckdbTableRef } from "@/lib/elt/duckdb-table-ref";
-import { STARTER_WAREHOUSE_DEFAULT_DB } from "@/lib/elt/starter-warehouse";
+import {
+  motherduckDatabaseCandidates,
+  motherduckDatabaseMismatchHint,
+  resolveMotherduckDatabaseForTable,
+} from "@/lib/elt/motherduck-warehouse";
 import {
   formatMotherduckColumnError,
   isMotherduckMissingObjectError,
@@ -118,20 +122,6 @@ async function fetchDuckdbFamilyColumns(
   return [];
 }
 
-function motherduckDatabaseCandidates(
-  secrets: Record<string, string>,
-  config: Record<string, unknown>,
-  catalogFromRef?: string
-): string[] {
-  const configured = motherduckDatabaseName(secrets, config);
-  const out: string[] = [];
-  for (const db of [catalogFromRef, configured, "my_db", STARTER_WAREHOUSE_DEFAULT_DB]) {
-    const d = db?.trim();
-    if (d && !out.includes(d)) out.push(d);
-  }
-  return out;
-}
-
 async function fetchMotherduckColumns(
   secrets: Record<string, string>,
   config: Record<string, unknown>,
@@ -140,9 +130,21 @@ async function fetchMotherduckColumns(
   catalogFromRef?: string
 ): Promise<{ columns: AssetColumnDef[]; database?: string; lastError?: string }> {
   const runner = runMotherduckReadOnlyQuery;
+  const configuredDb = motherduckDatabaseName(secrets, config);
   let lastError: string | undefined;
 
-  for (const database of motherduckDatabaseCandidates(secrets, config, catalogFromRef)) {
+  const resolvedDb = await resolveMotherduckDatabaseForTable(
+    secrets,
+    config,
+    schema,
+    table,
+    catalogFromRef
+  );
+  const databases = resolvedDb
+    ? [resolvedDb, ...motherduckDatabaseCandidates(secrets, config, catalogFromRef).filter((d) => d !== resolvedDb)]
+    : motherduckDatabaseCandidates(secrets, config, catalogFromRef);
+
+  for (const database of databases) {
     const queryConfig = { ...config, database };
     try {
       const columns = await fetchDuckdbFamilyColumns(
@@ -166,7 +168,7 @@ async function fetchMotherduckColumns(
     }
   }
 
-  return { columns: [], lastError };
+  return { columns: [], lastError, database: resolvedDb ?? undefined };
 }
 
 function rowsetToColumnDefs(rowset: WarehouseQueryRowset): AssetColumnDef[] {
@@ -360,10 +362,14 @@ export async function fetchWarehouseColumnsForAsset(
         );
         const configuredDb = motherduckDatabaseName(secrets, config);
         const resolvedDb = database ?? configuredDb;
+        const hint = database ? motherduckDatabaseMismatchHint(configuredDb, database) : undefined;
+        const successMsg = `Found ${columns.length} column(s) in MotherDuck (${resolvedDb}).`;
         return {
           ok: columns.length > 0,
           message: columns.length
-            ? `Found ${columns.length} column(s) in MotherDuck (${resolvedDb}).`
+            ? hint
+              ? `${successMsg} ${hint}`
+              : successMsg
             : formatMotherduckColumnError(schema, table, configuredDb, lastError),
           columns,
         };
