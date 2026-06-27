@@ -123,6 +123,15 @@ def _inject_dlt_secret_aliases(env: dict[str, str]) -> dict[str, str]:
         out.setdefault("SOURCES__JIRA__EMAIL", jira_email)
     if jira_token:
         out.setdefault("SOURCES__JIRA__API_TOKEN", jira_token)
+    zd_sub = out.get("ZENDESK_SUBDOMAIN")
+    zd_email = out.get("ZENDESK_EMAIL")
+    zd_token = out.get("ZENDESK_TOKEN") or out.get("ZENDESK_API_TOKEN")
+    if zd_sub:
+        out.setdefault("SOURCES__ZENDESK__SUBDOMAIN", zd_sub)
+    if zd_email:
+        out.setdefault("SOURCES__ZENDESK__EMAIL", zd_email)
+    if zd_token:
+        out.setdefault("SOURCES__ZENDESK__TOKEN", zd_token)
     slack = out.get("SLACK_BOT_TOKEN") or out.get("SLACK_ACCESS_TOKEN")
     if slack:
         out.setdefault("SLACK_BOT_TOKEN", slack)

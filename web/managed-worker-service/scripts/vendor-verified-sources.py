@@ -23,11 +23,23 @@ DEFAULT_SOURCES = (
   "pipedrive",
   "salesforce",
   "zendesk",
+  "jira",
+  "slack",
+  "workable",
+  "matomo",
+  "asana_dlt",
+  "google_analytics",
+  "facebook_ads",
+  "google_ads",
   "notion",
   "airtable",
   "freshdesk",
   "personio",
   "strapi",
+  "inbox",
+  "mux",
+  "bing_webmaster",
+  "google_sheets",
 )
 
 ROOT = Path(__file__).resolve().parents[1]

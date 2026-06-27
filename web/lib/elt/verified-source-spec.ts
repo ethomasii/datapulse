@@ -307,6 +307,78 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
   },
 };
 
+/** Config / slice params from dlt-hub — not credential factory kwargs. */
+const SKIP_HUB_CREDENTIAL_PARAMS = new Set([
+  "start_date",
+  "end_date",
+  "since",
+  "since_timestamp",
+  "resources",
+  "store_url",
+  "property_id",
+  "customer_id",
+  "account_id",
+  "site_id",
+  "base_id",
+  "table_names",
+  "database_ids",
+  "spreadsheet_url",
+  "range_names",
+  "channel_list",
+  "endpoints",
+  "items_per_page",
+  "repo_owner",
+  "repo_name",
+  "bucket_url",
+  "file_glob",
+]);
+
+function envKeyForHubParam(slug: string, param: string): string {
+  const normalized = param.toUpperCase().replace(/-/g, "_");
+  const prefix = slug.toUpperCase().replace(/-/g, "_").replace(/_DLT$/, "");
+  if (
+    normalized === "API_KEY" ||
+    normalized === "ACCESS_TOKEN" ||
+    normalized === "API_TOKEN" ||
+    normalized === "PRIVATE_TOKEN" ||
+    normalized === "AUTH_TOKEN" ||
+    normalized === "TOKEN"
+  ) {
+    return `${prefix}_${normalized}`;
+  }
+  return normalized.includes("_") ? normalized : `${prefix}_${normalized}`;
+}
+
+function credentialsFromHub(slug: string): VerifiedCredentialSpec[] {
+  const hub =
+    getDltHubSource(slug) ??
+    getDltHubSource(VERIFIED_SLUG_ALIASES[slug] ?? "") ??
+    getDltHubSource(Object.entries(VERIFIED_SLUG_ALIASES).find(([, v]) => v === slug)?.[0] ?? "");
+  if (!hub?.params.length) {
+    const prefix = slug.toUpperCase().replace(/-/g, "_");
+    return [{ param: "api_key", envKeys: [`${prefix}_API_KEY`, `${prefix}_ACCESS_TOKEN`, "API_KEY"] }];
+  }
+  const credParams = hub.params.filter((p) => !SKIP_HUB_CREDENTIAL_PARAMS.has(p));
+  if (!credParams.length) {
+    const prefix = slug.toUpperCase().replace(/-/g, "_");
+    return [{ param: "access_token", envKeys: [`${prefix}_ACCESS_TOKEN`, `${prefix}_API_KEY`] }];
+  }
+  return credParams.map((param) => ({
+    param,
+    envKeys: [envKeyForHubParam(hub.slug, param)],
+  }));
+}
+
+function heuristicVerifiedSpec(slug: string): VerifiedSourceSpec {
+  const module = VERIFIED_SLUG_ALIASES[slug] ?? slug;
+  const factory = module.includes(".") ? module : `${module.replace(/_dlt$/, "")}_source`;
+  return {
+    module,
+    factory,
+    credentials: credentialsFromHub(slug),
+  };
+}
+
 function enrichPartitionDefaults(slug: string, spec: VerifiedSourceSpec): VerifiedSourceSpec {
   let next = spec;
   if (getIncrementalEnvConfig(slug) && !next.partitionKwarg && !next.partitionSliceMode) {
@@ -345,15 +417,8 @@ export function resolveVerifiedSourceSpec(slug: string): VerifiedSourceSpec | nu
   const key = VERIFIED_SLUG_ALIASES[raw] ?? raw;
   const explicit = VERIFIED_SOURCE_SPECS[key];
   if (explicit) return enrichPartitionDefaults(key, explicit);
-  // Heuristic for verified packages without an explicit row yet.
-  const importModule = key;
-  const factory = key.includes(".") ? key : `${key.replace(/_dlt$/, "")}_source`;
-  const prefix = key.toUpperCase().replace(/-/g, "_");
-  return enrichPartitionDefaults(key, {
-    module: importModule,
-    factory,
-    credentials: [{ param: "api_key", envKeys: [`${prefix}_API_KEY`, `${prefix}_ACCESS_TOKEN`, "API_KEY"] }],
-  });
+  if (!getDltHubSource(key) && !getDltHubSource(raw)) return null;
+  return enrichPartitionDefaults(key, heuristicVerifiedSpec(key));
 }
 
 export function isVerifiedPackageSource(slug: string): boolean {

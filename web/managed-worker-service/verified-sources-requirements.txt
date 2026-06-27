@@ -1,7 +1,14 @@
 # Extra pip deps for vendored dlt verified sources (managed worker / GHA).
 # Regenerate: python web/managed-worker-service/scripts/vendor-verified-sources.py
 
+asana<5.0.0
+facebook-business>=16.0.2
+google-ads
+google-analytics-data
+google-api-python-client
+google-auth-oauthlib
 pyairtable~=2.1
 pyiceberg[s3fs,pyarrow]>=0.7.0
+requests_oauthlib
 simple-salesforce>=1.12.4
 stripe<16,>=5.0.0

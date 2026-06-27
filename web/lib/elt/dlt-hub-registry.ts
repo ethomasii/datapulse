@@ -334,7 +334,7 @@ export const DLT_HUB_SOURCES: DltHubSource[] = [
     category: "Support & Ops",
     auth: ["Client ID + Client Secret"],
     params: ["client_id", "client_secret"],
-    incremental: false,
+    incremental: true,
     docsUrl: "https://github.com/dlt-hub/verified-sources/tree/master/sources/personio",
   },
   {
