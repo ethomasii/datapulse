@@ -11,7 +11,7 @@ function resolvedServer(config: Record<string, unknown>): ResolvedMcpServer | nu
 export const mcpToolCallComponent: NativeComponentDefinition = {
   id: "mcp_tool_call",
   name: "MCP tool call",
-  category: "ingestion",
+  category: "ai",
   description: "Deterministic single-shot MCP tool call — ingest tool result as a table (no LLM).",
   compileTarget: "python",
   fields: [

@@ -3,6 +3,7 @@ import { resolveComponentCompiler } from "@/lib/elt/component-packages";
 import { getNativeComponent, resolveNativeComponentId } from "./registry";
 import { resetMcpPreambleFlagForTests } from "./mcp-python-runtime";
 import { hydrateComponentMcpConfig, loadMcpServersForCompile } from "@/lib/elt/mcp-server/resolve";
+import { normalizeMcpVirtualConfig } from "@/lib/elt/mcp-server/virtual-components";
 import type { CompiledPipelineComponents, NativeComponentCompileResult } from "./types";
 import { isDataframeExecution } from "./definitions/_sql-helpers";
 import {
@@ -123,7 +124,11 @@ function compilePipelineComponentsSync(
   };
 
   for (const comp of components) {
-    const cfg = { ...(comp.config ?? {}), template_id: comp.config?.template_id ?? comp.id };
+    let cfg: Record<string, unknown> = {
+      ...(comp.config ?? {}),
+      template_id: comp.config?.template_id ?? comp.id,
+    };
+    cfg = normalizeMcpVirtualConfig(cfg);
     const nativeId = resolveNativeComponentId(cfg) ?? comp.id;
     const native = getNativeComponent(nativeId);
     if (!native) {
@@ -198,6 +203,7 @@ export async function compilePipelineComponentsAsync(
       ...(comp.config ?? {}),
       template_id: comp.config?.template_id ?? comp.id,
     };
+    cfg = normalizeMcpVirtualConfig(cfg);
     cfg = hydrateComponentMcpConfig(cfg, mcpServers);
     const nativeId = resolveNativeComponentId(cfg) ?? comp.id;
     const compiler = await resolveComponentCompiler(nativeId, {

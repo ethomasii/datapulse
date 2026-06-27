@@ -47,4 +47,20 @@ describe("groupCanvasOperatorPalette", () => {
     expect(filtered.length).toBe(1);
     expect(filtered[0]?.items.every((c) => c.id.includes("join"))).toBe(true);
   });
+
+  it("separates MCP virtual tools into their own section", () => {
+    const ai = [
+      item("litellm_agent", "ai"),
+      {
+        ...item("mcp_virtual:s1:create_refund", "ai"),
+        isMcpVirtual: true,
+        name: "Stripe · create_refund",
+      },
+    ];
+    const sections = groupCanvasOperatorPalette([], ai);
+    expect(sections.find((s) => s.id === "ai")?.items.map((c) => c.id)).toEqual(["litellm_agent"]);
+    expect(sections.find((s) => s.id === "mcp_tools")?.items.map((c) => c.id)).toEqual([
+      "mcp_virtual:s1:create_refund",
+    ]);
+  });
 });

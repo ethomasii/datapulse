@@ -74,6 +74,7 @@ import {
   xmlParserComponent,
 } from "./definitions/advanced-transforms";
 import { scdType1Component, scdType2Component } from "./definitions/scd-transforms";
+import { parseMcpVirtualComponentId } from "@/lib/elt/mcp-server/virtual-components";
 import type { NativeComponentDefinition } from "./types";
 
 const ALL_NATIVE: NativeComponentDefinition[] = [
@@ -177,13 +178,21 @@ export function getNativeComponent(id: string): NativeComponentDefinition | null
 }
 
 export function isNativeComponent(id: string): boolean {
-  return getNativeComponent(id) !== null;
+  const key = id.trim();
+  if (parseMcpVirtualComponentId(key)) return true;
+  return getNativeComponent(key) !== null;
 }
 
 export function resolveNativeComponentId(config: Record<string, unknown>): string | null {
   const templateId = String(config.template_id ?? "").trim();
-  if (templateId && byId.has(templateId)) return byId.get(templateId)!.id;
+  if (templateId) {
+    if (parseMcpVirtualComponentId(templateId)) return "mcp_tool_call";
+    if (byId.has(templateId)) return byId.get(templateId)!.id;
+  }
   const componentId = String(config.component_id ?? "").trim();
-  if (componentId && byId.has(componentId)) return byId.get(componentId)!.id;
+  if (componentId) {
+    if (parseMcpVirtualComponentId(componentId)) return "mcp_tool_call";
+    if (byId.has(componentId)) return byId.get(componentId)!.id;
+  }
   return null;
 }

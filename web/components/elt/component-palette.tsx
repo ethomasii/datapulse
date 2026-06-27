@@ -26,6 +26,10 @@ export type ComponentListItem = {
   compilerTierHint?: string;
   icon?: string;
   monitorPair?: { monitorId: string; pipelineComponentId: string; label: string } | null;
+  isMcpVirtual?: boolean;
+  mcpServerId?: string;
+  mcpServerName?: string;
+  defaultConfig?: Record<string, unknown>;
 };
 
 type Props = {

@@ -15,7 +15,11 @@ import {
 } from "@/lib/elt/component-compiler-tier";
 import { compileTargetLabel } from "@/lib/elt/compile-target-labels";
 import { sanitizeCatalogDescription } from "@/lib/elt/sanitize-catalog-copy";
-import { isNativeComponent } from "@/lib/elt/native-components/registry";
+import { getNativeComponent, isNativeComponent } from "@/lib/elt/native-components/registry";
+import {
+  mcpVirtualListItemStub,
+  parseMcpVirtualComponentId,
+} from "@/lib/elt/mcp-server/virtual-components";
 
 export type ComponentManifestEntry = {
   id: string;
@@ -46,6 +50,12 @@ export type ComponentListItem = ComponentManifestEntry & {
   compilerTierHint?: string;
   /** User-facing compile target label (no vendor names). */
   compileTargetLabel?: string;
+  /** Workspace MCP tool expanded from toolsCache (compiles as mcp_tool_call). */
+  isMcpVirtual?: boolean;
+  mcpServerId?: string;
+  mcpServerName?: string;
+  /** Prefilled node config when dropped on canvas. */
+  defaultConfig?: Record<string, unknown>;
 };
 
 type ManifestIndex = {
@@ -153,6 +163,8 @@ export function listComponents(filters?: {
 
 export function getComponentById(id: string): ComponentListItem | null {
   if (CATALOG_EXCLUDED_COMPONENT_IDS.has(id)) return null;
+  const virtual = parseMcpVirtualComponentId(id);
+  if (virtual) return mcpVirtualListItemStub(virtual);
   const row = index.components.find((c) => c.id === id);
   if (row) return enrichComponent(row);
 
@@ -209,8 +221,10 @@ export function listComponentCategories(): { category: string; count: number }[]
 }
 
 function enrichComponent(row: ComponentManifestEntry): ComponentListItem {
-  const route = routeComponent(row.id, row.category);
-  const ports = canvasPortsForCategory(row.category);
+  const nativeDef = getNativeComponent(row.id);
+  const category = nativeDef?.category ?? row.category;
+  const route = routeComponent(row.id, category);
+  const ports = canvasPortsForCategory(category);
   const pair =
     route.target === "monitor" || route.target === "dlt" ? suggestMonitorPipelinePair(row.id) : null;
   const native = isNativeComponent(row.id);
@@ -219,7 +233,8 @@ function enrichComponent(row: ComponentManifestEntry): ComponentListItem {
   const description = sanitizeCatalogDescription(row.description);
   return {
     ...row,
-    description,
+    category,
+    description: nativeDef?.description ?? description,
     compileTarget: route.target,
     compileTargetLabel: compileTargetLabel(route.target),
     compileBadge: route.badge,

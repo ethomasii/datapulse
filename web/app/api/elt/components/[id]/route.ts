@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentDbUser } from "@/lib/auth/server";
+import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
 import { fetchComponentSchema, getComponentById } from "@/lib/elt/component-registry";
 import {
   hasComponentCompiler,
@@ -14,6 +15,7 @@ import {
   dagsterAttributesToFields,
   getNativeComponent,
 } from "@/lib/elt/native-components";
+import { getMcpVirtualComponentDetail } from "@/lib/elt/mcp-server/virtual-components";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -26,11 +28,28 @@ export async function GET(req: Request, ctx: Ctx) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await ctx.params;
-  const component = getComponentById(id);
-  if (!component) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
   const url = new URL(req.url);
   const includeSchema = url.searchParams.get("includeSchema") === "1";
+
+  const perms = await getWorkspacePermissions(user.id);
+  const mcpVirtual = await getMcpVirtualComponentDetail(id, perms.resourceOwnerIds);
+  if (mcpVirtual) {
+    return NextResponse.json({
+      component: {
+        ...mcpVirtual.component,
+        isNative: true,
+        isPackage: false,
+        hasCompiler: true,
+        packageCatalogId: null,
+      },
+      schema: null,
+      nativeFields: mcpVirtual.formFields,
+      nativeCompilerId: "mcp_tool_call",
+    });
+  }
+
+  const component = getComponentById(id);
+  if (!component) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   let schema: unknown = null;
   if (includeSchema && component.schema_url) {

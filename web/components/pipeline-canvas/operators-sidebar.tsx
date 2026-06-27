@@ -114,7 +114,7 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
           { credentials: "same-origin" }
         ),
         fetch(
-          `/api/elt/components?nativeOnly=1&executableOnly=1&category=ai&limit=${PALETTE_FETCH_LIMIT}`,
+          `/api/elt/components?nativeOnly=1&executableOnly=1&category=ai&includeMcpTools=1&limit=${PALETTE_FETCH_LIMIT}`,
           { credentials: "same-origin" }
         ),
       ]);

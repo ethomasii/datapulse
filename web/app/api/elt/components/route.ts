@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentDbUser } from "@/lib/auth/server";
+import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
 import {
   COMPONENT_MANIFEST_META,
   listComponentCategories,
@@ -8,6 +9,7 @@ import {
 import { listPackageCatalogComponents } from "@/lib/elt/component-packages";
 import { defaultCatalogSources } from "@/lib/elt/component-packages/catalog-sources";
 import { loadWorkspaceCatalogUrls } from "@/lib/elt/workspace-catalog-sources";
+import { listMcpVirtualComponents } from "@/lib/elt/mcp-server/virtual-components";
 import type { ComponentCompileTarget } from "@/lib/elt/component-compile-router";
 
 /**
@@ -25,6 +27,7 @@ export async function GET(req: Request) {
   const executableOnly = url.searchParams.get("executableOnly") === "1";
   const nativeOnly = url.searchParams.get("nativeOnly") === "1";
   const includePackages = url.searchParams.get("includePackages") === "1";
+  const includeMcpTools = url.searchParams.get("includeMcpTools") === "1";
   const limit = Number(url.searchParams.get("limit") ?? "50");
   const offset = Number(url.searchParams.get("offset") ?? "0");
 
@@ -74,6 +77,28 @@ export async function GET(req: Request) {
   }));
 
   let merged = [...packageAsList, ...items.filter((i) => !packageAsList.some((p) => p.id === i.id))];
+
+  if (includeMcpTools) {
+    const perms = await getWorkspacePermissions(user.id);
+    const mcpVirtual = await listMcpVirtualComponents(perms.resourceOwnerIds);
+    const catFilter = category?.trim().toLowerCase();
+    let mcpItems = mcpVirtual;
+    if (catFilter) {
+      mcpItems = mcpItems.filter((c) => c.category.toLowerCase() === catFilter);
+    }
+    if (q?.trim()) {
+      const ql = q.trim().toLowerCase();
+      mcpItems = mcpItems.filter(
+        (c) =>
+          c.id.toLowerCase().includes(ql) ||
+          c.name.toLowerCase().includes(ql) ||
+          c.description.toLowerCase().includes(ql) ||
+          (c.mcpServerName?.toLowerCase().includes(ql) ?? false)
+      );
+    }
+    merged = [...merged.filter((c) => !mcpItems.some((m) => m.id === c.id)), ...mcpItems];
+  }
+
   if (executableOnly) {
     merged = merged.filter((c) => c.isExecutable);
   }

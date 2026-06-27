@@ -47,6 +47,7 @@ import {
   findAppendTargetAfterNode,
 } from "@/lib/elt/canvas-node-append-after";
 import { prefetchCanvasComponentCatalog } from "./use-canvas-component-catalog";
+import { initialConfigForComponent } from "@/lib/elt/mcp-server/virtual-components";
 
 const STORAGE_KEY = "eltpulse-pipeline-canvas-v1";
 
@@ -410,6 +411,7 @@ function FlowCanvas({
         compileHint: string;
         canvasPorts: { left: boolean; right: boolean };
         icon?: string;
+        defaultConfig?: Record<string, unknown>;
       },
       position?: { x: number; y: number }
     ) => {
@@ -443,7 +445,7 @@ function FlowCanvas({
           compileHint: component.compileHint,
           canvasPorts: component.canvasPorts,
           icon: component.icon,
-          config: {},
+          config: initialConfigForComponent(component),
         },
       };
 
@@ -464,7 +466,10 @@ function FlowCanvas({
         if (wired) {
           newNode = {
             ...newNode,
-            data: { ...newNode.data, config: wired.configPatch },
+            data: {
+              ...newNode.data,
+              config: { ...initialConfigForComponent(component), ...wired.configPatch },
+            },
           };
         }
       }
@@ -551,7 +556,7 @@ function FlowCanvas({
             compileHint: component.compileHint,
             canvasPorts: component.canvasPorts,
             icon: component.icon,
-            config: {},
+            config: initialConfigForComponent(component),
           },
         };
 
@@ -701,6 +706,7 @@ function FlowCanvas({
         compileHint: string;
         canvasPorts: { left: boolean; right: boolean };
         icon?: string;
+        defaultConfig?: Record<string, unknown>;
       },
       config?: Record<string, unknown>
     ) => {
@@ -731,7 +737,7 @@ function FlowCanvas({
           compileHint: component.compileHint,
           canvasPorts: component.canvasPorts,
           icon: component.icon,
-          config: { ...(config ?? {}), template_id: component.id },
+          config: { ...initialConfigForComponent(component), ...(config ?? {}) },
         },
       };
 
@@ -739,6 +745,7 @@ function FlowCanvas({
       let nextNodes = result.nodes;
       let nextEdges = resolveCanvasEdges(nextNodes, result.edges);
 
+      const baseConfig = { ...initialConfigForComponent(component), ...(config ?? {}) };
       const wired = wireInputFromUpstreamEdge(nextNodes, nextEdges, id, wireInputContextRef.current);
       if (wired) {
         nextNodes = nextNodes.map((n) =>
@@ -747,7 +754,7 @@ function FlowCanvas({
                 ...n,
                 data: {
                   ...n.data,
-                  config: { ...(config ?? {}), ...wired.configPatch, template_id: component.id },
+                  config: { ...baseConfig, ...wired.configPatch, template_id: component.id },
                 },
               }
             : n

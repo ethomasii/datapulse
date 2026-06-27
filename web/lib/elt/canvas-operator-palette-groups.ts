@@ -111,6 +111,13 @@ export const CANVAS_TRANSFORM_PALETTE_GROUPS: readonly CanvasOperatorPaletteGrou
   },
 ];
 
+export const CANVAS_MCP_TOOLS_GROUP: CanvasOperatorPaletteGroup = {
+  id: "mcp_tools",
+  title: "MCP tools",
+  subtitle: "Deterministic calls from your workspace MCP servers",
+  ids: [],
+};
+
 export const CANVAS_AI_PALETTE_GROUP: CanvasOperatorPaletteGroup = {
   id: "ai",
   title: "AI & MCP",
@@ -181,16 +188,25 @@ export function groupCanvasOperatorPalette(
   }
 
   const aiById = new Map(aiItems.map((c) => [c.id, c]));
+  const aiNative = aiItems.filter((c) => !c.isMcpVirtual);
+  const mcpVirtual = aiItems.filter((c) => c.isMcpVirtual);
   const aiOrdered: ComponentListItem[] = [];
   for (const id of CANVAS_AI_PALETTE_GROUP.ids) {
     const item = aiById.get(id);
-    if (item) aiOrdered.push(item);
+    if (item && !item.isMcpVirtual) aiOrdered.push(item);
   }
-  for (const item of aiItems) {
+  for (const item of aiNative) {
     if (!aiOrdered.some((c) => c.id === item.id)) aiOrdered.push(item);
   }
   if (aiOrdered.length) {
     sections.push({ ...CANVAS_AI_PALETTE_GROUP, items: aiOrdered });
+  }
+
+  if (mcpVirtual.length) {
+    sections.push({
+      ...CANVAS_MCP_TOOLS_GROUP,
+      items: [...mcpVirtual].sort((a, b) => a.name.localeCompare(b.name)),
+    });
   }
 
   return sections;
