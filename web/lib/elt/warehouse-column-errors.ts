@@ -12,12 +12,27 @@ export function isMotherduckMissingObjectError(message: string): boolean {
   );
 }
 
+export function isMotherduckCredentialError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("motherduck_token") ||
+    m.includes("set motherduck_token") ||
+    m.includes("unauthorized") ||
+    m.includes("401") ||
+    m.includes("could not decrypt") ||
+    m.includes("encryption_key")
+  );
+}
+
 export function formatMotherduckColumnError(
   schema: string,
   table: string,
   configuredDatabase: string,
   lastError?: string
 ): string {
+  if (lastError && isMotherduckCredentialError(lastError)) {
+    return lastError.slice(0, 240);
+  }
   if (lastError && !isMotherduckMissingObjectError(lastError)) {
     return lastError.slice(0, 200);
   }

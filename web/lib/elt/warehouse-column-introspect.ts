@@ -10,6 +10,7 @@ import {
 } from "@/lib/elt/motherduck-warehouse";
 import {
   formatMotherduckColumnError,
+  isMotherduckCredentialError,
   isMotherduckMissingObjectError,
 } from "@/lib/elt/warehouse-column-errors";
 import { resolveDestinationConnectionContext } from "@/lib/elt/warehouse-destination-secrets";
@@ -126,10 +127,34 @@ async function fetchColumnsFromDuckdbColumns(
 ): Promise<AssetColumnDef[]> {
   try {
     const rowset = await runQuery(secrets, config, duckdbColumnsSql(schema, table));
-    return rowsetToColumnDefs(rowset);
-  } catch {
+    return duckdbMetadataRowsetToColumnDefs(rowset);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (isMotherduckCredentialError(msg)) throw e;
     return [];
   }
+}
+
+/** Map duckdb_columns() / information_schema rowsets to table column defs. */
+function duckdbMetadataRowsetToColumnDefs(rowset: WarehouseQueryRowset): AssetColumnDef[] {
+  const nameIdx = rowset.columns.findIndex((c) => {
+    const k = c.toLowerCase();
+    return k === "column_name" || k === "name";
+  });
+  const typeIdx = rowset.columns.findIndex((c) => {
+    const k = c.toLowerCase();
+    return k === "column_type" || k === "data_type" || k === "type";
+  });
+  if (nameIdx >= 0) {
+    return rowset.rows
+      .map((row) => ({
+        name: String(row[nameIdx] ?? ""),
+        type: typeIdx >= 0 && row[typeIdx] != null ? String(row[typeIdx]) : undefined,
+        source: "warehouse" as const,
+      }))
+      .filter((c) => c.name);
+  }
+  return rowsetToColumnDefs(rowset);
 }
 
 async function fetchColumnsFromPragmaTableInfo(
@@ -163,15 +188,19 @@ async function fetchSampleColumnNames(
   config: Record<string, unknown>,
   qualifiedRefs: string[]
 ): Promise<AssetColumnDef[]> {
+  let lastError: string | undefined;
   for (const qualified of qualifiedRefs) {
     try {
       const rowset = await runQuery(secrets, config, `SELECT * FROM ${qualified} LIMIT 1`);
       const defs = columnDefsFromSampleRowset(rowset);
       if (defs.length) return defs;
-    } catch {
-      /* try next ref shape */
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      lastError = msg;
+      if (isMotherduckCredentialError(msg)) throw e;
     }
   }
+  if (lastError && isMotherduckCredentialError(lastError)) throw new Error(lastError);
   return [];
 }
 
@@ -284,6 +313,15 @@ async function fetchMotherduckColumns(
   const runner = runMotherduckReadOnlyQuery;
   const configuredDb = motherduckDatabaseName(secrets, config);
   let lastError: string | undefined;
+
+  if (!secrets.MOTHERDUCK_TOKEN?.trim()) {
+    return {
+      columns: [],
+      lastError:
+        "MOTHERDUCK_TOKEN is missing — re-save your MotherDuck token on the destination connection (Connections page).",
+      database: configuredDb,
+    };
+  }
 
   const resolvedDb = await resolveMotherduckDatabaseForTable(
     secrets,

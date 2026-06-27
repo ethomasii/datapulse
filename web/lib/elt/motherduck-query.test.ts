@@ -56,6 +56,14 @@ describe("parseMotherduckSqlResponse", () => {
       ["title", "VARCHAR"],
     ]);
   });
+
+  it("infers column names from object rows when metadata is omitted", () => {
+    const parsed = parseMotherduckSqlResponse({
+      rows: [{ column_name: "number", data_type: "BIGINT" }],
+    });
+    expect(parsed.columns).toEqual(["column_name", "data_type"]);
+    expect(parsed.rows[0]).toEqual(["number", "BIGINT"]);
+  });
 });
 
 describe("motherduckScopedSql", () => {
@@ -69,11 +77,13 @@ describe("motherduckScopedSql", () => {
 });
 
 describe("motherduckQueryPayload", () => {
-  it("sends database field for scoped queries", () => {
-    expect(motherduckQueryPayload("my_db", "SELECT 1")).toEqual({ database: "my_db", sql: "SELECT 1" });
+  it("prefixes USE for catalog scoping (matches notebook)", () => {
+    expect(motherduckQueryPayload("my_db", "SELECT 1")).toEqual({
+      sql: 'USE "my_db";\nSELECT 1',
+    });
   });
 
-  it("skips database when SQL already USEs", () => {
+  it("skips USE when SQL already USEs", () => {
     expect(motherduckQueryPayload("my_db", "USE other; SELECT 1")).toEqual({ sql: "USE other; SELECT 1" });
   });
 });

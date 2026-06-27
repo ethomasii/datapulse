@@ -811,12 +811,12 @@ export async function introspectTrino(
 // ─── MotherDuck (HTTP SQL API) ───────────────────────────────────────────────
 
 type MotherDuckSqlResponse = {
-  rows?: unknown[][];
-  data?: unknown[][];
+  rows?: unknown[];
+  data?: unknown[];
   columns?: { name?: string }[] | string[];
   columnNames?: string[];
   fields?: ({ name?: string } | string)[];
-  schema?: { columns?: ({ name?: string } | string)[] };
+  schema?: { columns?: ({ name?: string } | string)[] } | Array<{ name?: string; type?: unknown }>;
   success?: boolean;
   result?: MotherDuckSqlResponse;
   error?: string;
@@ -832,11 +832,11 @@ export function motherduckScopedSql(database: string, sql: string): string {
   return `USE "${db.replace(/"/g, '""')}";\n${sql}`;
 }
 
-/** Request body for MotherDuck SQL API — prefer `database` field over USE prefix. */
+/** Request body for MotherDuck SQL API — USE prefix matches notebook/catalog scoping. */
 export function motherduckQueryPayload(database: string, sql: string): { sql: string; database?: string } {
   const db = database.trim();
   if (!db || /^\s*use\s+/i.test(sql)) return { sql };
-  return { database: db, sql };
+  return { sql: motherduckScopedSql(db, sql) };
 }
 
 function motherduckColumnNames(rawCols: Array<string | { name?: string }>): string[] {
@@ -879,23 +879,28 @@ export function parseMotherduckSqlResponse(body: MotherDuckSqlResponse): Motherd
       : body;
 
   const rawRows = payload.rows ?? payload.data ?? [];
+  const rawRowsArr = Array.isArray(rawRows) ? rawRows : [];
   type ColumnRef = string | { name?: string };
   let rawCols: ColumnRef[] = payload.columns ?? (payload as { columnNames?: string[] }).columnNames ?? [];
-  if (rawCols.length === 0 && payload.schema?.columns) {
-    rawCols = payload.schema.columns;
+  if (rawCols.length === 0 && payload.schema && typeof payload.schema === "object" && "columns" in payload.schema) {
+    rawCols = payload.schema.columns ?? [];
+  } else if (rawCols.length === 0 && Array.isArray(payload.schema)) {
+    rawCols = payload.schema.map((c) => (typeof c === "object" && c ? c.name ?? "" : String(c)));
   }
   let columns = motherduckColumnNames(rawCols);
-  let rows = normalizeMotherduckRows(Array.isArray(rawRows) ? rawRows : [], columns);
+
+  if (columns.length === 0 && rawRowsArr.length > 0) {
+    const first = rawRowsArr[0];
+    if (first && typeof first === "object" && !Array.isArray(first)) {
+      columns = Object.keys(first as Record<string, unknown>);
+    }
+  }
+
+  let rows = normalizeMotherduckRows(rawRowsArr, columns);
 
   if (columns.length === 0 && rows.length > 0) {
-    const first = rows[0];
-    if (Array.isArray(rawRows) && rawRows[0] && typeof rawRows[0] === "object" && !Array.isArray(rawRows[0])) {
-      columns = Object.keys(rawRows[0] as Record<string, unknown>);
-      rows = normalizeMotherduckRows(rawRows as unknown[], columns);
-    } else {
-      const width = first?.length ?? 0;
-      columns = Array.from({ length: width }, (_, i) => `col_${i}`);
-    }
+    const width = rows[0]?.length ?? 0;
+    columns = Array.from({ length: width }, (_, i) => `col_${i}`);
   }
 
   if (columns.length === 0 && rows.length === 0 && Array.isArray(payload.fields)) {
