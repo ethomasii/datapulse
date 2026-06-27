@@ -31,6 +31,9 @@ export function minimalSourceConfigurationForNewPipeline(sourceType: string): Re
     }
     out.github_token_env = "GITHUB_TOKEN";
     out.items_per_page = 100;
+    if (out.max_items === undefined) {
+      out.max_items = 500;
+    }
     const first = String(out.repos).split(",")[0]?.trim() ?? "";
     const [o, n] = first.split("/").map((x) => x.trim());
     if (o && n) {

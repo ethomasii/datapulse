@@ -20,6 +20,40 @@ describe("generateDltPipeline github", () => {
     expect(code).toContain("github_reactions(**source_kwargs).with_resources(*reactions_resources)");
     expect(code).not.toContain("github_repo_events(");
     expect(code).not.toContain("github_stargazers(");
+    expect(code).toContain("max_items=500");
+  });
+
+  it("defaults max_items to 500 when unset", () => {
+    const code = generateDltPipeline({
+      name: "github_sync",
+      sourceType: "github",
+      destinationType: "motherduck",
+      sourceConfiguration: {
+        repo_owner: "dlt-hub",
+        repo_name: "dlt",
+        resources: ["issues"],
+      },
+      writeDisposition: "append",
+      fileFormat: "parquet",
+    } as PipelineRequest);
+    expect(code).toContain("max_items=500");
+  });
+
+  it("honors explicit max_items including 0 for unlimited", () => {
+    const code = generateDltPipeline({
+      name: "github_sync",
+      sourceType: "github",
+      destinationType: "motherduck",
+      sourceConfiguration: {
+        repo_owner: "dlt-hub",
+        repo_name: "dlt",
+        resources: ["issues"],
+        max_items: 0,
+      },
+      writeDisposition: "append",
+      fileFormat: "parquet",
+    } as PipelineRequest);
+    expect(code).toContain("max_items=None");
   });
 
   it("runs separate verified sources for repo_events and stargazers", () => {

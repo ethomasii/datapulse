@@ -8,7 +8,11 @@ import { generatePostgresDltPipeline, generateStripePipeline } from "./generate-
 import { generateVerifiedSourcePipeline } from "./generate-dlt-verified";
 import { isVerifiedPackageSource } from "./verified-source-spec";
 import { eltpulsePythonModuleHeader, ELTPULSE_PIPELINES_DOCS } from "./codegen-branding";
-import { normalizeGithubResources, partitionGithubResources } from "./github-dlt-resources";
+import {
+  normalizeGithubResources,
+  partitionGithubResources,
+  resolveGithubMaxItems,
+} from "./github-dlt-resources";
 
 // SWC/webpack misparses Python triple-quotes inside JS template literals.
 // Use this constant so the parser never sees `"""` as a literal in source.
@@ -43,10 +47,8 @@ function generateGithubPipeline(request: PipelineRequest): string {
     typeof config.items_per_page === "number" && config.items_per_page > 0
       ? Math.min(100, Math.floor(config.items_per_page))
       : 100;
-  const maxItemsPy =
-    typeof config.max_items === "number" && config.max_items >= 0
-      ? String(Math.floor(config.max_items))
-      : "None";
+  const maxItems = resolveGithubMaxItems(config);
+  const maxItemsPy = maxItems > 0 ? String(maxItems) : "None";
   const datasetName =
     request.schemaOverride || `github_${repoOwner}_${repoName}`.replace(/[^a-zA-Z0-9_]/g, "_");
 
@@ -119,7 +121,7 @@ def run(partition_key: str = None):
         owner="${escapePyString(repoOwner)}",
         name="${escapePyString(repoName)}",
         items_per_page=${itemsPerPage},
-        max_items=${maxItemsPy},  # None = load all (within API limits)
+        max_items=${maxItemsPy},  # None = unlimited; default cap avoids GraphQL 403 on large repos
         access_token=github_token,
     )
 

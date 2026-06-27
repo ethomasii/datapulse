@@ -119,14 +119,20 @@ export function GuidedSourceBlock({
               />
             </label>
             <label className="block">
-              <span className="text-xs text-slate-600 dark:text-slate-400">Max items (empty = none)</span>
+              <span className="text-xs text-slate-600 dark:text-slate-400">Max items per resource</span>
               <input
-                value={typeof sourceCfg.max_items === "number" ? String(sourceCfg.max_items) : ""}
+                value={
+                  typeof sourceCfg.max_items === "number"
+                    ? String(sourceCfg.max_items)
+                    : sourceCfg.max_items === 0
+                      ? "0"
+                      : "500"
+                }
                 onChange={(e) => {
                   const t = e.target.value.trim();
                   const n = { ...sourceCfg };
                   if (t === "") {
-                    delete n.max_items;
+                    n.max_items = 500;
                   } else {
                     const m = parseInt(t, 10);
                     if (!Number.isNaN(m) && m >= 0) n.max_items = m;
@@ -134,9 +140,13 @@ export function GuidedSourceBlock({
                   onSourceCfgChange(n);
                 }}
                 inputMode="numeric"
-                placeholder="unlimited"
+                placeholder="500"
                 className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-900"
               />
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                Default 500 per resource (issues, pull requests, stargazers) to avoid GitHub GraphQL rate limits on
+                active repos. Set <code className="font-mono text-[10px]">0</code> for unlimited.
+              </p>
             </label>
           </div>
         </div>
