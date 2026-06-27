@@ -102,7 +102,7 @@ export function preferDestinationWireEdges(nodes: Node[], edges: Edge[]): Edge[]
   const hasBackbone = edges.some((e) => e.source === source.id && e.target === dest.id);
   if (!hasBackbone) return edges;
 
-  const componentIds = new Set(nodes.filter((n) => n.type === "componentNode").map((n) => n.id));
+  const componentIds = nodes.filter((n) => n.type === "componentNode").map((n) => n.id);
   let next = edges;
 
   for (const compId of componentIds) {
