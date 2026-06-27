@@ -38,6 +38,14 @@ import { findNearestEdge, insertNodeOnEdge } from "@/lib/elt/canvas-edge-insert"
 import { wireInputFromUpstreamEdge, rewireAllComponentInputs, type WireInputContext, preferDestinationWireEdges } from "@/lib/elt/canvas-wire-input";
 import { dashedAnimatedEdgeStyle, resolveCanvasEdges } from "./canvas-edge-defaults";
 import { pipelineNodeTypes } from "./custom-nodes";
+import {
+  CanvasGraphActionsProvider,
+  type CanvasGraphActionsValue,
+} from "./canvas-graph-actions-context";
+import {
+  appendNodeAfterUpstream,
+  findAppendTargetAfterNode,
+} from "@/lib/elt/canvas-node-append-after";
 
 const STORAGE_KEY = "eltpulse-pipeline-canvas-v1";
 
@@ -100,6 +108,20 @@ export type PipelineCanvasControl = {
     },
     position?: { x: number; y: number }
   ) => void;
+  addComponentAfterNode: (
+    upstreamNodeId: string,
+    component: {
+      id: string;
+      name: string;
+      category: string;
+      compileTarget: string;
+      compileBadge?: string;
+      compileHint: string;
+      canvasPorts: { left: boolean; right: boolean };
+      icon?: string;
+    },
+    config?: Record<string, unknown>
+  ) => void;
   addSourceNode: () => void;
   addDestinationNode: () => void;
   replaceGraph: (nodes: Node[], edges: Edge[]) => void;
@@ -147,6 +169,11 @@ export type PipelineCanvasProps = {
   transformOnly?: boolean;
   /** Pipeline landing tables for auto-filling transform input when wired from Source. */
   wireInputContext?: WireInputContext;
+  /** Lakeflow-style + menu: transform-by-example and Pulse AI hooks from parent. */
+  graphActionHandlers?: Pick<
+    CanvasGraphActionsValue,
+    "openTransformByExample" | "openExtendWithAssistant"
+  >;
 };
 
 function FlowCanvas({
@@ -171,6 +198,7 @@ function FlowCanvas({
   variant = "default",
   transformOnly = false,
   wireInputContext,
+  graphActionHandlers,
 }: PipelineCanvasProps) {
   const isDesigner = variant === "designer";
   const { resolvedTheme } = useTheme();
@@ -485,7 +513,7 @@ function FlowCanvas({
       if (nextEdges !== edges) setEdges(nextEdges);
       fitAfterGraphChange();
     },
-    [nodes, edges, transformOnly, setNodes, setEdges, fitAfterGraphChange]
+    [nodes, edges, transformOnly, setNodes, setEdges, fitAfterGraphChange, wireInputContext]
   );
 
   const addNativeTransformNode = useCallback(
@@ -656,6 +684,82 @@ function FlowCanvas({
     [onInspectorFocusChange]
   );
 
+  const addComponentAfterNode = useCallback(
+    (
+      upstreamNodeId: string,
+      component: {
+        id: string;
+        name: string;
+        category: string;
+        compileTarget: string;
+        compileBadge?: string;
+        compileHint: string;
+        canvasPorts: { left: boolean; right: boolean };
+        icon?: string;
+      },
+      config?: Record<string, unknown>
+    ) => {
+      idCounter += 1;
+      const id = `n-${idCounter}`;
+      const appendSpec = {
+        type: "componentNode" as const,
+        data: {
+          compileHint: component.compileHint,
+          category: component.category,
+          compileTarget: component.compileTarget,
+          canvasPorts: component.canvasPorts,
+        },
+      };
+      const anchor = findAppendTargetAfterNode(nodes, edges, upstreamNodeId, appendSpec);
+      if (!anchor) return;
+
+      const newNode: Node = {
+        id,
+        type: "componentNode",
+        position: anchor.position,
+        data: {
+          componentId: component.id,
+          label: component.name,
+          category: component.category,
+          compileTarget: component.compileTarget,
+          compileBadge: component.compileBadge ?? component.compileTarget,
+          compileHint: component.compileHint,
+          canvasPorts: component.canvasPorts,
+          icon: component.icon,
+          config: { ...(config ?? {}), template_id: component.id },
+        },
+      };
+
+      const result = appendNodeAfterUpstream(nodes, edges, upstreamNodeId, newNode);
+      let nextNodes = result.nodes;
+      let nextEdges = resolveCanvasEdges(nextNodes, result.edges);
+
+      const wired = wireInputFromUpstreamEdge(nextNodes, nextEdges, id, wireInputContextRef.current);
+      if (wired) {
+        nextNodes = nextNodes.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  config: { ...(config ?? {}), ...wired.configPatch, template_id: component.id },
+                },
+              }
+            : n
+        );
+      }
+
+      setNodes(nextNodes);
+      setEdges(nextEdges);
+      fitAfterGraphChange();
+      queueMicrotask(() => {
+        const added = nextNodes.find((n) => n.id === id);
+        if (added) emitInspectorFocus(added);
+      });
+    },
+    [nodes, edges, setNodes, setEdges, fitAfterGraphChange, emitInspectorFocus]
+  );
+
   useEffect(() => {
     if (!canvasControlRef) return;
     canvasControlRef.current = {
@@ -672,6 +776,7 @@ function FlowCanvas({
         });
       },
       addComponentNode,
+      addComponentAfterNode,
       addSourceNode: () => addNode("sourceNode"),
       addDestinationNode: () => addNode("destNode"),
       replaceGraph: (nextNodes: Node[], nextEdges: Edge[]) => {
@@ -685,7 +790,28 @@ function FlowCanvas({
     return () => {
       canvasControlRef.current = null;
     };
-  }, [canvasControlRef, setNodes, setEdges, addComponentNode, addNode, fit, emitInspectorFocus, nodes, edges]);
+  }, [canvasControlRef, setNodes, setEdges, addComponentNode, addComponentAfterNode, addNode, fit, emitInspectorFocus, nodes, edges]);
+
+  const graphActionsValue = useMemo<CanvasGraphActionsValue | null>(() => {
+    if (!isDesigner) return null;
+    return {
+      isDesigner: true,
+      pipelineId: pipelineId ?? undefined,
+      addComponentAfterNode: (upstreamNodeId, component, config) => {
+        addComponentAfterNode(upstreamNodeId, component, config);
+      },
+      openTransformByExample:
+        graphActionHandlers?.openTransformByExample ??
+        (() => {
+          /* optional parent hook */
+        }),
+      openExtendWithAssistant:
+        graphActionHandlers?.openExtendWithAssistant ??
+        (() => {
+          /* optional parent hook */
+        }),
+    };
+  }, [isDesigner, pipelineId, addComponentAfterNode, graphActionHandlers]);
 
   const onSelectionChange = useCallback(
     ({ nodes: selectedNodes, edges: selectedEdges }: { nodes: Node[]; edges: Edge[] }) => {
@@ -737,6 +863,7 @@ function FlowCanvas({
 
   return (
     <CanvasBindingsProvider value={bindingsContext}>
+    <CanvasGraphActionsProvider value={graphActionsValue}>
     <div className={isDesigner ? "flex h-full min-h-0 flex-col" : "flex h-full min-h-[420px] flex-col"}>
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50/90 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/80">
         <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Add</span>
@@ -945,6 +1072,7 @@ function FlowCanvas({
         ) : null}
       </div>
     </div>
+    </CanvasGraphActionsProvider>
     </CanvasBindingsProvider>
   );
 }

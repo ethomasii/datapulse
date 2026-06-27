@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { Edge, Node } from "@xyflow/react";
 import { Bot, ChevronUp, Loader2, Lock, Send } from "lucide-react";
 import clsx from "clsx";
@@ -18,6 +18,10 @@ export type CanvasPulseNodeContext = {
   config?: Record<string, unknown>;
 };
 
+export type PulseCanvasBarHandle = {
+  openAssistant: (opts: { node: CanvasPulseNodeContext; draft?: string; expand?: boolean }) => void;
+};
+
 type Props = {
   pipelineId?: string;
   onPipelinePatched?: () => void;
@@ -29,15 +33,18 @@ type Props = {
 };
 
 /** Inline NL prompt bar on the canvas — tied to the selected step. */
-export function PulseCanvasBar({
-  pipelineId,
-  onPipelinePatched,
-  selectedLabel,
-  canvasNode,
-  getCanvasSnapshot,
-  onPatchNode,
-  onReplaceGraph,
-}: Props) {
+export const PulseCanvasBar = forwardRef<PulseCanvasBarHandle, Props>(function PulseCanvasBar(
+  {
+    pipelineId,
+    onPipelinePatched,
+    selectedLabel,
+    canvasNode,
+    getCanvasSnapshot,
+    onPatchNode,
+    onReplaceGraph,
+  },
+  ref
+) {
   const { features, loading: planLoading } = usePlanFeatures();
   const aiAllowed = features.aiAssistant ?? false;
   const [expanded, setExpanded] = useState(false);
@@ -50,9 +57,29 @@ export function PulseCanvasBar({
   } | null>(null);
   const [applyingPatch, setApplyingPatch] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [assistantNodeOverride, setAssistantNodeOverride] = useState<CanvasPulseNodeContext | null>(null);
 
-  const placeholder = selectedLabel
-    ? `Ask ${PULSE_AI_SHORT} to add or edit after ${selectedLabel}…`
+  const effectiveCanvasNode = assistantNodeOverride ?? canvasNode ?? null;
+  const effectiveLabel = effectiveCanvasNode?.label ?? selectedLabel;
+
+  useImperativeHandle(ref, () => ({
+    openAssistant: ({ node, draft, expand = true }) => {
+      setAssistantNodeOverride(node);
+      if (draft) setDraft(draft);
+      if (expand) setExpanded(true);
+      setQuickReply(null);
+      setPendingPatch(null);
+      queueMicrotask(() => textareaRef.current?.focus());
+    },
+  }));
+
+  useEffect(() => {
+    if (!canvasNode?.nodeId) return;
+    setAssistantNodeOverride(null);
+  }, [canvasNode?.nodeId]);
+
+  const placeholder = effectiveLabel
+    ? `Ask ${PULSE_AI_SHORT} to add or edit after ${effectiveLabel}…`
     : `Ask ${PULSE_AI_SHORT} to add a step… (e.g. filter, dedupe, aggregate by day)`;
 
   const applyCanvasPatch = useCallback(
@@ -96,7 +123,7 @@ export function PulseCanvasBar({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pipelineId,
-          canvasNodeContext: canvasNode ?? undefined,
+          canvasNodeContext: effectiveCanvasNode ?? undefined,
           canvasSnapshot: snapshot
             ? { nodes: snapshot.nodes, edges: snapshot.edges, v: 1 }
             : undefined,
@@ -157,12 +184,12 @@ export function PulseCanvasBar({
     } finally {
       setSending(false);
     }
-  }, [aiAllowed, canvasNode, draft, getCanvasSnapshot, onPatchNode, onReplaceGraph, pipelineId, sending]);
+  }, [aiAllowed, effectiveCanvasNode, draft, getCanvasSnapshot, onPatchNode, onReplaceGraph, pipelineId, sending]);
 
   useEffect(() => {
     if (!expanded) return;
     textareaRef.current?.focus();
-  }, [expanded, selectedLabel]);
+  }, [expanded, effectiveLabel]);
 
   return (
     <div className="relative z-30 shrink-0 isolate border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
@@ -268,7 +295,7 @@ export function PulseCanvasBar({
               inline
               canvasMode
               pipelineId={pipelineId}
-              canvasNodeContext={canvasNode ?? undefined}
+              canvasNodeContext={effectiveCanvasNode ?? undefined}
               getCanvasSnapshot={getCanvasSnapshot}
               onPatchNode={onPatchNode}
               onReplaceGraph={onReplaceGraph}
@@ -279,4 +306,4 @@ export function PulseCanvasBar({
       ) : null}
     </div>
   );
-}
+});

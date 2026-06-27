@@ -10,6 +10,19 @@ import { cn } from "@/lib/utils";
 import { displayConnectorNodeHint } from "@/lib/elt/canvas-node-hints";
 import { useCanvasBindings } from "./canvas-bindings-context";
 import { TRANSFORM_TOOLS, transformToolBadge } from "./transform-tools";
+import { NodeAddStepMenu } from "./node-add-step-menu";
+import type { CanvasNodeRef } from "./canvas-graph-actions-context";
+import { canAddStepAfterNode } from "@/lib/elt/canvas-node-append-after";
+
+function nodeRef(id: string, type: string, data: Record<string, unknown>): CanvasNodeRef {
+  return {
+    nodeId: id,
+    nodeType: type,
+    label: String(data.label ?? data.componentId ?? type),
+    componentId: data.componentId ? String(data.componentId) : undefined,
+    config: (data.config as Record<string, unknown>) ?? undefined,
+  };
+}
 
 function handleClass(kind: "emerald" | "amber" | "sky") {
   const map = {
@@ -108,7 +121,7 @@ export function SourceNode({ id, data }: NodeProps) {
     : storedHint;
 
   return (
-    <div className="w-[200px] max-w-[200px] shrink-0 overflow-visible rounded-xl border-2 border-emerald-500/90 bg-white px-2 py-2 shadow-md dark:border-emerald-600 dark:bg-emerald-950/50">
+    <div className="relative w-[200px] max-w-[200px] shrink-0 overflow-visible rounded-xl border-2 border-emerald-500/90 bg-white px-2 py-2 shadow-md dark:border-emerald-600 dark:bg-emerald-950/50">
       <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-200">
         <Database className="h-3.5 w-3.5 shrink-0" aria-hidden />
         Source
@@ -136,6 +149,9 @@ export function SourceNode({ id, data }: NodeProps) {
         placeholder="Notes — scope, owner, credentials…"
       />
       <Handle type="source" position={Position.Right} className={handleClass("emerald")} />
+      {canAddStepAfterNode({ id, type: "sourceNode", data, position: { x: 0, y: 0 } }) ? (
+        <NodeAddStepMenu node={nodeRef(id, "sourceNode", data as Record<string, unknown>)} className="absolute -right-3 top-1/2 z-10 -translate-y-1/2" />
+      ) : null}
     </div>
   );
 }
@@ -148,7 +164,7 @@ export function TransformNode({ id, data }: NodeProps) {
   const transformTool = String(data.transformTool ?? "");
 
   return (
-    <div className="min-w-[210px] max-w-[240px] shrink-0 rounded-xl border-2 border-amber-500/90 bg-white px-2 py-2 shadow-md dark:border-amber-600 dark:bg-amber-950/40">
+    <div className="relative min-w-[210px] max-w-[240px] shrink-0 rounded-xl border-2 border-amber-500/90 bg-white px-2 py-2 shadow-md dark:border-amber-600 dark:bg-amber-950/40">
       <Handle type="target" position={Position.Left} className={handleClass("amber")} />
       <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-amber-900 dark:text-amber-100">
         <ArrowRightLeft className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -213,6 +229,9 @@ export function TransformNode({ id, data }: NodeProps) {
         placeholder="Models, layers, tests…"
       />
       <Handle type="source" position={Position.Right} className={handleClass("amber")} />
+      {canAddStepAfterNode({ id, type: "transformNode", data, position: { x: 0, y: 0 } }) ? (
+        <NodeAddStepMenu node={nodeRef(id, "transformNode", data as Record<string, unknown>)} className="absolute -right-3 top-1/2 z-10 -translate-y-1/2" />
+      ) : null}
     </div>
   );
 }
@@ -227,7 +246,7 @@ export function DestinationNode({ id, data }: NodeProps) {
     : storedHint;
 
   return (
-    <div className="w-[200px] max-w-[200px] shrink-0 overflow-visible rounded-xl border-2 border-sky-500/90 bg-white px-2 py-2 shadow-md dark:border-sky-600 dark:bg-sky-950/40">
+    <div className="relative w-[200px] max-w-[200px] shrink-0 overflow-visible rounded-xl border-2 border-sky-500/90 bg-white px-2 py-2 shadow-md dark:border-sky-600 dark:bg-sky-950/40">
       <Handle type="target" position={Position.Left} className={handleClass("sky")} />
       <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-sky-900 dark:text-sky-100">
         <Target className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -256,6 +275,9 @@ export function DestinationNode({ id, data }: NodeProps) {
         placeholder="Notes — scope, owner, credentials…"
       />
       <Handle type="source" position={Position.Right} className={handleClass("sky")} />
+      {canAddStepAfterNode({ id, type: "destNode", data, position: { x: 0, y: 0 } }) ? (
+        <NodeAddStepMenu node={nodeRef(id, "destNode", data as Record<string, unknown>)} className="absolute -right-3 top-1/2 z-10 -translate-y-1/2" />
+      ) : null}
     </div>
   );
 }
@@ -277,7 +299,7 @@ export function ComponentNode({ id, data }: NodeProps) {
 
   return (
     <div
-      className={`w-[200px] max-w-[200px] shrink-0 overflow-visible rounded-lg border-2 px-3 py-2 shadow-sm ${
+      className={`relative w-[200px] max-w-[200px] shrink-0 overflow-visible rounded-lg border-2 px-3 py-2 shadow-sm ${
         isTerminal
           ? "border-dashed border-amber-400 bg-amber-50/40 dark:border-amber-500 dark:bg-amber-950/20"
           : "border-violet-400 bg-white dark:border-violet-600 dark:bg-slate-900"
@@ -319,6 +341,13 @@ export function ComponentNode({ id, data }: NodeProps) {
       ) : null}
       {ports?.right !== false ? (
         <Handle type="source" position={Position.Right} className={handleClass(accent)} />
+      ) : null}
+      {canAddStepAfterNode({ id, type: "componentNode", data: d, position: { x: 0, y: 0 } }) &&
+      ports?.right !== false ? (
+        <NodeAddStepMenu
+          node={nodeRef(id, "componentNode", d)}
+          className="absolute -right-3 top-1/2 z-10 -translate-y-1/2"
+        />
       ) : null}
     </div>
   );

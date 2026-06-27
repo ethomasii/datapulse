@@ -8,7 +8,10 @@ import { CanvasPreviewPanel } from "@/components/pipeline-canvas/canvas-preview-
 import { CanvasFusionPanel } from "@/components/pipeline-canvas/canvas-fusion-panel";
 import { DesignerFullscreenShell } from "@/components/pipeline-canvas/designer-fullscreen-shell";
 import { DesignerMobileChrome } from "@/components/pipeline-canvas/designer-mobile-chrome";
-import { PulseCanvasBar } from "@/components/pipeline-canvas/pulse-canvas-bar";
+import { PulseCanvasBar, type PulseCanvasBarHandle } from "@/components/pipeline-canvas/pulse-canvas-bar";
+import { TransformByExampleDialog } from "@/components/pipeline-canvas/transform-by-example-dialog";
+import type { CanvasNodeRef } from "@/components/pipeline-canvas/canvas-graph-actions-context";
+import type { ComponentListItem } from "@/components/elt/component-palette";
 import { OperatorsSidebar } from "@/components/pipeline-canvas/operators-sidebar";
 import { LakeStarterGallery } from "@/components/elt/lake-starter-gallery";
 import { LakeStarterChips } from "@/components/elt/lake-starter-chips";
@@ -173,6 +176,8 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
   );
 
   const canvasControlRef = useRef<PipelineCanvasControl | null>(null);
+  const pulseBarRef = useRef<PulseCanvasBarHandle | null>(null);
+  const [transformByExampleNode, setTransformByExampleNode] = useState<CanvasNodeRef | null>(null);
   const [inspectorFocus, setInspectorFocus] = useState<CanvasInspectorFocus>({ kind: "none" });
   const [stepDiagnostics, setStepDiagnostics] = useState<OperatorDiagnostic[]>([]);
 
@@ -1124,8 +1129,73 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
     wireInputSourceConfiguration,
   ]);
 
+  const focusCanvasNode = useCallback((node: CanvasNodeRef) => {
+    if (node.nodeType === "componentNode") {
+      setInspectorFocus({
+        kind: "component",
+        nodeId: node.nodeId,
+        data: {
+          componentId: node.componentId ?? "",
+          label: node.label,
+          config: node.config ?? {},
+        },
+      });
+      return;
+    }
+    if (node.nodeType === "sourceNode") {
+      setInspectorFocus({ kind: "source", nodeId: node.nodeId });
+      return;
+    }
+    if (node.nodeType === "destNode") {
+      setInspectorFocus({ kind: "destination", nodeId: node.nodeId });
+      return;
+    }
+    if (node.nodeType === "transformNode") {
+      setInspectorFocus({
+        kind: "transform",
+        nodeId: node.nodeId,
+        data: {
+          label: node.label,
+          config: node.config ?? {},
+        },
+      });
+    }
+  }, []);
+
+  const graphActionHandlers = useMemo(
+    () => ({
+      openTransformByExample: (node: CanvasNodeRef) => {
+        focusCanvasNode(node);
+        setTransformByExampleNode(node);
+      },
+      openExtendWithAssistant: (node: CanvasNodeRef, draft?: string) => {
+        focusCanvasNode(node);
+        pulseBarRef.current?.openAssistant({
+          node: {
+            nodeId: node.nodeId,
+            componentId: node.componentId,
+            label: node.label,
+            config: node.config,
+          },
+          draft,
+          expand: true,
+        });
+      },
+    }),
+    [focusCanvasNode]
+  );
+
+  const handleTransformByExampleApply = useCallback(
+    (upstreamNodeId: string, component: ComponentListItem, config: Record<string, unknown>) => {
+      canvasControlRef.current?.addComponentAfterNode(upstreamNodeId, component, config);
+      setTransformByExampleNode(null);
+    },
+    []
+  );
+
   function renderDesignerWorkspace() {
     return (
+      <>
       <div className="flex h-full min-h-0 flex-col overflow-hidden lg:flex-row">
         <OperatorsSidebar
           className="hidden h-full w-[220px] shrink-0 xl:w-[260px] 2xl:w-[300px] lg:flex"
@@ -1149,6 +1219,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
               pipelineDestinationType={pipelineDestinationType}
               transformOnly={transformOnlyMode}
               wireInputContext={wireInputContext}
+              graphActionHandlers={graphActionHandlers}
               onPickSourceType={(t) => void patchPipelineBindings({ sourceType: t })}
               onPickDestinationType={(t) => void patchPipelineBindings({ destinationType: t })}
               bindingsBusy={bindingsBusy}
@@ -1170,6 +1241,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
             />
           </div>
           <PulseCanvasBar
+            ref={pulseBarRef}
             pipelineId={selectedId}
             selectedLabel={selectedStepLabel}
             canvasNode={canvasPulseNode}
@@ -1247,6 +1319,16 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
           ) : null}
         </aside>
       </div>
+      <TransformByExampleDialog
+        open={Boolean(transformByExampleNode)}
+        pipelineId={selectedId}
+        node={transformByExampleNode}
+        getCanvasSnapshot={() => canvasControlRef.current?.getGraph() ?? null}
+        wireInputContext={wireInputContext}
+        onClose={() => setTransformByExampleNode(null)}
+        onApply={handleTransformByExampleApply}
+      />
+      </>
     );
   }
 

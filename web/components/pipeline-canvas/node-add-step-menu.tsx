@@ -1,0 +1,233 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Bot, ChevronRight, Loader2, Plus, Sparkles, Wand2 } from "lucide-react";
+import clsx from "clsx";
+import type { ComponentListItem } from "@/components/elt/component-palette";
+import { ComponentPalette } from "@/components/elt/component-palette";
+import {
+  NODE_ADD_AI_ACTIONS,
+  NODE_ADD_STEP_SECTIONS,
+  type NodeAddAiActionId,
+} from "@/lib/elt/node-add-step-menu-config";
+import type { CanvasNodeRef } from "@/components/pipeline-canvas/canvas-graph-actions-context";
+import { useCanvasGraphActions } from "@/components/pipeline-canvas/canvas-graph-actions-context";
+
+type Props = {
+  node: CanvasNodeRef;
+  className?: string;
+};
+
+export function NodeAddStepMenu({ node, className }: Props) {
+  const actions = useCanvasGraphActions();
+  const [open, setOpen] = useState(false);
+  const [showPalette, setShowPalette] = useState(false);
+  const [catalog, setCatalog] = useState<ComponentListItem[]>([]);
+  const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as HTMLElement)) {
+        setOpen(false);
+        setShowPalette(false);
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || catalog.length) return;
+    let cancelled = false;
+    setLoadingCatalog(true);
+    void fetch("/api/elt/components?includePackages=1&executableOnly=1&limit=500", {
+      credentials: "same-origin",
+    })
+      .then((r) => r.json())
+      .then((data: { components?: ComponentListItem[] }) => {
+        if (!cancelled) setCatalog(data.components ?? []);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingCatalog(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, catalog.length]);
+
+  const catalogById = useMemo(() => new Map(catalog.map((c) => [c.id, c])), [catalog]);
+
+  const pickComponent = useCallback(
+    (component: ComponentListItem, config?: Record<string, unknown>) => {
+      actions?.addComponentAfterNode(node.nodeId, component, config);
+      setOpen(false);
+      setShowPalette(false);
+    },
+    [actions, node.nodeId]
+  );
+
+  const pickQuick = useCallback(
+    (componentId: string) => {
+      const item = catalogById.get(componentId);
+      if (item) pickComponent(item);
+    },
+    [catalogById, pickComponent]
+  );
+
+  const pickAi = useCallback(
+    (actionId: NodeAddAiActionId) => {
+      setOpen(false);
+      if (actionId === "transform_by_example") {
+        actions?.openTransformByExample(node);
+      } else {
+        actions?.openExtendWithAssistant(
+          node,
+          `Add a step after "${node.label}" that `
+        );
+      }
+    },
+    [actions, node]
+  );
+
+  if (!actions?.isDesigner) return null;
+
+  return (
+    <>
+      <div ref={rootRef} className={clsx("relative", className)}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((v) => !v);
+          }}
+          className={clsx(
+            "nodrag nopan flex h-6 w-6 items-center justify-center rounded-full border-2 border-violet-500 bg-white text-violet-700 shadow-md transition hover:scale-105 hover:bg-violet-50 dark:border-violet-400 dark:bg-slate-900 dark:text-violet-200 dark:hover:bg-violet-950/60",
+            open && "ring-2 ring-violet-300 dark:ring-violet-700"
+          )}
+          aria-label={`Add step after ${node.label}`}
+          aria-expanded={open}
+          title="Add next step"
+        >
+          <Plus className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
+        </button>
+
+        {open && !showPalette ? (
+          <div
+            role="menu"
+            className="absolute left-full top-1/2 z-[200] ml-2 w-[min(17rem,calc(100vw-2rem))] -translate-y-1/2 rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              After {node.label}
+            </p>
+
+            {loadingCatalog ? (
+              <div className="flex items-center gap-2 px-3 py-3 text-xs text-slate-500">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                Loading operators…
+              </div>
+            ) : (
+              NODE_ADD_STEP_SECTIONS.map((section) => (
+                <div key={section.id} className="border-t border-slate-100 px-1 py-1 dark:border-slate-800">
+                  <p className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-300">
+                    {section.label}
+                  </p>
+                  {section.items.map((item) => {
+                    const available = catalogById.has(item.componentId);
+                    return (
+                      <button
+                        key={item.componentId}
+                        type="button"
+                        role="menuitem"
+                        disabled={!available}
+                        onClick={() => pickQuick(item.componentId)}
+                        className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-violet-50 disabled:opacity-40 dark:hover:bg-violet-950/40"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-xs font-medium text-slate-900 dark:text-white">
+                            {item.label}
+                          </span>
+                          {item.hint ? (
+                            <span className="block text-[10px] text-slate-500">{item.hint}</span>
+                          ) : null}
+                        </span>
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
+                      </button>
+                    );
+                  })}
+                </div>
+              ))
+            )}
+
+            <div className="border-t border-slate-100 px-1 py-1 dark:border-slate-800">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => setShowPalette(true)}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+              >
+                <Wand2 className="h-3.5 w-3.5 text-slate-500" aria-hidden />
+                <span className="text-xs font-medium text-slate-900 dark:text-white">More transforms…</span>
+              </button>
+            </div>
+
+            <div className="border-t border-slate-100 px-1 py-1 dark:border-slate-800">
+              {NODE_ADD_AI_ACTIONS.map((action) => (
+                <button
+                  key={action.id}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => pickAi(action.id)}
+                  className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-teal-50 dark:hover:bg-teal-950/30"
+                >
+                  {action.id === "transform_by_example" ? (
+                    <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-600" aria-hidden />
+                  ) : (
+                    <Bot className="mt-0.5 h-3.5 w-3.5 shrink-0 text-teal-600" aria-hidden />
+                  )}
+                  <span className="min-w-0">
+                    <span className="block text-xs font-medium text-slate-900 dark:text-white">
+                      {action.label}
+                    </span>
+                    <span className="block text-[10px] text-slate-500">{action.hint}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {showPalette ? (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => {
+            setShowPalette(false);
+            setOpen(false);
+          }}
+        >
+          <div
+            className="flex h-[min(90dvh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-950"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+                Add transform after {node.label}
+              </h2>
+            </div>
+            <ComponentPalette
+              className="min-h-0 flex-1 border-0"
+              transformDesigner
+              nativeOnly
+              onSelect={(c) => pickComponent(c)}
+            />
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
