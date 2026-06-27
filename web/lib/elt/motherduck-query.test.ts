@@ -77,13 +77,20 @@ describe("motherduckScopedSql", () => {
 });
 
 describe("motherduckQueryPayload", () => {
-  it("prefixes USE for catalog scoping (matches notebook)", () => {
+  it("uses API database field for catalog scoping (single statement)", () => {
     expect(motherduckQueryPayload("my_db", "SELECT 1")).toEqual({
-      sql: 'USE "my_db";\nSELECT 1',
+      sql: "SELECT 1",
+      database: "my_db",
     });
   });
 
-  it("skips USE when SQL already USEs", () => {
+  it("omits database attach when omitDatabase is set", () => {
+    expect(motherduckQueryPayload("my_db", "SELECT 1", { omitDatabase: true })).toEqual({
+      sql: "SELECT 1",
+    });
+  });
+
+  it("skips database when SQL already USEs", () => {
     expect(motherduckQueryPayload("my_db", "USE other; SELECT 1")).toEqual({ sql: "USE other; SELECT 1" });
   });
 });

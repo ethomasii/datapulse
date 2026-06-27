@@ -43,6 +43,15 @@ function tableExistsSql(schema: string, table: string): string {
 function duckdbTableExistsSql(schema: string, table: string): string {
   const s = escapeSqlLiteral(schema);
   const t = escapeSqlLiteral(table);
+  return `SELECT database_name FROM duckdb_tables()
+    WHERE lower(schema_name) = lower('${s}')
+      AND lower(table_name) = lower('${t}')
+    LIMIT 1`;
+}
+
+function duckdbTableExistsSqlAttached(schema: string, table: string): string {
+  const s = escapeSqlLiteral(schema);
+  const t = escapeSqlLiteral(table);
   return `SELECT 1 AS ok FROM duckdb_tables()
     WHERE lower(schema_name) = lower('${s}')
       AND lower(table_name) = lower('${t}')
@@ -55,7 +64,15 @@ async function motherduckTableExists(
   schema: string,
   table: string
 ): Promise<boolean> {
-  for (const sql of [duckdbTableExistsSql(schema, table), tableExistsSql(schema, table)]) {
+  try {
+    const rowset = await runMotherduckReadOnlyQuery(secrets, config, duckdbTableExistsSql(schema, table), {
+      omitDatabase: true,
+    });
+    if (rowset.rows.length > 0) return true;
+  } catch {
+    /* fall through to attached lookup */
+  }
+  for (const sql of [duckdbTableExistsSqlAttached(schema, table), tableExistsSql(schema, table)]) {
     try {
       const rowset = await runMotherduckReadOnlyQuery(secrets, config, sql);
       if (rowset.rows.length > 0) return true;
@@ -76,7 +93,8 @@ export async function listMotherduckDatabases(
     const rowset = await runMotherduckReadOnlyQuery(
       secrets,
       { ...config, database: configured },
-      "SELECT database_name FROM duckdb_databases() ORDER BY 1"
+      "SELECT database_name FROM duckdb_databases() ORDER BY 1",
+      { omitDatabase: true }
     );
     const nameIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "database_name");
     const idx = nameIdx >= 0 ? nameIdx : 0;
@@ -96,6 +114,26 @@ export async function resolveMotherduckDatabaseForTable(
   table: string,
   catalogFromRef?: string
 ): Promise<string | null> {
+  try {
+    const rowset = await runMotherduckReadOnlyQuery(secrets, config, duckdbTableExistsSql(schema, table), {
+      omitDatabase: true,
+    });
+    const nameIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "database_name");
+    const idx = nameIdx >= 0 ? nameIdx : 0;
+    const found = rowset.rows
+      .map((row) => String(row[idx] ?? "").trim())
+      .filter(Boolean);
+    if (found.length) {
+      if (catalogFromRef && found.includes(catalogFromRef)) return catalogFromRef;
+      const configured = motherduckDatabaseName(secrets, config);
+      if (found.includes(configured)) return configured;
+      if (found.includes("my_db")) return "my_db";
+      return found[0]!;
+    }
+  } catch {
+    /* fall through to per-database attach */
+  }
+
   const tried = new Set<string>();
 
   async function tryDatabase(database: string): Promise<boolean> {

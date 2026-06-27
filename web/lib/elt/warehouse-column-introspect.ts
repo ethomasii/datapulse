@@ -4,7 +4,6 @@
 
 import { parseDuckdbTableRef } from "@/lib/elt/duckdb-table-ref";
 import {
-  motherduckDatabaseCandidates,
   motherduckDatabaseMismatchHint,
   resolveMotherduckDatabaseForTable,
 } from "@/lib/elt/motherduck-warehouse";
@@ -23,6 +22,8 @@ import {
   runDatabricksReadOnlyQuery,
   runDuckdbReadOnlyQuery,
   runMotherduckReadOnlyQuery,
+  motherduckToken,
+  type MotherduckQueryOptions,
   runMysqlReadOnlyQuery,
   runSnowflakeReadOnlyQuery,
   runSqliteReadOnlyQuery,
@@ -42,7 +43,8 @@ const COL_LIMIT = 500;
 type RowsetRunner = (
   secrets: Record<string, string>,
   config: Record<string, unknown>,
-  sql: string
+  sql: string,
+  options?: MotherduckQueryOptions
 ) => Promise<WarehouseQueryRowset>;
 
 const COLUMN_RUNNERS: Record<string, RowsetRunner> = {
@@ -92,14 +94,17 @@ function catalogFromQueryConfig(config: Record<string, unknown>): string | undef
   return typeof db === "string" && db.trim() ? db.trim() : undefined;
 }
 
-/** Primary MotherDuck/DuckDB column metadata query (scoped via API `database` / USE). */
-export function duckdbColumnsSql(schema: string, table: string): string {
+/** Primary MotherDuck/DuckDB column metadata query (optionally scoped to a catalog). */
+export function duckdbColumnsSql(schema: string, table: string, database?: string): string {
   const s = schema.replace(/'/g, "''");
   const t = table.replace(/'/g, "''");
+  const dbFilter = database?.trim()
+    ? `\n      AND lower(database_name) = lower('${database.trim().replace(/'/g, "''")}')`
+    : "";
   return `SELECT column_name, column_type AS data_type
     FROM duckdb_columns()
     WHERE lower(schema_name) = lower('${s}')
-      AND lower(table_name) = lower('${t}')
+      AND lower(table_name) = lower('${t}')${dbFilter}
     ORDER BY column_index
     LIMIT ${COL_LIMIT}`;
 }
@@ -123,10 +128,11 @@ async function fetchColumnsFromDuckdbColumns(
   secrets: Record<string, string>,
   config: Record<string, unknown>,
   schema: string,
-  table: string
+  table: string,
+  database?: string
 ): Promise<AssetColumnDef[]> {
   try {
-    const rowset = await runQuery(secrets, config, duckdbColumnsSql(schema, table));
+    const rowset = await runQuery(secrets, config, duckdbColumnsSql(schema, table, database));
     return duckdbMetadataRowsetToColumnDefs(rowset);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -204,21 +210,48 @@ async function fetchSampleColumnNames(
   return [];
 }
 
-/** MotherDuck: duckdb_columns() first, then SELECT * LIMIT 1 — no information_schema / LIMIT 0. */
+/** MotherDuck: duckdb_columns() first, then DESCRIBE / SELECT * LIMIT 1 — no information_schema / LIMIT 0. */
 async function fetchMotherduckTableColumns(
   runner: RowsetRunner,
   secrets: Record<string, string>,
   config: Record<string, unknown>,
   schema: string,
-  table: string
+  table: string,
+  catalog?: string
 ): Promise<AssetColumnDef[]> {
-  const fromDuckdbColumns = await fetchColumnsFromDuckdbColumns(runner, secrets, config, schema, table);
+  const db = catalog ?? catalogFromQueryConfig(config);
+
+  const fromDuckdbColumns = await fetchColumnsFromDuckdbColumns(runner, secrets, config, schema, table, db);
   if (fromDuckdbColumns.length) return fromDuckdbColumns;
 
-  const catalog = catalogFromQueryConfig(config);
-  const qualifiedRefs = catalog
-    ? [quoteDuckdbTable(schema, table), quoteDuckdbCatalogTable(catalog, schema, table)]
+  const qualifiedRefs = db
+    ? [quoteDuckdbCatalogTable(db, schema, table), quoteDuckdbTable(schema, table)]
     : [quoteDuckdbTable(schema, table)];
+
+  if (db) {
+    try {
+      const rowset = await runner(
+        secrets,
+        config,
+        `DESCRIBE ${quoteDuckdbCatalogTable(db, schema, table)}`
+      );
+      const nameIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "column_name");
+      const typeIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "column_type");
+      if (nameIdx >= 0) {
+        const fromDescribe = rowset.rows
+          .map((row) => ({
+            name: String(row[nameIdx] ?? ""),
+            type: typeIdx >= 0 && row[typeIdx] != null ? String(row[typeIdx]) : undefined,
+            source: "warehouse" as const,
+          }))
+          .filter((c) => c.name);
+        if (fromDescribe.length) return fromDescribe;
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
   return fetchSampleColumnNames(runner, secrets, config, qualifiedRefs);
 }
 
@@ -310,11 +343,10 @@ async function fetchMotherduckColumns(
   table: string,
   catalogFromRef?: string
 ): Promise<{ columns: AssetColumnDef[]; database?: string; lastError?: string }> {
-  const runner = runMotherduckReadOnlyQuery;
   const configuredDb = motherduckDatabaseName(secrets, config);
   let lastError: string | undefined;
 
-  if (!secrets.MOTHERDUCK_TOKEN?.trim()) {
+  if (!motherduckToken(secrets)) {
     return {
       columns: [],
       lastError:
@@ -323,29 +355,27 @@ async function fetchMotherduckColumns(
     };
   }
 
-  const resolvedDb = await resolveMotherduckDatabaseForTable(
-    secrets,
-    config,
-    schema,
-    table,
-    catalogFromRef
-  );
-  const databases = resolvedDb
-    ? [resolvedDb, ...motherduckDatabaseCandidates(secrets, config, catalogFromRef).filter((d) => d !== resolvedDb)]
-    : motherduckDatabaseCandidates(secrets, config, catalogFromRef);
+  const resolvedDb =
+    (await resolveMotherduckDatabaseForTable(secrets, config, schema, table, catalogFromRef)) ??
+    catalogFromRef ??
+    configuredDb;
 
-  for (const database of databases) {
-    const queryConfig = { ...config, database };
+  const queryConfig = { ...config, database: resolvedDb };
+  const omitDbRunner: RowsetRunner = (s, c, sql, opts) =>
+    runMotherduckReadOnlyQuery(s, c, sql, { omitDatabase: true, ...opts });
+
+  for (const runner of [omitDbRunner, runMotherduckReadOnlyQuery]) {
     try {
       const columns = await fetchMotherduckTableColumns(
         runner,
         secrets,
         queryConfig,
         schema,
-        table
+        table,
+        resolvedDb
       );
       if (columns.length) {
-        return { columns, database };
+        return { columns, database: resolvedDb };
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -356,7 +386,7 @@ async function fetchMotherduckColumns(
     }
   }
 
-  return { columns: [], lastError, database: resolvedDb ?? undefined };
+  return { columns: [], lastError, database: resolvedDb };
 }
 
 function rowsetToColumnDefs(rowset: WarehouseQueryRowset): AssetColumnDef[] {

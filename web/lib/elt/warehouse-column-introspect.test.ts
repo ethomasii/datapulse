@@ -10,4 +10,10 @@ describe("duckdbColumnsSql", () => {
     expect(sql).toContain("column_type AS data_type");
     expect(sql).toContain("ORDER BY column_index");
   });
+
+  it("filters by database_name when catalog is known", () => {
+    const sql = duckdbColumnsSql("github_dlt_hub_dlt", "issues", "my_db");
+    expect(sql).toContain("database_name");
+    expect(sql).toContain("my_db");
+  });
 });

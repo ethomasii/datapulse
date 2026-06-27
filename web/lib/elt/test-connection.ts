@@ -135,9 +135,31 @@ export async function testConnection(input: ConnectionTestInput): Promise<Connec
     };
   }
   if (connector === "motherduck") {
-    const token = secrets.MOTHERDUCK_TOKEN ?? "";
+    const { motherduckToken, runMotherduckReadOnlyQuery, motherduckDatabaseName } = await import(
+      "@/lib/elt/warehouse-introspect-connectors"
+    );
+    const token = motherduckToken(secrets);
     if (!token.trim()) return { ok: false, message: "Set MOTHERDUCK_TOKEN to test MotherDuck." };
-    return { ok: true, message: "MotherDuck token present — full connectivity verified on first run." };
+    const database = motherduckDatabaseName(secrets, input.config);
+    try {
+      const rowset = await runMotherduckReadOnlyQuery(
+        secrets,
+        input.config,
+        "SELECT database_name FROM duckdb_databases() LIMIT 5",
+        { omitDatabase: true }
+      );
+      const count = rowset.rows.length;
+      return {
+        ok: true,
+        message:
+          count > 0
+            ? `MotherDuck connected — ${count} database(s) visible. Connection database: "${database}".`
+            : `MotherDuck token accepted. Connection database: "${database}".`,
+      };
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e);
+      return { ok: false, message: detail.slice(0, 220) };
+    }
   }
   if (connector === "stripe" || connector === "stripe_analytics") {
     const key = secrets.STRIPE_SECRET_KEY ?? secrets.stripe_secret_key ?? "";

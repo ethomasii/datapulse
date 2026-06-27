@@ -33,6 +33,9 @@ export function formatMotherduckColumnError(
   if (lastError && isMotherduckCredentialError(lastError)) {
     return lastError.slice(0, 240);
   }
+  if (lastError && /http 404/i.test(lastError)) {
+    return lastError.slice(0, 240);
+  }
   if (lastError && !isMotherduckMissingObjectError(lastError)) {
     return lastError.slice(0, 200);
   }
