@@ -1,0 +1,25 @@
+{
+  "id": "unique_check",
+  "name": "Unique check",
+  "category": "check",
+  "description": "Assert column(s) are unique on a table.",
+  "compileTarget": "quality",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "unique",
+      "label": "Unique columns",
+      "type": "string_list",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

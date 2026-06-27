@@ -1,0 +1,52 @@
+{
+  "id": "mcp_tool_call",
+  "name": "MCP tool call",
+  "category": "ai",
+  "description": "Deterministic single-shot MCP tool call — ingest tool result as a table (no LLM).",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "mcp_server_id",
+      "label": "MCP server",
+      "type": "string",
+      "description": "Workspace MCP server id"
+    },
+    {
+      "key": "tool_name",
+      "label": "Tool name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "tool_args",
+      "label": "Tool args (JSON)",
+      "type": "text"
+    },
+    {
+      "key": "parse_as",
+      "label": "Parse as",
+      "type": "select",
+      "options": [
+        "auto",
+        "json",
+        "text"
+      ],
+      "default": "auto"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "asset_name",
+      "label": "Asset name",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

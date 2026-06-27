@@ -1,0 +1,134 @@
+// web/lib/elt/escape-py.ts
+function escapePyString(s) {
+  return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+// web/lib/elt/native-components/definitions/_pandas-helpers.ts
+function parseTableParts(table) {
+  const parts = table.split(".");
+  if (parts.length > 1) {
+    return { schema: parts[0], name: parts.slice(1).join(".") };
+  }
+  return { schema: "public", name: table };
+}
+function pandasReadTable(table) {
+  return [
+    "import pandas as pd",
+    "    _dest_client = pipeline._get_destination_clients(pipeline.state)[0]",
+    "    _sql = _dest_client.sql_client()",
+    `    _df = pd.read_sql('SELECT * FROM ${escapePyString(table)}', _sql._engine)`
+  ];
+}
+function pandasWriteTable(outputTable, label) {
+  const { schema, name } = parseTableParts(outputTable);
+  return [
+    `    _df.to_sql("${escapePyString(name)}", _sql._engine, schema="${escapePyString(schema)}", if_exists="replace", index=False)`,
+    `    print(f"[${label}] wrote {len(_df)} rows to ${escapePyString(outputTable)}")`
+  ];
+}
+function strList(v) {
+  if (Array.isArray(v)) return v.map(String).filter(Boolean);
+  if (typeof v === "string" && v.trim()) {
+    return v.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+// web/lib/elt/native-components/definitions/_sql-helpers.ts
+function sqlQualifiedTable(table) {
+  const parts = table.split(".").map((p) => p.trim()).filter(Boolean);
+  if (!parts.length) return table;
+  return parts.map((p) => `"${p.replace(/"/g, '""')}"`).join(".");
+}
+function sqlCreateTableAs(output, selectSql) {
+  return `CREATE OR REPLACE TABLE ${sqlQualifiedTable(output)} AS
+${selectSql}`;
+}
+function isDataframeExecution(config) {
+  const mode = String(config.execution ?? config.transform_mode ?? "warehouse").toLowerCase();
+  return mode === "dataframe" || mode === "pandas" || mode === "worker";
+}
+function sqlDedupeSelect(table, subset, keep) {
+  const src = sqlQualifiedTable(table);
+  if (!subset.length) {
+    return `SELECT DISTINCT *
+FROM ${src}`;
+  }
+  const part = subset.map((c) => `"${c.replace(/"/g, '""')}"`).join(", ");
+  const order = keep.toLowerCase() === "last" ? "DESC" : "ASC";
+  return `SELECT *
+FROM (
+  SELECT *, ROW_NUMBER() OVER (PARTITION BY ${part} ORDER BY 1 ${order}) AS _elt_rn
+  FROM ${src}
+) AS _elt_dedup
+WHERE _elt_rn = 1`;
+}
+
+// web/lib/elt/native-components/definitions/drop-duplicates.ts
+var dropDuplicatesComponent = {
+  id: "drop_duplicates",
+  aliases: ["unique_dedup", "warehouse_dedup"],
+  name: "Drop duplicates",
+  category: "transformation",
+  description: "Deduplicate rows by key columns via warehouse SQL (default) or dataframe.",
+  compileTarget: "warehouse",
+  fields: [
+    { key: "table", label: "Table", type: "string", required: true },
+    {
+      key: "subset",
+      label: "Key columns",
+      description: "Columns defining uniqueness (empty = all columns)",
+      type: "string_list"
+    },
+    {
+      key: "keep",
+      label: "Keep",
+      type: "select",
+      options: ["first", "last", "false"],
+      default: "first"
+    },
+    { key: "output_table", label: "Output table", type: "string" },
+    {
+      key: "execution",
+      label: "Execution",
+      type: "select",
+      options: ["warehouse", "dataframe"],
+      default: "warehouse"
+    }
+  ],
+  compile(config) {
+    const table = String(config.table ?? config.asset_name ?? "").trim();
+    const output = String(config.output_table ?? table).trim();
+    const subset = strList(config.subset ?? config.unique_columns ?? config.key_columns);
+    const keep = String(config.keep ?? "first").trim() || "first";
+    if (!table) {
+      return { warnings: ["drop_duplicates: table is required"], sql: [], python: [] };
+    }
+    if (isDataframeExecution(config)) {
+      const subsetPy = subset.length ? `[${subset.map((c) => JSON.stringify(c)).join(", ")}]` : "None";
+      const python = [
+        `# \u2500\u2500 drop_duplicates (dataframe): ${table} \u2500\u2500`,
+        "try:",
+        ...pandasReadTable(table).map((l) => l.startsWith("import") ? l : `    ${l}`),
+        `    _before = len(_df)`,
+        `    _df = _df.drop_duplicates(subset=${subsetPy}, keep=${JSON.stringify(keep)})`,
+        ...pandasWriteTable(output, "drop_duplicates"),
+        `    print(f"[drop_duplicates] removed {_before - len(_df)} duplicate rows")`,
+        "except Exception as _dedup_err:",
+        '    print(f"[drop_duplicates] failed: {_dedup_err}")',
+        "    raise"
+      ];
+      return { python };
+    }
+    const sql = [sqlCreateTableAs(output, sqlDedupeSelect(table, subset, keep))];
+    return { sql };
+  }
+};
+
+// ../../../../../tmp/eltpulse-compile-EyK14Q/drop_duplicates.ts
+function compile(config) {
+  return dropDuplicatesComponent.compile(config);
+}
+export {
+  compile
+};

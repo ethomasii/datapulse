@@ -1,0 +1,83 @@
+{
+  "id": "litellm_agent",
+  "aliases": [
+    "openai_agent",
+    "anthropic_agent",
+    "gemini_agent",
+    "snowflake_cortex_agent"
+  ],
+  "name": "LLM agent (MCP)",
+  "category": "ai",
+  "description": "LiteLLM agent with optional MCP tools — single prompt or per-row over a table (prompt_column → output_column).",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Input table",
+      "type": "string",
+      "description": "Set with output_table for per-row agent mode"
+    },
+    {
+      "key": "prompt_column",
+      "label": "Prompt column",
+      "type": "string",
+      "description": "Per-row user message source column"
+    },
+    {
+      "key": "prompt_prefix",
+      "label": "Prompt prefix",
+      "type": "text",
+      "description": "Prepended to each row prompt in per-row mode"
+    },
+    {
+      "key": "prompt",
+      "label": "User prompt",
+      "type": "text",
+      "description": "Single-shot mode — omit when using table + prompt_column"
+    },
+    {
+      "key": "system_prompt",
+      "label": "System prompt",
+      "type": "text"
+    },
+    {
+      "key": "model",
+      "label": "Model",
+      "type": "string",
+      "default": "gpt-4o-mini"
+    },
+    {
+      "key": "api_key_env_var",
+      "label": "API key env var",
+      "type": "string",
+      "placeholder": "OPENAI_API_KEY"
+    },
+    {
+      "key": "max_iterations",
+      "label": "Max tool iterations",
+      "type": "number",
+      "default": 10
+    },
+    {
+      "key": "mcp_server_ids",
+      "label": "MCP server ids",
+      "type": "string_list"
+    },
+    {
+      "key": "output_column",
+      "label": "Output column",
+      "type": "string",
+      "default": "agent_output"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "description": "Required for per-row mode"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

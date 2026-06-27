@@ -1,0 +1,41 @@
+{
+  "id": "one_hot_encoding",
+  "aliases": [
+    "get_dummies",
+    "dummy_encode"
+  ],
+  "name": "One-hot encoding",
+  "category": "transformation",
+  "description": "One-hot encode categorical columns (pandas get_dummies).",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "columns",
+      "label": "Columns to encode",
+      "type": "string_list",
+      "required": true
+    },
+    {
+      "key": "drop_first",
+      "label": "Drop first category",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

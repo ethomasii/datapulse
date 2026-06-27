@@ -1,0 +1,44 @@
+{
+  "id": "add_column_expr",
+  "aliases": [
+    "computed_column",
+    "derive_column",
+    "formula",
+    "warehouse_formula",
+    "multi_field_formula"
+  ],
+  "name": "Add computed column",
+  "category": "transformation",
+  "description": "Add a column via pandas eval expression.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "column",
+      "label": "New column name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "expression",
+      "label": "Expression",
+      "description": "pandas eval, e.g. amount * 1.1",
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

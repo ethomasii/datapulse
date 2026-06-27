@@ -1,0 +1,8 @@
+{
+  "name": "pipeline-components-catalog-stub",
+  "private": true,
+  "description": "Placeholder so Vercel Root Directory (web) exists on the catalog branch. Not a deployable app.",
+  "scripts": {
+    "build": "echo 'pipeline-components-catalog branch — component packages only; no Next.js deploy.' && exit 0"
+  }
+}

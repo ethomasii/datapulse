@@ -1,0 +1,63 @@
+{
+  "id": "scd_type_2",
+  "aliases": [
+    "slowly_changing_dimension_2",
+    "historized_dimension"
+  ],
+  "name": "SCD Type 2",
+  "category": "transformation",
+  "description": "Historize dimension changes with effective dates and current-row flag.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "staging_table",
+      "label": "Staging table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "dimension_table",
+      "label": "Dimension table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "business_keys",
+      "label": "Business keys",
+      "type": "string_list",
+      "required": true
+    },
+    {
+      "key": "compare_columns",
+      "label": "Columns to detect change",
+      "type": "string_list"
+    },
+    {
+      "key": "effective_from_column",
+      "label": "Effective from column",
+      "type": "string",
+      "default": "effective_from"
+    },
+    {
+      "key": "effective_to_column",
+      "label": "Effective to column",
+      "type": "string",
+      "default": "effective_to"
+    },
+    {
+      "key": "is_current_column",
+      "label": "Is current column",
+      "type": "string",
+      "default": "is_current"
+    },
+    {
+      "key": "output_table",
+      "label": "Output dimension table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

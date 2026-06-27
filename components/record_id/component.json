@@ -1,0 +1,45 @@
+{
+  "id": "record_id",
+  "aliases": [
+    "row_number",
+    "surrogate_key"
+  ],
+  "name": "Record ID",
+  "category": "transformation",
+  "description": "Add monotonic row ID column.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "column",
+      "label": "ID column name",
+      "type": "string",
+      "default": "record_id"
+    },
+    {
+      "key": "start_at",
+      "label": "Start at",
+      "type": "number",
+      "default": 1
+    },
+    {
+      "key": "group_by",
+      "label": "Restart per group",
+      "type": "string_list"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

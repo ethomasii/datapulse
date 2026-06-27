@@ -1,0 +1,61 @@
+{
+  "id": "outlier_clipper",
+  "aliases": [
+    "outlier_detection",
+    "winsorize"
+  ],
+  "name": "Outlier clipper",
+  "category": "transformation",
+  "description": "Detect and clip, drop, or flag outliers using IQR or z-score.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "columns",
+      "label": "Numeric columns",
+      "type": "string_list",
+      "required": true
+    },
+    {
+      "key": "method",
+      "label": "Method",
+      "type": "select",
+      "options": [
+        "iqr",
+        "zscore"
+      ],
+      "default": "iqr"
+    },
+    {
+      "key": "action",
+      "label": "Action",
+      "type": "select",
+      "options": [
+        "clip",
+        "drop",
+        "flag"
+      ],
+      "default": "clip"
+    },
+    {
+      "key": "threshold",
+      "label": "Z-score threshold",
+      "type": "number",
+      "default": 3
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

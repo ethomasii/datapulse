@@ -1,0 +1,48 @@
+{
+  "id": "union_tables",
+  "aliases": [
+    "dataframe_union",
+    "warehouse_union"
+  ],
+  "name": "Union",
+  "category": "transformation",
+  "description": "Stack tables with UNION ALL in warehouse SQL (default) or pandas concat when execution=dataframe.",
+  "compileTarget": "warehouse",
+  "fields": [
+    {
+      "key": "tables",
+      "label": "Tables",
+      "description": "Comma-separated schema.table names",
+      "type": "string_list",
+      "required": true
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "ignore_index",
+      "label": "Reset index",
+      "description": "Dataframe mode only — ignored for warehouse SQL",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "execution",
+      "label": "Execution",
+      "description": "warehouse = SQL push-down (default); dataframe = worker pandas",
+      "type": "select",
+      "options": [
+        "warehouse",
+        "dataframe"
+      ],
+      "default": "warehouse"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

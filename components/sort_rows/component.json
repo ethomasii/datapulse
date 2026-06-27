@@ -1,0 +1,51 @@
+{
+  "id": "sort_rows",
+  "aliases": [
+    "sort",
+    "arrange"
+  ],
+  "name": "Sort rows",
+  "category": "transformation",
+  "description": "Sort a table by columns via warehouse SQL (default) or dataframe.",
+  "compileTarget": "warehouse",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "columns",
+      "label": "Sort columns",
+      "type": "string_list",
+      "required": true
+    },
+    {
+      "key": "ascending",
+      "label": "Ascending",
+      "description": "true/false or comma list matching columns",
+      "type": "string",
+      "default": "true"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    },
+    {
+      "key": "execution",
+      "label": "Execution",
+      "type": "select",
+      "options": [
+        "warehouse",
+        "dataframe"
+      ],
+      "default": "warehouse"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

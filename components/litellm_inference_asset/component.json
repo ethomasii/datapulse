@@ -1,0 +1,49 @@
+{
+  "id": "litellm_inference_asset",
+  "aliases": [
+    "llm_prompt_executor",
+    "openai_llm",
+    "anthropic_llm",
+    "gemini_llm"
+  ],
+  "name": "LLM row enrichment",
+  "category": "ai",
+  "description": "Per-row LLM text generation via LiteLLM — adds an output column from a prompt column.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Input table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "prompt_column",
+      "label": "Prompt column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "output_column",
+      "label": "Output column",
+      "type": "string",
+      "default": "llm_output"
+    },
+    {
+      "key": "model",
+      "label": "Model",
+      "type": "string",
+      "default": "gpt-4o-mini"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

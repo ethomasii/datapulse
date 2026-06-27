@@ -1,0 +1,38 @@
+{
+  "id": "xml_parser",
+  "name": "XML parser",
+  "category": "transformation",
+  "description": "Parse XML in a column into flat fields using path mappings.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "column",
+      "label": "XML column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "paths",
+      "label": "XPath mappings",
+      "description": "JSON object xpath → column, e.g. {\".//name\":\"patient_name\"}",
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

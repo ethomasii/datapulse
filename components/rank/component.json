@@ -1,0 +1,60 @@
+{
+  "id": "rank",
+  "name": "Rank rows",
+  "category": "transformation",
+  "description": "Rank rows by column with optional grouping (pandas rank).",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "column",
+      "label": "Rank column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "group_by",
+      "label": "Group by",
+      "type": "string_list"
+    },
+    {
+      "key": "method",
+      "label": "Tie method",
+      "type": "select",
+      "options": [
+        "average",
+        "min",
+        "max",
+        "first",
+        "dense"
+      ],
+      "default": "average"
+    },
+    {
+      "key": "ascending",
+      "label": "Ascending",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "output_column",
+      "label": "Output column name",
+      "type": "string",
+      "default": "rank"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

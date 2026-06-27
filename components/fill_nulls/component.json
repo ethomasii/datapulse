@@ -1,0 +1,35 @@
+{
+  "id": "fill_nulls",
+  "aliases": [
+    "impute_nulls",
+    "imputation"
+  ],
+  "name": "Fill nulls",
+  "category": "transformation",
+  "description": "Fill null values with constants per column (pandas fillna).",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "values",
+      "label": "Fill values JSON",
+      "description": "e.g. {\"status\":\"unknown\",\"amount\":0}",
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

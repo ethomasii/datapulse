@@ -1,0 +1,35 @@
+{
+  "id": "s3_to_database_asset",
+  "aliases": [
+    "csv_file_ingestion",
+    "file_ingestion"
+  ],
+  "name": "S3 / file ingest",
+  "category": "ingestion",
+  "description": "Merge filesystem/S3 ingest hints into source configuration for dlt codegen.",
+  "compileTarget": "dlt",
+  "fields": [
+    {
+      "key": "bucket_url",
+      "label": "Bucket URL or path",
+      "description": "s3://bucket/prefix or local path",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "file_glob",
+      "label": "File glob",
+      "type": "string",
+      "default": "**/*"
+    },
+    {
+      "key": "table_name",
+      "label": "Destination table name",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

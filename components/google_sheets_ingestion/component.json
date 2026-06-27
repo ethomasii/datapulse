@@ -1,0 +1,34 @@
+{
+  "id": "google_sheets_ingestion",
+  "name": "Google Sheets ingest",
+  "category": "ingestion",
+  "description": "Merge Google Sheets spreadsheet hints for dlt sheets source.",
+  "compileTarget": "dlt",
+  "fields": [
+    {
+      "key": "spreadsheet_id",
+      "label": "Spreadsheet ID",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "sheet_names",
+      "label": "Sheet names",
+      "type": "string_list"
+    },
+    {
+      "key": "credentials_path",
+      "label": "Service account JSON path",
+      "type": "string"
+    },
+    {
+      "key": "resource_name",
+      "label": "Destination table name",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

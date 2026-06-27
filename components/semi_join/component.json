@@ -1,0 +1,40 @@
+{
+  "id": "semi_join",
+  "aliases": [
+    "exists_join"
+  ],
+  "name": "Semi join",
+  "category": "transformation",
+  "description": "Rows in left that have a match in right (left columns only).",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "left_table",
+      "label": "Left table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "right_table",
+      "label": "Right table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "on",
+      "label": "Join key(s)",
+      "type": "string_list",
+      "required": true
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

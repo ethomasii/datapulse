@@ -1,0 +1,30 @@
+{
+  "id": "gcs_monitor",
+  "name": "GCS file sensor",
+  "category": "sensor",
+  "description": "Monitor GCS prefix for new objects.",
+  "compileTarget": "monitor",
+  "fields": [
+    {
+      "key": "bucket",
+      "label": "Bucket",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "prefix",
+      "label": "Prefix",
+      "type": "string"
+    },
+    {
+      "key": "file_pattern",
+      "label": "File pattern",
+      "type": "string",
+      "default": ".*"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

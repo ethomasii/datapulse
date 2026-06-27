@@ -1,0 +1,52 @@
+{
+  "id": "filter_rows",
+  "aliases": [
+    "dataframe_filter",
+    "row_filter",
+    "filter",
+    "warehouse_filter",
+    "select_records",
+    "audience_segment"
+  ],
+  "name": "Filter",
+  "category": "transformation",
+  "description": "Filter rows in warehouse SQL (default) or in-memory dataframe when execution=dataframe.",
+  "compileTarget": "warehouse",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true,
+      "placeholder": "staging.events"
+    },
+    {
+      "key": "condition",
+      "label": "Filter condition",
+      "description": "SQL WHERE clause (default). Pandas query when execution=dataframe.",
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "description": "Leave empty to overwrite source table",
+      "type": "string"
+    },
+    {
+      "key": "execution",
+      "label": "Execution",
+      "description": "warehouse = SQL push-down (default); dataframe = worker pandas",
+      "type": "select",
+      "options": [
+        "warehouse",
+        "dataframe"
+      ],
+      "default": "warehouse"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

@@ -1,0 +1,36 @@
+{
+  "id": "kafka_to_database_asset",
+  "name": "Kafka ingest",
+  "category": "ingestion",
+  "description": "Merge Kafka consumer hints into source configuration.",
+  "compileTarget": "dlt",
+  "fields": [
+    {
+      "key": "bootstrap_servers",
+      "label": "Bootstrap servers",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "topic",
+      "label": "Topic",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "group_id",
+      "label": "Consumer group",
+      "type": "string",
+      "default": "eltpulse_consumer"
+    },
+    {
+      "key": "resource_name",
+      "label": "Table name",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

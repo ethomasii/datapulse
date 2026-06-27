@@ -1,0 +1,45 @@
+{
+  "id": "text_to_columns",
+  "aliases": [
+    "split_column",
+    "parse_text"
+  ],
+  "name": "Text to columns",
+  "category": "transformation",
+  "description": "Split a string column into multiple columns.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "column",
+      "label": "Source column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "delimiter",
+      "label": "Delimiter",
+      "type": "string",
+      "default": ","
+    },
+    {
+      "key": "output_columns",
+      "label": "Output column names",
+      "type": "string_list"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

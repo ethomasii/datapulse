@@ -1,0 +1,33 @@
+{
+  "id": "dq_check",
+  "aliases": [
+    "great_expectations_check",
+    "soda_check"
+  ],
+  "name": "Data quality check",
+  "category": "check",
+  "description": "not_null and unique checks on a table (runs as post-load SQL validation).",
+  "compileTarget": "quality",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "not_null",
+      "label": "Not null columns",
+      "type": "string_list"
+    },
+    {
+      "key": "unique",
+      "label": "Unique columns",
+      "type": "string_list"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

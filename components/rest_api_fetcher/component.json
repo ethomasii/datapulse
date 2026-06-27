@@ -1,0 +1,49 @@
+{
+  "id": "rest_api_fetcher",
+  "name": "REST API fetch",
+  "category": "ingestion",
+  "description": "Merge REST API source hints for dlt rest_api connector.",
+  "compileTarget": "dlt",
+  "fields": [
+    {
+      "key": "base_url",
+      "label": "Base URL",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "endpoint",
+      "label": "Endpoint path",
+      "type": "string",
+      "default": "/"
+    },
+    {
+      "key": "resource_name",
+      "label": "Resource name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "pagination_type",
+      "label": "Pagination",
+      "type": "select",
+      "options": [
+        "auto",
+        "cursor",
+        "offset",
+        "none"
+      ],
+      "default": "auto"
+    },
+    {
+      "key": "data_selector",
+      "label": "Data JSON path",
+      "type": "string",
+      "placeholder": "data"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

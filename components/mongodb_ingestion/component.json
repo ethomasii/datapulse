@@ -1,0 +1,35 @@
+{
+  "id": "mongodb_ingestion",
+  "name": "MongoDB ingest",
+  "category": "ingestion",
+  "description": "Merge MongoDB connection hints for dlt mongodb source.",
+  "compileTarget": "dlt",
+  "fields": [
+    {
+      "key": "connection_url",
+      "label": "MongoDB connection URL",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "database",
+      "label": "Database",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "collection",
+      "label": "Collection",
+      "type": "string"
+    },
+    {
+      "key": "resource_name",
+      "label": "Destination table name",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

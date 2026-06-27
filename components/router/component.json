@@ -1,0 +1,49 @@
+{
+  "id": "router",
+  "aliases": [
+    "conditional_split",
+    "branch"
+  ],
+  "name": "Router",
+  "category": "transformation",
+  "description": "Split rows into multiple output tables by condition (warehouse SQL CTAS by default; one CTAS per route).",
+  "compileTarget": "warehouse",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "routes",
+      "label": "Routes",
+      "description": "JSON array of branches. Each object needs \"condition\" (SQL WHERE / pandas query) and \"output_table\" (schema.table). Rows can match multiple routes.",
+      "type": "text",
+      "required": true,
+      "default": "[]",
+      "placeholder": "[\n  {\"condition\":\"status = \\\"active\\\"\",\"output_table\":\"staging.active\"},\n  {\"condition\":\"status = \\\"inactive\\\"\",\"output_table\":\"staging.inactive\"}\n]"
+    },
+    {
+      "key": "default_output_table",
+      "label": "Default output table",
+      "description": "Optional table for rows that match no route condition.",
+      "type": "string"
+    },
+    {
+      "key": "execution",
+      "label": "Execution",
+      "description": "warehouse = SQL CTAS per route (default); dataframe = worker pandas",
+      "type": "select",
+      "options": [
+        "warehouse",
+        "dataframe"
+      ],
+      "default": "warehouse"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

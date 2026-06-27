@@ -1,0 +1,67 @@
+{
+  "id": "multi_row_formula",
+  "aliases": [
+    "lag_lead",
+    "shift_formula"
+  ],
+  "name": "Multi-row formula",
+  "category": "transformation",
+  "description": "Lag, lead, or diff a column with optional grouping and ordering.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "column",
+      "label": "Source column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "operation",
+      "label": "Operation",
+      "type": "select",
+      "options": [
+        "lag",
+        "lead",
+        "diff",
+        "pct_change"
+      ],
+      "default": "lag"
+    },
+    {
+      "key": "periods",
+      "label": "Periods",
+      "type": "number",
+      "default": 1
+    },
+    {
+      "key": "group_by",
+      "label": "Group by",
+      "type": "string_list"
+    },
+    {
+      "key": "order_by",
+      "label": "Order by",
+      "type": "string_list"
+    },
+    {
+      "key": "output_column",
+      "label": "Output column",
+      "type": "string"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

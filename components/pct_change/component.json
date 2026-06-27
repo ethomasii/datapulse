@@ -1,0 +1,57 @@
+{
+  "id": "pct_change",
+  "aliases": [
+    "period_over_period",
+    "growth_rate"
+  ],
+  "name": "Percent change",
+  "category": "transformation",
+  "description": "Period-over-period diff and percent change on a value column.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "column",
+      "label": "Value column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "group_by",
+      "label": "Group by",
+      "type": "string_list"
+    },
+    {
+      "key": "order_by",
+      "label": "Order by",
+      "type": "string_list",
+      "required": true
+    },
+    {
+      "key": "periods",
+      "label": "Periods",
+      "type": "number",
+      "default": 1
+    },
+    {
+      "key": "output_column",
+      "label": "Output column",
+      "type": "string",
+      "default": "pct_change"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

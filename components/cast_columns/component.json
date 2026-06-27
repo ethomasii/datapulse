@@ -1,0 +1,35 @@
+{
+  "id": "cast_columns",
+  "aliases": [
+    "make_columns",
+    "type_coercer"
+  ],
+  "name": "Cast columns",
+  "category": "transformation",
+  "description": "Cast column dtypes after load (pandas astype).",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "dtypes",
+      "label": "Dtype mapping",
+      "description": "JSON object column → dtype, e.g. {\"amount\":\"float64\",\"created_at\":\"datetime64[ns]\"}",
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

@@ -1,0 +1,61 @@
+{
+  "id": "litellm_function_calling",
+  "name": "LLM function calling",
+  "category": "ai",
+  "description": "Per-row LiteLLM tool/function calling — writes tool call JSON to an output column (no execution loop).",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Input table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "text_column",
+      "label": "Text column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "tools",
+      "label": "Tools (JSON array)",
+      "type": "text",
+      "required": true,
+      "placeholder": "[{\"type\":\"function\",\"function\":{\"name\":\"search\",\"parameters\":{...}}}]"
+    },
+    {
+      "key": "model",
+      "label": "Model",
+      "type": "string",
+      "default": "gpt-4o-mini"
+    },
+    {
+      "key": "output_column",
+      "label": "Output column",
+      "type": "string",
+      "default": "tool_calls"
+    },
+    {
+      "key": "system_prompt",
+      "label": "System prompt",
+      "type": "text"
+    },
+    {
+      "key": "api_key_env_var",
+      "label": "API key env var",
+      "type": "string",
+      "placeholder": "OPENAI_API_KEY"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": false,
+  "compileNote": "Add compile.mjs alongside component.json for executable package (no datapulse PR required)."
+}

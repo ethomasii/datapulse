@@ -1,0 +1,51 @@
+{
+  "id": "schema_validator",
+  "aliases": [
+    "json_schema_validator"
+  ],
+  "name": "Schema validator",
+  "category": "transformation",
+  "description": "Validate JSON rows against a JSON Schema; drop, tag, or raise on failure.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "column",
+      "label": "JSON column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "json_schema",
+      "label": "JSON Schema",
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "on_failure",
+      "label": "On failure",
+      "type": "select",
+      "options": [
+        "drop",
+        "tag",
+        "raise"
+      ],
+      "default": "drop"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

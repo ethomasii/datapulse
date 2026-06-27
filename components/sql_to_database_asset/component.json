@@ -1,0 +1,23 @@
+{
+  "id": "sql_to_database_asset",
+  "aliases": [
+    "database_replication"
+  ],
+  "name": "SQL database replicate",
+  "category": "ingestion",
+  "description": "Merge Sling/database replication table hints into source configuration.",
+  "compileTarget": "sling",
+  "fields": [
+    {
+      "key": "tables",
+      "label": "Tables",
+      "description": "schema.table list",
+      "type": "string_list",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

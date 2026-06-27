@@ -1,0 +1,25 @@
+{
+  "id": "sqs_to_database_asset",
+  "name": "SQS queue ingest",
+  "category": "ingestion",
+  "description": "Merge SQS queue ingest hints for dlt REST/queue patterns.",
+  "compileTarget": "dlt",
+  "fields": [
+    {
+      "key": "queue_url",
+      "label": "Queue URL",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "resource_name",
+      "label": "Resource / table name",
+      "type": "string",
+      "default": "sqs_messages"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

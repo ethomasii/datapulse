@@ -1,0 +1,37 @@
+{
+  "id": "s3_monitor",
+  "name": "S3 file sensor",
+  "category": "sensor",
+  "description": "Monitor S3 prefix for new files; creates EltMonitor on canvas save.",
+  "compileTarget": "monitor",
+  "fields": [
+    {
+      "key": "bucket_name",
+      "label": "Bucket",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "prefix",
+      "label": "Prefix",
+      "type": "string",
+      "placeholder": "incoming/"
+    },
+    {
+      "key": "threshold",
+      "label": "Min new files",
+      "type": "number",
+      "default": 1
+    },
+    {
+      "key": "key_pattern",
+      "label": "Key pattern (regex)",
+      "type": "string",
+      "default": ".*"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

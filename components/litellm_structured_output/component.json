@@ -1,0 +1,72 @@
+{
+  "id": "litellm_structured_output",
+  "name": "LLM structured extraction",
+  "category": "ai",
+  "description": "Per-row structured JSON extraction via LiteLLM — expands schema fields into new columns.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Input table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "text_column",
+      "label": "Text column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "schema_definition",
+      "label": "Schema definition (JSON)",
+      "type": "text",
+      "required": true,
+      "placeholder": "{\"name\":{\"type\":\"string\"},\"company\":{\"type\":\"string\"}}"
+    },
+    {
+      "key": "model",
+      "label": "Model",
+      "type": "string",
+      "default": "gpt-4o-mini"
+    },
+    {
+      "key": "prompt_prefix",
+      "label": "Prompt prefix",
+      "type": "text"
+    },
+    {
+      "key": "output_prefix",
+      "label": "Output column prefix",
+      "type": "string",
+      "default": "extracted_"
+    },
+    {
+      "key": "on_error",
+      "label": "On error",
+      "type": "select",
+      "options": [
+        "null",
+        "skip",
+        "raise"
+      ],
+      "default": "null"
+    },
+    {
+      "key": "api_key_env_var",
+      "label": "API key env var",
+      "type": "string",
+      "placeholder": "OPENAI_API_KEY"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": false,
+  "compileNote": "Add compile.mjs alongside component.json for executable package (no datapulse PR required)."
+}

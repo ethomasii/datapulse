@@ -1,0 +1,35 @@
+{
+  "id": "append_fields",
+  "aliases": [
+    "broadcast_join",
+    "lookup_append"
+  ],
+  "name": "Append fields",
+  "category": "transformation",
+  "description": "Broadcast-append columns from a small lookup table to every row.",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Main table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "lookup_table",
+      "label": "Lookup table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

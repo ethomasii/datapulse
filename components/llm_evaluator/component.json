@@ -1,0 +1,55 @@
+{
+  "id": "llm_evaluator",
+  "name": "LLM evaluator (judge)",
+  "category": "ai",
+  "description": "LLM-as-judge scores upstream agent/LLM output (answer relevance, groundedness, etc.).",
+  "compileTarget": "python",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Input table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "input_column",
+      "label": "Answer column",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "reference_column",
+      "label": "Reference column",
+      "type": "string"
+    },
+    {
+      "key": "feedback",
+      "label": "Feedback metric",
+      "type": "select",
+      "options": [
+        "answer_relevance",
+        "groundedness",
+        "helpfulness",
+        "coherence",
+        "harmfulness"
+      ],
+      "default": "answer_relevance"
+    },
+    {
+      "key": "model",
+      "label": "Judge model",
+      "type": "string",
+      "default": "gpt-4o-mini"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}

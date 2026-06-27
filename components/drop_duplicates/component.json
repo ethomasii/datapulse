@@ -1,0 +1,55 @@
+{
+  "id": "drop_duplicates",
+  "aliases": [
+    "unique_dedup",
+    "warehouse_dedup"
+  ],
+  "name": "Drop duplicates",
+  "category": "transformation",
+  "description": "Deduplicate rows by key columns via warehouse SQL (default) or dataframe.",
+  "compileTarget": "warehouse",
+  "fields": [
+    {
+      "key": "table",
+      "label": "Table",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "subset",
+      "label": "Key columns",
+      "description": "Columns defining uniqueness (empty = all columns)",
+      "type": "string_list"
+    },
+    {
+      "key": "keep",
+      "label": "Keep",
+      "type": "select",
+      "options": [
+        "first",
+        "last",
+        "false"
+      ],
+      "default": "first"
+    },
+    {
+      "key": "output_table",
+      "label": "Output table",
+      "type": "string"
+    },
+    {
+      "key": "execution",
+      "label": "Execution",
+      "type": "select",
+      "options": [
+        "warehouse",
+        "dataframe"
+      ],
+      "default": "warehouse"
+    }
+  ],
+  "version": 1,
+  "runtime": "eltpulse",
+  "packageCompile": true,
+  "compileArtifact": "compile.mjs"
+}
