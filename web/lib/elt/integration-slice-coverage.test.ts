@@ -45,6 +45,11 @@ describe("tier-1 integration slice coverage", () => {
     expect(auditIntegrationSliceCoverage().length).toBe(TIER1_PIPELINE_SOURCES.length);
   });
 
+  it("marks google ads as honestly none_only on tier-1 bar", () => {
+    expect(TIER1_NONE_ONLY_OK.has("google_ads")).toBe(true);
+    expect(runSlicesAllowed("google_ads")).toBe(false);
+  });
+
   it("marks segment as none_only outside tier-1 bar", () => {
     expect(TIER1_NONE_ONLY_OK.has("segment")).toBe(true);
     expect(runSlicesAllowed("segment")).toBe(false);

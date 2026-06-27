@@ -1,6 +1,6 @@
 import { escapePyString } from "./escape-py";
 import type { VerifiedSourceSpec } from "./verified-source-spec";
-import { getIncrementalEnvConfig } from "./verified-incremental-env";
+import { getIncrementalEnvConfig, matomoUsesReportsFactory } from "./verified-incremental-env";
 
 /** Python block: apply partition_key to source_kwargs start/end date kwargs. */
 export function buildKwargPartitionBlock(spec: VerifiedSourceSpec): string {
@@ -44,9 +44,10 @@ export function buildVerifiedImportLine(spec: VerifiedSourceSpec): string {
 
 export function buildVerifiedSourceInstantiation(
   spec: VerifiedSourceSpec,
-  resourceBlock: string
+  resourceBlock: string,
+  factoryOverride?: string
 ): string {
-  const factory = spec.factory;
+  const factory = factoryOverride ?? spec.factory;
   if (spec.partitionSliceMode === "jira_jql") {
     return `
     if partition_key:
@@ -65,16 +66,60 @@ export function buildVerifiedSourceInstantiation(
     source = ${factory}(**source_kwargs)${resourceBlock}`;
 }
 
-export function buildDltIncrementalEnvPartitionBlock(slug: string): string {
+export function buildDltIncrementalEnvPartitionBlock(
+  slug: string,
+  config: Record<string, unknown> = {}
+): string {
   const cfg = getIncrementalEnvConfig(slug);
   if (!cfg) return "";
-  const source = escapePyString(cfg.dltSourceName.toUpperCase());
-  const rows = cfg.resources
-    .map((r) => {
-      const dayRange = r.dateRangeParams ? "True" : "False";
-      return `        ("${escapePyString(r.name)}", "${escapePyString(r.cursorField)}", ${dayRange})`;
-    })
-    .join(",\n");
+
+  const useMatomoReports = slug === "matomo" && matomoUsesReportsFactory(config);
+  const staticSource = escapePyString(cfg.dltSourceName.toUpperCase());
+  const staticRows = useMatomoReports
+    ? ""
+    : cfg.resources
+        .map((r) => {
+          const dayRange = r.dateRangeParams ? "True" : "False";
+          return `        ("${escapePyString(r.name)}", "${escapePyString(r.cursorField)}", ${dayRange})`;
+        })
+        .join(",\n");
+
+  const dynamicBlock =
+    cfg.dynamicQueries && useMatomoReports
+      ? `
+        _queries = source_kwargs.get("${escapePyString(cfg.dynamicQueries.queriesConfigKey)}") or []
+        _dyn_source = "${escapePyString(cfg.dynamicQueries.dltSourceName.toUpperCase())}"
+        _dyn_cursor = "${escapePyString(cfg.dynamicQueries.cursorField.toUpperCase())}"
+        for _q in _queries:
+            if not isinstance(_q, dict):
+                continue
+            _res = _q.get("resource_name")
+            if not _res:
+                continue
+            _prefix = "SOURCES__" + _dyn_source + "__" + str(_res).upper() + "__" + _dyn_cursor + "__"
+            os.environ.setdefault(_prefix + "INITIAL_VALUE", initial)
+            if end_val:
+                os.environ.setdefault(_prefix + "END_VALUE", end_val)`
+      : "";
+
+  const staticBlock =
+    staticRows.length > 0
+      ? `
+        for _res, _cursor, _day_range in (
+${staticRows},
+        ):
+            _prefix = "SOURCES__${staticSource}__" + _res.upper() + "__" + _cursor.upper() + "__"
+            os.environ.setdefault(_prefix + "INITIAL_VALUE", initial)
+            if end_val:
+                os.environ.setdefault(_prefix + "END_VALUE", end_val)
+            if _day_range and end_val:
+                _base = "SOURCES__${staticSource}__" + _res.upper() + "__"
+                os.environ.setdefault(_base + "START_DATE", pk[:10])
+                os.environ.setdefault(_base + "END_DATE", end_val[:10])`
+      : "";
+
+  if (!staticBlock && !dynamicBlock) return "";
+
   return `
     if partition_key:
         from datetime import date, timedelta
@@ -86,23 +131,16 @@ export function buildDltIncrementalEnvPartitionBlock(slug: string): string {
                 _day = date.fromisoformat(pk[:10])
                 end_val = f"{(_day + timedelta(days=1)).isoformat()}T00:00:00Z"
             except ValueError:
-                pass
-        for _res, _cursor, _day_range in (
-${rows},
-        ):
-            _prefix = "SOURCES__${source}__" + _res.upper() + "__" + _cursor.upper() + "__"
-            os.environ.setdefault(_prefix + "INITIAL_VALUE", initial)
-            if end_val:
-                os.environ.setdefault(_prefix + "END_VALUE", end_val)
-            if _day_range and end_val:
-                _base = "SOURCES__${source}__" + _res.upper() + "__"
-                os.environ.setdefault(_base + "START_DATE", pk[:10])
-                os.environ.setdefault(_base + "END_DATE", end_val[:10])`;
+                pass${dynamicBlock}${staticBlock}`;
 }
 
-export function buildVerifiedPartitionBlock(spec: VerifiedSourceSpec, slug?: string): string {
+export function buildVerifiedPartitionBlock(
+  spec: VerifiedSourceSpec,
+  slug?: string,
+  config: Record<string, unknown> = {}
+): string {
   if (spec.partitionSliceMode === "dlt_incremental_env" && slug) {
-    return buildDltIncrementalEnvPartitionBlock(slug);
+    return buildDltIncrementalEnvPartitionBlock(slug, config);
   }
   return buildKwargPartitionBlock(spec);
 }

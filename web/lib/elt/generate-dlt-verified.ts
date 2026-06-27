@@ -10,6 +10,9 @@ import {
   buildVerifiedSourceInstantiation,
 } from "./generate-dlt-partition";
 import {
+  resolveMatomoFactory,
+} from "./verified-incremental-env";
+import {
   resolveVerifiedSourceSpec,
   type VerifiedCredentialSpec,
   type VerifiedSourceSpec,
@@ -265,8 +268,12 @@ export function generateVerifiedSourcePipeline(request: PipelineRequest): string
     } else if (typeof raw === "number" || typeof raw === "boolean") {
       kwargLines.push(`        ${escapePyString(key)}=${raw},`);
     } else if (Array.isArray(raw)) {
-      const items = raw.map((x) => `"${escapePyString(String(x))}"`).join(", ");
-      kwargLines.push(`        ${escapePyString(key)}=[${items}],`);
+      if (raw.some((x) => typeof x === "object" && x !== null)) {
+        kwargLines.push(`        ${escapePyString(key)}=${JSON.stringify(raw)},`);
+      } else {
+        const items = raw.map((x) => `"${escapePyString(String(x))}"`).join(", ");
+        kwargLines.push(`        ${escapePyString(key)}=[${items}],`);
+      }
     } else {
       kwargLines.push(`        ${escapePyString(key)}=${JSON.stringify(raw)},`);
     }
@@ -283,9 +290,18 @@ export function generateVerifiedSourcePipeline(request: PipelineRequest): string
     }
   }
 
-  const partitionBlock = buildVerifiedPartitionBlock(spec, request.sourceType);
-  const sourceInstantiation = buildVerifiedSourceInstantiation(spec, resourceBlock);
-  const importLine = buildVerifiedImportLine(spec);
+  const partitionBlock = buildVerifiedPartitionBlock(spec, request.sourceType, config);
+  const matomoFactory =
+    request.sourceType === "matomo" ? resolveMatomoFactory(config) : undefined;
+  const importLine =
+    matomoFactory != null
+      ? `from matomo import ${matomoFactory}`
+      : buildVerifiedImportLine(spec);
+  const sourceInstantiation = buildVerifiedSourceInstantiation(
+    spec,
+    resourceBlock,
+    matomoFactory
+  );
 
   const extraImport = credSection.imports ? `\n${credSection.imports}` : "";
 

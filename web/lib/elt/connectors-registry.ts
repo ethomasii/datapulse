@@ -617,6 +617,8 @@ const API_CONNECTORS: ConnectorDef[] = [
     ],
     sourceConfigFields: [
       { key: "site_id", label: "Site ID", type: "text", required: true, placeholder: "1", help: "Numeric site ID from Matomo" },
+      { key: "live_events_site_id", label: "Live events site ID", type: "text", required: false, help: "Defaults to site_id for matomo_visits live stream" },
+      { key: "queries", label: "Report queries (JSON)", type: "textarea", required: false, help: "When set, uses matomo_reports with incremental date slices per resource_name" },
     ],
   },
   {
@@ -717,6 +719,31 @@ const API_CONNECTORS: ConnectorDef[] = [
     category: "APIs & SaaS",
     credentialFields: [
       { key: "FACEBOOK_ACCESS_TOKEN", label: "Access Token", type: "password", required: true, help: "Create at: developers.facebook.com" },
+      { key: "FACEBOOK_ADS_ACCOUNT_ID", label: "Ad Account ID", type: "text", required: true, placeholder: "act_1234567890" },
+    ],
+    sourceConfigFields: [
+      { key: "resources", label: "Load mode", type: "select", default: "insights", options: [
+        { value: "insights", label: "Insights (incremental, sliceable)" },
+      ]},
+    ],
+  },
+  {
+    slug: "facebook_ads_catalog",
+    label: "Facebook Ads (Catalog)",
+    connectionTypes: ["source"],
+    category: "APIs & SaaS",
+    credentialFields: [
+      { key: "FACEBOOK_ACCESS_TOKEN", label: "Access Token", type: "password", required: true, help: "Create at: developers.facebook.com" },
+      { key: "FACEBOOK_ADS_ACCOUNT_ID", label: "Ad Account ID", type: "text", required: true, placeholder: "act_1234567890" },
+    ],
+    sourceConfigFields: [
+      { key: "resources", label: "Object types", type: "multiselect", required: false, options: [
+        { value: "campaigns", label: "Campaigns" },
+        { value: "ads", label: "Ads" },
+        { value: "ad_sets", label: "Ad sets" },
+        { value: "ad_creatives", label: "Ad creatives" },
+        { value: "leads", label: "Leads" },
+      ], default: ["campaigns", "ads", "ad_sets"] },
     ],
   },
   {

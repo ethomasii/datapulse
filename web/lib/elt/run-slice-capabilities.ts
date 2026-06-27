@@ -113,7 +113,14 @@ const CAPABILITIES: Record<string, RunSliceCapability> = {
     ...DLT_SINCE,
     mechanism: "facebook_insights_source date_start incremental env bounds",
   },
-  google_ads: { ...DLT_DATE_RANGE, mechanism: "google_ads(start_date=partition_key)" },
+  facebook_ads_catalog: {
+    ...FULL_REPLACE,
+    mechanism: "facebook_ads_source() campaigns/ads/ad_sets — full replace catalog",
+  },
+  google_ads: {
+    ...FULL_REPLACE,
+    mechanism: "google_ads() dimension tables — replace load, no date slice param",
+  },
   slack: { ...DLT_SINCE, mechanism: "slack_source(start_date=partition_key)" },
   notion: {
     ...DLT_SINCE,

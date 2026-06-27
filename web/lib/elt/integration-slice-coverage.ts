@@ -49,6 +49,7 @@ export const TIER1_NONE_ONLY_OK = new Set([
   "bing_webmaster",
   "inbox",
   "mux",
+  "google_ads",
 ]);
 
 export type IntegrationSliceAudit = {

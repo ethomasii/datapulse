@@ -59,9 +59,11 @@ describe("VERIFIED_INCREMENTAL_ENV", () => {
   });
 
   it("uses matomo_visits source name for live visits incremental", () => {
-    expect(VERIFIED_INCREMENTAL_ENV.matomo).toEqual({
-      dltSourceName: "matomo_visits",
-      resources: [{ name: "visits", cursorField: "serverTimestamp" }],
+    expect(VERIFIED_INCREMENTAL_ENV.matomo.dltSourceName).toBe("matomo_visits");
+    expect(VERIFIED_INCREMENTAL_ENV.matomo.dynamicQueries).toEqual({
+      dltSourceName: "matomo_reports",
+      queriesConfigKey: "queries",
+      cursorField: "date",
     });
   });
 });

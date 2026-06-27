@@ -15,10 +15,19 @@ export type IncrementalEnvResource = {
   dateRangeParams?: boolean;
 };
 
+/** Config-driven report resources (e.g. matomo_reports query list). */
+export type IncrementalEnvDynamicQueries = {
+  dltSourceName: string;
+  queriesConfigKey: string;
+  cursorField: string;
+};
+
 export type IncrementalEnvConfig = {
   /** dlt source section name (@dlt.source name=...) */
   dltSourceName: string;
   resources: IncrementalEnvResource[];
+  /** When pipeline config includes queries, apply env bounds per query resource_name. */
+  dynamicQueries?: IncrementalEnvDynamicQueries;
 };
 
 /** Catalog slug → VERIFIED_INCREMENTAL_ENV key (e.g. asana → asana_dlt). */
@@ -54,6 +63,11 @@ export const VERIFIED_INCREMENTAL_ENV: Record<string, IncrementalEnvConfig> = {
   matomo: {
     dltSourceName: "matomo_visits",
     resources: [{ name: "visits", cursorField: "serverTimestamp" }],
+    dynamicQueries: {
+      dltSourceName: "matomo_reports",
+      queriesConfigKey: "queries",
+      cursorField: "date",
+    },
   },
   facebook_ads: {
     dltSourceName: "facebook_ads",
@@ -69,6 +83,15 @@ export function resolveIncrementalEnvSlug(slug: string): string {
 export function getIncrementalEnvConfig(slug: string): IncrementalEnvConfig | null {
   const resolved = resolveIncrementalEnvSlug(slug);
   return VERIFIED_INCREMENTAL_ENV[resolved] ?? null;
+}
+
+export function matomoUsesReportsFactory(config: Record<string, unknown>): boolean {
+  const queries = config.queries;
+  return Array.isArray(queries) && queries.length > 0;
+}
+
+export function resolveMatomoFactory(config: Record<string, unknown>): "matomo_reports" | "matomo_visits" {
+  return matomoUsesReportsFactory(config) ? "matomo_reports" : "matomo_visits";
 }
 
 export function slugsWithIncrementalEnv(): string[] {

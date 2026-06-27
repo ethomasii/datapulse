@@ -91,8 +91,31 @@ describe("verified source run slice codegen", () => {
       destinationType: "motherduck",
       sourceConfiguration: { site_id: "1" },
     } as PipelineRequest);
+    expect(code).toContain("from matomo import matomo_visits");
     expect(code).toContain('"visits", "serverTimestamp"');
     expect(code).toContain("SOURCES__MATOMO_VISITS__");
+  });
+
+  it("wires matomo reports dynamic incremental env from partition_key", () => {
+    const code = generateVerifiedSourcePipeline({
+      name: "matomo_reports_sync",
+      sourceType: "matomo",
+      destinationType: "motherduck",
+      sourceConfiguration: {
+        site_id: "1",
+        queries: [
+          {
+            resource_name: "daily_visits",
+            methods: ["VisitsSummary.get"],
+            period: "day",
+          },
+        ],
+      },
+    } as PipelineRequest);
+    expect(code).toContain("from matomo import matomo_reports");
+    expect(code).toContain('source_kwargs.get("queries")');
+    expect(code).toContain('_dyn_source = "MATOMO_REPORTS"');
+    expect(code).toContain('_q.get("resource_name")');
   });
 
   it("wires facebook insights incremental env from partition_key", () => {

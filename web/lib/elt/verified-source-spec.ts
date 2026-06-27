@@ -235,16 +235,23 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
       { param: "account_id", envKeys: ["FACEBOOK_ADS_ACCOUNT_ID", "FACEBOOK_ACCOUNT_ID"] },
     ],
   },
+  facebook_ads_catalog: {
+    module: "facebook_ads",
+    factory: "facebook_ads_source",
+    credentials: [
+      { param: "access_token", envKeys: ["FACEBOOK_ADS_ACCESS_TOKEN", "FACEBOOK_ACCESS_TOKEN"] },
+      { param: "account_id", envKeys: ["FACEBOOK_ADS_ACCOUNT_ID", "FACEBOOK_ACCOUNT_ID"] },
+    ],
+  },
   google_ads: {
     module: "google_ads",
-    factory: "google_ads_source",
+    factory: "google_ads",
     credentials: [
-      { param: "developer_token", envKeys: ["GOOGLE_ADS_DEVELOPER_TOKEN"] },
+      { param: "dev_token", envKeys: ["GOOGLE_ADS_DEVELOPER_TOKEN"] },
       { param: "credentials", envKeys: ["GOOGLE_ADS_CREDENTIALS", "GCP_CREDENTIALS"] },
+      { param: "impersonated_email", envKeys: ["GOOGLE_ADS_IMPERSONATED_EMAIL", "GOOGLE_ADS_LOGIN_CUSTOMER_ID"] },
     ],
-    configKeys: ["customer_id", "start_date"],
-    partitionKwarg: "start_date",
-    partitionEndKwarg: "end_date",
+    configKeys: ["customer_id"],
   },
   bing_webmaster: {
     module: "bing_webmaster",
@@ -255,10 +262,10 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
     module: "matomo",
     factory: "matomo_visits",
     credentials: [
-      { param: "token_auth", envKeys: ["MATOMO_TOKEN_AUTH"] },
+      { param: "api_token", envKeys: ["MATOMO_TOKEN_AUTH", "MATOMO_API_TOKEN"] },
       { param: "url", envKeys: ["MATOMO_URL"] },
     ],
-    configKeys: ["live_events_site_id", "site_id"],
+    configKeys: ["live_events_site_id", "site_id", "queries"],
   },
   inbox: {
     module: "inbox",
