@@ -815,6 +815,7 @@ type MotherDuckSqlResponse = {
   data?: unknown[][];
   columns?: { name?: string }[] | string[];
   columnNames?: string[];
+  fields?: ({ name?: string } | string)[];
   schema?: { columns?: ({ name?: string } | string)[] };
   success?: boolean;
   result?: MotherDuckSqlResponse;
