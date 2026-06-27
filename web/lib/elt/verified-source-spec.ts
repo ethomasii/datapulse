@@ -44,7 +44,7 @@ export type VerifiedSourceSpec = {
   /** Optional end bound kwarg for day slices (e.g. end_date). */
   partitionEndKwarg?: string;
   /** How partition_key is applied when the factory has no single start_date arg. */
-  partitionSliceMode?: "jira_jql" | "asana_tasks" | "salesforce_incremental" | "dlt_incremental_env";
+  partitionSliceMode?: "jira_jql" | "dlt_incremental_env";
   /** Config key holding selected resource ids */
   resourceConfigKey?: string;
   alternateResourceConfigKeys?: string[];
@@ -113,7 +113,6 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
     module: "salesforce",
     factory: "salesforce_source",
     credentialStyle: "salesforce_security_token",
-    partitionSliceMode: "salesforce_incremental",
     credentials: [
       { param: "user_name", envKeys: ["SALESFORCE_USER", "SALESFORCE_USERNAME"] },
       { param: "password", envKeys: ["SALESFORCE_PASSWORD"] },
@@ -176,7 +175,6 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
     module: "asana_dlt",
     factory: "asana_source",
     credentialStyle: "asana_secrets",
-    partitionSliceMode: "asana_tasks",
     credentials: [{ param: "access_token", envKeys: ["ASANA_ACCESS_TOKEN", "ASANA_DLT_ACCESS_TOKEN"] }],
   },
   workable: {
@@ -231,14 +229,11 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
   },
   facebook_ads: {
     module: "facebook_ads",
-    factory: "facebook_ads_source",
+    factory: "facebook_insights_source",
     credentials: [
       { param: "access_token", envKeys: ["FACEBOOK_ADS_ACCESS_TOKEN", "FACEBOOK_ACCESS_TOKEN"] },
       { param: "account_id", envKeys: ["FACEBOOK_ADS_ACCOUNT_ID", "FACEBOOK_ACCOUNT_ID"] },
     ],
-    configKeys: ["start_date"],
-    partitionKwarg: "start_date",
-    partitionEndKwarg: "end_date",
   },
   google_ads: {
     module: "google_ads",
@@ -258,14 +253,12 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
   },
   matomo: {
     module: "matomo",
-    factory: "matomo_source",
+    factory: "matomo_visits",
     credentials: [
       { param: "token_auth", envKeys: ["MATOMO_TOKEN_AUTH"] },
       { param: "url", envKeys: ["MATOMO_URL"] },
     ],
-    configKeys: ["site_id", "start_date"],
-    partitionKwarg: "start_date",
-    partitionEndKwarg: "end_date",
+    configKeys: ["live_events_site_id", "site_id"],
   },
   inbox: {
     module: "inbox",

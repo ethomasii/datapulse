@@ -7,6 +7,28 @@ describe("resolveVerifiedSourceSpec partition defaults", () => {
     expect(spec?.partitionSliceMode).toBe("dlt_incremental_env");
   });
 
+  it("wires salesforce via dlt_incremental_env", () => {
+    const spec = resolveVerifiedSourceSpec("salesforce");
+    expect(spec?.partitionSliceMode).toBe("dlt_incremental_env");
+  });
+
+  it("wires asana via dlt_incremental_env", () => {
+    const spec = resolveVerifiedSourceSpec("asana");
+    expect(spec?.partitionSliceMode).toBe("dlt_incremental_env");
+  });
+
+  it("wires matomo via dlt_incremental_env", () => {
+    const spec = resolveVerifiedSourceSpec("matomo");
+    expect(spec?.partitionSliceMode).toBe("dlt_incremental_env");
+    expect(spec?.factory).toBe("matomo_visits");
+  });
+
+  it("wires facebook ads insights via dlt_incremental_env", () => {
+    const spec = resolveVerifiedSourceSpec("facebook_ads");
+    expect(spec?.partitionSliceMode).toBe("dlt_incremental_env");
+    expect(spec?.factory).toBe("facebook_insights_source");
+  });
+
   it("wires strapi since/until kwargs", () => {
     const spec = resolveVerifiedSourceSpec("strapi");
     expect(spec?.partitionKwarg).toBe("since");

@@ -36,8 +36,8 @@ describe("verified source run slice codegen", () => {
       destinationType: "motherduck",
       sourceConfiguration: {},
     } as PipelineRequest);
-    expect(code).toContain("SOURCES__ASANA_DLT__TASKS__MODIFIED_AT__INITIAL_VALUE");
-    expect(code).toContain("SOURCES__ASANA_DLT__TASKS__MODIFIED_AT__END_VALUE");
+    expect(code).toContain('"tasks", "modified_at"');
+    expect(code).toContain('SOURCES__ASANA_DLT__" + _res.upper() + "__" + _cursor.upper() + "__');
   });
 
   it("sets salesforce incremental env from partition_key", () => {
@@ -47,8 +47,9 @@ describe("verified source run slice codegen", () => {
       destinationType: "motherduck",
       sourceConfiguration: { resources: ["account"] },
     } as PipelineRequest);
-    expect(code).toContain('"SOURCES__SALESFORCE__" + _res.upper() + "__LAST_TIMESTAMP__"');
-    expect(code).toContain('"account", "opportunity"');
+    expect(code).toContain('"account", "LastModifiedDate"');
+    expect(code).toContain('"opportunity", "SystemModstamp"');
+    expect(code).toContain('SOURCES__SALESFORCE__" + _res.upper() + "__" + _cursor.upper() + "__');
   });
 
   it("wires notion since/until from partition_key", () => {
@@ -83,15 +84,27 @@ describe("verified source run slice codegen", () => {
     expect(code).toContain('source_kwargs["since_timestamp"] = pk');
   });
 
-  it("wires matomo start_date and end_date from partition_key", () => {
+  it("wires matomo visits incremental env from partition_key", () => {
     const code = generateVerifiedSourcePipeline({
       name: "matomo_sync",
       sourceType: "matomo",
       destinationType: "motherduck",
       sourceConfiguration: { site_id: "1" },
     } as PipelineRequest);
-    expect(code).toContain('source_kwargs["start_date"] = pk');
-    expect(code).toContain('source_kwargs["end_date"]');
+    expect(code).toContain('"visits", "serverTimestamp"');
+    expect(code).toContain("SOURCES__MATOMO_VISITS__");
+  });
+
+  it("wires facebook insights incremental env from partition_key", () => {
+    const code = generateVerifiedSourcePipeline({
+      name: "fb_sync",
+      sourceType: "facebook_ads",
+      destinationType: "motherduck",
+      sourceConfiguration: {},
+    } as PipelineRequest);
+    expect(code).toContain("facebook_insights_source");
+    expect(code).toContain('"facebook_insights", "date_start"');
+    expect(code).toContain("SOURCES__FACEBOOK_ADS__");
   });
 
   it("wires workable start_date from partition_key", () => {

@@ -24,8 +24,8 @@ export function buildKwargPartitionBlock(spec: VerifiedSourceSpec): string {
   return block;
 }
 
-/** Salesforce merge resources that honor last_timestamp incremental bounds. */
-const SALESFORCE_INCREMENTAL_RESOURCES = [
+/** Salesforce merge resources that honor per-resource incremental cursors (see verified-incremental-env). */
+export const SALESFORCE_INCREMENTAL_RESOURCES = [
   "account",
   "opportunity",
   "opportunity_line_item",
@@ -34,43 +34,6 @@ const SALESFORCE_INCREMENTAL_RESOURCES = [
   "task",
   "event",
 ] as const;
-
-export function buildAsanaPartitionBlock(): string {
-  return `
-    if partition_key:
-        from datetime import date, timedelta
-        pk = partition_key.strip()
-        initial = pk if "T" in pk else f"{pk[:10]}T00:00:00.000Z"
-        os.environ.setdefault("SOURCES__ASANA_DLT__TASKS__MODIFIED_AT__INITIAL_VALUE", initial)
-        if len(pk) >= 10 and pk[4:5] == "-" and pk[7:8] == "-":
-            try:
-                _day = date.fromisoformat(pk[:10])
-                end = (_day + timedelta(days=1)).isoformat()
-                os.environ.setdefault("SOURCES__ASANA_DLT__TASKS__MODIFIED_AT__END_VALUE", f"{end}T00:00:00.000Z")
-            except ValueError:
-                pass`;
-}
-
-export function buildSalesforcePartitionBlock(): string {
-  const resources = SALESFORCE_INCREMENTAL_RESOURCES.map((r) => `"${r}"`).join(", ");
-  return `
-    if partition_key:
-        from datetime import date, timedelta
-        pk = partition_key.strip()
-        initial = pk if "T" in pk else f"{pk[:10]}T00:00:00Z"
-        end_val = None
-        if len(pk) >= 10 and pk[4:5] == "-" and pk[7:8] == "-":
-            try:
-                _day = date.fromisoformat(pk[:10])
-                end_val = f"{(_day + timedelta(days=1)).isoformat()}T00:00:00Z"
-            except ValueError:
-                pass
-        for _res in (${resources},):
-            _prefix = "SOURCES__SALESFORCE__" + _res.upper() + "__LAST_TIMESTAMP__"
-            os.environ.setdefault(_prefix + "INITIAL_VALUE", initial)
-            if end_val:
-                os.environ.setdefault(_prefix + "END_VALUE", end_val)`;
-}
 
 export function buildVerifiedImportLine(spec: VerifiedSourceSpec): string {
   if (spec.partitionSliceMode === "jira_jql") {
@@ -138,12 +101,6 @@ ${rows},
 }
 
 export function buildVerifiedPartitionBlock(spec: VerifiedSourceSpec, slug?: string): string {
-  if (spec.partitionSliceMode === "asana_tasks") {
-    return buildAsanaPartitionBlock();
-  }
-  if (spec.partitionSliceMode === "salesforce_incremental") {
-    return buildSalesforcePartitionBlock();
-  }
   if (spec.partitionSliceMode === "dlt_incremental_env" && slug) {
     return buildDltIncrementalEnvPartitionBlock(slug);
   }

@@ -106,10 +106,13 @@ const CAPABILITIES: Record<string, RunSliceCapability> = {
   },
   google_analytics: { ...DLT_DATE_RANGE, mechanism: "google_analytics(start_date=partition_key)" },
   matomo: {
-    ...DLT_DATE_RANGE,
-    mechanism: "matomo_source(start_date=partition_key, end_date=next_day)",
+    ...DLT_SINCE,
+    mechanism: "matomo_visits visits.serverTimestamp incremental env bounds",
   },
-  facebook_ads: { ...DLT_DATE_RANGE, mechanism: "facebook_ads_source(start_date=partition_key)" },
+  facebook_ads: {
+    ...DLT_SINCE,
+    mechanism: "facebook_insights_source date_start incremental env bounds",
+  },
   google_ads: { ...DLT_DATE_RANGE, mechanism: "google_ads(start_date=partition_key)" },
   slack: { ...DLT_SINCE, mechanism: "slack_source(start_date=partition_key)" },
   notion: {
@@ -220,12 +223,6 @@ function inferVerifiedSliceCapability(slug: string): RunSliceCapability | null {
     }
     if (spec.partitionSliceMode === "jira_jql") {
       return { ...DLT_SINCE, mechanism: "jira_search JQL updated range for day slices" };
-    }
-    if (spec.partitionSliceMode === "asana_tasks") {
-      return { ...DLT_SINCE, mechanism: "asana tasks modified_at incremental env bounds" };
-    }
-    if (spec.partitionSliceMode === "salesforce_incremental") {
-      return { ...DLT_SINCE, mechanism: "salesforce incremental env bounds on merge resources" };
     }
     const start = spec.partitionKwarg ?? "start_date";
     const end = spec.partitionEndKwarg ? `, ${spec.partitionEndKwarg}=next_day` : "";
