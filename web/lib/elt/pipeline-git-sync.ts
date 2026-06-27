@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { db } from "@/lib/db/client";
 import { ELTPULSE_REPO } from "@/lib/elt/eltpulse-repo-layout";
 import { eltPipelineToDeclarativeYamlString } from "@/lib/elt/pipeline-spec-export";
-import { parsePipelineDeclarationYaml } from "@/lib/elt/parse-pipeline-declaration";
+import { parsePipelineDeclarationYaml, parseAndCompileDeclarativeYaml } from "@/lib/elt/parse-pipeline-declaration";
 import { upsertPipelineDefinition } from "@/lib/elt/persist-pipeline";
 import { getGithubConnectionForUser } from "@/lib/db/github-connection-query";
 import { getGithubAccessTokenForUser } from "@/lib/integrations/github-access-token";
@@ -220,15 +220,41 @@ export async function restorePipelineFromGitCommit(
   if (!remote) return { ok: false, error: "Could not load file at that commit" };
 
   try {
-    const decl = parsePipelineDeclarationYaml(remote.yaml);
-    const result = await upsertPipelineDefinition(userId, decl.body, {
-      declarativeSpecYaml: decl.declarativeSpecYaml,
+    let parsed;
+    try {
+      parsed = await parseAndCompileDeclarativeYaml(userId, remote.yaml);
+    } catch {
+      parsed = parsePipelineDeclarationYaml(remote.yaml);
+    }
+    const result = await upsertPipelineDefinition(userId, parsed.body, {
+      ...(parsed.declarativeSpecYaml ? { declarativeSpecYaml: parsed.declarativeSpecYaml } : {}),
+      ...(parsed.deploymentBindings ? { deploymentBindings: parsed.deploymentBindings } : {}),
     });
     if (!result.ok) return { ok: false, error: result.message };
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+export async function promotePipelineToProduction(
+  userId: string,
+  pipelineId: string
+): Promise<PushPipelineResult & { compareUrl?: string | null; deployedAt?: string }> {
+  const result = await pushPipelineToGitBranch(userId, pipelineId, {
+    branch: "production",
+    commitMessage: `[eltpulse] Deploy to production`,
+  });
+  if (!result.ok) return result;
+
+  const { recordWorkspaceAuditForUser } = await import("@/lib/audit/workspace-audit");
+  void recordWorkspaceAuditForUser({
+    userId,
+    action: "pipeline.updated",
+    detail: { pipelineId, deployedToProduction: true, branch: result.branch, path: result.path },
+  });
+
+  return { ...result, deployedAt: new Date().toISOString() };
 }
 
 export async function pushPipelineToGitBranch(

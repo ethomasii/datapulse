@@ -61,7 +61,18 @@ const scheduleSpecSchema = z.object({
   enabled: z.boolean().optional(),
   cron: z.string().max(256).optional(),
   timezone: z.string().max(64).optional(),
+  /** Run environment slug for scheduled runs (default production). */
+  environment: z.string().max(64).optional(),
 });
+
+/** Per-deployment connection overrides (GitOps-safe — names only, no secrets). */
+export const deploymentBindingSpecSchema = z.object({
+  sourceConnection: z.string().min(1).optional(),
+  destinationConnection: z.string().min(1).optional(),
+  env: z.record(z.string(), z.string()).optional(),
+});
+
+export type DeploymentBindingSpec = z.infer<typeof deploymentBindingSpecSchema>;
 
 const medallionSpecSchema = z.object({
   /** Layer assigned to landed raw tables (default bronze). */
@@ -107,6 +118,8 @@ export const declarativePipelineSpecSchema = z.object({
   tests: z.string().max(16000).optional(),
   sensors: z.string().max(16000).optional(),
   otherNotes: z.string().max(8000).optional(),
+  /** development / production connection profiles — promoted with pipeline YAML in Git. */
+  deployments: z.record(z.string(), deploymentBindingSpecSchema).optional(),
 });
 
 export type DeclarativePipelineSpec = z.infer<typeof declarativePipelineSpecSchema>;

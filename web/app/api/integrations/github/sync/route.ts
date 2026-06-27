@@ -5,7 +5,7 @@ import { getCurrentDbUser } from "@/lib/auth/server";
 import { db } from "@/lib/db/client";
 import { getGithubConnectionForUser } from "@/lib/db/github-connection-query";
 import { ELTPULSE_REPO } from "@/lib/elt/eltpulse-repo-layout";
-import { parsePipelineDeclarationYaml } from "@/lib/elt/parse-pipeline-declaration";
+import { parsePipelineDeclarationYaml, parseAndCompileDeclarativeYaml } from "@/lib/elt/parse-pipeline-declaration";
 import { upsertPipelineDefinition } from "@/lib/elt/persist-pipeline";
 import { getGithubAccessTokenForUser } from "@/lib/integrations/github-access-token";
 import { pushPipelineToGithub } from "@/lib/integrations/github-push-pipeline";
@@ -111,20 +111,33 @@ export async function POST(req: Request) {
         continue;
       }
       const yamlText = decodeGithubFileContent(file);
-      let decl: ReturnType<typeof parsePipelineDeclarationYaml>;
       try {
-        decl = parsePipelineDeclarationYaml(yamlText);
+        let body;
+        let deploymentBindings;
+        let declarativeSpecYaml;
+        try {
+          const compiled = await parseAndCompileDeclarativeYaml(user.id, yamlText);
+          body = compiled.body;
+          deploymentBindings = compiled.deploymentBindings;
+          declarativeSpecYaml = compiled.declarativeSpecYaml;
+        } catch {
+          const decl = parsePipelineDeclarationYaml(yamlText);
+          body = decl.body;
+        }
+        const result = await upsertPipelineDefinition(user.id, body, {
+          ...(declarativeSpecYaml ? { declarativeSpecYaml } : {}),
+          ...(deploymentBindings ? { deploymentBindings } : {}),
+        });
+        if (!result.ok) {
+          errors.push({ path: f.path, message: result.message });
+          continue;
+        }
+        applied.push(body.name);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         errors.push({ path: f.path, message: msg });
         continue;
       }
-      const result = await upsertPipelineDefinition(user.id, decl.body);
-      if (!result.ok) {
-        errors.push({ path: f.path, message: result.message });
-        continue;
-      }
-      applied.push(decl.body.name);
     }
 
     return NextResponse.json({

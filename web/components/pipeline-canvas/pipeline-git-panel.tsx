@@ -142,7 +142,7 @@ export function PipelineGitPanel({ pipelineId, canWrite, onRestored }: Props) {
           </h3>
           <p className="mt-0.5 text-[10px] leading-snug text-slate-500">
             {sync?.message ??
-              "Canvas saves auto-push to the development branch. Publish merges to production."}
+              "Edit in dev → save pushes to develop. Deploy promotes definition + bindings to production branch (CI/CD)."}
           </p>
         </div>
         {sync?.inSync === false ? (
@@ -163,11 +163,11 @@ export function PipelineGitPanel({ pipelineId, canWrite, onRestored }: Props) {
           <button
             type="button"
             disabled={!!busy}
-            onClick={() => void runAction({ action: "push", branch: "production" }, "push-prod")}
+            onClick={() => void runAction({ action: "promote_to_production" }, "deploy-prod")}
             className="inline-flex items-center gap-1 rounded-md bg-violet-600 px-2 py-1 text-[10px] font-medium text-white hover:bg-violet-700 disabled:opacity-50"
           >
-            {busy === "push-prod" ? <Loader2 className="h-3 w-3 animate-spin" /> : <ArrowUpFromLine className="h-3 w-3" />}
-            Publish to production
+            {busy === "deploy-prod" ? <Loader2 className="h-3 w-3 animate-spin" /> : <ArrowUpFromLine className="h-3 w-3" />}
+            Deploy to production
           </button>
           <button
             type="button"
@@ -175,7 +175,7 @@ export function PipelineGitPanel({ pipelineId, canWrite, onRestored }: Props) {
             onClick={() => void runAction({ action: "push", branch: "development" }, "push-dev")}
             className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-[10px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           >
-            Push to develop
+            Push YAML to develop
           </button>
           {repoUrl ? (
             <a

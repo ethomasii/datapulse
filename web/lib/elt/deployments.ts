@@ -3,6 +3,7 @@ import { db } from "@/lib/db/client";
 import { getAccessibleResourceOwnerIds, workspaceResourceUserId } from "@/lib/auth/workspace-access";
 import { getWorkspacePermissions } from "@/lib/auth/org-permissions";
 import { loadWorkspaceConnectionById } from "@/lib/elt/workspace-connection-load";
+import type { DeploymentBindingSpec } from "@/lib/elt/declarative-pipeline-spec";
 
 export type DeploymentSummary = {
   id: string;
@@ -225,7 +226,9 @@ export async function listPipelineDeploymentBindings(userId: string, pipelineId:
   return db.pipelineDeploymentBinding.findMany({
     where: { pipelineId },
     include: {
-      deployment: { select: { id: true, slug: true, label: true, isDefault: true } },
+      deployment: {
+        select: { id: true, slug: true, label: true, isDefault: true, envOverridesEnc: true },
+      },
     },
   });
 }
@@ -241,4 +244,95 @@ export async function loadDestinationForPipelineEnvironment(
 ) {
   const resolved = await resolvePipelineConnectionsForEnvironment(userId, pipeline, environment);
   return loadWorkspaceConnectionById(userId, resolved.destinationConnectionId);
+}
+
+async function resolveConnectionIdByNameOrId(
+  userId: string,
+  ref: string | undefined,
+  connectionType: "source" | "destination"
+): Promise<string | null> {
+  if (!ref?.trim()) return null;
+  const ownerIds = await getAccessibleResourceOwnerIds(userId);
+  const key = ref.trim();
+  const byId = await db.connection.findFirst({
+    where: { id: key, userId: { in: ownerIds }, connectionType },
+    select: { id: true },
+  });
+  if (byId) return byId.id;
+  const byName = await db.connection.findFirst({
+    where: { name: key, userId: { in: ownerIds }, connectionType },
+    select: { id: true },
+  });
+  return byName?.id ?? null;
+}
+
+/** Export deployment bindings as GitOps-safe connection names for declarative YAML. */
+export async function exportDeploymentBindingsToSpec(
+  userId: string,
+  pipelineId: string
+): Promise<Record<string, DeploymentBindingSpec> | null> {
+  const bindings = await listPipelineDeploymentBindings(userId, pipelineId);
+  if (!bindings.length) return null;
+
+  const out: Record<string, DeploymentBindingSpec> = {};
+  for (const b of bindings) {
+    const slug = b.deployment.slug;
+    const entry: DeploymentBindingSpec = {};
+    if (b.sourceConnectionId) {
+      const c = await db.connection.findUnique({
+        where: { id: b.sourceConnectionId },
+        select: { name: true },
+      });
+      if (c) entry.sourceConnection = c.name;
+    }
+    if (b.destinationConnectionId) {
+      const c = await db.connection.findUnique({
+        where: { id: b.destinationConnectionId },
+        select: { name: true },
+      });
+      if (c) entry.destinationConnection = c.name;
+    }
+    const env = parseDeploymentEnvOverrides(b.deployment.envOverridesEnc);
+    if (Object.keys(env).length) entry.env = env;
+    if (Object.keys(entry).length) out[slug] = entry;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/** Apply `deployments:` block from declarative YAML without touching pipeline definition. */
+export async function applyDeploymentBindingsFromSpec(
+  userId: string,
+  pipelineId: string,
+  deployments: Record<string, DeploymentBindingSpec>
+): Promise<void> {
+  await ensureDefaultDeployments(userId);
+  const resourceUserId = workspaceResourceUserId(await getWorkspacePermissions(userId), userId);
+  const rows = await db.workspaceDeployment.findMany({ where: { userId: resourceUserId } });
+  const bindings: PipelineDeploymentBindingInput[] = [];
+
+  for (const [slug, cfg] of Object.entries(deployments)) {
+    const dep = rows.find((r) => r.slug === normalizeDeploymentSlug(slug));
+    if (!dep) continue;
+
+    if (cfg.env && Object.keys(cfg.env).length) {
+      await db.workspaceDeployment.update({
+        where: { id: dep.id },
+        data: { envOverridesEnc: encryptDeploymentEnvOverrides(cfg.env) },
+      });
+    }
+
+    bindings.push({
+      deploymentId: dep.id,
+      sourceConnectionId: await resolveConnectionIdByNameOrId(userId, cfg.sourceConnection, "source"),
+      destinationConnectionId: await resolveConnectionIdByNameOrId(
+        userId,
+        cfg.destinationConnection,
+        "destination"
+      ),
+    });
+  }
+
+  if (bindings.length) {
+    await upsertPipelineDeploymentBindings(userId, pipelineId, bindings);
+  }
 }

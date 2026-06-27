@@ -7,6 +7,7 @@ import {
   fetchPipelineGitHistory,
   getPipelineGitSyncStatus,
   listPipelineRevisions,
+  promotePipelineToProduction,
   pushPipelineToGitBranch,
   restorePipelineFromGitCommit,
   restorePipelineRevision,
@@ -20,6 +21,7 @@ import { resolveRouteParamId } from "@/lib/server/route-params";
 type Ctx = { params: Promise<{ id: string }> };
 
 const actionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("promote_to_production") }),
   z.object({ action: z.literal("push"), branch: z.enum(["production", "development"]).optional() }),
   z.object({ action: z.literal("restore_git"), commitSha: z.string().min(7).max(64) }),
   z.object({ action: z.literal("restore_revision"), revisionId: z.string().min(1) }),
@@ -100,6 +102,17 @@ export async function POST(req: Request, ctx: Ctx) {
 
   const body = parsed.data;
 
+  if (body.action === "promote_to_production") {
+    const result = await promotePipelineToProduction(user.id, pipelineId);
+    if (!result.ok) {
+      return NextResponse.json(
+        { error: result.error, skipped: result.skipped ?? false },
+        { status: result.skipped ? 400 : 502 }
+      );
+    }
+    return NextResponse.json(result);
+  }
+
   if (body.action === "push") {
     const result = await pushPipelineToGitBranch(user.id, pipelineId, { branch: body.branch ?? "production" });
     if (!result.ok) {
@@ -124,5 +137,9 @@ export async function POST(req: Request, ctx: Ctx) {
   }
 
   await upsertPipelineDeploymentBindings(user.id, pipelineId, body.bindings);
+  void pushPipelineToGitBranch(user.id, pipelineId, {
+    branch: "development",
+    commitMessage: `[eltpulse] Update deployment bindings`,
+  }).catch(() => undefined);
   return NextResponse.json({ ok: true });
 }

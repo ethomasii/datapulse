@@ -7,6 +7,7 @@ import {
 } from "@/lib/elt/declarative-pipeline-spec";
 import { readMedallionHints } from "@/lib/elt/compile-declarative-pipeline";
 import { db } from "@/lib/db/client";
+import { exportDeploymentBindingsToSpec } from "@/lib/elt/deployments";
 
 function tablesFromSourceConfig(sourceType: string, cfg: Record<string, unknown>): string[] | undefined {
   const slug = sourceType.toLowerCase();
@@ -145,11 +146,22 @@ export async function eltPipelineToDeclarativeSpec(
 }
 
 /** Serialize pipeline as declarative YAML v2 for GitOps. */
-export async function eltPipelineToDeclarativeYamlString(row: EltPipeline): Promise<string> {
-  if (row.declarativeSpecYaml?.trim()) {
+export async function eltPipelineToDeclarativeYamlString(
+  row: EltPipeline,
+  opts?: { includeDeployments?: boolean; actingUserId?: string }
+): Promise<string> {
+  const spec = await eltPipelineToDeclarativeSpec(row);
+  if (opts?.includeDeployments && opts.actingUserId) {
+    const deployments = await exportDeploymentBindingsToSpec(opts.actingUserId, row.id);
+    if (deployments) {
+      (spec as Record<string, unknown>).deployments = deployments;
+    }
+  }
+
+  if (row.declarativeSpecYaml?.trim() && !opts?.includeDeployments) {
     return row.declarativeSpecYaml.trimEnd() + "\n";
   }
-  const spec = await eltPipelineToDeclarativeSpec(row);
+
   const doc: Record<string, unknown> = {
     eltpulse_pipeline: 2,
     upsert: true,

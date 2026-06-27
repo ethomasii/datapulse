@@ -13,6 +13,8 @@ import type { CreatePipelineBody } from "@/lib/elt/types";
 import { normalizeRunWebhookUrl } from "@/lib/elt/validate-run-webhook-url";
 import { maybeAutoPushPipelineToGit } from "@/lib/integrations/github-push-pipeline";
 import { recordWorkspaceAuditForUser } from "@/lib/audit/workspace-audit";
+import { applyDeploymentBindingsFromSpec } from "@/lib/elt/deployments";
+import type { DeploymentBindingSpec } from "@/lib/elt/declarative-pipeline-spec";
 
 export type PersistPipelineFailure = { ok: false; status: number; message: string };
 
@@ -25,6 +27,8 @@ export type PersistPipelineSuccess = {
 export type PersistPipelineOptions = {
   /** Store authoritative v2 declarative YAML on the pipeline row. */
   declarativeSpecYaml?: string | null;
+  /** Apply per-deployment connection bindings after upsert (GitOps). */
+  deploymentBindings?: Record<string, DeploymentBindingSpec>;
 };
 
 type PreparedPipelineWrite = {
@@ -178,6 +182,9 @@ export async function upsertPipelineDefinition(
       where: { id: existing.id },
       data,
     });
+    if (options?.deploymentBindings) {
+      await applyDeploymentBindingsFromSpec(resourceUserId, pipeline.id, options.deploymentBindings);
+    }
     void maybeAutoPushPipelineToGit(resourceUserId, pipeline.id);
     void recordWorkspaceAuditForUser({
       userId: resourceUserId,
@@ -193,6 +200,9 @@ export async function upsertPipelineDefinition(
       ...data,
     },
   });
+  if (options?.deploymentBindings) {
+    await applyDeploymentBindingsFromSpec(resourceUserId, pipeline.id, options.deploymentBindings);
+  }
   void maybeAutoPushPipelineToGit(resourceUserId, pipeline.id);
   void recordWorkspaceAuditForUser({
     userId: resourceUserId,

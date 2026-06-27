@@ -81,7 +81,7 @@ async function dispatchScheduledRun(
     const run = await createPendingEltRun({
       userId: pipeline.userId,
       pipelineId: pipeline.id,
-      environment: "schedule",
+      environment: "production",
       triggeredBy,
       partitionColumn: null,
       partitionValue: null,
@@ -161,7 +161,7 @@ async function dispatchStandaloneDbtRun(
       userId: project.userId,
       pipelineId: linked?.id ?? null,
       dbtProjectId: project.id,
-      environment: "schedule",
+      environment: "production",
       triggeredBy,
       partitionColumn: null,
       partitionValue: null,

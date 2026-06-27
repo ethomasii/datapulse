@@ -36,6 +36,7 @@ import { builderUrl, parseBuilderCanvasTab, type BuilderCanvasTab } from "@/lib/
 import type { DbtTransformNodeData } from "@/lib/elt/dbt-canvas";
 import { CanvasAssetLineagePanel } from "@/components/pipeline-canvas/canvas-asset-lineage-panel";
 import { PipelineGitPanel } from "@/components/pipeline-canvas/pipeline-git-panel";
+import { PipelineDeploymentPanel } from "@/components/pipeline-canvas/pipeline-deployment-panel";
 import { DeploymentSelector } from "@/components/pipeline-canvas/deployment-selector";
 import {
   type CanvasInspectorFocus,
@@ -821,6 +822,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
                 canWrite={canWrite}
                 onRestored={() => void loadPipelineGraph(selectedId)}
               />
+              <PipelineDeploymentPanel pipelineId={selectedId} canWrite={canWrite} />
               <CanvasAssetLineagePanel
                 pipelineId={selectedId}
                 pipelineName={selectedName}

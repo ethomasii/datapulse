@@ -70,10 +70,12 @@ export async function POST(req: Request) {
 
   const wantUpsert = modeParam === "upsert" || parsed.upsert;
 
-  const persistOpts =
-    parsed.declarativeSpecYaml !== undefined
+  const persistOpts = {
+    ...(parsed.declarativeSpecYaml !== undefined
       ? { declarativeSpecYaml: parsed.declarativeSpecYaml }
-      : undefined;
+      : {}),
+    ...(parsed.deploymentBindings ? { deploymentBindings: parsed.deploymentBindings } : {}),
+  };
 
   try {
     const result = wantUpsert

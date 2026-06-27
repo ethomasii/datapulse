@@ -73,7 +73,10 @@ export async function pushPipelineToGithub(
     return { ok: false, error: "Pipeline not found" };
   }
 
-  const yamlText = await eltPipelineToDeclarativeYamlString(row);
+  const yamlText = await eltPipelineToDeclarativeYamlString(row, {
+    includeDeployments: true,
+    actingUserId: userId,
+  });
   const relPath = `${ELTPULSE_REPO.pipelinesDir}/${row.name}.yaml`;
   const fileUrlPath = githubRepoContentsApiPath(ctx.owner, ctx.name, relPath);
   const fileUrlWithRef = `${fileUrlPath}?ref=${encodeURIComponent(ctx.branch)}`;

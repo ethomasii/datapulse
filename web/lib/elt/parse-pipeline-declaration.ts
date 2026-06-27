@@ -3,6 +3,7 @@ import { createPipelineBodySchema, type CreatePipelineBody } from "@/lib/elt/typ
 import {
   DECLARATIVE_PIPELINE_SPEC_VERSION,
   declarativePipelineSpecSchema,
+  type DeploymentBindingSpec,
 } from "@/lib/elt/declarative-pipeline-spec";
 import { compileDeclarativePipelineSpec } from "@/lib/elt/compile-declarative-pipeline";
 
@@ -18,6 +19,8 @@ export type ParsedPipelineDeclaration = {
   specVersion: 1 | 2;
   /** Original YAML for v2 round-trip when applying declarative specs. */
   declarativeSpecYaml?: string;
+  /** Per-deployment connection bindings from YAML `deployments:` block. */
+  deploymentBindings?: Record<string, DeploymentBindingSpec>;
 };
 
 function readUpsert(merged: Record<string, unknown>): boolean {
@@ -107,7 +110,9 @@ export async function parseAndCompileDeclarativeYaml(
       );
     }
 
-    const compiled = await compileDeclarativePipelineSpec(userId, specParsed.data);
+    const { deployments, ...specWithoutDeployments } = specParsed.data;
+
+    const compiled = await compileDeclarativePipelineSpec(userId, specWithoutDeployments);
     if (!compiled.ok) {
       throw new Error(compiled.error);
     }
@@ -117,6 +122,7 @@ export async function parseAndCompileDeclarativeYaml(
       upsert,
       specVersion: 2,
       declarativeSpecYaml: yamlText.trimEnd() + "\n",
+      ...(deployments ? { deploymentBindings: deployments } : {}),
     };
   }
 
