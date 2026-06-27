@@ -4,6 +4,10 @@
 
 import { parseDuckdbTableRef } from "@/lib/elt/duckdb-table-ref";
 import { STARTER_WAREHOUSE_DEFAULT_DB } from "@/lib/elt/starter-warehouse";
+import {
+  formatMotherduckColumnError,
+  isMotherduckMissingObjectError,
+} from "@/lib/elt/warehouse-column-errors";
 import { resolveDestinationConnectionContext } from "@/lib/elt/warehouse-destination-secrets";
 import type { AssetColumnDef } from "@/lib/elt/catalog-metadata";
 import { parseLandingQualified } from "@/lib/elt/warehouse-introspect";
@@ -114,16 +118,6 @@ async function fetchDuckdbFamilyColumns(
   return [];
 }
 
-function isMotherduckMissingObjectError(message: string): boolean {
-  const m = message.toLowerCase();
-  return (
-    m === "not found" ||
-    m.includes("does not exist") ||
-    m.includes("not_found") ||
-    m.includes("catalog error")
-  );
-}
-
 function motherduckDatabaseCandidates(
   secrets: Record<string, string>,
   config: Record<string, unknown>,
@@ -173,21 +167,6 @@ async function fetchMotherduckColumns(
   }
 
   return { columns: [], lastError };
-}
-
-export function formatMotherduckColumnError(
-  schema: string,
-  table: string,
-  configuredDatabase: string,
-  lastError?: string
-): string {
-  if (lastError && !isMotherduckMissingObjectError(lastError)) {
-    return lastError.slice(0, 200);
-  }
-  return (
-    `No columns found for ${schema}.${table} in MotherDuck database "${configuredDatabase}". ` +
-    `Set Database on your destination connection to where dlt wrote data (often "my_db", not "${STARTER_WAREHOUSE_DEFAULT_DB}"), then retry.`
-  );
 }
 
 function rowsetToColumnDefs(rowset: WarehouseQueryRowset): AssetColumnDef[] {

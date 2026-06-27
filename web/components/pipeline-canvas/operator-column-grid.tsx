@@ -7,7 +7,7 @@ import clsx from "clsx";
 import { operatorColumnGridMode } from "@/lib/elt/operator-column-grid-mode";
 import { readClientFetchJson } from "@/lib/elt/fetch-json-body";
 import { stripDuckdbCatalogPrefix } from "@/lib/elt/duckdb-table-ref";
-import { formatMotherduckColumnError } from "@/lib/elt/warehouse-column-introspect";
+import { formatMotherduckColumnError } from "@/lib/elt/warehouse-column-errors";
 
 type ColumnMeta = { name: string; type?: string };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatMotherduckColumnError } from "./warehouse-column-introspect";
+import { formatMotherduckColumnError } from "./warehouse-column-errors";
 
 describe("formatMotherduckColumnError", () => {
   it("suggests my_db when MotherDuck returns Not Found", () => {
