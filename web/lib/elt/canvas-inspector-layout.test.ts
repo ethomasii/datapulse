@@ -24,10 +24,12 @@ describe("canvas-operator-scope", () => {
 });
 
 describe("detectStepIoMode", () => {
-  it("detects join, union, single, and output-only shapes", () => {
+  it("detects join, union, single, router, and output-only shapes", () => {
     expect(detectStepIoMode(new Set(["left_table", "right_table", "output_table"]))).toBe("join");
     expect(detectStepIoMode(new Set(["tables", "output_table"]))).toBe("union");
     expect(detectStepIoMode(new Set(["table", "output_table"]))).toBe("single");
+    expect(detectStepIoMode(new Set(["table", "routes"]))).toBe("router");
+    expect(detectStepIoMode(new Set(["table", "routes"]), "router")).toBe("router");
     expect(detectStepIoMode(new Set(["prompt", "output_table"]))).toBe("output_only");
     expect(detectStepIoMode(new Set(["sql"]))).toBe(null);
   });
@@ -70,6 +72,17 @@ describe("canvas-inspector-layout", () => {
     expect(layout.stepIoMode).toBe("output_only");
     expect(layout.hideCatalogPanel).toBe(true);
     expect(layout.visibleFormFields.map((f) => f.key)).toEqual(["prompt", "model"]);
+  });
+
+  it("uses router I/O and keeps execution in the form", () => {
+    const layout = resolveCanvasInspectorLayout("router", [
+      { key: "table", label: "Table", type: "string", required: true },
+      { key: "routes", label: "Routes", type: "text", required: true },
+      { key: "default_output_table", label: "Default output table", type: "string" },
+      { key: "execution", label: "Execution", type: "select", options: ["warehouse", "dataframe"] },
+    ]);
+    expect(layout.stepIoMode).toBe("router");
+    expect(layout.visibleFormFields.map((f) => f.key)).toEqual(["execution"]);
   });
 
   it("hides catalog for sql-only transforms", () => {

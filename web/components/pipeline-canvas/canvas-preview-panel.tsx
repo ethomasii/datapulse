@@ -5,8 +5,9 @@ import type { CanvasInspectorFocus } from "@/components/pipeline-canvas/pipeline
 import { DataPreviewPane } from "@/components/pipeline-canvas/data-preview-pane";
 import type { PipelineComponentSpec } from "@/lib/elt/declarative-pipeline-spec";
 import {
-  inputPreviewSourcesFromConfig,
+  isRouterConfig,
   previewTableFromConfig,
+  routerOutputPreviewSourcesFromConfig,
 } from "@/lib/elt/pipeline-asset-keys";
 
 type Props = {
@@ -48,7 +49,12 @@ export function CanvasPreviewPanel({
   const config = liveConfig ?? ((focus.data.config as Record<string, unknown>) ?? {});
   const inputSources = inputPreviewSourcesFromConfig(config);
   const inputTable = inputSources[0]?.table ?? null;
-  const outputTable = previewTableFromConfig(config);
+  const outputSources = isRouterConfig(config) ? routerOutputPreviewSourcesFromConfig(config) : undefined;
+  const outputTable = outputSources?.[0]?.table ?? previewTableFromConfig(config);
+  const outputPreviewHint =
+    isRouterConfig(config) && !outputSources?.length
+      ? "Add Routes with output_table per branch to preview routed outputs."
+      : null;
 
   return (
     <section
@@ -69,12 +75,14 @@ export function CanvasPreviewPanel({
       <DataPreviewPane
         title="Output data preview"
         table={outputTable}
+        outputSources={outputSources}
         pipelineId={pipelineId}
         config={config}
         onDiagnosticChange={onOutputDiagnosticChange}
-        fusedPreview
+        fusedPreview={!isRouterConfig(config)}
         throughStepId={throughStepId}
         eltComponents={eltComponents}
+        emptyHint={outputPreviewHint}
       />
     </section>
   );

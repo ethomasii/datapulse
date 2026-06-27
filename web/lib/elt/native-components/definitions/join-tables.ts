@@ -85,7 +85,7 @@ export const joinTablesComponent: NativeComponentDefinition = {
     "full_outer_join",
     "customer_360_join",
   ],
-  name: "Join tables",
+  name: "Join",
   category: "transformation",
   description: "Join two warehouse tables via SQL push-down (default) or dataframe merge.",
   compileTarget: "warehouse",

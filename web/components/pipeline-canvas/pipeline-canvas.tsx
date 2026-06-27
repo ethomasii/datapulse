@@ -122,7 +122,8 @@ export type PipelineCanvasControl = {
       canvasPorts: { left: boolean; right: boolean };
       icon?: string;
     },
-    config?: Record<string, unknown>
+    config?: Record<string, unknown>,
+    options?: { sourceHandle?: string }
   ) => void;
   addSourceNode: () => void;
   addDestinationNode: () => void;
@@ -708,7 +709,8 @@ function FlowCanvas({
         icon?: string;
         defaultConfig?: Record<string, unknown>;
       },
-      config?: Record<string, unknown>
+      config?: Record<string, unknown>,
+      options?: { sourceHandle?: string }
     ) => {
       idCounter += 1;
       const id = `n-${idCounter}`;
@@ -741,7 +743,9 @@ function FlowCanvas({
         },
       };
 
-      const result = appendNodeAfterUpstream(nodes, edges, upstreamNodeId, newNode);
+      const result = appendNodeAfterUpstream(nodes, edges, upstreamNodeId, newNode, {
+        sourceHandle: options?.sourceHandle,
+      });
       let nextNodes = result.nodes;
       let nextEdges = resolveCanvasEdges(nextNodes, result.edges);
 
@@ -811,8 +815,8 @@ function FlowCanvas({
     return {
       isDesigner: true,
       pipelineId: pipelineId ?? undefined,
-      addComponentAfterNode: (upstreamNodeId, component, config) => {
-        addComponentAfterNode(upstreamNodeId, component, config);
+      addComponentAfterNode: (upstreamNodeId, component, config, options) => {
+        addComponentAfterNode(upstreamNodeId, component, config, options);
       },
       openTransformByExample:
         graphActionHandlers?.openTransformByExample ??

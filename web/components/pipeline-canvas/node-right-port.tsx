@@ -21,16 +21,34 @@ type Props = {
   accent: Accent;
   /** When false, show the default dot (e.g. terminal validate nodes). */
   allowAdd?: boolean;
+  /** React Flow handle id — required for multi-output router branches. */
+  handleId?: string;
+  className?: string;
 };
 
 /** Right-edge source port — in designer mode the handle becomes a compact + menu. */
-export function NodeRightPort({ node, accent, allowAdd = true }: Props) {
+export function NodeRightPort({ node, accent, allowAdd = true, handleId, className }: Props) {
   const actions = useCanvasGraphActions();
   const showAdd = Boolean(actions?.isDesigner && allowAdd);
 
   if (showAdd) {
-    return <NodeAddStepMenu node={node} asHandle />;
+    return (
+      <NodeAddStepMenu
+        node={{ ...node, sourceHandle: handleId ?? node.sourceHandle }}
+        asHandle
+        handleId={handleId}
+        className={className}
+      />
+    );
   }
 
-  return <Handle type="source" position={Position.Right} className={handleClass(accent)} />;
+  return (
+    <Handle
+      type="source"
+      position={Position.Right}
+      id={handleId}
+      className={handleClass(accent)}
+      title={handleId ? `Output: ${handleId}` : undefined}
+    />
+  );
 }

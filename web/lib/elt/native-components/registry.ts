@@ -189,6 +189,18 @@ export function isNativeComponent(id: string): boolean {
   return getNativeComponent(key) !== null;
 }
 
+/** Manifest id that maps to a native via alias (e.g. warehouse_join → join_tables). */
+export function isNativeCatalogAliasId(id: string): boolean {
+  const key = id.trim();
+  const def = byId.get(key);
+  if (!def) return false;
+  return key !== def.id;
+}
+
+export function resolveNativeCanonicalId(id: string): string | null {
+  return getNativeComponent(id)?.id ?? null;
+}
+
 export function resolveNativeComponentId(config: Record<string, unknown>): string | null {
   const templateId = String(config.template_id ?? "").trim();
   if (templateId) {

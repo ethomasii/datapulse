@@ -28,7 +28,8 @@ export function appendNodeAfterUpstream(
   nodes: Node[],
   edges: Edge[],
   upstreamId: string,
-  newNode: Node
+  newNode: Node,
+  opts?: { sourceHandle?: string }
 ): { nodes: Node[]; edges: Edge[]; inserted: boolean } {
   const upstream = nodes.find((n) => n.id === upstreamId);
   if (!upstream) return { nodes, edges, inserted: false };
@@ -42,7 +43,7 @@ export function appendNodeAfterUpstream(
       isValidPipelineCanvasEdge(upstream, newNode) &&
       isValidPipelineCanvasEdge(newNode, tgt)
     ) {
-      const result = insertNodeOnEdge(nodes, edges, edge, newNode);
+      const result = insertNodeOnEdge(nodes, edges, edge, newNode, opts);
       return { ...result, inserted: true };
     }
   }
@@ -54,9 +55,10 @@ export function appendNodeAfterUpstream(
   const nextEdges = [
     ...edges,
     {
-      id: `e-${upstreamId}-${newNode.id}`,
+      id: `e-${upstreamId}-${newNode.id}${opts?.sourceHandle ? `-${opts.sourceHandle}` : ""}`,
       source: upstreamId,
       target: newNode.id,
+      sourceHandle: opts?.sourceHandle,
       animated: true,
     },
   ];

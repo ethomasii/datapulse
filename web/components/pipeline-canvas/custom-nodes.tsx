@@ -13,6 +13,8 @@ import { TRANSFORM_TOOLS, transformToolBadge } from "./transform-tools";
 import { NodeRightPort } from "./node-right-port";
 import type { CanvasNodeRef } from "./canvas-graph-actions-context";
 import { canAddStepAfterNode } from "@/lib/elt/canvas-node-append-after";
+import { isRouterComponentId } from "@/lib/elt/router-routes";
+import { RouterOutputPorts } from "./router-node-ports";
 
 function nodeRef(id: string, type: string, data: Record<string, unknown>): CanvasNodeRef {
   return {
@@ -295,6 +297,7 @@ export function ComponentNode({ id, data }: NodeProps) {
   const componentId = String(d.componentId ?? "");
   const manifestIcon = typeof d.icon === "string" ? d.icon : undefined;
   const ports = d.canvasPorts as { left?: boolean; right?: boolean } | undefined;
+  const isRouter = isRouterComponentId(componentId);
   const isTerminal =
     category === "check" || target === "quality" || (ports?.left === true && ports?.right === false);
   const accent = isTerminal ? "amber" : "sky";
@@ -306,7 +309,7 @@ export function ComponentNode({ id, data }: NodeProps) {
         isTerminal
           ? "border-dashed border-amber-400 bg-amber-50/40 dark:border-amber-500 dark:bg-amber-950/20"
           : "border-violet-400 bg-white dark:border-violet-600 dark:bg-slate-900"
-      }`}
+      } ${isRouter ? "min-h-[5.5rem] pb-3" : ""}`}
     >
       {ports?.left !== false ? (
         <Handle type="target" position={Position.Left} className={handleClass(accent)} />
@@ -342,12 +345,21 @@ export function ComponentNode({ id, data }: NodeProps) {
           Assert only · no output
         </p>
       ) : null}
-      {ports?.right !== false ? (
-        <NodeRightPort
-          node={nodeRef(id, "componentNode", d)}
-          accent={accent}
-          allowAdd={canAddStepAfterNode({ id, type: "componentNode", data: d, position: { x: 0, y: 0 } })}
-        />
+      {ports?.right !== false && !isTerminal ? (
+        isRouter ? (
+          <RouterOutputPorts
+            data={d}
+            nodeRef={nodeRef(id, "componentNode", d)}
+            accent={accent}
+            allowAdd={canAddStepAfterNode({ id, type: "componentNode", data: d, position: { x: 0, y: 0 } })}
+          />
+        ) : (
+          <NodeRightPort
+            node={nodeRef(id, "componentNode", d)}
+            accent={accent}
+            allowAdd={canAddStepAfterNode({ id, type: "componentNode", data: d, position: { x: 0, y: 0 } })}
+          />
+        )
       ) : null}
     </div>
   );

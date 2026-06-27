@@ -2,6 +2,12 @@ import { escapePyString } from "@/lib/elt/escape-py";
 import type { NativeComponentDefinition } from "../types";
 import { inputTable, outputTable } from "./_config-helpers";
 import { pandasReadTable, pandasWriteTable, strList } from "./_pandas-helpers";
+import {
+  isDataframeExecution,
+  pandasQueryToSqlWhere,
+  sqlCreateTableAs,
+  sqlQualifiedTable,
+} from "./_sql-helpers";
 
 function outputParts(output: string) {
   const outSchema = output.includes(".") ? output.split(".")[0]! : "public";
@@ -574,18 +580,36 @@ export const routerComponent: NativeComponentDefinition = {
   aliases: ["conditional_split", "branch"],
   name: "Router",
   category: "transformation",
-  description: "Split rows into multiple output tables by condition.",
-  compileTarget: "python",
+  description:
+    "Split rows into multiple output tables by condition (warehouse SQL CTAS by default; one CTAS per route).",
+  compileTarget: "warehouse",
   fields: [
     { key: "table", label: "Table", type: "string", required: true },
     {
       key: "routes",
       label: "Routes",
-      description: 'JSON array [{\"condition\":\"status == \\"active\\"\",\"output_table\":\"active_rows\"}]',
+      description:
+        'JSON array of branches. Each object needs "condition" (SQL WHERE / pandas query) and "output_table" (schema.table). Rows can match multiple routes.',
       type: "text",
       required: true,
+      default: "[]",
+      placeholder:
+        '[\n  {"condition":"status = \\"active\\"","output_table":"staging.active"},\n  {"condition":"status = \\"inactive\\"","output_table":"staging.inactive"}\n]',
     },
-    { key: "default_output_table", label: "Default output table", type: "string" },
+    {
+      key: "default_output_table",
+      label: "Default output table",
+      description: "Optional table for rows that match no route condition.",
+      type: "string",
+    },
+    {
+      key: "execution",
+      label: "Execution",
+      description: "warehouse = SQL CTAS per route (default); dataframe = worker pandas",
+      type: "select",
+      options: ["warehouse", "dataframe"],
+      default: "warehouse",
+    },
   ],
   compile(config) {
     const table = inputTable(config);
@@ -596,38 +620,68 @@ export const routerComponent: NativeComponentDefinition = {
       try {
         routes = JSON.parse(raw) as typeof routes;
       } catch {
-        return { warnings: ["router: routes must be valid JSON array"], python: [] };
+        return { warnings: ["router: routes must be valid JSON array"], sql: [], python: [] };
       }
     } else if (Array.isArray(raw)) {
       routes = raw as typeof routes;
     }
     if (!table || !routes.length) {
-      return { warnings: ["router: table and routes required"], python: [] };
+      return { warnings: ["router: table and routes required"], sql: [], python: [] };
     }
-    const lines = [
-      `# ── router: ${table} ──`,
-      "try:",
-      ...pandasReadTable(table).map((l) => (l.startsWith("import") ? l : `    ${l}`)),
-      "    _routed_idx = set()",
-    ];
+
+    if (isDataframeExecution(config)) {
+      const lines = [
+        `# ── router (dataframe): ${table} ──`,
+        "try:",
+        ...pandasReadTable(table).map((l) => (l.startsWith("import") ? l : `    ${l}`)),
+        "    _routed_idx = set()",
+      ];
+      for (const route of routes) {
+        const cond = String(route.condition ?? "").trim();
+        const out = String(route.output_table ?? route.table ?? "").trim();
+        if (!cond || !out) continue;
+        const { outSchema, outName } = outputParts(out);
+        lines.push(`    _subset = _df[_df.eval(${JSON.stringify(cond)})]`);
+        lines.push("    _routed_idx.update(_subset.index.tolist())");
+        lines.push(
+          `    _subset.to_sql("${escapePyString(outName)}", _sql._engine, schema="${escapePyString(outSchema)}", if_exists="replace", index=False)`
+        );
+        lines.push(`    print(f"[router] wrote {len(_subset)} rows to ${escapePyString(out)}")`);
+      }
+      if (defaultOut) {
+        const { outSchema, outName } = outputParts(defaultOut);
+        lines.push("    _default = _df[~_df.index.isin(_routed_idx)]");
+        lines.push(
+          `    _default.to_sql("${escapePyString(outName)}", _sql._engine, schema="${escapePyString(outSchema)}", if_exists="replace", index=False)`
+        );
+        lines.push(`    print(f"[router] wrote {len(_default)} default rows to ${escapePyString(defaultOut)}")`);
+      }
+      lines.push("except Exception as _e:", '    print(f"[router] failed: {_e}")', "    raise");
+      return { python: lines };
+    }
+
+    const src = sqlQualifiedTable(table);
+    const sql: string[] = [];
+    const routedConditions: string[] = [];
     for (const route of routes) {
       const cond = String(route.condition ?? "").trim();
       const out = String(route.output_table ?? route.table ?? "").trim();
       if (!cond || !out) continue;
-      const { outSchema, outName } = outputParts(out);
-      lines.push(`    _subset = _df[_df.eval(${JSON.stringify(cond)})]`);
-      lines.push("    _routed_idx.update(_subset.index.tolist())");
-      lines.push(`    _subset.to_sql("${escapePyString(outName)}", _sql._engine, schema="${escapePyString(outSchema)}", if_exists="replace", index=False)`);
-      lines.push(`    print(f"[router] wrote {len(_subset)} rows to ${escapePyString(out)}")`);
+      const where = pandasQueryToSqlWhere(cond);
+      routedConditions.push(`(${where})`);
+      sql.push(sqlCreateTableAs(out, `SELECT *\nFROM ${src}\nWHERE ${where}`));
     }
     if (defaultOut) {
-      const { outSchema, outName } = outputParts(defaultOut);
-      lines.push("    _default = _df[~_df.index.isin(_routed_idx)]");
-      lines.push(`    _default.to_sql("${escapePyString(outName)}", _sql._engine, schema="${escapePyString(outSchema)}", if_exists="replace", index=False)`);
-      lines.push(`    print(f"[router] wrote {len(_default)} default rows to ${escapePyString(defaultOut)}")`);
+      const where =
+        routedConditions.length > 0
+          ? `NOT (${routedConditions.join(" OR ")})`
+          : "1 = 1";
+      sql.push(sqlCreateTableAs(defaultOut, `SELECT *\nFROM ${src}\nWHERE ${where}`));
     }
-    lines.push("except Exception as _e:", '    print(f"[router] failed: {_e}")', "    raise");
-    return { python: lines };
+    if (!sql.length) {
+      return { warnings: ["router: each route needs condition and output_table"], sql: [] };
+    }
+    return { sql };
   },
 };
 

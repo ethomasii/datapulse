@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { compileNativePipelineComponents } from "@/lib/elt/native-components/compile-pipeline-components";
 import { joinTablesComponent } from "@/lib/elt/native-components/definitions/join-tables";
+import { unionTablesComponent } from "@/lib/elt/native-components/definitions/union-tables";
 import { dqCheckComponent } from "@/lib/elt/native-components/definitions/dq-check";
 import { getNativeComponent, isNativeComponent, listNativeComponents } from "@/lib/elt/native-components/registry";
 import { dagsterAttributesToFields } from "@/lib/elt/native-components/dagster-schema";
@@ -37,6 +38,29 @@ describe("native-components", () => {
       execution: "dataframe",
     });
     expect(out.python?.join("\n")).toContain("merge");
+  });
+
+  it("union_tables emits warehouse UNION ALL by default", () => {
+    const out = unionTablesComponent.compile({
+      tables: ["staging.a", "staging.b"],
+      output_table: "staging.combined",
+    });
+    expect(out.sql?.join("\n")).toContain("UNION ALL");
+    expect(out.sql?.join("\n")).toContain('"staging"."a"');
+    expect(out.python).toBeUndefined();
+  });
+
+  it("union_tables dataframe mode emits pandas concat", () => {
+    const out = unionTablesComponent.compile({
+      tables: ["staging.a", "staging.b"],
+      output_table: "staging.combined",
+      execution: "dataframe",
+    });
+    expect(out.python?.join("\n")).toContain("concat");
+  });
+
+  it("resolves warehouse_union alias to union_tables", () => {
+    expect(getNativeComponent("warehouse_union")?.id).toBe("union_tables");
   });
 
   it("dq_check emits test lines", () => {
@@ -299,6 +323,55 @@ describe("native-components", () => {
   it("router resolves as native", () => {
     expect(isNativeComponent("router")).toBe(true);
     expect(isNativeComponent("conditional_split")).toBe(true);
+  });
+
+  it("router emits one warehouse CTAS per route", () => {
+    const def = getNativeComponent("router");
+    const out = def!.compile({
+      table: "staging.orders",
+      routes: JSON.stringify([
+        { condition: 'status = "active"', output_table: "staging.active_orders" },
+        { condition: 'status = "inactive"', output_table: "staging.inactive_orders" },
+      ]),
+      default_output_table: "staging.other_orders",
+    });
+    expect(out.sql).toHaveLength(3);
+    expect(out.sql?.[0]).toContain('"active_orders"');
+    expect(out.sql?.[0]).toContain('status = "active"');
+    expect(out.sql?.[2]).toContain("NOT (");
+  });
+
+  it("router emits separate CTAS per branch (fusion resumes on each branch)", () => {
+    const { result } = compileNativePipelineComponents({
+      elt_components: [
+        {
+          id: "split",
+          type: "python",
+          config: {
+            template_id: "router",
+            table: "staging.orders",
+            routes: JSON.stringify([
+              { condition: "amount > 100", output_table: "staging.big_orders" },
+              { condition: "amount <= 100", output_table: "staging.small_orders" },
+            ]),
+          },
+        },
+        {
+          id: "filter_big",
+          type: "python",
+          config: {
+            template_id: "filter_rows",
+            table: "staging.big_orders",
+            condition: "region = 'US'",
+            output_table: "staging.big_us_orders",
+          },
+          after: ["split"],
+        },
+      ],
+    });
+    expect(result.sqlStatements.length).toBeGreaterThanOrEqual(3);
+    expect(result.sqlStatements.some((s) => s.includes("big_us_orders"))).toBe(true);
+    expect(result.sqlStatements.some((s) => s.includes("big_orders"))).toBe(true);
   });
 
   it("scd_type_2 resolves as native", () => {

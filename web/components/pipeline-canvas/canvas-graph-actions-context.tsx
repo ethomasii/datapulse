@@ -9,6 +9,8 @@ export type CanvasNodeRef = {
   label: string;
   componentId?: string;
   config?: Record<string, unknown>;
+  /** Router branch handle when adding/connecting from a specific output port. */
+  sourceHandle?: string;
 };
 
 export type CanvasGraphActionsValue = {
@@ -17,7 +19,8 @@ export type CanvasGraphActionsValue = {
   addComponentAfterNode: (
     upstreamNodeId: string,
     component: ComponentListItem,
-    config?: Record<string, unknown>
+    config?: Record<string, unknown>,
+    options?: { sourceHandle?: string }
   ) => void;
   openTransformByExample: (node: CanvasNodeRef) => void;
   openExtendWithAssistant: (node: CanvasNodeRef, draft?: string) => void;

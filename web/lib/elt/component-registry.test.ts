@@ -7,6 +7,7 @@ import {
   isTerminalComponentCategory,
   isValidComponentEdge,
 } from "@/lib/elt/component-canvas-io";
+import { isNativeCatalogAliasId } from "@/lib/elt/native-components/registry";
 
 describe("component-registry", () => {
   it("loads manifest index", () => {
@@ -55,5 +56,32 @@ describe("component-registry", () => {
     expect(getComponentById("freshness_check")).toBeNull();
     const { items } = listComponents({ q: "freshness policy", limit: 20 });
     expect(items.some((c) => c.id === "freshness_check")).toBe(false);
+  });
+
+  it("native palette lists canonical join/filter/union/sample once (not manifest aliases)", () => {
+    expect(isNativeCatalogAliasId("dataframe_join")).toBe(true);
+    expect(isNativeCatalogAliasId("warehouse_join")).toBe(true);
+    expect(isNativeCatalogAliasId("select_records")).toBe(true);
+    expect(isNativeCatalogAliasId("create_samples")).toBe(true);
+    expect(isNativeCatalogAliasId("join_tables")).toBe(false);
+
+    const { items } = listComponents({ nativeOnly: true, executableOnly: true, limit: 500 });
+    const ids = items.map((c) => c.id);
+    expect(ids).toContain("join_tables");
+    expect(ids).toContain("filter_rows");
+    expect(ids).toContain("union_tables");
+    expect(ids).toContain("sample_rows");
+    expect(ids).not.toContain("dataframe_join");
+    expect(ids).not.toContain("warehouse_join");
+    expect(ids).not.toContain("dataframe_filter");
+    expect(ids).not.toContain("warehouse_filter");
+    expect(ids).not.toContain("select_records");
+    expect(ids).not.toContain("create_samples");
+    expect(ids).not.toContain("sample");
+  });
+
+  it("finds join_tables when searching warehouse join alias", () => {
+    const { items } = listComponents({ nativeOnly: true, q: "warehouse join", limit: 20 });
+    expect(items.some((c) => c.id === "join_tables")).toBe(true);
   });
 });

@@ -3,6 +3,10 @@
  */
 import type { Edge, Node } from "@xyflow/react";
 import { previewTableFromConfig } from "@/lib/elt/pipeline-asset-keys";
+import {
+  isRouterComponentId,
+  outputTableForRouterPort,
+} from "@/lib/elt/router-routes";
 import { remapStalePipelineTableRef } from "@/lib/elt/pipeline-assets";
 import { stripDuckdbCatalogPrefix } from "@/lib/elt/duckdb-table-ref";
 
@@ -35,14 +39,24 @@ function landingTablesFromContext(ctx?: WireInputContext): string[] {
   return (ctx?.rawLandingTables ?? []).map((t) => t.trim()).filter(Boolean);
 }
 
-function outputTableFromNode(node: Node, ctx?: WireInputContext): string | null {
+function outputTableFromNode(
+  node: Node,
+  ctx?: WireInputContext,
+  sourceHandle?: string | null
+): string | null {
   if (node.type === "sourceNode" || node.type === "destNode") {
     const landing = landingTablesFromContext(ctx);
     return landing[0] ?? null;
   }
   if (node.type === "transformNode") return null;
   if (node.type === "componentNode") {
-    const cfg = (node.data as { config?: Record<string, unknown> })?.config ?? {};
+    const data = node.data as { componentId?: string; config?: Record<string, unknown> };
+    const cfg = data?.config ?? {};
+    const componentId = String(data.componentId ?? cfg.template_id ?? "");
+    if (isRouterComponentId(componentId)) {
+      const branch = outputTableForRouterPort(cfg, sourceHandle ?? undefined);
+      if (branch) return branch;
+    }
     return previewTableFromConfig(cfg);
   }
   return null;
@@ -53,27 +67,28 @@ export function resolveOutputTablesFromNode(
   nodes: Node[],
   edges: Edge[],
   nodeId: string,
-  ctx?: WireInputContext
+  ctx?: WireInputContext,
+  sourceHandle?: string | null
 ): string[] {
   const node = nodes.find((n) => n.id === nodeId);
   if (!node) return [];
 
   if (node.type === "destNode" || node.type === "sourceNode") {
-    const out = outputTableFromNode(node, ctx);
+    const out = outputTableFromNode(node, ctx, sourceHandle);
     return out ? [out] : [];
   }
 
   if (node.type === "componentNode") {
-    const out = outputTableFromNode(node, ctx);
+    const out = outputTableFromNode(node, ctx, sourceHandle);
     if (out) return [out];
     return expandUpstreamSources(nodes, edges, nodeId).flatMap((n) => {
-      const t = outputTableFromNode(n, ctx);
+      const t = outputTableFromNode(n, ctx, sourceHandle);
       return t ? [t] : [];
     });
   }
 
   return expandUpstreamSources(nodes, edges, nodeId).flatMap((n) => {
-    const t = outputTableFromNode(n, ctx);
+    const t = outputTableFromNode(n, ctx, sourceHandle);
     return t ? [t] : [];
   });
 }
@@ -87,7 +102,13 @@ function collectUpstreamTables(
   const incoming = edges.filter((e) => e.target === targetNodeId);
   const tables: string[] = [];
   for (const edge of incoming) {
-    for (const out of resolveOutputTablesFromNode(nodes, edges, edge.source, ctx)) {
+    for (const out of resolveOutputTablesFromNode(
+      nodes,
+      edges,
+      edge.source,
+      ctx,
+      edge.sourceHandle
+    )) {
       if (out && !tables.includes(out)) tables.push(out);
     }
   }

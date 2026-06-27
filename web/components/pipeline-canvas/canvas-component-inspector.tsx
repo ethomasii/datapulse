@@ -9,6 +9,7 @@ import { ComponentDataPreview } from "@/components/elt/component-data-preview";
 import { RunStepPanel } from "@/components/elt/run-step-panel";
 import { OperatorColumnGrid } from "@/components/pipeline-canvas/operator-column-grid";
 import { OperatorStepIoPanel } from "@/components/pipeline-canvas/operator-step-io-panel";
+import { RouterRoutesEditor } from "@/components/pipeline-canvas/router-routes-editor";
 import { resolveCanvasInspectorLayout } from "@/lib/elt/canvas-inspector-layout";
 import { inputTableFromConfig } from "@/lib/elt/pipeline-asset-keys";
 import type { NativeComponentField } from "@/lib/elt/native-components";
@@ -216,6 +217,15 @@ export function CanvasComponentInspector({
           config={config}
           readOnly={readOnly}
           outputOptional={layout.outputOptional}
+          onChange={(next) => applyConfig(next, true)}
+        />
+      ) : null}
+
+      {layout.stepIoMode === "router" ? (
+        <RouterRoutesEditor
+          pipelineId={pipelineId}
+          config={config}
+          readOnly={readOnly}
           onChange={(next) => applyConfig(next, true)}
         />
       ) : null}

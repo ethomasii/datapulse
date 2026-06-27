@@ -71,10 +71,20 @@ function quoteTableRef(table: string): string | null {
     .join(".");
 }
 
+const optionalTableRef = z.preprocess(
+  (v) => (typeof v === "string" && !v.trim() ? undefined : v),
+  z.string().min(1).max(256).optional()
+);
+
+const previewConfigRecord = z.preprocess(
+  (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : undefined),
+  z.record(z.string(), z.unknown()).optional()
+);
+
 const bodySchema = z.object({
-  table: z.string().min(1).max(256).optional(),
-  config: z.record(z.string(), z.unknown()).optional(),
-  limit: z.number().int().min(1).max(25).optional(),
+  table: optionalTableRef,
+  config: previewConfigRecord,
+  limit: z.coerce.number().int().min(1).max(25).optional(),
   /** Skip row sample — only resolve column names (for Select Columns sidebar). */
   columnsOnly: z.boolean().optional(),
   /** Column distribution stats under preview headers (default true). */

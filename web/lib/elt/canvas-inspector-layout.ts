@@ -2,7 +2,7 @@ import type { NativeComponentField } from "@/lib/elt/native-components";
 import { operatorColumnGridMode } from "@/lib/elt/operator-column-grid-mode";
 
 /** How table I/O fields are surfaced in the canvas inspector. */
-export type StepIoMode = "single" | "join" | "union" | "output_only";
+export type StepIoMode = "single" | "join" | "union" | "output_only" | "router";
 
 const COLUMN_GRID_HIDDEN_KEYS = new Set([
   "table",
@@ -26,6 +26,14 @@ const JOIN_IO_HIDDEN_KEYS = new Set([
 const UNION_IO_HIDDEN_KEYS = new Set(["tables", "input_tables", "output_table"]);
 
 const OUTPUT_ONLY_HIDDEN_KEYS = new Set(["output_table", "asset_name", "asset_key"]);
+
+const ROUTER_IO_HIDDEN_KEYS = new Set([
+  "table",
+  "input_table",
+  "output_table",
+  "routes",
+  "default_output_table",
+]);
 
 const CATALOG_DUPLICATE_KEYS = new Set([
   "input_asset_keys",
@@ -53,7 +61,16 @@ function isOutputOptional(formFields: NativeComponentField[], keys: Set<string>)
 }
 
 /** Infer table I/O panel mode from native / package field definitions. */
-export function detectStepIoMode(keys: Set<string>): StepIoMode | null {
+export function detectStepIoMode(keys: Set<string>, componentId?: string): StepIoMode | null {
+  const id = componentId?.trim() ?? "";
+  if (
+    id === "router" ||
+    id === "conditional_split" ||
+    id === "branch" ||
+    keys.has("routes")
+  ) {
+    return "router";
+  }
   if (keys.has("left_table") || keys.has("right_table")) return "join";
   if (keys.has("tables") && !keys.has("table")) return "union";
   if (keys.has("table")) return "single";
@@ -72,6 +89,8 @@ function hiddenKeysForStepIo(
     JOIN_IO_HIDDEN_KEYS.forEach((k) => hidden.add(k));
   } else if (stepIoMode === "union") {
     UNION_IO_HIDDEN_KEYS.forEach((k) => hidden.add(k));
+  } else if (stepIoMode === "router") {
+    ROUTER_IO_HIDDEN_KEYS.forEach((k) => hidden.add(k));
   } else if (stepIoMode === "output_only") {
     OUTPUT_ONLY_HIDDEN_KEYS.forEach((k) => hidden.add(k));
   } else if (columnGridMode) {
@@ -89,7 +108,7 @@ export function resolveCanvasInspectorLayout(
 ): CanvasInspectorLayout {
   const columnGridMode = operatorColumnGridMode(componentId);
   const keys = fieldKeys(formFields);
-  const stepIoMode = detectStepIoMode(keys);
+  const stepIoMode = detectStepIoMode(keys, componentId);
   const hiddenFormKeys = hiddenKeysForStepIo(stepIoMode, columnGridMode);
   const visibleFormFields = formFields.filter((f) => !hiddenFormKeys.has(f.key));
 

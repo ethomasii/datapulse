@@ -55,6 +55,8 @@ export function OperatorStepIoPanel({
       ? "Join inputs"
       : mode === "union"
         ? "Union inputs"
+        : mode === "router"
+          ? "Router inputs"
         : mode === "output_only"
           ? "Output"
           : "Tables";
@@ -64,6 +66,8 @@ export function OperatorStepIoPanel({
       ? "Wire two upstream nodes or pick left and right tables, then set where the join lands."
       : mode === "union"
         ? "Pick two or more tables to stack, then set the combined output table."
+        : mode === "router"
+          ? "Reads one input table and writes multiple output tables — one per route condition below."
         : mode === "output_only"
           ? "Optional landing table for this step's results."
           : "Wire an upstream node to auto-fill the input table, or pick from this pipeline.";
@@ -75,7 +79,7 @@ export function OperatorStepIoPanel({
         <p className="mt-0.5 text-[10px] text-slate-500">{subtitle}</p>
       </div>
 
-      {mode === "single" ? (
+      {mode === "single" || mode === "router" ? (
         <label className="block text-sm">
           <span className="font-medium text-slate-700 dark:text-slate-300">Input table *</span>
           <span className="mt-0.5 block text-[11px] text-slate-500">

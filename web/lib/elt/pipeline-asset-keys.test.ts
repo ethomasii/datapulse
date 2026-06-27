@@ -3,6 +3,9 @@ import {
   enrichComponentListAssets,
   deriveStepAssetKey,
   inputPreviewSourcesFromConfig,
+  previewTableFromConfig,
+  routerOutputPreviewSourcesFromConfig,
+  routerOutputTablesFromConfig,
 } from "@/lib/elt/pipeline-asset-keys";
 import { buildCanvasFromDeclarativeSpec } from "@/lib/elt/spec-components-to-canvas";
 
@@ -23,6 +26,25 @@ describe("pipeline-asset-keys", () => {
       output_table: "staging.orders_enriched",
     });
     expect(key).toBe("staging.orders_enriched");
+  });
+
+  it("uses first router route output_table for preview", () => {
+    const config = {
+      template_id: "router",
+      table: "staging.orders",
+      routes: JSON.stringify([
+        { condition: 'status == "active"', output_table: "staging.active_orders" },
+        { condition: 'status == "inactive"', output_table: "staging.inactive_orders" },
+      ]),
+    };
+    const sources = routerOutputPreviewSourcesFromConfig(config);
+    expect(sources).toHaveLength(2);
+    expect(sources[0]?.table).toBe("staging.active_orders");
+    expect(routerOutputTablesFromConfig(config)).toEqual([
+      "staging.active_orders",
+      "staging.inactive_orders",
+    ]);
+    expect(previewTableFromConfig(config)).toBe("staging.active_orders");
   });
 
   it("chains inputs via after deps", () => {

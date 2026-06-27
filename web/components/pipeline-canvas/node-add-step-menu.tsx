@@ -20,6 +20,7 @@ type Props = {
   className?: string;
   /** Render as the right-edge React Flow handle (same spot/size as the blue dot). */
   asHandle?: boolean;
+  handleId?: string;
 };
 
 const handlePlusClass =
@@ -64,7 +65,7 @@ function ComponentPaletteModal({
   );
 }
 
-export function NodeAddStepMenu({ node, className, asHandle }: Props) {
+export function NodeAddStepMenu({ node, className, asHandle, handleId }: Props) {
   const actions = useCanvasGraphActions();
   const { catalogById, loading: loadingCatalog } = useCanvasComponentCatalog();
   const [open, setOpen] = useState(false);
@@ -87,11 +88,13 @@ export function NodeAddStepMenu({ node, className, asHandle }: Props) {
 
   const pickComponent = useCallback(
     (component: ComponentListItem, config?: Record<string, unknown>) => {
-      actions?.addComponentAfterNode(node.nodeId, component, config);
+      actions?.addComponentAfterNode(node.nodeId, component, config, {
+        sourceHandle: node.sourceHandle ?? handleId,
+      });
       setOpen(false);
       setShowPalette(false);
     },
-    [actions, node.nodeId]
+    [actions, node.nodeId, node.sourceHandle, handleId]
   );
 
   const pickQuick = useCallback(
@@ -215,7 +218,8 @@ export function NodeAddStepMenu({ node, className, asHandle }: Props) {
           ref={handleRef}
           type="source"
           position={Position.Right}
-          className={clsx(handlePlusClass, open && "!ring-2 !ring-violet-300 dark:!ring-violet-700")}
+          id={handleId}
+          className={clsx(handlePlusClass, open && "!ring-2 !ring-violet-300 dark:!ring-violet-700", className)}
           aria-label={`Add step after ${node.label}`}
           aria-expanded={open}
           title="Add next step"

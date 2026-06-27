@@ -35,7 +35,7 @@ function compileFilterRowsDataframe(
 export const filterRowsComponent: NativeComponentDefinition = {
   id: "filter_rows",
   aliases: ["dataframe_filter", "row_filter", "filter", "warehouse_filter", "select_records", "audience_segment"],
-  name: "Filter rows",
+  name: "Filter",
   category: "transformation",
   description: "Filter rows in warehouse SQL (default) or in-memory dataframe when execution=dataframe.",
   compileTarget: "warehouse",

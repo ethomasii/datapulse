@@ -37,6 +37,36 @@ describe("canvas-wire-input", () => {
     expect(wired?.configPatch._preview_nonce).toBeDefined();
   });
 
+  it("wires from a specific router branch handle", () => {
+    const nodes: Node[] = [
+      {
+        id: "router",
+        type: "componentNode",
+        position: { x: 0, y: 0 },
+        data: {
+          componentId: "router",
+          config: {
+            template_id: "router",
+            table: "staging.orders",
+            routes: JSON.stringify([
+              { condition: 'status = "active"', output_table: "staging.active_orders" },
+              { condition: 'status = "inactive"', output_table: "staging.inactive_orders" },
+            ]),
+          },
+        },
+      },
+      {
+        id: "down",
+        type: "componentNode",
+        position: { x: 200, y: 0 },
+        data: { config: {} },
+      },
+    ];
+    const edges: Edge[] = [{ id: "e1", source: "router", target: "down", sourceHandle: "route-1" }];
+    const wired = wireInputFromUpstreamEdge(nodes, edges, "down");
+    expect(wired?.configPatch.table).toBe("staging.inactive_orders");
+  });
+
   it("fills input table when wired from Source node using pipeline landing tables", () => {
     const nodes: Node[] = [
       { id: "src", type: "sourceNode", position: { x: 0, y: 0 }, data: {} },

@@ -5,6 +5,7 @@
 import { db } from "@/lib/db/client";
 import { canvasPortsForCategory } from "@/lib/elt/component-canvas-io";
 import type { ComponentListItem } from "@/lib/elt/component-registry";
+import { getNativeComponent } from "@/lib/elt/native-components";
 import type { NativeComponentField } from "@/lib/elt/native-components/types";
 import { toPublicMcpServer } from "./public";
 import type { McpToolDescriptor } from "./types";
@@ -228,6 +229,16 @@ export function initialConfigForComponent(component: {
   if (parsed) {
     const stub = mcpVirtualListItemStub(parsed);
     return { ...(stub.defaultConfig ?? {}), template_id: component.id };
+  }
+  const native = getNativeComponent(component.id);
+  if (native?.fields?.length) {
+    const fromFields: Record<string, unknown> = {};
+    for (const field of native.fields) {
+      if (field.default !== undefined) fromFields[field.key] = field.default;
+    }
+    if (Object.keys(fromFields).length) {
+      return { ...fromFields, template_id: component.id };
+    }
   }
   return { template_id: component.id };
 }

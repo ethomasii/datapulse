@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Eye, Loader2, Zap } from "lucide-react";
-import { previewTableFromConfig } from "@/lib/elt/pipeline-asset-keys";
-
+import {
+  isRouterConfig,
+  previewTableFromConfig,
+  routerOutputPreviewSourcesFromConfig,
+} from "@/lib/elt/pipeline-asset-keys";
 type PreviewResult = {
   ok?: boolean;
   columns?: string[];
@@ -34,12 +37,30 @@ export function ComponentDataPreview({
   const [error, setError] = useState<string | null>(null);
   const [autoTriggered, setAutoTriggered] = useState(false);
 
-  const table = previewTableFromConfig(config);
+  const outputSources = useMemo(
+    () => (isRouterConfig(config) ? routerOutputPreviewSourcesFromConfig(config) : []),
+    [config]
+  );
+  const [activeSourceId, setActiveSourceId] = useState(outputSources[0]?.id ?? "route-0");
+  const table =
+    outputSources.length > 0
+      ? outputSources.find((s) => s.id === activeSourceId)?.table ?? outputSources[0]?.table ?? previewTableFromConfig(config)
+      : previewTableFromConfig(config);
   const previewNonce = config._preview_nonce;
+
+  useEffect(() => {
+    if (outputSources.length && !outputSources.some((s) => s.id === activeSourceId)) {
+      setActiveSourceId(outputSources[0]!.id);
+    }
+  }, [outputSources, activeSourceId]);
 
   const load = useCallback(async () => {
     if (!table) {
-      setError("Set output_table or table in config to preview data.");
+      if (isRouterConfig(config) && !outputSources.length) {
+        setError("Add Routes with output_table per branch, then run the step to materialize outputs.");
+      } else {
+        setError("Set output_table or table in config to preview data.");
+      }
       return;
     }
     setLoading(true);
@@ -49,9 +70,8 @@ export function ComponentDataPreview({
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ config, limit: 10 }),
-      });
-      const data = (await res.json()) as PreviewResult & { error?: string };
+        body: JSON.stringify({ table, config, limit: 10 }),
+      });      const data = (await res.json()) as PreviewResult & { error?: string };
       if (!res.ok) throw new Error(data.error ?? "Preview failed");
       setResult(data);
     } catch (e) {
@@ -60,11 +80,10 @@ export function ComponentDataPreview({
     } finally {
       setLoading(false);
     }
-  }, [pipelineId, config, table]);
+  }, [pipelineId, config, table, outputSources.length]);
 
   useEffect(() => {
-    if (!autoLoad || readOnly || !table) return;
-    const t = setTimeout(() => {
+    if (!autoLoad || readOnly || !table) return;    const t = setTimeout(() => {
       setAutoTriggered(true);
       void load();
     }, 400);
@@ -74,8 +93,9 @@ export function ComponentDataPreview({
   if (!table && !readOnly) {
     return (
       <p className="text-xs text-slate-500">
-        Wire an upstream step or set a table to enable auto-preview for this step.
-      </p>
+        {isRouterConfig(config)
+          ? "Router writes multiple tables — set Routes (JSON) with output_table per branch, then use the branch picker to preview each output."
+          : "Wire an upstream step or set a table to enable auto-preview for this step."}      </p>
     );
   }
 
@@ -98,10 +118,23 @@ export function ComponentDataPreview({
           Sample rows
         </button>
       </div>
+      {outputSources.length > 1 ? (
+        <select
+          value={activeSourceId}
+          onChange={(e) => setActiveSourceId(e.target.value)}
+          className="mt-2 w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] dark:border-slate-600 dark:bg-slate-950"
+          aria-label="Select output branch"
+        >
+          {outputSources.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      ) : null}
       {table ? (
         <p className="mt-1 font-mono text-[10px] text-slate-500">{table}</p>
-      ) : null}
-      {error ? (
+      ) : null}      {error ? (
         <p className="mt-2 text-xs text-amber-700 dark:text-amber-300" role="alert">
           {error}
         </p>

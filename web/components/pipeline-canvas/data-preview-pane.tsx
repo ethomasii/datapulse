@@ -19,6 +19,16 @@ import {
 
 const PREVIEW_ROW_LIMIT = 25;
 
+function pickActivePreviewTable(
+  table: string | null,
+  sources: InputPreviewSource[] | undefined,
+  activeSourceId: string
+): string | null {
+  if (!sources?.length) return table;
+  if (sources.length === 1) return sources[0]!.table;
+  return sources.find((s) => s.id === activeSourceId)?.table ?? sources[0]?.table ?? table;
+}
+
 type PreviewResult = {
   ok?: boolean;
   columns?: string[];
@@ -41,10 +51,14 @@ type Props = {
   onDiagnosticChange?: (message: string | null) => void;
   /** Join steps: switch between left/right (or other) wired inputs. */
   inputSources?: InputPreviewSource[];
+  /** Router steps: switch between branch output tables. */
+  outputSources?: InputPreviewSource[];
   /** Fused SELECT preview for warehouse steps (output pane). */
   fusedPreview?: boolean;
   throughStepId?: string | null;
   eltComponents?: PipelineComponentSpec[];
+  /** Shown when no table is wired for preview (e.g. router without routes). */
+  emptyHint?: string | null;
 };
 
 export function DataPreviewPane({
@@ -55,10 +69,20 @@ export function DataPreviewPane({
   className,
   onDiagnosticChange,
   inputSources,
+  outputSources,
   fusedPreview = false,
   throughStepId = null,
   eltComponents,
+  emptyHint = null,
 }: Props) {
+  const switchableSources =
+    inputSources && inputSources.length > 0
+      ? inputSources
+      : outputSources && outputSources.length > 0
+        ? outputSources
+        : undefined;
+  const sourcePickerLabel = outputSources?.length ? "Select output branch" : "Select input table";
+
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PreviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,24 +90,27 @@ export function DataPreviewPane({
   const [search, setSearch] = useState("");
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const [activeSourceId, setActiveSourceId] = useState(inputSources?.[0]?.id ?? "input");
+  const [activeSourceId, setActiveSourceId] = useState(
+    switchableSources?.[0]?.id ?? "input"
+  );
   const onDiagnosticChangeRef = useRef(onDiagnosticChange);
   onDiagnosticChangeRef.current = onDiagnosticChange;
 
-  const activeTable =
-    inputSources?.length && inputSources.length > 1
-      ? inputSources.find((s) => s.id === activeSourceId)?.table ?? inputSources[0]?.table ?? table
-      : table;
+  const activeTable = pickActivePreviewTable(table, switchableSources, activeSourceId);
 
   useEffect(() => {
-    if (inputSources?.length && !inputSources.some((s) => s.id === activeSourceId)) {
-      setActiveSourceId(inputSources[0]!.id);
+    if (switchableSources?.length && !switchableSources.some((s) => s.id === activeSourceId)) {
+      setActiveSourceId(switchableSources[0]!.id);
     }
-  }, [inputSources, activeSourceId]);
+  }, [switchableSources, activeSourceId]);
 
   const load = useCallback(async () => {
     const useFused =
-      fusedPreview && throughStepId && eltComponents?.length && !inputSources?.length;
+      fusedPreview &&
+      throughStepId &&
+      eltComponents?.length &&
+      !inputSources?.length &&
+      !outputSources?.length;
     if (!useFused && !activeTable) return;
     setLoading(true);
     setError(null);
@@ -93,7 +120,7 @@ export function DataPreviewPane({
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          table: activeTable ?? undefined,
+          table: activeTable?.trim() || undefined,
           config,
           limit: PREVIEW_ROW_LIMIT,
           includeProfiles: !useFused,
@@ -115,14 +142,19 @@ export function DataPreviewPane({
     } finally {
       setLoading(false);
     }
-  }, [pipelineId, config, activeTable, fusedPreview, throughStepId, eltComponents, inputSources]);
+  }, [pipelineId, config, activeTable, fusedPreview, throughStepId, eltComponents, inputSources, outputSources]);
 
   const configKey = JSON.stringify(config);
   const componentsKey = JSON.stringify(eltComponents ?? []);
+  const sourcesKey = JSON.stringify(switchableSources ?? []);
 
   useEffect(() => {
     const useFused =
-      fusedPreview && throughStepId && eltComponents?.length && !inputSources?.length;
+      fusedPreview &&
+      throughStepId &&
+      eltComponents?.length &&
+      !inputSources?.length &&
+      !outputSources?.length;
     if (!useFused && !activeTable) {
       setResult(null);
       setError(null);
@@ -131,7 +163,7 @@ export function DataPreviewPane({
     }
     const t = setTimeout(() => void load(), 350);
     return () => clearTimeout(t);
-  }, [activeTable, load, configKey, componentsKey, fusedPreview, throughStepId, inputSources]);
+  }, [activeTable, load, configKey, componentsKey, sourcesKey, fusedPreview, throughStepId, inputSources, outputSources]);
 
   const rows = result?.rows ?? [];
   const columnNames = useMemo(
@@ -233,8 +265,8 @@ export function DataPreviewPane({
   }
 
   const sourceLabel =
-    inputSources && inputSources.length > 1
-      ? inputSources.find((s) => s.id === activeSourceId)?.label
+    switchableSources && switchableSources.length > 1
+      ? switchableSources.find((s) => s.id === activeSourceId)?.label
       : null;
 
   return (
@@ -246,14 +278,15 @@ export function DataPreviewPane({
     >
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-1.5 dark:border-slate-800">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{title}</p>
-        {inputSources && inputSources.length > 1 ? (
+        {switchableSources && switchableSources.length > 1 ? (
           <select
             value={activeSourceId}
             onChange={(e) => setActiveSourceId(e.target.value)}
-            className="max-w-[9rem] truncate rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-            aria-label="Select input table"
+            className="max-w-[11rem] truncate rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            aria-label={sourcePickerLabel}
+            title={sourceLabel ?? undefined}
           >
-            {inputSources.map((s) => (
+            {switchableSources.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.label}
               </option>
@@ -309,7 +342,9 @@ export function DataPreviewPane({
       </div>
       <div className="min-h-[3.5rem] flex-1 overflow-auto p-2">
         {!activeTable ? (
-          <p className="text-[11px] text-slate-500">Select a transform step with a wired table.</p>
+          <p className="text-[11px] text-slate-500">
+            {emptyHint ?? "Select a transform step with a wired table."}
+          </p>
         ) : loading && !result ? (
           <p className="flex items-center gap-1 text-[11px] text-slate-500">
             <Loader2 className="h-3 w-3 animate-spin" aria-hidden />

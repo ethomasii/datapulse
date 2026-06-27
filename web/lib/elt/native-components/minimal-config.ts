@@ -109,6 +109,10 @@ export function minimalNativeConfig(def: NativeComponentDefinition): Record<stri
   if (def.id === "litellm_agent") {
     config._resolved_mcp_servers = [mockMcpServer];
   }
+  if (def.id === "router" || def.id === "conditional_split" || def.id === "branch") {
+    config.routes =
+      '[{"condition":"status = \\"active\\"","output_table":"staging.active_rows"}]';
+  }
 
   return config;
 }

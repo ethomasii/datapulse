@@ -15,7 +15,8 @@ import {
 } from "@/lib/elt/component-compiler-tier";
 import { compileTargetLabel } from "@/lib/elt/compile-target-labels";
 import { sanitizeCatalogDescription } from "@/lib/elt/sanitize-catalog-copy";
-import { getNativeComponent, isNativeComponent } from "@/lib/elt/native-components/registry";
+import { getNativeComponent, isNativeComponent, isNativeCatalogAliasId, listNativeComponents } from "@/lib/elt/native-components/registry";
+import type { NativeComponentDefinition } from "@/lib/elt/native-components/types";
 import {
   mcpVirtualListItemStub,
   parseMcpVirtualComponentId,
@@ -87,6 +88,10 @@ const COMPONENT_SEARCH_ALIASES: Record<string, string[]> = {
   litellm_inference_asset: ["llm per row", "enrich column", "summarize each row", "llm enrichment"],
   litellm_agent: ["llm agent", "mcp agent", "agent per row"],
   mcp_tool_call: ["mcp tool", "deterministic mcp", "stripe refund"],
+  join_tables: ["join", "dataframe join", "warehouse join", "lookup", "merge tables"],
+  filter_rows: ["filter", "select records", "warehouse filter", "dataframe filter", "where"],
+  union_tables: ["union", "dataframe union", "warehouse union", "stack tables"],
+  sample_rows: ["sample", "create samples", "random sample"],
 };
 
 function searchQueryVariants(q: string): string[] {
@@ -112,14 +117,91 @@ function componentMatchesQuery(c: ComponentManifestEntry, variants: string[]): b
   const name = c.name.toLowerCase();
   const description = c.description.toLowerCase();
   const tags = (c.tags ?? []).map((t) => t.toLowerCase());
+  const nativeDef = getNativeComponent(c.id);
+  const aliasIds = (nativeDef?.aliases ?? []).map((a) => a.toLowerCase());
   return variants.some(
     (q) =>
       q === id ||
       id.includes(q) ||
       name.includes(q) ||
       description.includes(q) ||
-      tags.some((t) => t.includes(q) || q.includes(t))
+      tags.some((t) => t.includes(q) || q.includes(t)) ||
+      aliasIds.some((a) => a === q || a.includes(q) || q.includes(a))
   );
+}
+
+function nativeDefinitionMatchesQuery(def: NativeComponentDefinition, variants: string[]): boolean {
+  const id = def.id.toLowerCase();
+  const name = def.name.toLowerCase();
+  const description = def.description.toLowerCase();
+  const aliasIds = (def.aliases ?? []).map((a) => a.toLowerCase());
+  return variants.some(
+    (q) =>
+      q === id ||
+      id.includes(q) ||
+      name.includes(q) ||
+      description.includes(q) ||
+      aliasIds.some((a) => a === q || a.includes(q) || q.includes(a))
+  );
+}
+
+function nativeDefinitionToListItem(def: NativeComponentDefinition): ComponentListItem {
+  const route = routeComponent(def.id, def.category);
+  const ports = canvasPortsForCategory(def.category);
+  const pair =
+    route.target === "monitor" || route.target === "dlt" ? suggestMonitorPipelinePair(def.id) : null;
+  const compilerTier = resolveCompilerTier(def.id, route);
+  const isExecutable = isFaithfulCompiler(compilerTier);
+  return {
+    id: def.id,
+    name: def.name,
+    category: def.category,
+    description: def.description,
+    compileTarget: route.target,
+    compileTargetLabel: compileTargetLabel(route.target),
+    compileBadge: route.badge,
+    compileHint: route.hint,
+    canvasPorts: { left: ports.left, right: ports.right },
+    isNative: true,
+    hasCompiler: true,
+    compilerTier,
+    isExecutable,
+    compilerTierHint: compilerTierHint(compilerTier),
+    ...(pair ? { monitorPair: pair } : {}),
+  };
+}
+
+function listNativeCatalogItems(filters?: {
+  q?: string;
+  category?: string;
+  compileTarget?: ComponentCompileTarget;
+  executableOnly?: boolean;
+}): ComponentListItem[] {
+  let items = listNativeComponents().map(nativeDefinitionToListItem);
+
+  const q = filters?.q?.trim().toLowerCase();
+  if (q) {
+    const variants = searchQueryVariants(q);
+    items = items.filter((item) => {
+      const def = getNativeComponent(item.id);
+      return def ? nativeDefinitionMatchesQuery(def, variants) : componentMatchesQuery(item, variants);
+    });
+  }
+
+  const cat = filters?.category?.trim().toLowerCase();
+  if (cat) {
+    items = items.filter((c) => normalizeComponentCategory(c.category) === normalizeComponentCategory(cat));
+  }
+
+  if (filters?.executableOnly) {
+    items = items.filter((c) => c.isExecutable);
+  }
+
+  if (filters?.compileTarget) {
+    items = items.filter((c) => c.compileTarget === filters.compileTarget);
+  }
+
+  return items;
 }
 
 export const COMPONENT_MANIFEST_META = {
@@ -140,7 +222,30 @@ export function listComponents(filters?: {
   limit?: number;
   offset?: number;
 }): { items: ComponentListItem[]; total: number } {
+  if (filters?.nativeOnly) {
+    const items = listNativeCatalogItems(filters);
+    const total = items.length;
+    const offset = Math.max(0, filters?.offset ?? 0);
+    const limit = Math.min(100, Math.max(1, filters?.limit ?? 50));
+    return { items: items.slice(offset, offset + limit), total };
+  }
+
   let rows = index.components.filter((c) => !CATALOG_EXCLUDED_COMPONENT_IDS.has(c.id));
+  rows = rows.filter((c) => !isNativeCatalogAliasId(c.id));
+
+  const manifestNativeIds = new Set(
+    rows.filter((c) => isNativeComponent(c.id) && !isNativeCatalogAliasId(c.id)).map((c) => c.id)
+  );
+  for (const def of listNativeComponents()) {
+    if (!manifestNativeIds.has(def.id)) {
+      rows.push({
+        id: def.id,
+        name: def.name,
+        category: def.category,
+        description: def.description,
+      });
+    }
+  }
 
   const q = filters?.q?.trim().toLowerCase();
   if (q) {
@@ -247,6 +352,7 @@ function enrichComponent(row: ComponentManifestEntry): ComponentListItem {
   const description = sanitizeCatalogDescription(row.description);
   return {
     ...row,
+    name: nativeDef?.name ?? row.name,
     category,
     description: nativeDef?.description ?? description,
     compileTarget: route.target,

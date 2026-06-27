@@ -34,7 +34,8 @@ export function insertNodeOnEdge(
   nodes: Node[],
   edges: Edge[],
   edge: Edge,
-  newNode: Node
+  newNode: Node,
+  opts?: { sourceHandle?: string }
 ): { nodes: Node[]; edges: Edge[] } {
   const mid = (() => {
     const s = nodes.find((n) => n.id === edge.source);
@@ -51,6 +52,7 @@ export function insertNodeOnEdge(
       id: `e-${edge.source}-${placed.id}`,
       source: edge.source,
       target: placed.id,
+      sourceHandle: opts?.sourceHandle ?? edge.sourceHandle,
       animated: true,
       style: edge.style,
     },

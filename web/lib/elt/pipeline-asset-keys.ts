@@ -1,4 +1,11 @@
 import type { PipelineComponentSpec } from "@/lib/elt/declarative-pipeline-spec";
+import {
+  isRouterConfig,
+  parseRouterRouteRows,
+  routerOutputPortsFromConfig,
+} from "@/lib/elt/router-routes";
+
+export { isRouterConfig } from "@/lib/elt/router-routes";
 
 /** Normalize table or asset reference for spec + DAG display. */
 export function normalizeAssetKey(ref: string): string {
@@ -86,8 +93,45 @@ export function enrichComponentListAssets(
   });
 }
 
+export type RouterRoute = { condition?: string; output_table?: string; table?: string };
+
+/** @deprecated Prefer parseRouterRouteRows from router-routes */
+export function parseRouterRoutes(raw: unknown): RouterRoute[] {
+  if (typeof raw === "string") {
+    try {
+      return parseRouterRouteRows({ routes: raw }) as RouterRoute[];
+    } catch {
+      return [];
+    }
+  }
+  if (Array.isArray(raw)) return raw as RouterRoute[];
+  return [];
+}
+
+/** Output tables declared on router routes (+ optional default branch). */
+export function routerOutputTablesFromConfig(config: Record<string, unknown>): string[] {
+  return routerOutputPreviewSourcesFromConfig(config).map((s) => s.table);
+}
+
+/** Router branch outputs for multi-select preview (like join left/right). */
+export function routerOutputPreviewSourcesFromConfig(
+  config: Record<string, unknown>
+): InputPreviewSource[] {
+  if (!isRouterConfig(config)) return [];
+  return routerOutputPortsFromConfig(config).map((port) => ({
+    id: port.id,
+    label: port.label,
+    table: port.output_table,
+  }));
+}
+
 /** Warehouse table ref for read-only preview from step config. */
 export function previewTableFromConfig(config: Record<string, unknown>): string | null {
+  if (isRouterConfig(config)) {
+    const routeOut = routerOutputTablesFromConfig(config)[0];
+    if (routeOut) return routeOut;
+  }
+
   const table = String(
     config.output_table ??
       config.table ??

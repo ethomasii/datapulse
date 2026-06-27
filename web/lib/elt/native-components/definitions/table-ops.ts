@@ -333,7 +333,7 @@ export const replaceValuesComponent: NativeComponentDefinition = {
 export const sampleRowsComponent: NativeComponentDefinition = {
   id: "sample_rows",
   aliases: ["sample", "create_samples"],
-  name: "Sample rows",
+  name: "Sample",
   category: "transformation",
   description: "Random sample of rows (pandas sample).",
   compileTarget: "python",
