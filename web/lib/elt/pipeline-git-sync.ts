@@ -15,15 +15,26 @@ import {
 import { pushPipelineToGithub, type PushPipelineResult } from "@/lib/integrations/github-push-pipeline";
 import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
 import type { PipelineGitCommit } from "@/lib/elt/asset-pipeline-github-history";
+import {
+  getWorkspaceGithubSettings,
+  githubPromoteCompareUrl as workspacePromoteCompareUrl,
+  resolveUserDevelopmentBranch,
+} from "@/lib/elt/workspace-github";
 
 export type PipelineGitSyncStatus = {
   connected: boolean;
   repo: { owner: string; name: string; productionBranch: string; developmentBranch: string } | null;
+  /** Branch this user's canvas saves sync against. */
+  workingBranch: string | null;
   path: string | null;
   inSync: boolean | null;
   localSha: string | null;
   remoteSha: string | null;
   lastPushedAt: string | null;
+  prodInSync?: boolean | null;
+  productionDefinitionSource: "neon" | "git";
+  developmentDefinitionSource: "neon" | "git";
+  personalDevBranch: string | null;
   message: string | null;
 };
 
@@ -101,37 +112,49 @@ export async function getPipelineGitSyncStatus(
     return {
       connected: false,
       repo: null,
+      workingBranch: null,
       path: null,
       inSync: null,
       localSha: null,
       remoteSha: null,
       lastPushedAt: null,
+      productionDefinitionSource: "neon",
+      developmentDefinitionSource: "neon",
+      personalDevBranch: null,
       message: "Pipeline not found",
     };
   }
 
-  const token = await getGithubAccessTokenForUser(userId);
-  const { row: gh } = await getGithubConnectionForUser(userId);
-  const repo = repoContextFromGh(gh);
+  const settings = await getWorkspaceGithubSettings(userId);
   const path = `${ELTPULSE_REPO.pipelinesDir}/${row.name}.yaml`;
 
-  if (!token || !repo) {
+  if (!settings?.token || !settings.repo) {
     return {
-      connected: Boolean(token),
-      repo,
+      connected: Boolean(settings?.connection),
+      repo: settings?.repo ?? null,
+      workingBranch: settings ? resolveUserDevelopmentBranch(settings) : null,
       path,
       inSync: null,
       localSha: null,
       remoteSha: null,
       lastPushedAt: null,
-      message: token ? "Set default GitHub repository under Repositories." : "GitHub is not connected.",
+      productionDefinitionSource: settings?.productionDefinitionSource ?? "neon",
+      developmentDefinitionSource: settings?.developmentDefinitionSource ?? "neon",
+      personalDevBranch: settings?.personalDevBranch ?? null,
+      message: settings?.connection
+        ? "Set default GitHub repository under Repositories."
+        : "GitHub is not connected.",
     };
   }
+
+  const repo = settings.repo;
+  const workingBranch = resolveUserDevelopmentBranch(settings);
+  const token = settings.token;
 
   const localYaml = await eltPipelineToDeclarativeYamlString(row);
   const localSha = hashDeclarativeYaml(localYaml);
 
-  const remote = await fetchRemoteYamlAtRef(token, repo, path, repo.productionBranch);
+  const remote = await fetchRemoteYamlAtRef(token, repo, path, workingBranch);
   if (!remote) {
     return {
       connected: true,
@@ -141,20 +164,38 @@ export async function getPipelineGitSyncStatus(
       localSha,
       remoteSha: null,
       lastPushedAt: null,
-      message: "Not yet pushed to Git (file missing on production branch).",
+      message: `Not yet pushed to Git (${workingBranch} branch).`,
+      workingBranch,
+      productionDefinitionSource: settings.productionDefinitionSource,
+      developmentDefinitionSource: settings.developmentDefinitionSource,
+      personalDevBranch: settings.personalDevBranch,
     };
   }
 
   const remoteSha = hashDeclarativeYaml(remote.yaml);
+  const prodRemote = await fetchRemoteYamlAtRef(token, repo, path, repo.productionBranch);
+  const prodSha = prodRemote ? hashDeclarativeYaml(prodRemote.yaml) : null;
+  const prodInSync = prodSha != null && prodSha === remoteSha;
+
   return {
     connected: true,
     repo,
+    workingBranch,
     path,
     inSync: localSha === remoteSha,
     localSha,
     remoteSha,
     lastPushedAt: row.updatedAt.toISOString(),
-    message: localSha === remoteSha ? "In sync with Git." : "Neon copy differs from Git production branch.",
+    prodInSync,
+    productionDefinitionSource: settings.productionDefinitionSource,
+    developmentDefinitionSource: settings.developmentDefinitionSource,
+    personalDevBranch: settings.personalDevBranch,
+    message:
+      localSha === remoteSha
+        ? prodInSync
+          ? `In sync with ${workingBranch}; production (${repo.productionBranch}) matches.`
+          : `In sync with ${workingBranch}. Merge to ${repo.productionBranch} on GitHub to promote.`
+        : `Canvas differs from ${workingBranch} on GitHub.`,
   };
 }
 
@@ -185,13 +226,11 @@ export async function diffPipelineAgainstGitRef(
   });
   if (!row) return { error: "Pipeline not found" };
 
-  const token = await getGithubAccessTokenForUser(userId);
-  const { row: gh } = await getGithubConnectionForUser(userId);
-  const repo = repoContextFromGh(gh);
-  if (!token || !repo) return { error: "GitHub repository not configured" };
+  const settings = await getWorkspaceGithubSettings(userId);
+  if (!settings?.token || !settings.repo) return { error: "GitHub repository not configured" };
 
   const path = `${ELTPULSE_REPO.pipelinesDir}/${row.name}.yaml`;
-  const remote = await fetchRemoteYamlAtRef(token, repo, path, ref);
+  const remote = await fetchRemoteYamlAtRef(settings.token, settings.repo, path, ref);
   if (!remote) return { error: `Could not load ${path} at ${ref}` };
 
   const local = await eltPipelineToDeclarativeYamlString(row);
@@ -210,13 +249,11 @@ export async function restorePipelineFromGitCommit(
   });
   if (!row) return { ok: false, error: "Pipeline not found" };
 
-  const token = await getGithubAccessTokenForUser(userId);
-  const { row: gh } = await getGithubConnectionForUser(userId);
-  const repo = repoContextFromGh(gh);
-  if (!token || !repo) return { ok: false, error: "GitHub repository not configured" };
+  const settings = await getWorkspaceGithubSettings(userId);
+  if (!settings?.token || !settings.repo) return { ok: false, error: "GitHub repository not configured" };
 
   const path = `${ELTPULSE_REPO.pipelinesDir}/${row.name}.yaml`;
-  const remote = await fetchRemoteYamlAtRef(token, repo, path, commitSha);
+  const remote = await fetchRemoteYamlAtRef(settings.token, settings.repo, path, commitSha);
   if (!remote) return { ok: false, error: "Could not load file at that commit" };
 
   try {
@@ -235,6 +272,24 @@ export async function restorePipelineFromGitCommit(
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+export async function syncPipelineFromProductionBranch(
+  userId: string,
+  pipelineId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const settings = await getWorkspaceGithubSettings(userId);
+  if (!settings?.repo) return { ok: false, error: "GitHub repository not configured" };
+  return restorePipelineFromGitCommit(userId, pipelineId, settings.repo.productionBranch);
+}
+
+export function githubPromoteCompareUrl(
+  repo: { owner: string; name: string; productionBranch: string; developmentBranch: string },
+  workingBranch?: string
+): string | null {
+  const dev = workingBranch?.trim() || repo.developmentBranch;
+  if (dev === repo.productionBranch) return null;
+  return `https://github.com/${repo.owner}/${repo.name}/compare/${encodeURIComponent(repo.productionBranch)}...${encodeURIComponent(dev)}?expand=1`;
 }
 
 export async function promotePipelineToProduction(
@@ -262,21 +317,26 @@ export async function pushPipelineToGitBranch(
   pipelineId: string,
   options?: { branch?: "production" | "development"; commitMessage?: string }
 ): Promise<PushPipelineResult & { compareUrl?: string | null }> {
-  const { row: gh } = await getGithubConnectionForUser(userId);
-  const repo = repoContextFromGh(gh);
+  const settings = await getWorkspaceGithubSettings(userId);
+  if (!settings?.repo) {
+    return { ok: false, skipped: true, error: "GitHub repository not configured" };
+  }
+
   const branch =
-    options?.branch === "development" ? repo?.developmentBranch : repo?.productionBranch;
+    options?.branch === "production"
+      ? settings.repo.productionBranch
+      : resolveUserDevelopmentBranch(settings);
 
   const result = await pushPipelineToGithub(userId, pipelineId, {
     branch,
     commitMessage: options?.commitMessage,
   });
 
-  if (!result.ok || !repo) return result;
+  if (!result.ok) return result;
 
   const compareUrl =
-    options?.branch === "development" && branch !== repo.productionBranch
-      ? `https://github.com/${repo.owner}/${repo.name}/compare/${encodeURIComponent(repo.productionBranch)}...${encodeURIComponent(branch)}?expand=1`
+    options?.branch === "development" && branch !== settings.repo.productionBranch
+      ? workspacePromoteCompareUrl(settings)
       : null;
 
   return { ...result, compareUrl };

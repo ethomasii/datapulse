@@ -922,6 +922,7 @@ export function BuilderClient({
                       <PipelineRunButton
                         pipelineId={p.id}
                         pipelineName={p.name}
+                        showEnvironmentPicker
                         inline
                         className="mr-2 inline-block align-middle"
                       />

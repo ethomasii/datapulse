@@ -7,21 +7,27 @@ import {
   fetchPipelineGitHistory,
   getPipelineGitSyncStatus,
   listPipelineRevisions,
-  promotePipelineToProduction,
   pushPipelineToGitBranch,
   restorePipelineFromGitCommit,
   restorePipelineRevision,
+  syncPipelineFromProductionBranch,
 } from "@/lib/elt/pipeline-git-sync";
 import {
   listPipelineDeploymentBindings,
   upsertPipelineDeploymentBindings,
 } from "@/lib/elt/deployments";
 import { resolveRouteParamId } from "@/lib/server/route-params";
+import { createPromotionPullRequest } from "@/lib/integrations/github-create-promotion-pr";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 const actionSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("promote_to_production") }),
+  z.object({
+    action: z.literal("create_promotion_pr"),
+    title: z.string().min(1).max(256),
+    body: z.string().max(8000).optional(),
+    pushFirst: z.boolean().optional(),
+  }),
   z.object({ action: z.literal("push"), branch: z.enum(["production", "development"]).optional() }),
   z.object({ action: z.literal("restore_git"), commitSha: z.string().min(7).max(64) }),
   z.object({ action: z.literal("restore_revision"), revisionId: z.string().min(1) }),
@@ -102,19 +108,26 @@ export async function POST(req: Request, ctx: Ctx) {
 
   const body = parsed.data;
 
-  if (body.action === "promote_to_production") {
-    const result = await promotePipelineToProduction(user.id, pipelineId);
-    if (!result.ok) {
-      return NextResponse.json(
-        { error: result.error, skipped: result.skipped ?? false },
-        { status: result.skipped ? 400 : 502 }
-      );
-    }
+  if (body.action === "create_promotion_pr") {
+    const result = await createPromotionPullRequest(user.id, pipelineId, {
+      title: body.title,
+      body: body.body,
+      pushFirst: body.pushFirst,
+    });
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
     return NextResponse.json(result);
   }
 
+  if (body.action === "sync_from_production") {
+    const result = await syncPipelineFromProductionBranch(user.id, pipelineId);
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+    return NextResponse.json({ ok: true });
+  }
+
   if (body.action === "push") {
-    const result = await pushPipelineToGitBranch(user.id, pipelineId, { branch: body.branch ?? "production" });
+    const result = await pushPipelineToGitBranch(user.id, pipelineId, {
+      branch: body.branch ?? "development",
+    });
     if (!result.ok) {
       return NextResponse.json(
         { error: result.error, skipped: result.skipped ?? false },

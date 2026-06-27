@@ -14,9 +14,11 @@ type Props = {
   value: string;
   onChange: (slug: string) => void;
   className?: string;
+  /** Label before the select (default: Environment). */
+  label?: string;
 };
 
-export function DeploymentSelector({ value, onChange, className }: Props) {
+export function DeploymentSelector({ value, onChange, className, label = "Environment" }: Props) {
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -54,7 +56,7 @@ export function DeploymentSelector({ value, onChange, className }: Props) {
   return (
     <label className={`inline-flex items-center gap-1.5 text-xs ${className ?? ""}`}>
       <Layers className="h-3.5 w-3.5 text-slate-500" aria-hidden />
-      <span className="text-slate-500">Deployment</span>
+      <span className="text-slate-500">{label}</span>
       <select
         value={value || deployments.find((d) => d.isDefault)?.slug || deployments[0]?.slug}
         onChange={(e) => onChange(e.target.value)}

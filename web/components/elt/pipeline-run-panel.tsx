@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, CheckCircle2, Loader2, Play, XCircle } from "lucide-react";
+import { DeploymentSelector } from "@/components/pipeline-canvas/deployment-selector";
+import { DEFAULT_PIPELINE_RUN_ENVIRONMENT } from "@/lib/elt/pipeline-run-environment";
 import { hintsForRunFailure } from "@/lib/elt/run-error-hints";
 import { triggerPipelineRun } from "@/lib/elt/trigger-pipeline-run";
 
@@ -20,6 +22,7 @@ export function PipelineRunPanel({ pipelineId }: { pipelineId: string | null }) 
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [triggering, setTriggering] = useState(false);
+  const [environment, setEnvironment] = useState(DEFAULT_PIPELINE_RUN_ENVIRONMENT);
   const [error, setError] = useState<string | null>(null);
   const [execLabel, setExecLabel] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -74,7 +77,7 @@ export function PipelineRunPanel({ pipelineId }: { pipelineId: string | null }) 
     setTriggering(true);
     setError(null);
     try {
-      await triggerPipelineRun({ pipelineId });
+      await triggerPipelineRun({ pipelineId, environment });
       await loadRuns();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to start run");
@@ -108,7 +111,9 @@ export function PipelineRunPanel({ pipelineId }: { pipelineId: string | null }) 
             ) : null}
           </p>
         </div>
-        <button
+        <div className="flex flex-wrap items-center gap-2">
+          <DeploymentSelector value={environment} onChange={setEnvironment} />
+          <button
           type="button"
           onClick={() => void triggerRun()}
           disabled={triggering || isActive}
@@ -121,6 +126,7 @@ export function PipelineRunPanel({ pipelineId }: { pipelineId: string | null }) 
           )}
           {isActive ? "Running…" : "Run now"}
         </button>
+        </div>
       </div>
 
       {error ? <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p> : null}

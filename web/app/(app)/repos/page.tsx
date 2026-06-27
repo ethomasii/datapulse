@@ -2,6 +2,8 @@ import Link from "next/link";
 import { FolderGit2, Layers, Plug } from "lucide-react";
 import { requireDbUser } from "@/lib/auth/server";
 import { formatDefaultRepoLabel, getGithubConnectionForUser } from "@/lib/db/github-connection-query";
+import { resolveWorkspaceGithubOwnerId } from "@/lib/elt/workspace-github";
+import { db } from "@/lib/db/client";
 import { isCustomerGithubOauthEnabled } from "@/lib/integrations/customer-github-oauth";
 import { RelatedLinks } from "@/components/ui/related-links";
 import { RepositoriesClient } from "./repos-client";
@@ -9,7 +11,14 @@ import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 
 export default async function ReposPage() {
   const user = await requireDbUser();
-  const { row: gh, githubTableMissing } = await getGithubConnectionForUser(user.id);
+  const connectionUserId = await resolveWorkspaceGithubOwnerId(user.id);
+  const { row: gh, githubTableMissing } = await getGithubConnectionForUser(connectionUserId);
+  const personalDevBranch = (
+    await db.user.findUnique({
+      where: { id: user.id },
+      select: { personalDevBranch: true },
+    })
+  )?.personalDevBranch;
   const defaultRepoLabel = formatDefaultRepoLabel(gh);
 
   return (
@@ -37,6 +46,7 @@ export default async function ReposPage() {
       <RepositoriesClient
         githubLogin={gh?.githubLogin ?? null}
         initialConnection={gh}
+        initialPersonalDevBranch={personalDevBranch}
         githubTableMissing={githubTableMissing}
         showCustomerGithubOauth={isCustomerGithubOauthEnabled()}
       />

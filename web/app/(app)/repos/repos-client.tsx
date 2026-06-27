@@ -15,6 +15,7 @@ import {
   Search,
 } from "lucide-react";
 import type { GithubConnectionSummary } from "@/lib/db/github-connection-query";
+import { eltpulseSyncProductionWorkflow } from "@/lib/integrations/github-actions-sync-prod";
 import { parseGithubRepositoryUrl } from "@/lib/integrations/parse-github-repo-url";
 
 type PipelineRow = {
@@ -38,6 +39,7 @@ type RepoOption = {
 type Props = {
   githubLogin: string | null;
   initialConnection: GithubConnectionSummary | null;
+  initialPersonalDevBranch?: string | null;
   githubTableMissing: boolean;
   showCustomerGithubOauth: boolean;
 };
@@ -50,13 +52,23 @@ function defaultRepoUrl(row: GithubConnectionSummary | null): string {
 export function RepositoriesClient({
   githubLogin,
   initialConnection,
+  initialPersonalDevBranch,
   githubTableMissing,
   showCustomerGithubOauth,
 }: Props) {
   const [owner, setOwner] = useState(initialConnection?.defaultRepoOwner ?? "");
   const [repoName, setRepoName] = useState(initialConnection?.defaultRepoName ?? "");
   const [branch, setBranch] = useState(initialConnection?.defaultBranch ?? "main");
+  const [devBranch, setDevBranch] = useState(initialConnection?.developmentBranch ?? "develop");
+  const [personalDevBranch, setPersonalDevBranch] = useState(initialPersonalDevBranch ?? "");
+  const [prodDefinitionSource, setProdDefinitionSource] = useState<"neon" | "git">(
+    initialConnection?.productionDefinitionSource ?? "neon"
+  );
+  const [devDefinitionSource, setDevDefinitionSource] = useState<"neon" | "git">(
+    initialConnection?.developmentDefinitionSource ?? "neon"
+  );
   const [repositoryUrl, setRepositoryUrl] = useState(() => defaultRepoUrl(initialConnection));
+  const [workflowCopied, setWorkflowCopied] = useState(false);
 
   const [showPicker, setShowPicker] = useState(false);
   const [repos, setRepos] = useState<RepoOption[] | null>(null);
@@ -81,8 +93,26 @@ export function RepositoriesClient({
     setOwner(initialConnection?.defaultRepoOwner ?? "");
     setRepoName(initialConnection?.defaultRepoName ?? "");
     setBranch(initialConnection?.defaultBranch ?? "main");
+    setDevBranch(initialConnection?.developmentBranch ?? "develop");
+    setPersonalDevBranch(initialPersonalDevBranch ?? "");
+    setProdDefinitionSource(initialConnection?.productionDefinitionSource ?? "neon");
+    setDevDefinitionSource(initialConnection?.developmentDefinitionSource ?? "neon");
     setRepositoryUrl(defaultRepoUrl(initialConnection));
-  }, [initialConnection]);
+  }, [initialConnection, initialPersonalDevBranch]);
+
+  const githubWorkflowYaml = eltpulseSyncProductionWorkflow({
+    productionBranch: branch.trim() || "main",
+  });
+
+  async function copyWorkflow() {
+    try {
+      await navigator.clipboard.writeText(githubWorkflowYaml);
+      setWorkflowCopied(true);
+      setTimeout(() => setWorkflowCopied(false), 2000);
+    } catch {
+      setBanner({ kind: "err", text: "Could not copy workflow to clipboard." });
+    }
+  }
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -126,10 +156,21 @@ export function RepositoriesClient({
   }, [loadPipelines, loadMonitorCount]);
 
   const persistRepoSettings = useCallback(
-    async (o: string, n: string, b: string, opts?: { quiet?: boolean }): Promise<boolean> => {
+    async (
+      o: string,
+      n: string,
+      prodBranch: string,
+      opts?: {
+        quiet?: boolean;
+        developmentBranch?: string;
+        productionDefinitionSource?: "neon" | "git";
+        developmentDefinitionSource?: "neon" | "git";
+        personalDevBranch?: string | null;
+      }
+    ): Promise<boolean> => {
       const oo = o.trim();
       const nn = n.trim();
-      const bb = (b.trim() || "main") || "main";
+      const bb = (prodBranch.trim() || "main") || "main";
       if (!opts?.quiet) setSaving(true);
       if (!opts?.quiet) setBanner(null);
       try {
@@ -140,6 +181,13 @@ export function RepositoriesClient({
             defaultRepoOwner: oo || null,
             defaultRepoName: nn || null,
             defaultBranch: bb || null,
+            developmentBranch: (opts?.developmentBranch ?? devBranch).trim() || null,
+            productionDefinitionSource: opts?.productionDefinitionSource ?? prodDefinitionSource,
+            developmentDefinitionSource: opts?.developmentDefinitionSource ?? devDefinitionSource,
+            personalDevBranch:
+              opts?.personalDevBranch !== undefined
+                ? opts.personalDevBranch
+                : personalDevBranch.trim() || null,
           }),
         });
         const json = (await res.json()) as { error?: unknown };
@@ -158,7 +206,7 @@ export function RepositoriesClient({
         if (!opts?.quiet) setSaving(false);
       }
     },
-    []
+    [devBranch, devDefinitionSource, personalDevBranch, prodDefinitionSource]
   );
 
   async function handleOpenPicker() {
@@ -367,9 +415,10 @@ export function RepositoriesClient({
       )}
 
       <div className="rounded-xl border border-sky-200 bg-sky-50/60 px-4 py-3 text-sm text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-100">
-        <strong className="font-semibold">Git-native workflow:</strong> connect GitHub below, set your default repo, then
-        use <strong className="font-medium">Push pipeline</strong> on any saved pipeline to commit{" "}
-        <code className="text-xs">eltpulse/pipelines/*.yaml</code> — review in PRs like application code.
+        <strong className="font-semibold">CI/CD workflow:</strong> canvas saves auto-push to your{" "}
+        <strong className="font-medium">dev branch</strong> (shared or personal). Open a PR to{" "}
+        <strong className="font-medium">production</strong> on GitHub. After merge, a GitHub Action (below) syncs into
+        eltPulse — or set production runs to read Git <code className="text-xs">main</code> directly.
       </div>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
@@ -529,10 +578,63 @@ export function RepositoriesClient({
               </div>
             </div>
 
-            <details className="mt-6 rounded-lg border border-dashed border-slate-200 p-4 dark:border-slate-700">
+            <details className="mt-6 rounded-lg border border-dashed border-slate-200 p-4 dark:border-slate-700" open>
               <summary className="cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300">
-                Advanced: edit owner, repo name, and branch manually
+                Branches, definition source &amp; team settings
               </summary>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <label className="block text-sm sm:col-span-2">
+                  <span className="text-slate-600 dark:text-slate-400">Production branch</span>
+                  <input
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                    value={branch}
+                    onChange={(e) => setBranch(e.target.value)}
+                    placeholder="main"
+                  />
+                  <span className="mt-1 block text-xs text-slate-500">Merged YAML here is production. Pull imports from this branch.</span>
+                </label>
+                <label className="block text-sm">
+                  <span className="text-slate-600 dark:text-slate-400">Shared dev branch</span>
+                  <input
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                    value={devBranch}
+                    onChange={(e) => setDevBranch(e.target.value)}
+                    placeholder="develop"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="text-slate-600 dark:text-slate-400">Your personal dev branch (optional)</span>
+                  <input
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                    value={personalDevBranch}
+                    onChange={(e) => setPersonalDevBranch(e.target.value)}
+                    placeholder="dev/your-name"
+                  />
+                  <span className="mt-1 block text-xs text-slate-500">Team members can work on separate branches; canvas saves push here.</span>
+                </label>
+                <label className="block text-sm">
+                  <span className="text-slate-600 dark:text-slate-400">Production runs load definition from</span>
+                  <select
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                    value={prodDefinitionSource}
+                    onChange={(e) => setProdDefinitionSource(e.target.value as "neon" | "git")}
+                  >
+                    <option value="neon">Neon (canvas / after sync)</option>
+                    <option value="git">Git production branch (live from main)</option>
+                  </select>
+                </label>
+                <label className="block text-sm">
+                  <span className="text-slate-600 dark:text-slate-400">Development runs load definition from</span>
+                  <select
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-white"
+                    value={devDefinitionSource}
+                    onChange={(e) => setDevDefinitionSource(e.target.value as "neon" | "git")}
+                  >
+                    <option value="neon">Neon (canvas)</option>
+                    <option value="git">Git dev branch (your branch or shared develop)</option>
+                  </select>
+                </label>
+              </div>
               <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
                 <label className="block min-w-[8rem] flex-1 text-sm">
                   <span className="text-slate-600 dark:text-slate-400">Owner</span>
@@ -554,16 +656,6 @@ export function RepositoriesClient({
                     autoComplete="off"
                   />
                 </label>
-                <label className="block min-w-[8rem] flex-1 text-sm">
-                  <span className="text-slate-600 dark:text-slate-400">Branch</span>
-                  <input
-                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-white"
-                    value={branch}
-                    onChange={(e) => setBranch(e.target.value)}
-                    placeholder="main"
-                    autoComplete="off"
-                  />
-                </label>
                 <button
                   type="button"
                   onClick={() => void saveManualAdvanced()}
@@ -571,10 +663,33 @@ export function RepositoriesClient({
                   className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" aria-hidden />}
-                  Save
+                  Save Git settings
                 </button>
               </div>
             </details>
+          </section>
+
+          <section className="rounded-2xl border border-violet-200 bg-violet-50/40 p-6 dark:border-violet-900/40 dark:bg-violet-950/20">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">GitHub Action — sync after merge</h2>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              Add this workflow to your pipelines repo as{" "}
+              <code className="text-xs">.github/workflows/eltpulse-sync-prod.yml</code>. On merge to{" "}
+              <span className="font-mono text-xs">{branch.trim() || "main"}</span>, it pulls YAML into eltPulse via API
+              (requires a workspace API key with <code className="text-xs">pipelines:write</code>).
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void copyWorkflow()}
+                className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
+              >
+                {workflowCopied ? <Check className="h-4 w-4" /> : null}
+                {workflowCopied ? "Copied" : "Copy workflow YAML"}
+              </button>
+            </div>
+            <pre className="mt-4 max-h-64 overflow-auto rounded-lg border border-violet-200 bg-white p-3 text-[11px] leading-relaxed text-slate-800 dark:border-violet-900/50 dark:bg-slate-950 dark:text-slate-200">
+              {githubWorkflowYaml}
+            </pre>
           </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">

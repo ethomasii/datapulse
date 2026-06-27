@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveNewRunExecution } from "@/lib/agent/run-execution";
 import { db } from "@/lib/db/client";
 import { resolveWorkspaceOrganizationId } from "@/lib/elt/resolve-workspace-org";
+import { normalizePipelineRunEnvironment } from "@/lib/elt/pipeline-run-environment";
 import { resolveUserPlanTier, tierAllowsWebhookTriggers } from "@/lib/plans/tier-features";
 
 type Ctx = { params: { token: string } };
@@ -11,7 +12,7 @@ type Ctx = { params: { token: string } };
  * POST /api/webhooks/trigger/:token
  *
  * Body (JSON):
- *   { pipeline: string, environment?: string, correlationId?: string }
+ *   { pipeline: string, environment?: "development" | "production", correlationId?: string }
  *
  * The token is the user's `incomingWebhookToken`. No Clerk session required —
  * the token IS the auth. Keep it secret.
@@ -73,9 +74,9 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     return NextResponse.json({ error: "correlationId already exists" }, { status: 409 });
   }
 
-  const environment = typeof body.environment === "string" && body.environment.trim()
-    ? body.environment.trim()
-    : "webhook";
+  const environment = normalizePipelineRunEnvironment(
+    typeof body.environment === "string" ? body.environment : "production"
+  );
 
   const { targetAgentTokenId, ingestionExecutor } = await resolveNewRunExecution({
     userId: user.id,

@@ -7,6 +7,8 @@ export type GithubConnectionSummary = {
   defaultRepoName: string | null;
   defaultBranch: string | null;
   developmentBranch: string | null;
+  productionDefinitionSource: "neon" | "git";
+  developmentDefinitionSource: "neon" | "git";
 };
 
 function isMissingGithubTableError(e: unknown): boolean {
@@ -55,6 +57,8 @@ export async function getGithubConnectionForUser(userId: string): Promise<Github
             defaultRepoName: true,
             defaultBranch: true,
             developmentBranch: true,
+            productionDefinitionSource: true,
+            developmentDefinitionSource: true,
           },
       });
       return { row, githubTableMissing: false };
@@ -66,7 +70,9 @@ export async function getGithubConnectionForUser(userId: string): Promise<Github
 
   try {
     const rows = await db.$queryRaw<GithubConnectionSummary[]>`
-      SELECT "githubLogin", "defaultRepoOwner", "defaultRepoName", "defaultBranch", "developmentBranch"
+      SELECT "githubLogin", "defaultRepoOwner", "defaultRepoName", "defaultBranch", "developmentBranch",
+             COALESCE("production_definition_source", 'neon') AS "productionDefinitionSource",
+             COALESCE("development_definition_source", 'neon') AS "developmentDefinitionSource"
       FROM "GithubConnection"
       WHERE "userId" = ${userId}
       LIMIT 1

@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { RunTelemetryCompactCell, RunTelemetryView } from "@/components/elt/run-telemetry-view";
 import { RunDbtManifestPanel } from "@/components/elt/run-dbt-manifest-panel";
+import { DeploymentSelector } from "@/components/pipeline-canvas/deployment-selector";
+import { DEFAULT_PIPELINE_RUN_ENVIRONMENT } from "@/lib/elt/pipeline-run-environment";
 import { formatBytes, formatRows, parseRunTelemetry } from "@/lib/elt/run-telemetry";
 import { RelatedLinks } from "@/components/ui/related-links";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -216,7 +218,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
   const [detailLoading, setDetailLoading] = useState(false);
   const [gatewayOptions, setGatewayOptions] = useState<{ id: string; name: string }[]>([]);
   const [runNowPipelineId, setRunNowPipelineId] = useState("");
-  const [runNowEnvironment, setRunNowEnvironment] = useState("default");
+  const [runNowEnvironment, setRunNowEnvironment] = useState(DEFAULT_PIPELINE_RUN_ENVIRONMENT);
   const [runNowPartitionValue, setRunNowPartitionValue] = useState("");
   const [runNowGateway, setRunNowGateway] = useState("");
   const [runNowSubmitting, setRunNowSubmitting] = useState(false);
@@ -578,7 +580,7 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
     try {
       const body: Record<string, unknown> = {
         pipelineId: runNowPipelineId,
-        environment: runNowEnvironment.trim() || "default",
+        environment: runNowEnvironment,
         status: "pending",
       };
       const pv = runNowPartitionValue.trim();
@@ -765,12 +767,9 @@ export function RunsClient({ initialPipelines }: { initialPipelines: PipelineOpt
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-sky-900 dark:text-sky-200">Environment</span>
-              <input
-                value={runNowEnvironment}
-                onChange={(e) => setRunNowEnvironment(e.target.value)}
-                placeholder="default"
-                className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm dark:border-sky-800 dark:bg-slate-950 dark:text-white"
-              />
+              <div className="rounded-lg border border-sky-200 bg-white px-2 py-1.5 dark:border-sky-800 dark:bg-slate-950">
+                <DeploymentSelector value={runNowEnvironment} onChange={setRunNowEnvironment} />
+              </div>
             </label>
             {runNowPipelineMeta?.partitionColumn ? (
               <label className="flex flex-col gap-1 sm:col-span-2 lg:col-span-4">

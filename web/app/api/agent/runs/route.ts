@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
 import { getAgentAuthContext } from "@/lib/agent/auth";
 import { agentPollRunsWhere } from "@/lib/agent/gateway-routing";
-import { resolveExecutionPipelineCode } from "@/lib/elt/refresh-pipeline-artifacts-for-execution";
+import { resolveExecutionPipelineManifest } from "@/lib/elt/resolve-execution-pipeline-manifest";
 import { resolveRunConnectionEnv } from "@/lib/elt/deployments";
 
 /** Customer gateways must not pick runs reserved for eltPulse-operated workers. */
@@ -68,13 +68,14 @@ export async function GET(req: Request) {
   const hydrated = await Promise.all(
     runs.map(async (run) => {
       let connectionEnv: Record<string, string> | undefined;
+      const pipelineOwnerId = run.userId;
       if (run.pipeline) {
-        connectionEnv = await resolveRunConnectionEnv(user.id, run.pipeline, run.environment);
+        connectionEnv = await resolveRunConnectionEnv(pipelineOwnerId, run.pipeline, run.environment);
       }
       if (!run.pipeline || (run.pipeline.tool !== "dlt" && run.pipeline.tool !== "sling")) {
         return { ...run, connectionEnv };
       }
-      const pipelineCode = await resolveExecutionPipelineCode(user.id, {
+      const manifest = await resolveExecutionPipelineManifest(pipelineOwnerId, {
         id: run.pipeline.id,
         name: run.pipeline.name,
         tool: run.pipeline.tool,
@@ -82,13 +83,25 @@ export async function GET(req: Request) {
         destinationType: run.pipeline.destinationType,
         sourceConfiguration: run.pipeline.sourceConfiguration,
         pipelineCode: run.pipeline.pipelineCode ?? "",
+        configYaml: run.pipeline.configYaml,
+        workspaceYaml: run.pipeline.workspaceYaml,
         description: run.pipeline.description,
         groupName: run.pipeline.groupName,
-      });
+      }, run.environment);
       return {
         ...run,
         connectionEnv,
-        pipeline: { ...run.pipeline, pipelineCode },
+        pipeline: {
+          ...run.pipeline,
+          pipelineCode: manifest.pipelineCode,
+          configYaml: manifest.configYaml ?? run.pipeline.configYaml,
+          workspaceYaml: manifest.workspaceYaml ?? run.pipeline.workspaceYaml,
+          ...(manifest.sourceConfiguration !== undefined
+            ? { sourceConfiguration: manifest.sourceConfiguration }
+            : {}),
+        },
+        definitionSource: manifest.definitionSource,
+        definitionGitRef: manifest.gitRef,
       };
     })
   );

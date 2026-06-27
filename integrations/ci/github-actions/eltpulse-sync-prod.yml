@@ -1,0 +1,32 @@
+# Sync pipeline declarations from Git into eltPulse after merge to production.
+# Copy from Repositories → GitHub Action in eltPulse, or customize branch/secrets.
+#
+# Secrets: ELTPULSE_API_KEY (required), ELTPULSE_URL (optional)
+
+name: eltPulse sync production
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'eltpulse/pipelines/**'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull declarations into eltPulse
+        env:
+          ELTPULSE_URL: ${{ secrets.ELTPULSE_URL || 'https://app.eltpulse.dev' }}
+          ELTPULSE_API_KEY: ${{ secrets.ELTPULSE_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ELTPULSE_API_KEY:-}" ]; then
+            echo "ELTPULSE_API_KEY secret is required"
+            exit 1
+          fi
+          curl -sf -X POST "${ELTPULSE_URL}/api/integrations/github/sync" \
+            -H "Authorization: Bearer ${ELTPULSE_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"pull_declarations"}'

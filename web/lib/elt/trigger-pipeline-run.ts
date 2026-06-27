@@ -1,6 +1,12 @@
+import {
+  DEFAULT_PIPELINE_RUN_ENVIRONMENT,
+  normalizePipelineRunEnvironment,
+  type PipelineRunEnvironment,
+} from "@/lib/elt/pipeline-run-environment";
+
 export type TriggerPipelineRunInput = {
   pipelineId: string;
-  environment?: string;
+  environment?: PipelineRunEnvironment | string;
   partitionValue?: string;
   targetAgentTokenId?: string | null;
   triggeredBy?: string;
@@ -16,7 +22,7 @@ export async function triggerPipelineRun(
 ): Promise<TriggerPipelineRunResult> {
   const body: Record<string, unknown> = {
     pipelineId: input.pipelineId,
-    environment: input.environment?.trim() || "default",
+    environment: normalizePipelineRunEnvironment(input.environment ?? DEFAULT_PIPELINE_RUN_ENVIRONMENT),
     status: "pending",
   };
   const pv = input.partitionValue?.trim();

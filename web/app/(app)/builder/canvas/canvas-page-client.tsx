@@ -38,6 +38,7 @@ import { CanvasAssetLineagePanel } from "@/components/pipeline-canvas/canvas-ass
 import { PipelineGitPanel } from "@/components/pipeline-canvas/pipeline-git-panel";
 import { PipelineDeploymentPanel } from "@/components/pipeline-canvas/pipeline-deployment-panel";
 import { DeploymentSelector } from "@/components/pipeline-canvas/deployment-selector";
+import { PipelineRunButton } from "@/components/elt/pipeline-run-button";
 import {
   type CanvasInspectorFocus,
   type PipelineCanvasControl,
@@ -819,6 +820,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
             <>
               <PipelineGitPanel
                 pipelineId={selectedId}
+                pipelineName={selectedName}
                 canWrite={canWrite}
                 onRestored={() => void loadPipelineGraph(selectedId)}
               />
@@ -1262,7 +1264,10 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
             onReplaceGraph={(nodes, edges) => canvasControlRef.current?.replaceGraph(nodes, edges)}
             onPipelinePatched={() => void loadPipelineGraph(selectedId)}
             deploymentSelector={
-              <DeploymentSelector value={deploymentSlug} onChange={setDeploymentSlug} />
+              <div className="flex flex-wrap items-center gap-2">
+                <DeploymentSelector value={deploymentSlug} onChange={setDeploymentSlug} />
+                <PipelineRunButton pipelineId={selectedId} environment={deploymentSlug} inline openRunDetail />
+              </div>
             }
           />
           <div className="flex shrink-0 flex-col">

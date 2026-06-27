@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import YAML from "yaml";
-import { getCurrentDbUser } from "@/lib/auth/server";
+import {
+  API_SCOPES,
+  hasScope,
+  resolveApiUser,
+  scopeForbiddenResponse,
+  unauthorizedResponse,
+} from "@/lib/auth/api-user";
 import { db } from "@/lib/db/client";
 import { getGithubConnectionForUser } from "@/lib/db/github-connection-query";
 import { ELTPULSE_REPO } from "@/lib/elt/eltpulse-repo-layout";
+import { resolveWorkspaceGithubOwnerId } from "@/lib/elt/workspace-github";
 import { parsePipelineDeclarationYaml, parseAndCompileDeclarativeYaml } from "@/lib/elt/parse-pipeline-declaration";
 import { upsertPipelineDefinition } from "@/lib/elt/persist-pipeline";
 import { getGithubAccessTokenForUser } from "@/lib/integrations/github-access-token";
@@ -42,17 +49,18 @@ function repoContext(
 }
 
 export async function POST(req: Request) {
-  const user = await getCurrentDbUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await resolveApiUser(req);
+  if (!auth) return unauthorizedResponse();
 
-  const token = await getGithubAccessTokenForUser(user.id);
+  const user = auth.user;
+  const connectionUserId = await resolveWorkspaceGithubOwnerId(user.id);
+
+  const token = await getGithubAccessTokenForUser(connectionUserId);
   if (!token) {
     return NextResponse.json({ error: "GitHub is not connected." }, { status: 400 });
   }
 
-  const { row: gh } = await getGithubConnectionForUser(user.id);
+  const { row: gh } = await getGithubConnectionForUser(connectionUserId);
   const ctx = repoContext(gh?.defaultRepoOwner, gh?.defaultRepoName, gh?.defaultBranch);
   if (!ctx.ok) {
     return NextResponse.json({ error: ctx.message }, { status: 400 });
@@ -73,6 +81,9 @@ export async function POST(req: Request) {
   const basePath = ELTPULSE_REPO.pipelinesDir;
 
   if (parsed.data.action === "pull_declarations") {
+    if (auth.via === "api_key" && !hasScope(auth, API_SCOPES.PIPELINES_WRITE)) {
+      return scopeForbiddenResponse();
+    }
     const listPath = githubRepoContentsApiPath(ctx.owner, ctx.name, basePath, ctx.branch);
     const { ok, status, json: dirJson } = await githubJson<GithubContentDirItem[] | { message?: string }>(
       token,
@@ -288,7 +299,9 @@ export async function POST(req: Request) {
   }
 
   const pipelineId = parsed.data.pipelineId;
-  const result = await pushPipelineToGithub(user.id, pipelineId);
+  const result = await pushPipelineToGithub(user.id, pipelineId, {
+    branch: gh?.developmentBranch?.trim() || "develop",
+  });
   if (!result.ok) {
     const status = result.skipped ? 400 : 502;
     return NextResponse.json({ error: result.error }, { status });

@@ -104,6 +104,11 @@ enum NotificationTrigger {
   catalog_contract_violated
 }
 
+enum PipelineDefinitionSource {
+  neon
+  git
+}
+
 model User {
   id        String   @id @default(cuid())
   clerkId   String   @unique
@@ -165,6 +170,8 @@ model User {
   defaultDestinationConnection   Connection? @relation("UserDefaultDestination", fields: [defaultDestinationConnectionId], references: [id], onDelete: SetNull)
   /// GitHub catalog repos (`owner/repo` or raw URL) merged into component palette + compile resolution.
   componentCatalogUrls Json @default("[]") @map("component_catalog_urls")
+  /// Personal feature branch for canvas saves (team members). Falls back to workspace `developmentBranch`.
+  personalDevBranch String? @map("personal_dev_branch")
 
   @@index([organizationId])
   @@index([defaultAgentTokenId])
@@ -276,6 +283,10 @@ model GithubConnection {
   defaultBranch    String?  @default("main")
   /// Branch for canvas saves / feature work; PRs target `defaultBranch`.
   developmentBranch String? @default("develop") @map("development_branch")
+  /// Where production runs load pipeline definitions from (Neon vs Git `defaultBranch`).
+  productionDefinitionSource PipelineDefinitionSource @default(neon) @map("production_definition_source")
+  /// Where development runs load pipeline definitions from (Neon vs Git dev branch).
+  developmentDefinitionSource PipelineDefinitionSource @default(neon) @map("development_definition_source")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

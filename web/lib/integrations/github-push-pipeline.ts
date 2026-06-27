@@ -1,47 +1,32 @@
 import { db } from "@/lib/db/client";
-import { getGithubConnectionForUser } from "@/lib/db/github-connection-query";
 import { ELTPULSE_REPO } from "@/lib/elt/eltpulse-repo-layout";
 import { eltPipelineToDeclarativeYamlString } from "@/lib/elt/pipeline-spec-export";
-import { getGithubAccessTokenForUser } from "@/lib/integrations/github-access-token";
-import { githubJson, githubRepoContentsApiPath } from "@/lib/integrations/github-rest";
 import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
+import {
+  getWorkspaceGithubSettings,
+  resolveUserDevelopmentBranch,
+} from "@/lib/elt/workspace-github";
+import { githubJson, githubRepoContentsApiPath } from "@/lib/integrations/github-rest";
 import {
   resolveUserPlanTier,
   tierAllowsGitArtifactExport,
   upgradeMessageForFeature,
 } from "@/lib/plans/tier-features";
 
-function repoContext(
-  owner: string | null | undefined,
-  name: string | null | undefined,
-  branch: string | null | undefined
-): { ok: true; owner: string; name: string; branch: string } | { ok: false; message: string } {
-  const o = owner?.trim();
-  const n = name?.trim();
-  if (!o || !n) {
-    return {
-      ok: false,
-      message: "Set default GitHub owner and repository under Repositories.",
-    };
-  }
-  const br = (branch?.trim() || "main") || "main";
-  return { ok: true, owner: o, name: n, branch: br };
-}
-
 export type PushPipelineResult =
   | { ok: true; path: string; branch: string; htmlUrl: string | null }
   | { ok: false; skipped?: boolean; error: string };
 
 /**
- * Push pipeline declaration YAML to the user's connected GitHub repo.
- * Used by Repositories UI and auto-push on pipeline save.
+ * Push pipeline declaration YAML to the workspace GitHub repo.
+ * Canvas saves target the acting user's dev branch (personal or shared).
  */
 export async function pushPipelineToGithub(
-  userId: string,
+  actingUserId: string,
   pipelineId: string,
   options?: { branch?: string; commitMessage?: string }
 ): Promise<PushPipelineResult> {
-  const tier = await resolveUserPlanTier(userId);
+  const tier = await resolveUserPlanTier(actingUserId);
   if (!tierAllowsGitArtifactExport(tier)) {
     return {
       ok: false,
@@ -50,22 +35,15 @@ export async function pushPipelineToGithub(
     };
   }
 
-  const token = await getGithubAccessTokenForUser(userId);
-  if (!token) {
-    return { ok: false, skipped: true, error: "GitHub is not connected" };
+  const settings = await getWorkspaceGithubSettings(actingUserId);
+  if (!settings?.token || !settings.repo) {
+    return { ok: false, skipped: true, error: "GitHub is not connected or repository not configured" };
   }
 
-  const { row: gh } = await getGithubConnectionForUser(userId);
-  const ctx = repoContext(
-    gh?.defaultRepoOwner,
-    gh?.defaultRepoName,
-    options?.branch ?? gh?.defaultBranch
-  );
-  if (!ctx.ok) {
-    return { ok: false, skipped: true, error: ctx.message };
-  }
+  const branch = options?.branch?.trim() || resolveUserDevelopmentBranch(settings);
+  const { owner, name } = settings.repo;
 
-  const ownerIds = await getAccessibleResourceOwnerIds(userId);
+  const ownerIds = await getAccessibleResourceOwnerIds(actingUserId);
   const row = await db.eltPipeline.findFirst({
     where: { id: pipelineId, userId: { in: ownerIds } },
   });
@@ -75,13 +53,13 @@ export async function pushPipelineToGithub(
 
   const yamlText = await eltPipelineToDeclarativeYamlString(row, {
     includeDeployments: true,
-    actingUserId: userId,
+    actingUserId,
   });
   const relPath = `${ELTPULSE_REPO.pipelinesDir}/${row.name}.yaml`;
-  const fileUrlPath = githubRepoContentsApiPath(ctx.owner, ctx.name, relPath);
-  const fileUrlWithRef = `${fileUrlPath}?ref=${encodeURIComponent(ctx.branch)}`;
+  const fileUrlPath = githubRepoContentsApiPath(owner, name, relPath);
+  const fileUrlWithRef = `${fileUrlPath}?ref=${encodeURIComponent(branch)}`;
 
-  const existing = await githubJson<{ sha?: string }>(token, fileUrlWithRef);
+  const existing = await githubJson<{ sha?: string }>(settings.token, fileUrlWithRef);
   let sha: string | undefined;
   if (existing.ok && existing.json && typeof existing.json.sha === "string") {
     sha = existing.json.sha;
@@ -90,14 +68,14 @@ export async function pushPipelineToGithub(
   const putBody: Record<string, unknown> = {
     message: options?.commitMessage?.trim() || `[eltpulse] Sync pipeline ${row.name}`,
     content: Buffer.from(yamlText, "utf8").toString("base64"),
-    branch: ctx.branch,
+    branch,
   };
   if (sha) putBody.sha = sha;
 
   const put = await fetch(`https://api.github.com${fileUrlPath}`, {
     method: "PUT",
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${settings.token}`,
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
       "Content-Type": "application/json",
@@ -118,7 +96,7 @@ export async function pushPipelineToGithub(
   return {
     ok: true,
     path: relPath,
-    branch: ctx.branch,
+    branch,
     htmlUrl: putJson.content?.html_url ?? putJson.commit?.html_url ?? null,
   };
 }

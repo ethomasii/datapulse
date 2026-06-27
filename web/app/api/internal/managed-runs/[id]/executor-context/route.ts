@@ -12,7 +12,8 @@ import { db } from "@/lib/db/client";
 import { loadWorkspaceConnectionById } from "@/lib/elt/workspace-connection-load";
 import { sourceConfigurationFromDbtProject } from "@/lib/elt/dbt-projects";
 import { resolveRouteParamId } from "@/lib/server/route-params";
-import { resolveExecutionPipelineCode } from "@/lib/elt/refresh-pipeline-artifacts-for-execution";
+import { resolveExecutionPipelineManifest } from "@/lib/elt/resolve-execution-pipeline-manifest";
+import { resolvePipelineConnectionsForEnvironment, resolveRunConnectionEnv } from "@/lib/elt/deployments";
 
 export const dynamic = "force-dynamic";
 
@@ -92,11 +93,22 @@ export async function GET(req: Request, ctx: Ctx) {
   }
 
   const userId = run.userId;
+  const resolved =
+    run.pipeline != null
+      ? await resolvePipelineConnectionsForEnvironment(userId, run.pipeline, run.environment)
+      : null;
+  const sourceConnectionId = resolved?.sourceConnectionId ?? run.pipeline?.sourceConnectionId ?? null;
   const destinationConnectionId =
-    run.pipeline?.destinationConnectionId ?? run.dbtProject?.destinationConnectionId ?? null;
-  const [source, destination] = await Promise.all([
-    loadConnection(userId, run.pipeline?.sourceConnectionId ?? null),
+    resolved?.destinationConnectionId ??
+    run.pipeline?.destinationConnectionId ??
+    run.dbtProject?.destinationConnectionId ??
+    null;
+  const [source, destination, connectionEnv] = await Promise.all([
+    loadConnection(userId, sourceConnectionId),
     loadConnection(userId, destinationConnectionId),
+    run.pipeline
+      ? resolveRunConnectionEnv(userId, run.pipeline, run.environment)
+      : Promise.resolve({} as Record<string, string>),
   ]);
 
   const pipelinePayload = run.pipeline ?? {
@@ -114,17 +126,24 @@ export async function GET(req: Request, ctx: Ctx) {
   };
 
   if (run.pipeline) {
-    const pipelineCode = await resolveExecutionPipelineCode(userId, {
-      ...run.pipeline,
-      pipelineCode: run.pipeline.pipelineCode ?? "",
-    });
-    pipelinePayload.pipelineCode = pipelineCode;
+    const manifest = await resolveExecutionPipelineManifest(
+      userId,
+      { ...run.pipeline, pipelineCode: run.pipeline.pipelineCode ?? "" },
+      run.environment
+    );
+    pipelinePayload.pipelineCode = manifest.pipelineCode;
+    pipelinePayload.configYaml = manifest.configYaml ?? run.pipeline.configYaml;
+    pipelinePayload.workspaceYaml = manifest.workspaceYaml ?? run.pipeline.workspaceYaml;
+    if (manifest.sourceConfiguration !== undefined) {
+      pipelinePayload.sourceConfiguration = manifest.sourceConfiguration;
+    }
   }
 
   return NextResponse.json({
     run: {
       id: run.id,
       status: run.status,
+      environment: run.environment,
       partitionValue: run.partitionValue,
       partitionColumn: run.partitionColumn,
       correlationId: run.correlationId,
@@ -134,5 +153,6 @@ export async function GET(req: Request, ctx: Ctx) {
     pipeline: pipelinePayload,
     dbtProject: run.dbtProject ?? null,
     connections: { source, destination },
+    connectionEnv,
   });
 }

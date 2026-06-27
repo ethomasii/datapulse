@@ -503,7 +503,7 @@ export function QuickStartWizard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pipelineId,
-          environment: "default",
+          environment: "development",
           status: "pending",
           triggeredBy: "quick_start",
         }),

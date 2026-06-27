@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { pipelineRunEnvironmentSchema } from "./pipeline-run-environment";
 import { TELEMETRY_SAMPLES_MAX } from "./run-telemetry";
 
 export const runStatusSchema = z.enum(["pending", "running", "succeeded", "failed", "cancelled"]);
@@ -56,7 +57,7 @@ const resourceRollupSchema = z
 
 export const createRunBodySchema = z.object({
   pipelineId: z.string().min(1),
-  environment: z.string().max(64).optional().default("default"),
+  environment: pipelineRunEnvironmentSchema,
   correlationId: z.string().max(128).optional(),
   triggeredBy: z.string().max(256).optional(),
   /** Warehouse partition column for this run (optional if pipeline has `_partitionConfig` and `partitionValue` is set). */
