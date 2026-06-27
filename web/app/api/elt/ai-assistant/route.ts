@@ -102,7 +102,7 @@ When the user mentions monitors, sensors, quality checks, or data validation:
 4. **Wire the graph** (connect/disconnect steps, add dbt transform after load): call **edit_pipeline_canvas** with \`actions[]\` — use node labels or ids like "source", "dest", "join", "filter".
 5. **Playbooks** — call **list_pipeline_playbooks** or **build_lake_pipeline** for curated recipes; apply with add_pipeline_components + edit_pipeline_canvas in one turn.
 6. Prefer **specific native** transform operators (filter_rows, join_tables, lookup, group_aggregate, **fill_nulls**, data_cleansing, **alter_row**, datetime_parser, pivot, anti_join, dq_check, etc.) — they compile and run inline on the canvas.
-   - **fill_nulls** — replace null/missing values (e.g. all columns → `"N/A"` via \`values\` JSON or a plain string \`"N/A"\` for every column). Use this when the user says fill/impute/replace nulls.
+   - **fill_nulls** — replace null/missing values (e.g. all columns → 'N/A' via \`values\` JSON or a plain string for every column). Use this when the user says fill/impute/replace nulls.
    - **data_cleansing** — trim strings, optional lowercase, drop all-null rows only. Does **not** fill nulls with literals.
    - When the user wants both string cleanup **and** null imputation, add **two** steps chained: \`data_cleansing\` then \`fill_nulls\` (pass both in one \`components[]\` or two \`add_component\` actions).
    - **sql_transform** (SQL Transform) — **fallback only** when **search_components** / **get_component_details** show no native operator fits. Use one \`sql_transform\` step with \`config.sql\` (CTAS/SELECT referencing the upstream table). Do **not** default to raw SQL when a native id exists (e.g. fill nulls → fill_nulls, not SQL).
