@@ -74,7 +74,7 @@ export function topValueShares(values: unknown[], limit = 4): ValueShare[] {
     const key = String(v).slice(0, 48);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  return [...counts.entries()]
+  return Array.from(counts.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .map(([value, count]) => ({ value, share: count / values.length }));
@@ -92,7 +92,7 @@ export function profileChartKind(
   const boolTokens = new Set(nonNull.map((v) => String(v).toLowerCase()));
   if (
     boolTokens.size <= 2 &&
-    [...boolTokens].every((t) => t === "true" || t === "false" || t === "0" || t === "1")
+    Array.from(boolTokens).every((t) => t === "true" || t === "false" || t === "0" || t === "1")
   ) {
     return "boolean";
   }

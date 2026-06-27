@@ -39,14 +39,14 @@ function topoThroughStep(
   }
 
   const indeg = new Map<string, number>();
-  for (const id of needed) indeg.set(id, 0);
+  for (const id of Array.from(needed)) indeg.set(id, 0);
   for (const c of components) {
     if (!needed.has(c.id)) continue;
     for (const dep of c.after ?? []) {
       if (needed.has(dep)) indeg.set(c.id, (indeg.get(c.id) ?? 0) + 1);
     }
   }
-  const q = [...needed].filter((id) => (indeg.get(id) ?? 0) === 0);
+  const q = Array.from(needed).filter((id) => (indeg.get(id) ?? 0) === 0);
   const out: PipelineComponentSpec[] = [];
   while (q.length) {
     const id = q.shift()!;

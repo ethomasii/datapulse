@@ -61,7 +61,7 @@ export function replacePrimaryFromTable(
     candidates.push(`${schema}.${rest.join(".")}`);
   }
 
-  for (const form of [...new Set(candidates)]) {
+  for (const form of Array.from(new Set(candidates))) {
     const pattern = new RegExp(
       `(\\bFROM\\s+)${escapeRegExp(form)}(\\s+(?:AS\\s+)?[a-zA-Z_][\\w]*)?`,
       "i"

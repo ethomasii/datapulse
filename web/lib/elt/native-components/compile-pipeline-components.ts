@@ -139,7 +139,7 @@ function compilePipelineComponentsSync(
   flushSqlFusionSegment(acc, fusionEnabled, scratchByLogical);
 
   if (acc.scratchTables.size) {
-    config.elt_scratch_tables = [...acc.scratchTables];
+    config.elt_scratch_tables = Array.from(acc.scratchTables);
   }
 
   finalizeCompiledConfig(config, {
@@ -232,7 +232,7 @@ export async function compilePipelineComponentsAsync(
   flushSqlFusionSegment(acc, fusionEnabled, scratchByLogical);
 
   if (acc.scratchTables.size) {
-    config.elt_scratch_tables = [...acc.scratchTables];
+    config.elt_scratch_tables = Array.from(acc.scratchTables);
   }
 
   finalizeCompiledConfig(config, {
@@ -252,7 +252,7 @@ function prependScratchPreamble(statements: string[], scratchTables: Set<string>
   if (!scratchTables.size) return statements;
   const preamble = [
     ensureScratchSchemaSql(),
-    ...[...scratchTables].map((t) => dropScratchTableSql(t)),
+    ...Array.from(scratchTables).map((t) => dropScratchTableSql(t)),
   ];
   return [...preamble, ...statements];
 }

@@ -170,7 +170,7 @@ export function analyzePipelineFusion(
     const cid = String(cfg.template_id ?? spec.id);
     const cat = getComponentById(cid)?.category ?? "transformation";
     const route = routeComponent(cid, cat);
-    if (route.target === "warehouse" || route.target === "sql") warehouseSteps += 1;
+    if (route.target === "warehouse") warehouseSteps += 1;
   }
 
   const segments = buildFusionSegments(ordered);
