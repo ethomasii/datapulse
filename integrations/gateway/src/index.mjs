@@ -177,7 +177,8 @@ async function pollRunsOnce() {
 
     // Fire and forget — executor handles its own logging and final status PATCH
     activeRunIds.add(id);
-    executeRun(run, connEnv, api)
+    const runConnEnv = run.connectionEnv && typeof run.connectionEnv === "object" ? run.connectionEnv : connEnv;
+    executeRun(run, runConnEnv, api)
       .catch(async (err) => {
         console.error(`[eltpulse-gateway] executor error run=${id}:`, err.message || err);
         await api(`/api/agent/runs/${id}`, {

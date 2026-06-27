@@ -28,6 +28,7 @@ import {
   syncCanvasToPipelineSpec,
 } from "@/lib/elt/canvas-component-sync";
 import { applyCanvasSensorMonitors } from "@/lib/elt/apply-canvas-component-monitors";
+import { recordPipelineRevision, pushPipelineToGitBranch } from "@/lib/elt/pipeline-git-sync";
 import { linkDbtProjectToPipeline, unlinkDbtProjectFromPipeline } from "@/lib/elt/dbt-projects";
 import { resolveRouteParamId } from "@/lib/server/route-params";
 import { assertUserOwnsGatewayToken } from "@/lib/agent/gateway-routing";
@@ -568,6 +569,13 @@ export async function PATCH(req: Request, ctx: Ctx) {
     }
 
     const refreshed = await db.eltPipeline.findUnique({ where: { id: row.id } });
+    if (p.canvas !== undefined && declarativeSpecYaml?.trim()) {
+      void recordPipelineRevision(row.id, declarativeSpecYaml, { message: "Canvas save" }).catch(() => undefined);
+      void pushPipelineToGitBranch(user.id, row.id, {
+        branch: "development",
+        commitMessage: `[eltpulse] Save ${existing.name} (canvas)`,
+      }).catch(() => undefined);
+    }
     return NextResponse.json({
       pipeline: refreshed ?? row,
       ...(monitorApply ? { monitorApply } : {}),

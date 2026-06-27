@@ -24,7 +24,8 @@ function repoContext(
       message: "Set default GitHub owner and repository under Repositories.",
     };
   }
-  return { ok: true, owner: o, name: n, branch: (branch?.trim() || "main") || "main" };
+  const br = (branch?.trim() || "main") || "main";
+  return { ok: true, owner: o, name: n, branch: br };
 }
 
 export type PushPipelineResult =
@@ -37,7 +38,8 @@ export type PushPipelineResult =
  */
 export async function pushPipelineToGithub(
   userId: string,
-  pipelineId: string
+  pipelineId: string,
+  options?: { branch?: string; commitMessage?: string }
 ): Promise<PushPipelineResult> {
   const tier = await resolveUserPlanTier(userId);
   if (!tierAllowsGitArtifactExport(tier)) {
@@ -54,7 +56,11 @@ export async function pushPipelineToGithub(
   }
 
   const { row: gh } = await getGithubConnectionForUser(userId);
-  const ctx = repoContext(gh?.defaultRepoOwner, gh?.defaultRepoName, gh?.defaultBranch);
+  const ctx = repoContext(
+    gh?.defaultRepoOwner,
+    gh?.defaultRepoName,
+    options?.branch ?? gh?.defaultBranch
+  );
   if (!ctx.ok) {
     return { ok: false, skipped: true, error: ctx.message };
   }
@@ -79,7 +85,7 @@ export async function pushPipelineToGithub(
   }
 
   const putBody: Record<string, unknown> = {
-    message: `[eltpulse] Sync pipeline ${row.name}`,
+    message: options?.commitMessage?.trim() || `[eltpulse] Sync pipeline ${row.name}`,
     content: Buffer.from(yamlText, "utf8").toString("base64"),
     branch: ctx.branch,
   };

@@ -174,6 +174,7 @@ model User {
   workspaceApiKeys WorkspaceApiKey[]
   observabilityAlertRules ObservabilityAlertRule[]
   eltWorkflows EltWorkflow[]
+  workspaceDeployments WorkspaceDeployment[]
   auditEvents WorkspaceAuditEvent[]
   notificationPrefs  NotificationPreference[]
   notificationEvents NotificationEvent[]
@@ -273,10 +274,63 @@ model GithubConnection {
   defaultRepoOwner String?
   defaultRepoName  String?
   defaultBranch    String?  @default("main")
+  /// Branch for canvas saves / feature work; PRs target `defaultBranch`.
+  developmentBranch String? @default("develop") @map("development_branch")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   @@index([userId])
+}
+
+/// Dagster+-style deployment (development, staging, production) with optional env overrides.
+model WorkspaceDeployment {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug            String
+  label           String
+  isDefault       Boolean  @default(false) @map("is_default")
+  /// AES-256-GCM ciphertext of JSON env var overrides merged at run/preview time.
+  envOverridesEnc String?  @map("env_overrides_enc") @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  pipelineBindings PipelineDeploymentBinding[]
+
+  @@unique([userId, slug])
+  @@index([userId])
+  @@map("WorkspaceDeployment")
+}
+
+/// Per-pipeline connection overrides for a workspace deployment.
+model PipelineDeploymentBinding {
+  id                      String              @id @default(cuid())
+  pipelineId              String              @map("pipeline_id")
+  pipeline                EltPipeline         @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  deploymentId            String              @map("deployment_id")
+  deployment              WorkspaceDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  sourceConnectionId      String?             @map("source_connection_id")
+  sourceConnection        Connection?         @relation("DeploymentBindingSource", fields: [sourceConnectionId], references: [id], onDelete: SetNull)
+  destinationConnectionId String?             @map("destination_connection_id")
+  destinationConnection   Connection?         @relation("DeploymentBindingDestination", fields: [destinationConnectionId], references: [id], onDelete: SetNull)
+
+  @@unique([pipelineId, deploymentId])
+  @@index([pipelineId])
+  @@map("PipelineDeploymentBinding")
+}
+
+/// In-app snapshot of declarative pipeline YAML on each save (complements Git history).
+model PipelineRevision {
+  id                  String      @id @default(cuid())
+  pipelineId          String      @map("pipeline_id")
+  pipeline            EltPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  declarativeSpecYaml String      @map("declarative_spec_yaml") @db.Text
+  message             String?
+  gitCommitSha        String?     @map("git_commit_sha")
+  createdAt           DateTime    @default(now()) @map("created_at")
+
+  @@index([pipelineId, createdAt])
+  @@map("PipelineRevision")
 }
 
 /// Named, reusable connection profile (source or destination). Referenced by monitors and pipelines (FK).
@@ -302,6 +356,8 @@ model Connection {
   eltMonitors EltMonitor[]
   pipelinesAsSource      EltPipeline[] @relation("PipelineSourceConnection")
   pipelinesAsDestination EltPipeline[] @relation("PipelineDestinationConnection")
+  deploymentBindingsAsSource      PipelineDeploymentBinding[] @relation("DeploymentBindingSource")
+  deploymentBindingsAsDestination PipelineDeploymentBinding[] @relation("DeploymentBindingDestination")
   dbtProjectsAsDestination DbtProject[] @relation("DbtProjectDestination")
   usersAsDefaultDestination User[] @relation("UserDefaultDestination")
   organizationsAsDefaultDestination Organization[] @relation("OrganizationDefaultDestination")
@@ -611,6 +667,8 @@ model EltPipeline {
   @@index([dbtProjectId])
   runs EltPipelineRun[]
   eltMonitors EltMonitor[]
+  deploymentBindings PipelineDeploymentBinding[]
+  revisions PipelineRevision[]
 }
 
 enum RunStatus {

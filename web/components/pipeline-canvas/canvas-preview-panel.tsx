@@ -19,6 +19,7 @@ type Props = {
   onOutputDiagnosticChange?: (message: string | null) => void;
   throughStepId?: string | null;
   eltComponents?: PipelineComponentSpec[];
+  deployment?: string;
 };
 
 /** Lakeflow-style bottom strip — input vs output sample rows for the selected step. */
@@ -31,6 +32,7 @@ export function CanvasPreviewPanel({
   onOutputDiagnosticChange,
   throughStepId = null,
   eltComponents,
+  deployment,
 }: Props) {
   if (focus.kind !== "component") {
     return (
@@ -70,6 +72,7 @@ export function CanvasPreviewPanel({
         inputSources={inputSources.length > 1 ? inputSources : undefined}
         pipelineId={pipelineId}
         config={config}
+        deployment={deployment}
         onDiagnosticChange={onInputDiagnosticChange}
       />
       <DataPreviewPane
@@ -78,6 +81,7 @@ export function CanvasPreviewPanel({
         outputSources={outputSources}
         pipelineId={pipelineId}
         config={config}
+        deployment={deployment}
         onDiagnosticChange={onOutputDiagnosticChange}
         fusedPreview={!isRouterConfig(config)}
         throughStepId={throughStepId}

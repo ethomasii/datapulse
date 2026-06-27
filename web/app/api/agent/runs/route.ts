@@ -11,6 +11,7 @@ import { db } from "@/lib/db/client";
 import { getAgentAuthContext } from "@/lib/agent/auth";
 import { agentPollRunsWhere } from "@/lib/agent/gateway-routing";
 import { resolveExecutionPipelineCode } from "@/lib/elt/refresh-pipeline-artifacts-for-execution";
+import { resolveRunConnectionEnv } from "@/lib/elt/deployments";
 
 /** Customer gateways must not pick runs reserved for eltPulse-operated workers. */
 const NOT_CUSTOMER_GATEWAY_POLL: RunIngestionExecutor[] = [
@@ -52,6 +53,8 @@ export async function GET(req: Request) {
           sourceType: true,
           destinationType: true,
           sourceConfiguration: true,
+          sourceConnectionId: true,
+          destinationConnectionId: true,
           pipelineCode: true,
           configYaml: true,
           workspaceYaml: true,
@@ -64,8 +67,12 @@ export async function GET(req: Request) {
 
   const hydrated = await Promise.all(
     runs.map(async (run) => {
+      let connectionEnv: Record<string, string> | undefined;
+      if (run.pipeline) {
+        connectionEnv = await resolveRunConnectionEnv(user.id, run.pipeline, run.environment);
+      }
       if (!run.pipeline || (run.pipeline.tool !== "dlt" && run.pipeline.tool !== "sling")) {
-        return run;
+        return { ...run, connectionEnv };
       }
       const pipelineCode = await resolveExecutionPipelineCode(user.id, {
         id: run.pipeline.id,
@@ -80,6 +87,7 @@ export async function GET(req: Request) {
       });
       return {
         ...run,
+        connectionEnv,
         pipeline: { ...run.pipeline, pipelineCode },
       };
     })

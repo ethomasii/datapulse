@@ -18,6 +18,7 @@ import { buildFusedPreviewSelect } from "@/lib/elt/native-components/pipeline-fu
 import type { PipelineComponentSpec } from "@/lib/elt/declarative-pipeline-spec";
 import { assertReadOnlySql } from "@/lib/elt/warehouse-readonly-query";
 import { resolveRouteParamId } from "@/lib/server/route-params";
+import { resolvePipelineConnectionsForEnvironment } from "@/lib/elt/deployments";
 
 const pipelineSelect = {
   id: true,
@@ -25,6 +26,7 @@ const pipelineSelect = {
   tool: true,
   sourceType: true,
   sourceConfiguration: true,
+  sourceConnectionId: true,
   destinationConnectionId: true,
 } as const;
 
@@ -93,6 +95,8 @@ const bodySchema = z.object({
   fusedPreview: z.boolean().optional(),
   throughStepId: z.string().min(1).max(128).optional(),
   elt_components: z.array(z.record(z.string(), z.unknown())).optional(),
+  /** Deployment slug (development, production) — selects connection bindings for preview. */
+  deployment: z.string().max(64).optional(),
 });
 
 /**
@@ -136,8 +140,22 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     );
   }
 
+  const resolvedConnections = await resolvePipelineConnectionsForEnvironment(
+    user.id,
+    pipeline,
+    body.deployment ?? "development"
+  );
+  const destinationConnectionId =
+    resolvedConnections.destinationConnectionId ?? pipeline.destinationConnectionId;
+  if (!destinationConnectionId) {
+    return NextResponse.json(
+      { error: "No destination connection for this deployment." },
+      { status: 400 }
+    );
+  }
+
   const conn = await db.connection.findFirst({
-    where: { id: pipeline.destinationConnectionId, connectionType: "destination" },
+    where: { id: destinationConnectionId, connectionType: "destination" },
     select: { id: true, connector: true, config: true, connectionSecretsEnc: true },
   });
   if (!conn) return NextResponse.json({ error: "Destination connection not found" }, { status: 404 });

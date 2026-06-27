@@ -35,6 +35,8 @@ import { useWorkspacePermissions } from "@/lib/hooks/use-workspace-permissions";
 import { builderUrl, parseBuilderCanvasTab, type BuilderCanvasTab } from "@/lib/elt/builder-nav";
 import type { DbtTransformNodeData } from "@/lib/elt/dbt-canvas";
 import { CanvasAssetLineagePanel } from "@/components/pipeline-canvas/canvas-asset-lineage-panel";
+import { PipelineGitPanel } from "@/components/pipeline-canvas/pipeline-git-panel";
+import { DeploymentSelector } from "@/components/pipeline-canvas/deployment-selector";
 import {
   type CanvasInspectorFocus,
   type PipelineCanvasControl,
@@ -95,6 +97,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
   const [savedSourceConfigRevision, setSavedSourceConfigRevision] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [deploymentSlug, setDeploymentSlug] = useState("development");
   const [pipelineSourceType, setPipelineSourceType] = useState("");
   const [pipelineDestinationType, setPipelineDestinationType] = useState("");
   /** Resolved sync mode: connector sync supports in-pipeline dbt; database replication does not. */
@@ -812,14 +815,21 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
             </p>
           </div>
           {selectedId && selectedName && pipelineSourceType && pipelineDestinationType ? (
-            <CanvasAssetLineagePanel
-              pipelineId={selectedId}
-              pipelineName={selectedName}
-              tool={pipelineTool}
-              sourceType={pipelineSourceType}
-              destinationType={pipelineDestinationType}
-              sourceConfiguration={lineageSourceConfig}
-            />
+            <>
+              <PipelineGitPanel
+                pipelineId={selectedId}
+                canWrite={canWrite}
+                onRestored={() => void loadPipelineGraph(selectedId)}
+              />
+              <CanvasAssetLineagePanel
+                pipelineId={selectedId}
+                pipelineName={selectedName}
+                tool={pipelineTool}
+                sourceType={pipelineSourceType}
+                destinationType={pipelineDestinationType}
+                sourceConfiguration={lineageSourceConfig}
+              />
+            </>
           ) : null}
         </div>
       );
@@ -1249,6 +1259,9 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
             onPatchNode={(nodeId, patch) => canvasControlRef.current?.patchNodeData(nodeId, patch)}
             onReplaceGraph={(nodes, edges) => canvasControlRef.current?.replaceGraph(nodes, edges)}
             onPipelinePatched={() => void loadPipelineGraph(selectedId)}
+            deploymentSelector={
+              <DeploymentSelector value={deploymentSlug} onChange={setDeploymentSlug} />
+            }
           />
           <div className="flex shrink-0 flex-col">
             <CanvasFusionPanel
@@ -1261,6 +1274,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
               liveConfig={liveStepConfig}
               throughStepId={throughStepId}
               eltComponents={liveEltComponents}
+              deployment={deploymentSlug}
               className="h-56 shrink-0 xl:h-64 2xl:h-72"
               onInputDiagnosticChange={reportInputPreviewDiagnostic}
               onOutputDiagnosticChange={reportOutputPreviewDiagnostic}

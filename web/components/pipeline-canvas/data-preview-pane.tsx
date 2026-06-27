@@ -57,6 +57,7 @@ type Props = {
   fusedPreview?: boolean;
   throughStepId?: string | null;
   eltComponents?: PipelineComponentSpec[];
+  deployment?: string;
   /** Shown when no table is wired for preview (e.g. router without routes). */
   emptyHint?: string | null;
 };
@@ -73,6 +74,7 @@ export function DataPreviewPane({
   fusedPreview = false,
   throughStepId = null,
   eltComponents,
+  deployment,
   emptyHint = null,
 }: Props) {
   const switchableSources =
@@ -127,6 +129,7 @@ export function DataPreviewPane({
           fusedPreview: useFused,
           throughStepId: useFused ? throughStepId : undefined,
           elt_components: useFused ? eltComponents : undefined,
+          deployment,
         }),
       });
       const data = await readClientFetchJson<PreviewResult & { error?: string }>(res);
@@ -142,7 +145,7 @@ export function DataPreviewPane({
     } finally {
       setLoading(false);
     }
-  }, [pipelineId, config, activeTable, fusedPreview, throughStepId, eltComponents, inputSources, outputSources]);
+  }, [pipelineId, config, activeTable, fusedPreview, throughStepId, eltComponents, inputSources, outputSources, deployment]);
 
   const configKey = JSON.stringify(config);
   const componentsKey = JSON.stringify(eltComponents ?? []);
@@ -163,7 +166,7 @@ export function DataPreviewPane({
     }
     const t = setTimeout(() => void load(), 350);
     return () => clearTimeout(t);
-  }, [activeTable, load, configKey, componentsKey, sourcesKey, fusedPreview, throughStepId, inputSources, outputSources]);
+  }, [activeTable, load, configKey, componentsKey, sourcesKey, fusedPreview, throughStepId, inputSources, outputSources, deployment]);
 
   const rows = result?.rows ?? [];
   const columnNames = useMemo(

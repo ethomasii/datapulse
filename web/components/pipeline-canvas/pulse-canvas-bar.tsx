@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from "react";
 import type { Edge, Node } from "@xyflow/react";
 import { Bot, ChevronUp, Loader2, Lock, Send } from "lucide-react";
 import clsx from "clsx";
@@ -30,6 +30,7 @@ type Props = {
   getCanvasSnapshot?: () => { nodes: Node[]; edges: Edge[] } | null;
   onPatchNode?: (nodeId: string, patch: Record<string, unknown>) => void;
   onReplaceGraph?: (nodes: Node[], edges: Edge[]) => void;
+  deploymentSelector?: ReactNode;
 };
 
 /** Inline NL prompt bar on the canvas — tied to the selected step. */
@@ -42,6 +43,7 @@ export const PulseCanvasBar = forwardRef<PulseCanvasBarHandle, Props>(function P
     getCanvasSnapshot,
     onPatchNode,
     onReplaceGraph,
+    deploymentSelector,
   },
   ref
 ) {
@@ -194,6 +196,7 @@ export const PulseCanvasBar = forwardRef<PulseCanvasBarHandle, Props>(function P
   return (
     <div className="relative z-30 shrink-0 isolate border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
       <div className="flex items-end gap-2 px-3 py-2">
+        {deploymentSelector ? <div className="mb-2 shrink-0">{deploymentSelector}</div> : null}
         <Bot className={clsx("mb-2 h-4 w-4 shrink-0", aiAllowed ? "text-teal-600" : "text-slate-400")} aria-hidden />
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-2">

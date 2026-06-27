@@ -6,6 +6,7 @@ export type GithubConnectionSummary = {
   defaultRepoOwner: string | null;
   defaultRepoName: string | null;
   defaultBranch: string | null;
+  developmentBranch: string | null;
 };
 
 function isMissingGithubTableError(e: unknown): boolean {
@@ -48,12 +49,13 @@ export async function getGithubConnectionForUser(userId: string): Promise<Github
     try {
       const row = await delegate.findUnique({
         where: { userId },
-        select: {
-          githubLogin: true,
-          defaultRepoOwner: true,
-          defaultRepoName: true,
-          defaultBranch: true,
-        },
+          select: {
+            githubLogin: true,
+            defaultRepoOwner: true,
+            defaultRepoName: true,
+            defaultBranch: true,
+            developmentBranch: true,
+          },
       });
       return { row, githubTableMissing: false };
     } catch (e) {
@@ -64,7 +66,7 @@ export async function getGithubConnectionForUser(userId: string): Promise<Github
 
   try {
     const rows = await db.$queryRaw<GithubConnectionSummary[]>`
-      SELECT "githubLogin", "defaultRepoOwner", "defaultRepoName", "defaultBranch"
+      SELECT "githubLogin", "defaultRepoOwner", "defaultRepoName", "defaultBranch", "developmentBranch"
       FROM "GithubConnection"
       WHERE "userId" = ${userId}
       LIMIT 1

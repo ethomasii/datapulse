@@ -5,6 +5,7 @@ import { githubJson } from "@/lib/integrations/github-rest";
 
 export type PipelineGitCommit = {
   sha: string;
+  fullSha: string;
   message: string;
   author: string;
   at: string;
@@ -50,6 +51,7 @@ export async function fetchPipelineGithubHistory(
     .filter((c) => c.sha && c.commit)
     .map((c) => ({
       sha: c.sha.slice(0, 7),
+      fullSha: c.sha,
       message: c.commit?.message?.trim() ?? "Commit",
       author: c.commit?.author?.name?.trim() ?? "Unknown",
       at: c.commit?.author?.date ?? new Date().toISOString(),
