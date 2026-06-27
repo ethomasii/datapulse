@@ -17,27 +17,33 @@ describe("resolveDuckdbDatabaseLocation", () => {
 });
 
 describe("mergeConnectionRuntimeSecrets", () => {
-  it("maps destination config.database to DEST_DUCKDB_PATH", () => {
+  it("maps destination config.database to DEST_DUCKDB_PATH and dlt env", () => {
     expect(
       mergeConnectionRuntimeSecrets("destination", "duckdb", {}, { database: "s3://b/w.duckdb" })
-    ).toEqual({ DEST_DUCKDB_PATH: "s3://b/w.duckdb" });
+    ).toMatchObject({
+      DEST_DUCKDB_PATH: "s3://b/w.duckdb",
+      DESTINATION__DUCKDB__CREDENTIALS__DATABASE: "s3://b/w.duckdb",
+      DESTINATION__DUCKDB__CREDENTIALS: "s3://b/w.duckdb",
+    });
   });
 
   it("maps motherduck database config to MOTHERDUCK_DATABASE and dlt env", () => {
     expect(
       mergeConnectionRuntimeSecrets("destination", "motherduck", { MOTHERDUCK_TOKEN: "t" }, { database: "analytics" })
-    ).toEqual({
+    ).toMatchObject({
       MOTHERDUCK_TOKEN: "t",
       MOTHERDUCK_DATABASE: "analytics",
       DESTINATION__MOTHERDUCK__CREDENTIALS__DATABASE: "analytics",
+      DESTINATION__MOTHERDUCK__CREDENTIALS__PASSWORD: "t",
     });
   });
 
   it("defaults motherduck database to my_db for dlt and app", () => {
-    expect(mergeConnectionRuntimeSecrets("destination", "motherduck", { MOTHERDUCK_TOKEN: "t" }, {})).toEqual({
+    expect(mergeConnectionRuntimeSecrets("destination", "motherduck", { MOTHERDUCK_TOKEN: "t" }, {})).toMatchObject({
       MOTHERDUCK_TOKEN: "t",
       MOTHERDUCK_DATABASE: "my_db",
       DESTINATION__MOTHERDUCK__CREDENTIALS__DATABASE: "my_db",
+      DESTINATION__MOTHERDUCK__CREDENTIALS__PASSWORD: "t",
     });
   });
 });

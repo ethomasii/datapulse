@@ -1,5 +1,5 @@
 import type { ConfigField, CredentialField } from "@/lib/elt/connectors-registry";
-import { STARTER_WAREHOUSE_DEFAULT_DB } from "@/lib/elt/starter-warehouse";
+import { applyDltDestinationEnvMapping } from "@/lib/elt/dlt-connection-env";
 
 /** Shared copy for DuckDB connection config (not local filesystem paths). */
 export const DUCKDB_DATABASE_LOCATION_HELP =
@@ -79,19 +79,8 @@ export function mergeConnectionRuntimeSecrets(
     }
   }
 
-  if (connectionType === "destination" && slug === "motherduck") {
-    const db =
-      (typeof config.database === "string" ? config.database.trim() : "") ||
-      merged.MOTHERDUCK_DATABASE?.trim() ||
-      STARTER_WAREHOUSE_DEFAULT_DB;
-    if (db) {
-      if (!merged.MOTHERDUCK_DATABASE) merged.MOTHERDUCK_DATABASE = db;
-      // dlt reads DESTINATION__MOTHERDUCK__CREDENTIALS__DATABASE, not MOTHERDUCK_DATABASE.
-      // Without this, dlt defaults to my_db while the app queries the connection catalog.
-      if (!merged.DESTINATION__MOTHERDUCK__CREDENTIALS__DATABASE) {
-        merged.DESTINATION__MOTHERDUCK__CREDENTIALS__DATABASE = db;
-      }
-    }
+  if (connectionType === "destination") {
+    return applyDltDestinationEnvMapping(slug, merged, config);
   }
 
   return merged;
