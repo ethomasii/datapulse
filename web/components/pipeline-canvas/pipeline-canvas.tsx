@@ -46,6 +46,7 @@ import {
   appendNodeAfterUpstream,
   findAppendTargetAfterNode,
 } from "@/lib/elt/canvas-node-append-after";
+import { prefetchCanvasComponentCatalog } from "./use-canvas-component-catalog";
 
 const STORAGE_KEY = "eltpulse-pipeline-canvas-v1";
 
@@ -259,6 +260,10 @@ function FlowCanvas({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (isDesigner) prefetchCanvasComponentCatalog();
+  }, [isDesigner]);
 
   useEffect(() => {
     if (!mounted || !useLocalDraft) return;
