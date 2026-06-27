@@ -5,10 +5,20 @@ import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
 import { previewTableFromConfig } from "@/lib/elt/pipeline-asset-keys";
 import { resolvePreviewTableRefWithWarehouse } from "@/lib/elt/pipeline-assets";
+import { stripDuckdbCatalogPrefix } from "@/lib/elt/duckdb-table-ref";
 import { fetchWarehouseColumnsForAsset } from "@/lib/elt/warehouse-column-introspect";
 import { introspectDestinationConnection } from "@/lib/elt/warehouse-introspect";
 import { runReadOnlyQuery } from "@/lib/elt/warehouse-readonly-query";
 import { resolveRouteParamId } from "@/lib/server/route-params";
+
+const pipelineSelect = {
+  id: true,
+  name: true,
+  tool: true,
+  sourceType: true,
+  sourceConfiguration: true,
+  destinationConnectionId: true,
+} as const;
 
 function quoteTableRef(table: string): string | null {
   const t = table.trim();
@@ -46,18 +56,21 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   const ownerIds = await getAccessibleResourceOwnerIds(user.id);
 
-  const pipeline = await db.eltPipeline.findFirst({
-    where: { id: pipelineId, userId: { in: ownerIds } },
-    select: {
-      id: true,
-      name: true,
-      tool: true,
-      sourceType: true,
-      sourceConfiguration: true,
-      destinationConnectionId: true,
-    },
-  });
-  if (!pipeline) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const pipeline =
+    (await db.eltPipeline.findFirst({
+      where: { id: pipelineId, userId: { in: ownerIds } },
+      select: pipelineSelect,
+    })) ??
+    (await db.eltPipeline.findFirst({
+      where: { name: pipelineId, userId: { in: ownerIds } },
+      select: pipelineSelect,
+    }));
+  if (!pipeline) {
+    return NextResponse.json(
+      { error: "Pipeline not found — open the pipeline from the builder and save, then retry." },
+      { status: 404 }
+    );
+  }
   if (!pipeline.destinationConnectionId) {
     return NextResponse.json(
       { error: "Link a destination connection to preview warehouse data." },
@@ -86,14 +99,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     /* introspection optional — fall back to config-derived refs */
   }
 
-  const table = resolvePreviewTableRefWithWarehouse({
-    name: pipeline.name,
-    sourceType: pipeline.sourceType,
-    tool: pipeline.tool,
-    sourceConfiguration: pipeline.sourceConfiguration,
-    requested: rawTable,
-    warehouseTables,
-  });
+  const table = stripDuckdbCatalogPrefix(
+    resolvePreviewTableRefWithWarehouse({
+      name: pipeline.name,
+      sourceType: pipeline.sourceType,
+      tool: pipeline.tool,
+      sourceConfiguration: pipeline.sourceConfiguration,
+      requested: rawTable,
+      warehouseTables,
+    })
+  );
 
   const limit = body.limit ?? 10;
   const quoted = quoteTableRef(table);

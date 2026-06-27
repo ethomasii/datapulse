@@ -4,6 +4,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import { previewTableFromConfig } from "@/lib/elt/pipeline-asset-keys";
 import { remapStalePipelineTableRef } from "@/lib/elt/pipeline-assets";
+import { stripDuckdbCatalogPrefix } from "@/lib/elt/duckdb-table-ref";
 
 export type WireInputContext = {
   /** Raw landing tables from pipeline source config (github issues, etc.). */
@@ -154,7 +155,7 @@ export function wireInputFromUpstreamEdge(
   let changed = false;
 
   function maybeRemapField(key: string) {
-    const raw = String(patch[key] ?? "").trim();
+    const raw = stripDuckdbCatalogPrefix(String(patch[key] ?? "").trim());
     if (!raw || !ctx?.landingDataset || !ctx?.pipelineName) return;
     const remapped = remapStalePipelineTableRef(raw, ctx.pipelineName, ctx.landingDataset);
     if (remapped !== raw) {
@@ -176,6 +177,9 @@ export function wireInputFromUpstreamEdge(
   } else {
     for (const key of ["table", "input_table", "left_table", "right_table"]) {
       maybeRemapField(key);
+    }
+    if (changed) {
+      patch._preview_nonce = Date.now();
     }
   }
   if ((!String(patch.left_table ?? "").trim() || wasAutofill) && upstreamTables.length >= 1) {

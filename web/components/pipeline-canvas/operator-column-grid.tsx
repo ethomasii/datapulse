@@ -6,6 +6,7 @@ import clsx from "clsx";
 
 import { operatorColumnGridMode } from "@/lib/elt/operator-column-grid-mode";
 import { readClientFetchJson } from "@/lib/elt/fetch-json-body";
+import { stripDuckdbCatalogPrefix } from "@/lib/elt/duckdb-table-ref";
 
 type ColumnMeta = { name: string; type?: string };
 
@@ -59,7 +60,8 @@ export function OperatorColumnGrid({
   const mode = useMemo(() => operatorColumnGridMode(componentId), [componentId]);
 
   const loadColumns = useCallback(async () => {
-    if (!inputTable) {
+    const tableRef = inputTable ? stripDuckdbCatalogPrefix(inputTable) : null;
+    if (!tableRef) {
       setColumns([]);
       return;
     }
@@ -70,7 +72,7 @@ export function OperatorColumnGrid({
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ table: inputTable, columnsOnly: true }),
+        body: JSON.stringify({ table: tableRef, columnsOnly: true }),
       });
       const data = await readClientFetchJson<{
         ok?: boolean;
@@ -78,15 +80,25 @@ export function OperatorColumnGrid({
         columns?: string[];
         rows?: Record<string, unknown>[];
         error?: string;
+        table?: string;
       }>(res);
-      if (!res.ok) throw new Error(data.error ?? data.message ?? "Could not load columns");
-      if (data.ok === false) throw new Error(data.message ?? "Could not load columns");
+      if (!res.ok) {
+        throw new Error(data.error ?? data.message ?? "Could not load columns");
+      }
       const names =
         data.columns?.length
           ? data.columns
           : data.rows?.[0]
             ? Object.keys(data.rows[0])
             : [];
+      if (!names.length) {
+        setColumns([]);
+        setError(
+          data.message ??
+            `No columns found for ${data.table ?? tableRef}. Run a sync and confirm your MotherDuck connection Database (e.g. my_db) matches where dlt wrote data.`
+        );
+        return;
+      }
       setColumns(names.map((name) => ({ name })));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Column load failed");

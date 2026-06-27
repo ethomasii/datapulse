@@ -2,11 +2,13 @@
  * Fetch column metadata for a single warehouse table (asset detail / catalog enrichment).
  */
 
+import { parseDuckdbTableRef } from "@/lib/elt/duckdb-table-ref";
 import { resolveDestinationConnectionContext } from "@/lib/elt/warehouse-destination-secrets";
 import type { AssetColumnDef } from "@/lib/elt/catalog-metadata";
 import { parseLandingQualified } from "@/lib/elt/warehouse-introspect";
 import {
   buildPostgresConnectionString,
+  motherduckDatabaseName,
   runClickhouseReadOnlyQuery,
   runDatabricksReadOnlyQuery,
   runDuckdbReadOnlyQuery,
@@ -76,12 +78,14 @@ async function fetchDuckdbFamilyColumns(
   config: Record<string, unknown>,
   schema: string,
   table: string,
-  connector: string
+  connector: string,
+  queryConfig?: Record<string, unknown>
 ): Promise<AssetColumnDef[]> {
-  const fromInfo = await fetchColumnsFromInformationSchema(runner, secrets, config, schema, table, connector);
+  const cfg = queryConfig ?? config;
+  const fromInfo = await fetchColumnsFromInformationSchema(runner, secrets, cfg, schema, table, connector);
   if (fromInfo.length) return fromInfo;
 
-  const rowset = await runner(secrets, config, `DESCRIBE ${quoteDuckdbTable(schema, table)}`);
+  const rowset = await runner(secrets, cfg, `DESCRIBE ${quoteDuckdbTable(schema, table)}`);
   const nameIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "column_name");
   const typeIdx = rowset.columns.findIndex((c) => c.toLowerCase() === "column_type");
   if (nameIdx >= 0) {
@@ -201,19 +205,39 @@ export async function fetchWarehouseColumnsForAsset(
   connection: DestinationConnectionRow,
   landingQualified: string | undefined
 ): Promise<WarehouseColumnResult> {
-  const ref = parseTableRef(landingQualified);
-  if (!ref) {
-    return { ok: false, message: "No schema.table landing target on this asset.", columns: [] };
-  }
-
   const connector = normalizeConnector(connection.connector);
   const { secrets, config } = resolveDestinationConnectionContext(connection);
+
+  let schema: string;
+  let table: string;
+  let queryConfig = config;
+
+  if (connector === "motherduck" || connector === "duckdb" || connector === "sqlite") {
+    const defaultDb =
+      connector === "motherduck" ? motherduckDatabaseName(secrets, config) : undefined;
+    const duckRef = parseDuckdbTableRef(landingQualified ?? "", defaultDb);
+    if (!duckRef) {
+      return { ok: false, message: "No schema.table landing target on this asset.", columns: [] };
+    }
+    schema = duckRef.schema;
+    table = duckRef.table;
+    if (duckRef.database && duckRef.database !== defaultDb) {
+      queryConfig = { ...config, database: duckRef.database };
+    }
+  } else {
+    const ref = parseTableRef(landingQualified);
+    if (!ref) {
+      return { ok: false, message: "No schema.table landing target on this asset.", columns: [] };
+    }
+    schema = ref.schema;
+    table = ref.table;
+  }
 
   try {
     if (connector === "postgres" || connector === "redshift") {
       const connStr = buildPostgresConnectionString(secrets, config);
       if (!connStr) return { ok: false, message: "Postgres connection incomplete.", columns: [] };
-      const columns = await fetchPostgresColumns(connStr, ref.schema, ref.table);
+      const columns = await fetchPostgresColumns(connStr, schema, table);
       return {
         ok: columns.length > 0,
         message: columns.length ? `Found ${columns.length} column(s) in warehouse.` : "Table not found or empty.",
@@ -222,7 +246,7 @@ export async function fetchWarehouseColumnsForAsset(
     }
 
     if (connector === "bigquery") {
-      const columns = await fetchBigQueryColumns(secrets, config, ref.schema, ref.table);
+      const columns = await fetchBigQueryColumns(secrets, config, schema, table);
       return {
         ok: columns.length > 0,
         message: columns.length ? `Found ${columns.length} column(s) in BigQuery.` : "Table not found or empty.",
@@ -233,11 +257,11 @@ export async function fetchWarehouseColumnsForAsset(
     if (connector === "snowflake") {
       const sql = `SELECT column_name, data_type, comment
         FROM information_schema.columns
-        WHERE table_schema = '${ref.schema.replace(/'/g, "''")}'
-          AND table_name = '${ref.table.replace(/'/g, "''")}'
+        WHERE table_schema = '${schema.replace(/'/g, "''")}'
+          AND table_name = '${table.replace(/'/g, "''")}'
         ORDER BY ordinal_position
         LIMIT ${COL_LIMIT}`;
-      const result = await runSnowflakeReadOnlyQuery(secrets, config, sql, { schema: ref.schema });
+      const result = await runSnowflakeReadOnlyQuery(secrets, config, sql, { schema });
       const columns = result.rows
         .map((row) => ({
           name: String(row[0] ?? ""),
@@ -257,14 +281,14 @@ export async function fetchWarehouseColumnsForAsset(
     if (runner) {
       const columns =
         connector === "motherduck" || connector === "duckdb" || connector === "sqlite"
-          ? await fetchDuckdbFamilyColumns(runner, secrets, config, ref.schema, ref.table, connector)
-          : await fetchColumnsFromInformationSchema(runner, secrets, config, ref.schema, ref.table, connector);
+          ? await fetchDuckdbFamilyColumns(runner, secrets, config, schema, table, connector, queryConfig)
+          : await fetchColumnsFromInformationSchema(runner, secrets, config, schema, table, connector);
       const label = connector.charAt(0).toUpperCase() + connector.slice(1);
       return {
         ok: columns.length > 0,
         message: columns.length
           ? `Found ${columns.length} column(s) in ${label}.`
-          : `No columns found for ${ref.schema}.${ref.table}. The table may not exist yet — run a pipeline sync first.`,
+          : `No columns found for ${schema}.${table}. The table may not exist yet — run a pipeline sync first.`,
         columns,
       };
     }

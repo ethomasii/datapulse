@@ -3,6 +3,7 @@
  * inferred from persisted pipeline rows (no warehouse introspection in v1).
  */
 
+import { stripDuckdbCatalogPrefix } from "@/lib/elt/duckdb-table-ref";
 import { readDbtTransformConfig } from "@/lib/elt/dbt-run-phases";
 import { dbtHubPackageDisplayName, resolveDbtHubPackage } from "@/lib/elt/dbt-hub-packages";
 import type { DbtRunManifest } from "@/lib/elt/dbt-run-manifest";
@@ -437,7 +438,7 @@ export function remapStalePipelineTableRef(
   pipelineName: string,
   landingDataset: string
 ): string {
-  const val = tableRef.trim();
+  const val = stripDuckdbCatalogPrefix(tableRef.trim());
   if (!val || !landingDataset.trim()) return val;
   const parts = val.split(".").filter(Boolean);
   if (parts.length !== 2) return val;
@@ -505,7 +506,7 @@ export function matchWarehouseTableRef(
 ): string | null {
   if (!requested.trim() || !warehouseTables.length) return null;
 
-  const req = requested.trim().toLowerCase();
+  const req = stripDuckdbCatalogPrefix(requested.trim()).toLowerCase();
   const exact = warehouseTables.find((t) => t.qualified.toLowerCase() === req);
   if (exact) return exact.qualified;
 
@@ -540,13 +541,16 @@ export function resolvePreviewTableRefWithWarehouse(input: {
   requested: string;
   warehouseTables?: Array<{ schema: string; table: string; qualified: string }>;
 }): string {
-  const configResolved = resolvePreviewTableRef({
-    name: input.name,
-    sourceType: input.sourceType,
-    tool: input.tool,
-    sourceConfiguration: input.sourceConfiguration,
-    requested: input.requested,
-  });
+  const requested = stripDuckdbCatalogPrefix(input.requested.trim());
+  const configResolved = stripDuckdbCatalogPrefix(
+    resolvePreviewTableRef({
+      name: input.name,
+      sourceType: input.sourceType,
+      tool: input.tool,
+      sourceConfiguration: input.sourceConfiguration,
+      requested,
+    })
+  );
 
   if (!input.warehouseTables?.length) return configResolved;
 
@@ -563,7 +567,7 @@ export function resolvePreviewTableRefWithWarehouse(input: {
 
   const fromWarehouse =
     matchWarehouseTableRef(configResolved, input.warehouseTables, bundle.landingDataset) ??
-    matchWarehouseTableRef(input.requested, input.warehouseTables, bundle.landingDataset);
+    matchWarehouseTableRef(requested, input.warehouseTables, bundle.landingDataset);
 
   return fromWarehouse ?? configResolved;
 }

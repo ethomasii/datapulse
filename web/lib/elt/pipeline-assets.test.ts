@@ -51,6 +51,12 @@ describe("matchWarehouseTableRef", () => {
       "github_dlt_hub_dlt.issues"
     );
   });
+
+  it("matches after stripping MotherDuck catalog prefix", () => {
+    expect(
+      matchWarehouseTableRef("my_db.github_to_motherduck.issues", tables, "github_dlt_hub_dlt")
+    ).toBe("github_dlt_hub_dlt.issues");
+  });
 });
 
 describe("derivePipelineAssets", () => {
