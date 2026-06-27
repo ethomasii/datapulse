@@ -47,9 +47,9 @@ export function buildStepEngineUrl(connection: DestinationConnectionRow): string
 
   if (connector === "motherduck") {
     const token = secret(secrets, "MOTHERDUCK_TOKEN", "DEST_MOTHERDUCK_TOKEN");
-    const database = String(config.database ?? config.database_name ?? "md").trim();
+    const database = String(config.database ?? config.database_name ?? "my_db").trim();
     if (!token) return null;
-    return `duckdb:md:${database}?motherduck_token=${encodeURIComponent(token)}`;
+    return `md:${database}?motherduck_token=${encodeURIComponent(token)}&saas_mode=true`;
   }
 
   return null;
