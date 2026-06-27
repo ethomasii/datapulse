@@ -1153,7 +1153,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
               pipelineId={selectedId}
               focus={inspectorFocus}
               liveConfig={liveStepConfig}
-              className="h-48 shrink-0 xl:h-56 2xl:h-64"
+              className="h-56 shrink-0 xl:h-64 2xl:h-72"
               onInputDiagnosticChange={reportInputPreviewDiagnostic}
               onOutputDiagnosticChange={reportOutputPreviewDiagnostic}
             />

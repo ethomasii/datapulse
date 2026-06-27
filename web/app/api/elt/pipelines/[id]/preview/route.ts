@@ -12,6 +12,8 @@ import { introspectDestinationConnection } from "@/lib/elt/warehouse-introspect"
 import { motherduckDatabaseName } from "@/lib/elt/warehouse-introspect-connectors";
 import { resolveDestinationConnectionContext } from "@/lib/elt/warehouse-destination-secrets";
 import { runReadOnlyQuery, type ReadOnlyQueryOptions } from "@/lib/elt/warehouse-readonly-query";
+import { fetchWarehouseColumnProfiles } from "@/lib/elt/warehouse-column-profile-server";
+import type { ColumnProfile } from "@/lib/elt/warehouse-column-profile";
 import { resolveRouteParamId } from "@/lib/server/route-params";
 
 const pipelineSelect = {
@@ -72,6 +74,8 @@ const bodySchema = z.object({
   limit: z.number().int().min(1).max(25).optional(),
   /** Skip row sample — only resolve column names (for Select Columns sidebar). */
   columnsOnly: z.boolean().optional(),
+  /** DuckDB-family SUMMARIZE stats under preview headers (default true). */
+  includeProfiles: z.boolean().optional(),
 });
 
 /**
@@ -155,6 +159,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   const configuredDatabase = motherduckConfiguredDatabase(conn);
+  const destContext = resolveDestinationConnectionContext(conn);
 
   if (body.columnsOnly) {
     try {
@@ -223,7 +228,23 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         message: enrichMotherduckPreviewMessage(result.message, conn, warehouseRef, configuredDatabase),
       };
     }
-    return NextResponse.json({ table, configuredDatabase, ...result });
+
+    const includeProfiles = body.includeProfiles !== false;
+    let columnProfiles: Record<string, ColumnProfile> | undefined;
+    if (includeProfiles && result.ok && result.columns.length > 0) {
+      const duckRef = parseDuckdbTableRef(warehouseRef, configuredDatabase ?? "");
+      columnProfiles = await fetchWarehouseColumnProfiles({
+        connector: conn.connector,
+        secrets: destContext.secrets,
+        config: destContext.config,
+        quotedTable: quoted,
+        catalogFromRef: duckRef?.database ?? queryOptions?.catalogFromRef,
+        schema: duckRef?.schema ?? queryOptions?.schema,
+        table: duckRef?.table ?? queryOptions?.table,
+      });
+    }
+
+    return NextResponse.json({ table, configuredDatabase, columnProfiles, ...result });
   } catch (e) {
     const raw = e instanceof Error ? e.message : String(e);
     const msg = enrichMotherduckPreviewMessage(raw, conn, warehouseRef, configuredDatabase);
