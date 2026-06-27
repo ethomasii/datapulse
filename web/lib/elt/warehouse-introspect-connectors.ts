@@ -6,7 +6,7 @@ import { createHash, createHmac, createPrivateKey, createPublicKey, createSign, 
 import { fetchGcpAccessToken } from "@/lib/elt/gcp-access-token";
 import { resolveDuckdbDatabaseLocation } from "@/lib/elt/duckdb-destination";
 import { readFetchJsonBody } from "@/lib/elt/fetch-json-body";
-import { isDuckdbModuleMissingError, openDuckdbReadOnly } from "@/lib/elt/duckdb-native";
+import { isDuckdbNativeFallbackError, openDuckdbReadOnly } from "@/lib/elt/duckdb-native";
 import { buildMotherduckDsn, motherduckDatabaseName, motherduckToken } from "@/lib/elt/motherduck-dsn";
 import { runMotherduckMcpQuery } from "@/lib/elt/motherduck-mcp-client";
 import type { WarehouseIntrospectionResult, WarehouseTableRef } from "@/lib/elt/warehouse-introspect";
@@ -945,7 +945,7 @@ export async function executeMotherduckSql(
     return { rowset, attachDatabase: catalog };
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
-    if (isDuckdbModuleMissingError(detail)) {
+    if (isDuckdbNativeFallbackError(detail)) {
       const rowset = await runMotherduckMcpQuery(token, catalog, sql);
       return { rowset, attachDatabase: catalog };
     }
