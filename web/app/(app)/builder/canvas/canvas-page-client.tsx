@@ -782,8 +782,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
           <div className={stickyHeaderClass}>
             <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Operator configuration</h2>
             <p className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-400">
-              Set the input table, pick columns or filters, and choose where results land. Wire upstream nodes on
-              the graph to auto-fill the input.
+              Tables and step settings in one place — wire upstream nodes on the graph to auto-fill inputs.
             </p>
           </div>
           <CanvasComponentInspector

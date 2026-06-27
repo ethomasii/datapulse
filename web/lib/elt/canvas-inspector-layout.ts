@@ -1,6 +1,9 @@
 import type { NativeComponentField } from "@/lib/elt/native-components";
 import { operatorColumnGridMode } from "@/lib/elt/operator-column-grid-mode";
 
+/** How table I/O fields are surfaced in the canvas inspector. */
+export type StepIoMode = "single" | "join" | "union" | "output_only";
+
 const COLUMN_GRID_HIDDEN_KEYS = new Set([
   "table",
   "input_table",
@@ -9,16 +12,75 @@ const COLUMN_GRID_HIDDEN_KEYS = new Set([
   "column_names",
 ]);
 
-const TABLE_IO_HIDDEN_KEYS = new Set(["table", "input_table", "output_table"]);
+const SINGLE_IO_HIDDEN_KEYS = new Set(["table", "input_table", "output_table"]);
+
+const JOIN_IO_HIDDEN_KEYS = new Set([
+  "left_table",
+  "right_table",
+  "left_asset_key",
+  "right_asset_key",
+  "output_table",
+  "input_table",
+]);
+
+const UNION_IO_HIDDEN_KEYS = new Set(["tables", "input_tables", "output_table"]);
+
+const OUTPUT_ONLY_HIDDEN_KEYS = new Set(["output_table", "asset_name", "asset_key"]);
+
+const CATALOG_DUPLICATE_KEYS = new Set([
+  "input_asset_keys",
+  "output_asset_key",
+  "upstream_asset_key",
+]);
 
 export type CanvasInspectorLayout = {
   columnGridMode: ReturnType<typeof operatorColumnGridMode>;
+  stepIoMode: StepIoMode | null;
   hideCatalogPanel: boolean;
-  showStepIoPanel: boolean;
-  showOutputTable: boolean;
+  outputOptional: boolean;
   hiddenFormKeys: Set<string>;
   visibleFormFields: NativeComponentField[];
 };
+
+function fieldKeys(formFields: NativeComponentField[]): Set<string> {
+  return new Set(formFields.map((f) => f.key));
+}
+
+function isOutputOptional(formFields: NativeComponentField[], keys: Set<string>): boolean {
+  if (!keys.has("output_table")) return true;
+  const field = formFields.find((f) => f.key === "output_table");
+  return field ? !field.required : true;
+}
+
+/** Infer table I/O panel mode from native / package field definitions. */
+export function detectStepIoMode(keys: Set<string>): StepIoMode | null {
+  if (keys.has("left_table") || keys.has("right_table")) return "join";
+  if (keys.has("tables") && !keys.has("table")) return "union";
+  if (keys.has("table")) return "single";
+  if (keys.has("output_table")) return "output_only";
+  return null;
+}
+
+function hiddenKeysForStepIo(
+  stepIoMode: StepIoMode | null,
+  columnGridMode: ReturnType<typeof operatorColumnGridMode>
+): Set<string> {
+  const hidden = new Set(CATALOG_DUPLICATE_KEYS);
+  if (!stepIoMode) return hidden;
+
+  if (stepIoMode === "join") {
+    JOIN_IO_HIDDEN_KEYS.forEach((k) => hidden.add(k));
+  } else if (stepIoMode === "union") {
+    UNION_IO_HIDDEN_KEYS.forEach((k) => hidden.add(k));
+  } else if (stepIoMode === "output_only") {
+    OUTPUT_ONLY_HIDDEN_KEYS.forEach((k) => hidden.add(k));
+  } else if (columnGridMode) {
+    COLUMN_GRID_HIDDEN_KEYS.forEach((k) => hidden.add(k));
+  } else {
+    SINGLE_IO_HIDDEN_KEYS.forEach((k) => hidden.add(k));
+  }
+  return hidden;
+}
 
 /** Decide which config sections to show in the canvas operator inspector. */
 export function resolveCanvasInspectorLayout(
@@ -26,27 +88,19 @@ export function resolveCanvasInspectorLayout(
   formFields: NativeComponentField[]
 ): CanvasInspectorLayout {
   const columnGridMode = operatorColumnGridMode(componentId);
-  const keys = new Set(formFields.map((f) => f.key));
-  const isJoinLike = keys.has("left_table") || keys.has("right_table");
-  const hasTableField = keys.has("table") && !isJoinLike;
-  const showOutputTable = keys.has("output_table");
-  const showStepIoPanel = Boolean(columnGridMode || hasTableField);
-  const hideCatalogPanel = showStepIoPanel;
-
-  const hiddenFormKeys = new Set<string>();
-  if (columnGridMode) {
-    COLUMN_GRID_HIDDEN_KEYS.forEach((k) => hiddenFormKeys.add(k));
-  } else if (hasTableField) {
-    TABLE_IO_HIDDEN_KEYS.forEach((k) => hiddenFormKeys.add(k));
-  }
-
+  const keys = fieldKeys(formFields);
+  const stepIoMode = detectStepIoMode(keys);
+  const hiddenFormKeys = hiddenKeysForStepIo(stepIoMode, columnGridMode);
   const visibleFormFields = formFields.filter((f) => !hiddenFormKeys.has(f.key));
 
   return {
     columnGridMode,
-    hideCatalogPanel,
-    showStepIoPanel,
-    showOutputTable,
+    stepIoMode,
+    hideCatalogPanel: formFields.length > 0,
+    outputOptional:
+      stepIoMode === "single" || stepIoMode === "output_only"
+        ? isOutputOptional(formFields, keys)
+        : false,
     hiddenFormKeys,
     visibleFormFields,
   };
