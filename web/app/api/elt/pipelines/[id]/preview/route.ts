@@ -4,8 +4,9 @@ import { getCurrentDbUser } from "@/lib/auth/server";
 import { getAccessibleResourceOwnerIds } from "@/lib/auth/workspace-access";
 import { db } from "@/lib/db/client";
 import { previewTableFromConfig } from "@/lib/elt/pipeline-asset-keys";
-import { resolvePreviewTableRef } from "@/lib/elt/pipeline-assets";
+import { resolvePreviewTableRefWithWarehouse } from "@/lib/elt/pipeline-assets";
 import { fetchWarehouseColumnsForAsset } from "@/lib/elt/warehouse-column-introspect";
+import { introspectDestinationConnection } from "@/lib/elt/warehouse-introspect";
 import { runReadOnlyQuery } from "@/lib/elt/warehouse-readonly-query";
 import { resolveRouteParamId } from "@/lib/server/route-params";
 
@@ -71,19 +72,28 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ error: "table or config with output_table/table required" }, { status: 400 });
   }
 
-  const table = resolvePreviewTableRef({
-    name: pipeline.name,
-    sourceType: pipeline.sourceType,
-    tool: pipeline.tool,
-    sourceConfiguration: pipeline.sourceConfiguration,
-    requested: rawTable,
-  });
-
   const conn = await db.connection.findFirst({
     where: { id: pipeline.destinationConnectionId, userId: { in: ownerIds }, connectionType: "destination" },
     select: { id: true, connector: true, config: true, connectionSecretsEnc: true },
   });
   if (!conn) return NextResponse.json({ error: "Destination connection not found" }, { status: 404 });
+
+  let warehouseTables: Array<{ schema: string; table: string; qualified: string }> | undefined;
+  try {
+    const intro = await introspectDestinationConnection(conn);
+    if (intro.ok) warehouseTables = intro.tables;
+  } catch {
+    /* introspection optional — fall back to config-derived refs */
+  }
+
+  const table = resolvePreviewTableRefWithWarehouse({
+    name: pipeline.name,
+    sourceType: pipeline.sourceType,
+    tool: pipeline.tool,
+    sourceConfiguration: pipeline.sourceConfiguration,
+    requested: rawTable,
+    warehouseTables,
+  });
 
   const limit = body.limit ?? 10;
   const quoted = quoteTableRef(table);

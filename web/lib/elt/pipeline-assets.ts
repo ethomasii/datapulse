@@ -497,6 +497,77 @@ export function resolvePreviewTableRef(input: {
   return requested;
 }
 
+/** Match a requested schema.table against live warehouse introspection (MotherDuck schema drift, etc.). */
+export function matchWarehouseTableRef(
+  requested: string,
+  warehouseTables: Array<{ schema: string; table: string; qualified: string }>,
+  landingDataset?: string
+): string | null {
+  if (!requested.trim() || !warehouseTables.length) return null;
+
+  const req = requested.trim().toLowerCase();
+  const exact = warehouseTables.find((t) => t.qualified.toLowerCase() === req);
+  if (exact) return exact.qualified;
+
+  const tableName = req.split(".").pop() ?? req;
+  const byTable = warehouseTables.filter((t) => t.table.toLowerCase() === tableName);
+  if (byTable.length === 1) return byTable[0]!.qualified;
+
+  if (byTable.length > 1 && landingDataset?.trim()) {
+    const ld = landingDataset.trim().toLowerCase();
+    const byDataset = byTable.find((t) => t.schema.toLowerCase() === ld);
+    if (byDataset) return byDataset.qualified;
+  }
+
+  if (byTable.length > 1) {
+    const reqSchema = req.includes(".") ? req.split(".").slice(0, -1).join(".").toLowerCase() : "";
+    if (reqSchema) {
+      const bySchema = byTable.find((t) => t.schema.toLowerCase() === reqSchema);
+      if (bySchema) return bySchema.qualified;
+    }
+    return byTable[0]!.qualified;
+  }
+
+  return null;
+}
+
+/** Config remap first, then optional warehouse catalog match. */
+export function resolvePreviewTableRefWithWarehouse(input: {
+  name: string;
+  sourceType: string;
+  tool: string;
+  sourceConfiguration: unknown;
+  requested: string;
+  warehouseTables?: Array<{ schema: string; table: string; qualified: string }>;
+}): string {
+  const configResolved = resolvePreviewTableRef({
+    name: input.name,
+    sourceType: input.sourceType,
+    tool: input.tool,
+    sourceConfiguration: input.sourceConfiguration,
+    requested: input.requested,
+  });
+
+  if (!input.warehouseTables?.length) return configResolved;
+
+  const bundle = derivePipelineAssets({
+    id: "preview",
+    name: input.name,
+    tool: input.tool,
+    enabled: true,
+    sourceType: input.sourceType,
+    destinationType: "unknown",
+    sourceConfiguration: input.sourceConfiguration,
+    updatedAt: new Date().toISOString(),
+  });
+
+  const fromWarehouse =
+    matchWarehouseTableRef(configResolved, input.warehouseTables, bundle.landingDataset) ??
+    matchWarehouseTableRef(input.requested, input.warehouseTables, bundle.landingDataset);
+
+  return fromWarehouse ?? configResolved;
+}
+
 /** Derive asset bundle for a single pipeline row. */
 export function derivePipelineAssets(pipeline: PipelineAssetInput): PipelineAssetBundle {
   const config = normalizeSourceConfigurationForCodegen(

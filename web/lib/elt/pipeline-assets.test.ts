@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildWorkspaceAssets,
   derivePipelineAssets,
+  matchWarehouseTableRef,
   resolveLandingDataset,
   resolvePreviewTableRef,
 } from "./pipeline-assets";
@@ -36,6 +37,19 @@ describe("resolvePreviewTableRef", () => {
       requested: "github_to_motherduck.issues",
     });
     expect(resolved).toBe("github_dlt_hub_dlt.issues");
+  });
+});
+
+describe("matchWarehouseTableRef", () => {
+  const tables = [
+    { schema: "github_dlt_hub_dlt", table: "issues", qualified: "github_dlt_hub_dlt.issues" },
+    { schema: "github_acme_app", table: "issues", qualified: "github_acme_app.issues" },
+  ];
+
+  it("finds table by resource name when schema is stale", () => {
+    expect(matchWarehouseTableRef("github_to_motherduck.issues", tables, "github_dlt_hub_dlt")).toBe(
+      "github_dlt_hub_dlt.issues"
+    );
   });
 });
 

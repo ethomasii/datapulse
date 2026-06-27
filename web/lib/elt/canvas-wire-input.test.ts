@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Edge, Node } from "@xyflow/react";
 import {
   expandUpstreamSources,
+  preferDestinationWireEdges,
   rewireAllComponentInputs,
   resolveCanvasAutoWireSourceId,
   wireInputFromUpstreamEdge,
@@ -63,7 +64,25 @@ describe("canvas-wire-input", () => {
     expect(wired?.configPatch.input_table).toBe("github_dlt_hub_dlt.issues");
   });
 
-  it("skips Output node and resolves upstream Source for autofill", () => {
+  it("wires from destination when backbone exists (not source)", () => {
+    const nodes: Node[] = [
+      { id: "src", type: "sourceNode", position: { x: 0, y: 0 }, data: {} },
+      { id: "dest", type: "destNode", position: { x: 200, y: 0 }, data: {} },
+      { id: "sel", type: "componentNode", position: { x: 400, y: 0 }, data: { config: {} } },
+    ];
+    const edges: Edge[] = [
+      { id: "e1", source: "src", target: "dest" },
+      { id: "e2", source: "src", target: "sel" },
+    ];
+    const fixed = preferDestinationWireEdges(nodes, edges);
+    expect(fixed.some((e) => e.source === "dest" && e.target === "sel")).toBe(true);
+    expect(fixed.some((e) => e.source === "src" && e.target === "sel")).toBe(false);
+    const wired = wireInputFromUpstreamEdge(nodes, fixed, "sel", ctx);
+    expect(wired?.configPatch.table).toBe("github_dlt_hub_dlt.issues");
+    expect(wired?.configPatch._wired_from).toBe("destination");
+  });
+
+  it("skips Output node and resolves landed warehouse table", () => {
     const nodes: Node[] = [
       { id: "src", type: "sourceNode", position: { x: 0, y: 0 }, data: {} },
       { id: "dest", type: "destNode", position: { x: 200, y: 0 }, data: {} },
@@ -75,6 +94,7 @@ describe("canvas-wire-input", () => {
     ];
     const wired = wireInputFromUpstreamEdge(nodes, edges, "sel", ctx);
     expect(wired?.configPatch.table).toBe("github_dlt_hub_dlt.issues");
+    expect(wired?.configPatch._wired_from).toBe("destination");
   });
 
   it("expandUpstreamSources walks through dest to source", () => {

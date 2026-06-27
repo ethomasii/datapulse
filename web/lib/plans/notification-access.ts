@@ -8,12 +8,15 @@ export type PlanEnforcementResult = {
   upgradeRequired?: PlanTier;
 };
 
-function tierFromSubscription(subscription: Subscription | null): PlanTier {
-  return subscription?.tier ?? "free";
+function tierForEnforcement(subscription: Subscription | null, effectiveTier?: PlanTier): PlanTier {
+  return effectiveTier ?? subscription?.tier ?? "free";
 }
 
-export function canAccessEmailNotifications(subscription: Subscription | null): PlanEnforcementResult {
-  const tier = tierFromSubscription(subscription);
+export function canAccessEmailNotifications(
+  subscription: Subscription | null,
+  effectiveTier?: PlanTier
+): PlanEnforcementResult {
+  const tier = tierForEnforcement(subscription, effectiveTier);
   if (!tierAtLeast(tier, "pro")) {
     return {
       allowed: false,
@@ -24,8 +27,11 @@ export function canAccessEmailNotifications(subscription: Subscription | null): 
   return { allowed: true };
 }
 
-export function canAccessSlackNotifications(subscription: Subscription | null): PlanEnforcementResult {
-  const tier = tierFromSubscription(subscription);
+export function canAccessSlackNotifications(
+  subscription: Subscription | null,
+  effectiveTier?: PlanTier
+): PlanEnforcementResult {
+  const tier = tierForEnforcement(subscription, effectiveTier);
   if (!tierAtLeast(tier, "team")) {
     return {
       allowed: false,
@@ -36,8 +42,11 @@ export function canAccessSlackNotifications(subscription: Subscription | null): 
   return { allowed: true };
 }
 
-export function canAccessTeamsNotifications(subscription: Subscription | null): PlanEnforcementResult {
-  const tier = tierFromSubscription(subscription);
+export function canAccessTeamsNotifications(
+  subscription: Subscription | null,
+  effectiveTier?: PlanTier
+): PlanEnforcementResult {
+  const tier = tierForEnforcement(subscription, effectiveTier);
   if (!tierAtLeast(tier, "pro")) {
     return {
       allowed: false,
@@ -48,8 +57,11 @@ export function canAccessTeamsNotifications(subscription: Subscription | null): 
   return { allowed: true };
 }
 
-export function canAccessDiscordNotifications(subscription: Subscription | null): PlanEnforcementResult {
-  const tier = tierFromSubscription(subscription);
+export function canAccessDiscordNotifications(
+  subscription: Subscription | null,
+  effectiveTier?: PlanTier
+): PlanEnforcementResult {
+  const tier = tierForEnforcement(subscription, effectiveTier);
   if (!tierAtLeast(tier, "pro")) {
     return {
       allowed: false,
@@ -60,8 +72,11 @@ export function canAccessDiscordNotifications(subscription: Subscription | null)
   return { allowed: true };
 }
 
-export function canAccessPagerDutyNotifications(subscription: Subscription | null): PlanEnforcementResult {
-  const tier = tierFromSubscription(subscription);
+export function canAccessPagerDutyNotifications(
+  subscription: Subscription | null,
+  effectiveTier?: PlanTier
+): PlanEnforcementResult {
+  const tier = tierForEnforcement(subscription, effectiveTier);
   if (!tierAtLeast(tier, "pro")) {
     return {
       allowed: false,
@@ -72,8 +87,11 @@ export function canAccessPagerDutyNotifications(subscription: Subscription | nul
   return { allowed: true };
 }
 
-export function canAccessWebhookNotifications(subscription: Subscription | null): PlanEnforcementResult {
-  const tier = tierFromSubscription(subscription);
+export function canAccessWebhookNotifications(
+  subscription: Subscription | null,
+  effectiveTier?: PlanTier
+): PlanEnforcementResult {
+  const tier = tierForEnforcement(subscription, effectiveTier);
   if (!tierAtLeast(tier, "pro")) {
     return {
       allowed: false,

@@ -17,6 +17,7 @@ import {
   Layers,
   Network,
   PlayCircle,
+  Shield,
   Split,
   Table2,
   UserCircle,
@@ -182,6 +183,38 @@ function NavSectionBlock({
   );
 }
 
+function SuperAdminNavBlock({ pathname, collapsed }: { pathname: string; collapsed: boolean }) {
+  const active = pathname === "/settings/admin" || pathname.startsWith("/settings/admin/");
+  return (
+    <div>
+      {!collapsed && (
+        <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-widest text-amber-600 dark:text-amber-500">
+          Platform Admin
+        </p>
+      )}
+      {collapsed && <div className="mb-1 h-px bg-slate-100 dark:bg-slate-800" aria-hidden />}
+      <ul className="space-y-0.5">
+        <li>
+          <Link
+            href="/settings/admin"
+            title={collapsed ? "Admin tools" : undefined}
+            className={clsx(
+              "flex items-center rounded-lg border border-amber-200/80 transition dark:border-amber-800/80",
+              collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2 text-sm font-medium",
+              active
+                ? "bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+                : "text-amber-800 hover:bg-amber-50/80 dark:text-amber-300/90 dark:hover:bg-amber-950/30"
+            )}
+          >
+            <Shield className="h-4 w-4 shrink-0" aria-hidden />
+            {!collapsed && "Admin tools"}
+          </Link>
+        </li>
+      </ul>
+    </div>
+  );
+}
+
 function FloatingAiGate() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -193,7 +226,13 @@ function FloatingAiGate() {
   return <AiPipelineAssistant />;
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  isSuperAdmin = false,
+}: {
+  children: React.ReactNode;
+  isSuperAdmin?: boolean;
+}) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -273,6 +312,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             pathname={pathname}
             collapsed={collapsed}
           />
+          {isSuperAdmin ? <SuperAdminNavBlock pathname={pathname} collapsed={collapsed} /> : null}
         </nav>
         <div
           className={clsx(

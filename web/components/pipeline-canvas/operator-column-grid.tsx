@@ -172,8 +172,8 @@ export function OperatorColumnGrid({
           <p className="px-3 py-4 text-[11px] text-amber-700 dark:text-amber-300">{error}</p>
         ) : columns.length === 0 ? (
           <p className="px-3 py-4 text-[11px] text-slate-500">
-            No columns found for {inputTable}. The table may be empty or not synced yet — run the pipeline, or check the
-            destination database name on your connection.
+            No columns found for {inputTable}. Run a sync, confirm your MotherDuck connection Database matches where
+            dlt wrote data (e.g. my_db), or pick the table from the asset picker.
           </p>
         ) : (
           <table className="w-full text-left text-[11px]">

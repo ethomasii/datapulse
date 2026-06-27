@@ -78,7 +78,9 @@ export function OperatorStepIoPanel({
       {mode === "single" ? (
         <label className="block text-sm">
           <span className="font-medium text-slate-700 dark:text-slate-300">Input table *</span>
-          <span className="mt-0.5 block text-[11px] text-slate-500">Table this step reads from</span>
+          <span className="mt-0.5 block text-[11px] text-slate-500">
+            Table this step reads from — wire from <strong>Destination</strong> (landed warehouse data), not Source
+          </span>
           <PipelineTableAssetPicker
             pipelineId={pipelineId}
             value={inputRef}

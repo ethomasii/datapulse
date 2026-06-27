@@ -35,7 +35,7 @@ import { enrichCanvasComponentNodes } from "@/lib/elt/component-canvas-io";
 import { findCanvasAppendTarget } from "@/lib/elt/canvas-node-placement";
 import { autoLayoutPipelineCanvas } from "@/lib/elt/canvas-auto-layout";
 import { findNearestEdge, insertNodeOnEdge } from "@/lib/elt/canvas-edge-insert";
-import { wireInputFromUpstreamEdge, rewireAllComponentInputs, type WireInputContext } from "@/lib/elt/canvas-wire-input";
+import { wireInputFromUpstreamEdge, rewireAllComponentInputs, type WireInputContext, preferDestinationWireEdges } from "@/lib/elt/canvas-wire-input";
 import { dashedAnimatedEdgeStyle, resolveCanvasEdges } from "./canvas-edge-defaults";
 import { pipelineNodeTypes } from "./custom-nodes";
 
@@ -205,9 +205,10 @@ function FlowCanvas({
     if (!pipelineId) return;
     const hasGraph = loadedGraph && Array.isArray(loadedGraph.nodes);
     const baseNodes = enrichCanvasComponentNodes(hasGraph ? loadedGraph.nodes : demoNodes);
-    const nextEdges = hasGraph
+    const baseEdges = hasGraph
       ? resolveCanvasEdges(baseNodes, loadedGraph.edges)
       : resolveCanvasEdges(demoNodes, demoEdges);
+    const nextEdges = preferDestinationWireEdges(baseNodes, baseEdges);
     const nextNodes = rewireAllComponentInputs(baseNodes, nextEdges, wireInputContext);
     setNodes(nextNodes);
     setEdges(nextEdges);
@@ -260,7 +261,7 @@ function FlowCanvas({
   const onConnect = useCallback(
     (params: Connection) => {
       setEdges((eds) => {
-        const nextEdges = addEdge(
+        const added = addEdge(
           {
             ...params,
             animated: true,
@@ -268,6 +269,7 @@ function FlowCanvas({
           },
           eds
         );
+        const nextEdges = preferDestinationWireEdges(nodes, added);
         if (params.target) {
           setNodes((nds) => {
             const wired = wireInputFromUpstreamEdge(nds, nextEdges, params.target!, wireInputContext);
@@ -288,7 +290,7 @@ function FlowCanvas({
         return nextEdges;
       });
     },
-    [setEdges, setNodes, wireInputContext]
+    [setEdges, setNodes, wireInputContext, nodes]
   );
 
   const removeSelectedNodes = useCallback(() => {

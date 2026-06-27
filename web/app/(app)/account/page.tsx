@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { CreditCard, Bell, Users, Code2 } from "lucide-react";
+import { CreditCard, Bell, Users, Code2, Shield } from "lucide-react";
 import { requireDbUser } from "@/lib/auth/server";
+import { isSuperAdminClerkId } from "@/lib/auth/super-admin";
 import type { Metadata } from "next";
 import { RelatedLinks } from "@/components/ui/related-links";
 
@@ -12,9 +13,28 @@ export default async function AccountProfilePage() {
   const user = await requireDbUser();
   const tier = user.subscription?.tier ?? "free";
   const status = user.subscription?.status ?? "active";
+  const superAdmin = isSuperAdminClerkId(user.clerkId);
 
   return (
     <>
+      {superAdmin && (
+        <section className="mb-6 rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 p-5 dark:border-amber-700 dark:bg-amber-950/30">
+          <div className="mb-2 flex items-center gap-2">
+            <Shield className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <h2 className="text-sm font-semibold text-amber-900 dark:text-amber-200">Platform admin</h2>
+          </div>
+          <p className="mb-3 text-xs text-amber-800/90 dark:text-amber-300/90">
+            Tier switcher and internal shortcuts — same as ServicePulse Admin tools.
+          </p>
+          <Link
+            href="/settings/admin"
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-500"
+          >
+            Open Admin tools
+          </Link>
+        </section>
+      )}
+
       <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Profile</h2>
         <dl className="mt-4 space-y-3">

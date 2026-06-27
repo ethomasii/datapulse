@@ -22,7 +22,7 @@ export function expandUpstreamSources(nodes: Node[], edges: Edge[], nodeId: stri
   if (node.type === "destNode") {
     const incoming = edges.filter((e) => e.target === nodeId);
     if (!incoming.length) {
-      return nodes.filter((n) => n.type === "sourceNode");
+      return [node];
     }
     return incoming.flatMap((e) => expandUpstreamSources(nodes, edges, e.source));
   }
@@ -30,10 +30,14 @@ export function expandUpstreamSources(nodes: Node[], edges: Edge[], nodeId: stri
   return [node];
 }
 
+function landingTablesFromContext(ctx?: WireInputContext): string[] {
+  return (ctx?.rawLandingTables ?? []).map((t) => t.trim()).filter(Boolean);
+}
+
 function outputTableFromNode(node: Node, ctx?: WireInputContext): string | null {
-  if (node.type === "sourceNode") {
-    const first = ctx?.rawLandingTables?.[0]?.trim();
-    return first || null;
+  if (node.type === "sourceNode" || node.type === "destNode") {
+    const landing = landingTablesFromContext(ctx);
+    return landing[0] ?? null;
   }
   if (node.type === "transformNode") return null;
   if (node.type === "componentNode") {
@@ -41,6 +45,36 @@ function outputTableFromNode(node: Node, ctx?: WireInputContext): string | null 
     return previewTableFromConfig(cfg);
   }
   return null;
+}
+
+/** Resolve warehouse table ref(s) produced by an upstream node (stops at Destination — post-load boundary). */
+export function resolveOutputTablesFromNode(
+  nodes: Node[],
+  edges: Edge[],
+  nodeId: string,
+  ctx?: WireInputContext
+): string[] {
+  const node = nodes.find((n) => n.id === nodeId);
+  if (!node) return [];
+
+  if (node.type === "destNode" || node.type === "sourceNode") {
+    const out = outputTableFromNode(node, ctx);
+    return out ? [out] : [];
+  }
+
+  if (node.type === "componentNode") {
+    const out = outputTableFromNode(node, ctx);
+    if (out) return [out];
+    return expandUpstreamSources(nodes, edges, nodeId).flatMap((n) => {
+      const t = outputTableFromNode(n, ctx);
+      return t ? [t] : [];
+    });
+  }
+
+  return expandUpstreamSources(nodes, edges, nodeId).flatMap((n) => {
+    const t = outputTableFromNode(n, ctx);
+    return t ? [t] : [];
+  });
 }
 
 function collectUpstreamTables(
@@ -52,12 +86,46 @@ function collectUpstreamTables(
   const incoming = edges.filter((e) => e.target === targetNodeId);
   const tables: string[] = [];
   for (const edge of incoming) {
-    for (const src of expandUpstreamSources(nodes, edges, edge.source)) {
-      const out = outputTableFromNode(src, ctx);
+    for (const out of resolveOutputTablesFromNode(nodes, edges, edge.source, ctx)) {
       if (out && !tables.includes(out)) tables.push(out);
     }
   }
   return tables;
+}
+
+/** Prefer Destination over Source when ingest backbone exists (transforms read landed warehouse data). */
+export function preferDestinationWireEdges(nodes: Node[], edges: Edge[]): Edge[] {
+  const source = nodes.find((n) => n.type === "sourceNode");
+  const dest = nodes.find((n) => n.type === "destNode");
+  if (!source || !dest) return edges;
+
+  const hasBackbone = edges.some((e) => e.source === source.id && e.target === dest.id);
+  if (!hasBackbone) return edges;
+
+  const componentIds = new Set(nodes.filter((n) => n.type === "componentNode").map((n) => n.id));
+  let next = edges;
+
+  for (const compId of componentIds) {
+    const incoming = next.filter((e) => e.target === compId);
+    const fromDest = incoming.some((e) => e.source === dest.id);
+    const fromSourceOnly = incoming.some((e) => e.source === source.id) && !fromDest;
+    if (!fromSourceOnly) continue;
+
+    next = next.filter((e) => !(e.target === compId && e.source === source.id));
+    if (!next.some((e) => e.source === dest.id && e.target === compId)) {
+      next = [
+        ...next,
+        {
+          id: `e-${dest.id}-${compId}-rewire`,
+          source: dest.id,
+          target: compId,
+          animated: true,
+        },
+      ];
+    }
+  }
+
+  return next;
 }
 
 /** Patch target component config with upstream table ref after a new edge. */
@@ -73,6 +141,7 @@ export function wireInputFromUpstreamEdge(
   const upstreamTables = collectUpstreamTables(nodes, edges, targetNodeId, ctx);
   if (!upstreamTables.length) return null;
 
+  const incoming = edges.filter((e) => e.target === targetNodeId);
   const existing = ((target.data as { config?: Record<string, unknown> })?.config ?? {}) as Record<
     string,
     unknown
@@ -99,6 +168,9 @@ export function wireInputFromUpstreamEdge(
     patch.input_table = primary;
     patch.input_asset_keys = upstreamTables;
     patch._wire_autofill_at = new Date().toISOString();
+    patch._wired_from = incoming.some((e) => nodes.find((n) => n.id === e.source)?.type === "destNode")
+      ? "destination"
+      : "source";
     patch._preview_nonce = Date.now();
     changed = true;
   } else {
@@ -125,9 +197,10 @@ export function rewireAllComponentInputs(
   edges: Edge[],
   ctx?: WireInputContext
 ): Node[] {
+  const normalizedEdges = preferDestinationWireEdges(nodes, edges);
   return nodes.map((node) => {
     if (node.type !== "componentNode") return node;
-    const wired = wireInputFromUpstreamEdge(nodes, edges, node.id, ctx);
+    const wired = wireInputFromUpstreamEdge(nodes, normalizedEdges, node.id, ctx);
     if (!wired) return node;
     return {
       ...node,

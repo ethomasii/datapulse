@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { requireDbUser } from "@/lib/auth/server";
+import { isSuperAdminClerkId } from "@/lib/auth/super-admin";
 import { getMonthlyRowsSynced } from "@/lib/billing/report-usage";
 import { getDedicatedComputeBilling } from "@/lib/billing/dedicated-compute-subscription";
 import { PLAN_PIPELINE_LIMITS, countUserPipelines } from "@/lib/plans/limits";
 import { BillingPlansClient } from "@/components/account/billing-plans-client";
+import { DevTierSwitcher } from "@/app/(app)/billing/dev-tier-switcher";
 import { db } from "@/lib/db/client";
 import type { Metadata } from "next";
 
@@ -27,9 +29,12 @@ export default async function BillingPage() {
   const dedicatedBilling = org ? await getDedicatedComputeBilling(org.id) : null;
   const pipelineLimit = PLAN_PIPELINE_LIMITS[tier];
   const usageMeterEnabled = Boolean(process.env.STRIPE_USAGE_METER_EVENT_NAME);
+  const isSuperAdmin = isSuperAdminClerkId(user.clerkId);
 
   return (
     <div className="space-y-6">
+      {isSuperAdmin ? <DevTierSwitcher currentTier={tier} /> : null}
+
       <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Subscription</h2>
         <dl className="mt-4 grid gap-6 sm:grid-cols-2">
