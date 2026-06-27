@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { Handle, Position } from "@xyflow/react";
 import { Bot, ChevronRight, Loader2, Plus, Sparkles, Wand2 } from "lucide-react";
 import clsx from "clsx";
@@ -99,7 +99,7 @@ export function NodeAddStepMenu({ node, className, asHandle }: Props) {
 
   if (!actions?.isDesigner) return null;
 
-  const toggleOpen = (e: MouseEvent) => {
+  const toggleOpen = (e: ReactMouseEvent) => {
     e.stopPropagation();
     setOpen((v) => !v);
   };
