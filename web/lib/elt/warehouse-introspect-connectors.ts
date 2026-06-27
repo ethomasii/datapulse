@@ -7,6 +7,7 @@ import { fetchGcpAccessToken } from "@/lib/elt/gcp-access-token";
 import { resolveDuckdbDatabaseLocation } from "@/lib/elt/duckdb-destination";
 import { readFetchJsonBody } from "@/lib/elt/fetch-json-body";
 import { buildMotherduckDsn, motherduckDatabaseName, motherduckToken } from "@/lib/elt/motherduck-dsn";
+import { runMotherduckMcpQuery } from "@/lib/elt/motherduck-mcp-client";
 import type { WarehouseIntrospectionResult, WarehouseTableRef } from "@/lib/elt/warehouse-introspect";
 
 const TABLE_LIMIT = 5000;
@@ -926,7 +927,7 @@ export type MotherduckSqlResult = {
   attachDatabase?: string;
 };
 
-/** Run SQL against MotherDuck via DuckDB native `md:` connection (not HTTP /v1/sql). */
+/** Run SQL against MotherDuck via MCP HTTP API (serverless-safe; no native duckdb). */
 export async function executeMotherduckSql(
   secrets: Record<string, string>,
   sql: string,
@@ -934,12 +935,13 @@ export async function executeMotherduckSql(
 ): Promise<MotherduckSqlResult> {
   const config = database?.trim() ? { database: database.trim() } : {};
   const catalog = motherduckDatabaseName(secrets, config);
-  const dsn = buildMotherduckDsn(secrets, { database: catalog });
-  const rowset = await runDuckdbFileReadOnlyQuery(dsn, sql);
+  const token = motherduckToken(secrets);
+  if (!token) throw new Error("Set MOTHERDUCK_TOKEN to query MotherDuck.");
+  const rowset = await runMotherduckMcpQuery(token, catalog, sql);
   return { rowset, attachDatabase: catalog };
 }
 
-/** Run a read-only SQL statement against MotherDuck via DuckDB `md:` DSN. */
+/** Run a read-only SQL statement against MotherDuck. */
 export async function runMotherduckReadOnlyQuery(
   secrets: Record<string, string>,
   config: Record<string, unknown>,
