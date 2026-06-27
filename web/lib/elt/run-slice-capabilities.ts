@@ -70,20 +70,32 @@ const CAPABILITIES: Record<string, RunSliceCapability> = {
   },
   stripe: { ...DLT_SINCE, mechanism: "stripe_source(start_date=partition_key)" },
   shopify: { ...DLT_SINCE, mechanism: "shopify_source(start_date=partition_key)" },
-  hubspot: { ...DLT_SINCE, mechanism: "hubspot_source(start_date=partition_key)" },
-  salesforce: { ...DLT_SINCE, mechanism: "salesforce_source(start_date=partition_key)" },
+  hubspot: {
+    mode: "none_only" as const,
+    label: "Full merge load only",
+    detail:
+      "HubSpot CRM objects load with merge disposition; date/key run slices are not wired yet (no source-level since filter). Use scheduled full runs or web analytics events separately.",
+    mechanism: "hubspot() — no partition_key filter",
+  },
+  salesforce: {
+    ...DLT_SINCE,
+    mechanism: "salesforce incremental env bounds on merge resources (account, opportunity, …)",
+  },
   google_analytics: { ...DLT_DATE_RANGE, mechanism: "google_analytics(start_date=partition_key)" },
   facebook_ads: { ...DLT_DATE_RANGE, mechanism: "facebook_ads_source(start_date=partition_key)" },
   google_ads: { ...DLT_DATE_RANGE, mechanism: "google_ads(start_date=partition_key)" },
   slack: { ...DLT_SINCE, mechanism: "slack_source(start_date=partition_key)" },
   notion: { ...DLT_SINCE, mechanism: "notion_source(start_date=partition_key)" },
   airtable: { ...DLT_SINCE, mechanism: "airtable_source(start_date=partition_key)" },
-  jira: { ...DLT_SINCE, mechanism: "jira(start_date=partition_key)" },
+  jira: { ...DLT_SINCE, mechanism: "jira_search JQL updated range for day slices" },
   zendesk: { ...DLT_SINCE, mechanism: "zendesk_support(start_date=partition_key)" },
   intercom: { ...DLT_SINCE, mechanism: "intercom_source(start_date=partition_key)" },
   mixpanel: { ...DLT_DATE_RANGE, mechanism: "mixpanel_source(start_date=partition_key)" },
   segment: { ...DLT_SINCE, mechanism: "segment_source(start_date=partition_key)" },
-  asana: { ...DLT_SINCE, mechanism: "asana_source(start_date=partition_key)" },
+  asana: {
+    ...DLT_SINCE,
+    mechanism: "asana tasks modified_at incremental bounds via partition_key",
+  },
 
   rest_api: { ...DLT_QUERY },
 

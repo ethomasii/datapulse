@@ -8,7 +8,7 @@ describe("generateVerifiedSourcePipeline", () => {
       name: "hubspot_crm",
       sourceType: "hubspot",
       destinationType: "motherduck",
-      sourceConfiguration: { start_date: "2024-01-01" },
+      sourceConfiguration: {},
       writeDisposition: "append",
       fileFormat: "parquet",
     } as PipelineRequest);

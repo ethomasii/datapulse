@@ -5,6 +5,11 @@ import { eltpulseReportLoadInfoPython } from "./generate-eltpulse-run-reporting"
 import { postTransformBeforeReturn } from "./generate-post-transform";
 import { eltpulsePythonModuleHeader } from "./codegen-branding";
 import {
+  buildVerifiedImportLine,
+  buildVerifiedPartitionBlock,
+  buildVerifiedSourceInstantiation,
+} from "./generate-dlt-partition";
+import {
   resolveVerifiedSourceSpec,
   type VerifiedCredentialSpec,
   type VerifiedSourceSpec,
@@ -278,11 +283,9 @@ export function generateVerifiedSourcePipeline(request: PipelineRequest): string
     }
   }
 
-  const partitionBlock = spec.partitionKwarg
-    ? `
-    if partition_key:
-        source_kwargs["${escapePyString(spec.partitionKwarg)}"] = partition_key`
-    : "";
+  const partitionBlock = buildVerifiedPartitionBlock(spec);
+  const sourceInstantiation = buildVerifiedSourceInstantiation(spec, resourceBlock);
+  const importLine = buildVerifiedImportLine(spec);
 
   const extraImport = credSection.imports ? `\n${credSection.imports}` : "";
 
@@ -290,7 +293,7 @@ export function generateVerifiedSourcePipeline(request: PipelineRequest): string
 
 import os
 import dlt
-from ${spec.module} import ${spec.factory}${extraImport}
+${importLine}${extraImport}
 
 def run(partition_key: str = None):
     ${destinationComment}
@@ -305,8 +308,7 @@ ${credSection.setup}
     source_kwargs = dict(
 ${kwargLines.join("\n")}
     )${partitionBlock}
-
-    source = ${spec.factory}(**source_kwargs)${resourceBlock}
+${sourceInstantiation}
 
     info = pipeline.run(
         source,

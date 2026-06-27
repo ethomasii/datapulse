@@ -39,6 +39,10 @@ export type VerifiedSourceSpec = {
   configKeys?: string[];
   /** Optional partition_key → factory kwarg for incremental runs */
   partitionKwarg?: string;
+  /** Optional end bound kwarg for day slices (e.g. end_date). */
+  partitionEndKwarg?: string;
+  /** How partition_key is applied when the factory has no single start_date arg. */
+  partitionSliceMode?: "jira_jql" | "asana_tasks" | "salesforce_incremental";
   /** Config key holding selected resource ids */
   resourceConfigKey?: string;
   alternateResourceConfigKeys?: string[];
@@ -75,6 +79,7 @@ const SHOPIFY_SPEC: VerifiedSourceSpec = {
   credentials: [{ param: "private_app_password", envKeys: ["SHOPIFY_PRIVATE_APP_PASSWORD", "SHOPIFY_ACCESS_TOKEN"] }],
   configKeys: ["store_url", "start_date"],
   partitionKwarg: "start_date",
+  partitionEndKwarg: "end_date",
   resourceConfigKey: "resources",
   defaultResources: ["orders", "customers", "products"],
   normalizeResources: normalizeShopifyResources,
@@ -86,7 +91,6 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
     module: "hubspot",
     factory: "hubspot",
     credentials: [{ param: "api_key", envKeys: ["HUBSPOT_API_KEY", "HUBSPOT_ACCESS_TOKEN"] }],
-    configKeys: ["start_date"],
     resourceConfigKey: "resources",
     defaultResources: ["contacts", "companies", "deals"],
     normalizeResources: normalizeHubspotResources,
@@ -95,6 +99,7 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
     module: "salesforce",
     factory: "salesforce_source",
     credentialStyle: "salesforce_security_token",
+    partitionSliceMode: "salesforce_incremental",
     credentials: [
       { param: "user_name", envKeys: ["SALESFORCE_USER", "SALESFORCE_USERNAME"] },
       { param: "password", envKeys: ["SALESFORCE_PASSWORD"] },
@@ -130,6 +135,7 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
     ],
     configKeys: ["start_date"],
     partitionKwarg: "start_date",
+    partitionEndKwarg: "end_date",
     resourceConfigKey: "resources",
     defaultResources: ["tickets", "users"],
     normalizeResources: normalizeZendeskResources,
@@ -138,6 +144,7 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
     module: "jira",
     factory: "jira",
     credentialStyle: "jira_api",
+    partitionSliceMode: "jira_jql",
     credentials: [
       { param: "subdomain", envKeys: ["JIRA_SUBDOMAIN", "JIRA_DOMAIN"] },
       { param: "email", envKeys: ["JIRA_EMAIL"] },
@@ -151,6 +158,7 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
     module: "asana_dlt",
     factory: "asana_source",
     credentialStyle: "asana_secrets",
+    partitionSliceMode: "asana_tasks",
     credentials: [{ param: "access_token", envKeys: ["ASANA_ACCESS_TOKEN", "ASANA_DLT_ACCESS_TOKEN"] }],
   },
   workable: {
@@ -168,6 +176,7 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
     credentials: [{ param: "access_token", envKeys: ["SLACK_ACCESS_TOKEN", "SLACK_BOT_TOKEN"] }],
     configKeys: ["start_date"],
     partitionKwarg: "start_date",
+    partitionEndKwarg: "end_date",
     alternateResourceConfigKeys: ["resources"],
     defaultResources: ["channels", "users"],
     normalizeResources: normalizeSlackResources,
@@ -196,6 +205,7 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
     credentials: [{ param: "credentials", envKeys: ["GOOGLE_ANALYTICS_CREDENTIALS", "GCP_CREDENTIALS"] }],
     configKeys: ["property_id", "start_date"],
     partitionKwarg: "start_date",
+    partitionEndKwarg: "end_date",
   },
   facebook_ads: {
     module: "facebook_ads",
@@ -206,6 +216,7 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
     ],
     configKeys: ["start_date"],
     partitionKwarg: "start_date",
+    partitionEndKwarg: "end_date",
   },
   google_ads: {
     module: "google_ads",
@@ -216,6 +227,7 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
     ],
     configKeys: ["customer_id", "start_date"],
     partitionKwarg: "start_date",
+    partitionEndKwarg: "end_date",
   },
   bing_webmaster: {
     module: "bing_webmaster",
@@ -231,6 +243,7 @@ export const VERIFIED_SOURCE_SPECS: Record<string, VerifiedSourceSpec> = {
     ],
     configKeys: ["site_id", "start_date"],
     partitionKwarg: "start_date",
+    partitionEndKwarg: "end_date",
   },
   inbox: {
     module: "inbox",
