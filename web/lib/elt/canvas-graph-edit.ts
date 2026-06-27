@@ -60,7 +60,7 @@ export type CanvasGraphEditAction =
     }
   | {
       op: "update_node_config";
-      /** Node id or label — prefer exact node id from Genie context. */
+      /** Node id or label — prefer exact node id from Pulse AI context. */
       node: string;
       config: Record<string, unknown>;
       /** When true (default), shallow-merge into existing config. */

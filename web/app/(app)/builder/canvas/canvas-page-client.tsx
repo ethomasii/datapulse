@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 import { CanvasPreviewPanel } from "@/components/pipeline-canvas/canvas-preview-panel";
 import { DesignerFullscreenShell } from "@/components/pipeline-canvas/designer-fullscreen-shell";
 import { DesignerMobileChrome } from "@/components/pipeline-canvas/designer-mobile-chrome";
-import { GenieCanvasBar } from "@/components/pipeline-canvas/genie-canvas-bar";
+import { PulseCanvasBar } from "@/components/pipeline-canvas/pulse-canvas-bar";
 import { OperatorsSidebar } from "@/components/pipeline-canvas/operators-sidebar";
 import { LakeStarterGallery } from "@/components/elt/lake-starter-gallery";
 import { LakeStarterChips } from "@/components/elt/lake-starter-chips";
@@ -176,7 +176,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
     return (inspectorFocus.data.config as Record<string, unknown>) ?? {};
   }, [inspectorFocus]);
 
-  const canvasGenieNode = useMemo(() => {
+  const canvasPulseNode = useMemo(() => {
     if (inspectorFocus.kind !== "component") return null;
     return {
       nodeId: inspectorFocus.nodeId,
@@ -1066,10 +1066,10 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
               }
             />
           </div>
-          <GenieCanvasBar
+          <PulseCanvasBar
             pipelineId={selectedId}
             selectedLabel={selectedStepLabel}
-            canvasNode={canvasGenieNode}
+            canvasNode={canvasPulseNode}
             getCanvasSnapshot={() => canvasControlRef.current?.getGraph() ?? null}
             onPatchNode={(nodeId, patch) => canvasControlRef.current?.patchNodeData(nodeId, patch)}
             onReplaceGraph={(nodes, edges) => canvasControlRef.current?.replaceGraph(nodes, edges)}

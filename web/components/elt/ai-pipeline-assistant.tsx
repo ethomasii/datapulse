@@ -12,6 +12,7 @@ import type { CreatePipelineBody } from '@/lib/elt/types';
 import type { InlineField, PatchPipelinePayload } from '@/app/api/elt/ai-assistant/route';
 import { useWorkspacePermissions } from '@/lib/hooks/use-workspace-permissions';
 import { builderUrl } from '@/lib/elt/builder-nav';
+import { PULSE_AI_NAME } from '@/lib/brand/pulse-ai';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -390,7 +391,7 @@ export function AiPipelineAssistant({
   pipelineId?: string;
   /** Canvas sidebar styling and edit-mode starter prompts. */
   canvasMode?: boolean;
-  /** Selected canvas step — Genie edits this node when set. */
+  /** Selected canvas step — Pulse AI edits this node when set. */
   canvasNodeContext?: {
     nodeId: string;
     componentId?: string;
@@ -671,10 +672,10 @@ export function AiPipelineAssistant({
         <button
           onClick={() => setOpen(true)}
           className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-teal-500 to-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-lg hover:from-teal-400 hover:to-sky-400 transition-all"
-          title="AI Pipeline Builder"
+          title={PULSE_AI_NAME}
         >
           <Sparkles className="h-4 w-4" />
-          <span>AI Builder</span>
+          <span>{PULSE_AI_NAME}</span>
         </button>
       )}
 
@@ -686,7 +687,7 @@ export function AiPipelineAssistant({
               <Bot className="h-4 w-4 text-white" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-semibold text-white">AI Pipeline Builder</p>
+              <p className="text-sm font-semibold text-white">{PULSE_AI_NAME}</p>
               <p className="text-[11px] text-slate-400">Powered by Claude · eltPulse</p>
             </div>
             <button onClick={() => setExpanded((v) => !v)} className="rounded p-1 text-slate-400 hover:text-white" title={expanded ? 'Collapse' : 'Expand'}>

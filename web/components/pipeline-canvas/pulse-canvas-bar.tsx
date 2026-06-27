@@ -6,8 +6,9 @@ import { Bot, ChevronUp, Loader2, Send } from "lucide-react";
 import clsx from "clsx";
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
 import type { PatchPipelinePayload } from "@/app/api/elt/ai-assistant/route";
+import { PULSE_AI_NAME, PULSE_AI_SHORT } from "@/lib/brand/pulse-ai";
 
-export type CanvasGenieNodeContext = {
+export type CanvasPulseNodeContext = {
   nodeId: string;
   componentId?: string;
   label?: string;
@@ -18,14 +19,14 @@ type Props = {
   pipelineId?: string;
   onPipelinePatched?: () => void;
   selectedLabel?: string;
-  canvasNode?: CanvasGenieNodeContext | null;
+  canvasNode?: CanvasPulseNodeContext | null;
   getCanvasSnapshot?: () => { nodes: Node[]; edges: Edge[] } | null;
   onPatchNode?: (nodeId: string, patch: Record<string, unknown>) => void;
   onReplaceGraph?: (nodes: Node[], edges: Edge[]) => void;
 };
 
-/** Lakeflow Genie-style NL bar — inline prompt tied to the selected canvas step. */
-export function GenieCanvasBar({
+/** Inline NL prompt bar on the canvas — tied to the selected step. */
+export function PulseCanvasBar({
   pipelineId,
   onPipelinePatched,
   selectedLabel,
@@ -46,8 +47,8 @@ export function GenieCanvasBar({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const placeholder = selectedLabel
-    ? `Add or edit after ${selectedLabel}… (e.g. add dedupe step, filter active rows)`
-    : "Add a step… (e.g. add filter, dedupe on id, aggregate by day)";
+    ? `Ask ${PULSE_AI_SHORT} to add or edit after ${selectedLabel}…`
+    : `Ask ${PULSE_AI_SHORT} to add a step… (e.g. filter, dedupe, aggregate by day)`;
 
   const applyCanvasPatch = useCallback(
     async (id: string, patch: PatchPipelinePayload) => {
@@ -105,7 +106,7 @@ export function GenieCanvasBar({
         patchMode?: "canvas_local" | "pipeline";
         nodePatch?: { nodeId: string; config: Record<string, unknown> };
       };
-      if (!res.ok) throw new Error(data.error ?? "Genie request failed");
+      if (!res.ok) throw new Error(data.error ?? `${PULSE_AI_NAME} request failed`);
 
       if (data.nodePatch && onPatchNode) {
         onPatchNode(data.nodePatch.nodeId, { config: data.nodePatch.config });
@@ -137,7 +138,7 @@ export function GenieCanvasBar({
         }
         setPendingPatch({ pipelineId: data.patchPipelineId, patch: data.patchPayload });
         setQuickReply(
-          (data.message ?? "Genie prepared canvas changes.") +
+          (data.message ?? `${PULSE_AI_NAME} prepared canvas changes.`) +
             " Review and apply — nothing is saved until you confirm."
         );
         setDraft("");
@@ -147,7 +148,7 @@ export function GenieCanvasBar({
       setQuickReply(data.message ?? "Done.");
       setDraft("");
     } catch (e) {
-      setQuickReply(e instanceof Error ? e.message : "Genie request failed");
+      setQuickReply(e instanceof Error ? e.message : `${PULSE_AI_NAME} request failed`);
     } finally {
       setSending(false);
     }
@@ -209,7 +210,7 @@ export function GenieCanvasBar({
           onClick={() => void sendQuick()}
           disabled={!draft.trim() || sending || !pipelineId}
           className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-40"
-          aria-label="Send to Genie"
+          aria-label={`Send to ${PULSE_AI_NAME}`}
         >
           {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </button>
@@ -218,7 +219,7 @@ export function GenieCanvasBar({
           onClick={() => setExpanded((e) => !e)}
           className="mb-0.5 rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
           aria-expanded={expanded}
-          aria-label={expanded ? "Collapse Genie chat" : "Expand Genie chat"}
+          aria-label={expanded ? `Collapse ${PULSE_AI_NAME} chat` : `Expand ${PULSE_AI_NAME} chat`}
         >
           <ChevronUp className={clsx("h-4 w-4 transition", expanded ? "rotate-180" : "")} aria-hidden />
         </button>

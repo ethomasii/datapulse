@@ -183,7 +183,7 @@ export default function McpServersPage() {
     <AppPage>
       <AppPageHeader
         title="MCP servers"
-        description="Register Model Context Protocol servers for Genie and pipeline components (mcp_tool_call, litellm_agent, …)."
+        description="Register Model Context Protocol servers for Pulse AI and pipeline components (mcp_tool_call, litellm_agent, …)."
       />
 
       <RelatedLinks
@@ -402,7 +402,7 @@ export default function McpServersPage() {
           <Link href="/builder" className="text-violet-600 hover:underline dark:text-violet-300">
             pipeline components
           </Link>{" "}
-          or ask Genie to wire an agent family flow (
+          or ask Pulse AI to wire an agent family flow (
           <a
             href="https://dagster-component-ui.vercel.app/examples/agent_family"
             className="text-violet-600 hover:underline dark:text-violet-300"

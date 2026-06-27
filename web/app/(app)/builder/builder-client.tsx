@@ -984,7 +984,7 @@ export function BuilderClient({
                   className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 ${createMode === "ai" ? "bg-gradient-to-r from-teal-500 to-sky-500 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"}`}
                 >
                   <Sparkles className="h-3.5 w-3.5" />
-                  AI
+                  Pulse AI
                 </button>
                 <button
                   type="button"
@@ -1135,11 +1135,11 @@ export function BuilderClient({
             />
           )}
 
-          {/* AI Builder panel */}
+          {/* Pulse AI panel */}
           {!editingId && newPipelineKind === "elt" && createMode === "ai" && (
             <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-4 dark:border-teal-800 dark:bg-teal-900/10">
               <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
-                Describe what you want to load and the AI will generate the pipeline. You can review and edit it before saving.
+                Describe what you want to load — Pulse AI will generate the pipeline. Review and edit before saving.
               </p>
               <AiPipelineAssistant
                 onPipelineSaved={() => { void load(); setShowCreateForm(false); }}

@@ -1149,8 +1149,8 @@ function countTransformNodes(nodes: Node[]): number {
   return nodes.filter((n) => n.type === "componentNode" || n.type === "transformNode").length;
 }
 
-function genieGraphShrinkError(beforeNodes: Node[], afterNodes: Node[], genieMode: boolean): string | null {
-  if (!genieMode) return null;
+function pulseCanvasGraphShrinkError(beforeNodes: Node[], afterNodes: Node[], pulseCanvasMode: boolean): string | null {
+  if (!pulseCanvasMode) return null;
   const beforeTransforms = countTransformNodes(beforeNodes);
   const afterTransforms = countTransformNodes(afterNodes);
   if (beforeTransforms > 0 && afterTransforms < beforeTransforms) {
@@ -1166,7 +1166,7 @@ async function toolEditPipelineCanvas(
   userId: string,
   contextPipelineId: string | undefined,
   params: { pipeline_id?: string; actions?: unknown },
-  options?: { canvasSnapshot?: CanvasSnapshot | null; genieMode?: boolean; genieTargetNodeId?: string }
+  options?: { canvasSnapshot?: CanvasSnapshot | null; pulseCanvasMode?: boolean; pulseTargetNodeId?: string }
 ) {
   const pipelineId = String(params.pipeline_id ?? contextPipelineId ?? "").trim();
   const actions = Array.isArray(params.actions)
@@ -1207,7 +1207,7 @@ async function toolEditPipelineCanvas(
   }
 
   const afterNodes = edited.canvas.nodes as Node[];
-  const shrinkErr = genieGraphShrinkError(beforeNodes, afterNodes, options?.genieMode ?? false);
+  const shrinkErr = pulseCanvasGraphShrinkError(beforeNodes, afterNodes, options?.pulseCanvasMode ?? false);
   if (shrinkErr) {
     return { success: false, error: shrinkErr, errors: edited.errors, messages: edited.messages };
   }
@@ -1235,8 +1235,8 @@ async function toolEditPipelineCanvas(
     actions.length > 0 && actions.every((a) => a.op === "update_node_config");
   const localPreview = isLocalCanvasPreviewPatch(beforeNodes, afterNodes);
   let nodePatch: { node_id: string; config: Record<string, unknown> } | undefined;
-  if (configOnly && options?.genieTargetNodeId) {
-    const updated = afterNodes.find((n) => n.id === options.genieTargetNodeId);
+  if (configOnly && options?.pulseTargetNodeId) {
+    const updated = afterNodes.find((n) => n.id === options.pulseTargetNodeId);
     const cfg = (updated?.data as Record<string, unknown> | undefined)?.config;
     if (updated && cfg && typeof cfg === "object") {
       nodePatch = { node_id: updated.id, config: cfg as Record<string, unknown> };
@@ -1248,7 +1248,7 @@ async function toolEditPipelineCanvas(
     next_action:
       configOnly && nodePatch
         ? "patch_node_local"
-        : localPreview && (options?.genieMode ?? false)
+        : localPreview && (options?.pulseCanvasMode ?? false)
           ? "patch_canvas_local"
           : "patch_pipeline",
     pipeline_id: pipelineId,
@@ -1263,7 +1263,7 @@ async function toolAddPipelineComponents(
   userId: string,
   contextPipelineId: string | undefined,
   params: { pipeline_id?: string; components?: unknown },
-  options?: { canvasSnapshot?: CanvasSnapshot | null; genieMode?: boolean }
+  options?: { canvasSnapshot?: CanvasSnapshot | null; pulseCanvasMode?: boolean }
 ) {
   const pipelineId = String(params.pipeline_id ?? contextPipelineId ?? "").trim();
   const components = normalizeAiComponents(params.components);
@@ -1299,7 +1299,7 @@ async function toolAddPipelineComponents(
   });
 
   const afterNodes = applied.canvas.nodes as Node[];
-  const shrinkErr = genieGraphShrinkError(beforeNodes, afterNodes, options?.genieMode ?? false);
+  const shrinkErr = pulseCanvasGraphShrinkError(beforeNodes, afterNodes, options?.pulseCanvasMode ?? false);
   if (shrinkErr) {
     return { success: false, error: shrinkErr, skipped_components: applied.skippedComponents };
   }
@@ -1338,7 +1338,7 @@ async function toolAddPipelineComponents(
   return {
     success: true,
     next_action:
-      additiveOnly && (options?.genieMode ?? false) ? "patch_canvas_local" : "patch_pipeline",
+      additiveOnly && (options?.pulseCanvasMode ?? false) ? "patch_canvas_local" : "patch_pipeline",
     pipeline_id: pipelineId,
     patch_payload: { canvas: applied.canvas } satisfies PatchPipelinePayload,
     components_added: applied.extracted.components.map((c) => c.id),
@@ -1589,11 +1589,11 @@ export async function POST(request: Request) {
 When the user asks to add checks, sensors, or transforms, call **add_pipeline_components** (omit pipeline_id — context is set).
 When they ask to connect steps, wire join→filter, or add dbt after load, call **edit_pipeline_canvas** with actions[].
 When they describe a brand-new pipeline instead, use **generate_pipeline** without pipeline_id.`;
-      const inGenieBar = Boolean(canvasSnapshot?.nodes?.length);
-      if (inGenieBar) {
+      const inPulseCanvasBar = Boolean(canvasSnapshot?.nodes?.length);
+      if (inPulseCanvasBar) {
         pipelineContextBlock += `
 
-## Lakeflow Genie (designer bar — primary use cases)
+## Pulse AI (canvas designer bar — primary use cases)
 1. **Add a step** — "add a filter", "dedupe after bronze", "aggregate by day":
    - Call **add_pipeline_components** with one \`component_id\` (prefer native: filter_rows, dedupe_rows, group_aggregate, data_cleansing, **alter_row** (CDC alter row / ADF semantics), select_columns, join_tables, etc.)
    - OR **edit_pipeline_canvas** with \`add_component\` + \`after\` set to the upstream node id/label
@@ -1601,7 +1601,7 @@ When they describe a brand-new pipeline instead, use **generate_pipeline** witho
 2. **Replace a step** — "swap data cleansing for alter row", "use filter_rows instead":
    - **search_components** for the target id (e.g. \`alter_row\` for "alter rows" / CDC tagging)
    - **get_component_details** with \`include_schema=true\` for required \`config\` fields (table, conditions, etc.)
-   - **edit_pipeline_canvas** with \`replace_component\` + \`config\` on the node id/label — keeps position and wires; do **not** remove+add (removal is blocked in Genie mode)
+   - **edit_pipeline_canvas** with \`replace_component\` + \`config\` on the node id/label — keeps position and wires; do **not** remove+add (removal is blocked in Pulse AI canvas mode)
    - Canvas updates immediately in the designer; user clicks **Save to pipeline** to persist
 3. **Edit a step's settings** — rename columns, change filter, etc.:
    - **edit_pipeline_canvas** with \`update_node_config\` on the target node id
@@ -1612,7 +1612,7 @@ Do **NOT** call generate_pipeline, build_lake_pipeline, or build_transform_steps
       if (canvasNodeContext?.nodeId) {
         pipelineContextBlock += `
 
-## Genie anchor step (selected on canvas)
+## Pulse AI anchor step (selected on canvas)
 - Node ID: ${canvasNodeContext.nodeId}
 - Component: ${canvasNodeContext.componentId ?? "unknown"}
 - Label: ${canvasNodeContext.label ?? "—"}
@@ -1803,7 +1803,7 @@ Use this as the source of truth for graph edits — not the last saved pipeline 
             components: inp.components,
           }, {
             canvasSnapshot,
-            genieMode: Boolean(canvasSnapshot?.nodes?.length),
+            pulseCanvasMode: Boolean(canvasSnapshot?.nodes?.length),
           });
         } else if (name === "edit_pipeline_canvas") {
           result = await toolEditPipelineCanvas(user.id, pipelineId, {
@@ -1811,8 +1811,8 @@ Use this as the source of truth for graph edits — not the last saved pipeline 
             actions: inp.actions,
           }, {
             canvasSnapshot,
-            genieMode: Boolean(canvasSnapshot?.nodes?.length),
-            genieTargetNodeId: canvasNodeContext?.nodeId,
+            pulseCanvasMode: Boolean(canvasSnapshot?.nodes?.length),
+            pulseTargetNodeId: canvasNodeContext?.nodeId,
           });
         } else if (name === "build_transform_steps") {
           result = toolBuildTransformSteps({

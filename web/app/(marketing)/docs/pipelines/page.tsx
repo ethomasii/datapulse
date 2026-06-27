@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DocsProse } from "@/components/docs/docs-prose";
+import { getSourceCount } from "@/lib/marketing/connector-catalog";
+
+const sourceCount = getSourceCount();
 
 export const metadata: Metadata = {
   title: "Pipelines",
-  description: "Sources, destinations, tools, and exports in eltPulse.",
+  description:
+    "Visual ELT canvas, sources, destinations, generated dlt/Sling/dbt code, and GitOps declarations.",
 };
 
 export default function PipelinesDocsPage() {
@@ -13,103 +17,103 @@ export default function PipelinesDocsPage() {
       <h1>Pipelines</h1>
       <p>
         A <strong>pipeline</strong> is a named definition from a <strong>source type</strong> to a{" "}
-        <strong>destination type</strong>. eltPulse resolves the right sync engine automatically based on your source
-        and destination combination.
+        <strong>destination type</strong>. eltPulse resolves the sync engine automatically — <strong>dlt</strong> for
+        SaaS/API sources, <strong>Sling</strong> for database replication — and generates code you can run managed or
+        export to Git.
       </p>
 
-      <h2>Catalog</h2>
+      <h2>Connector catalog</h2>
       <p>
-        The builder exposes a broad catalog of sources and destinations. Generators are implemented incrementally: GitHub
-        and REST are structured in the UI; other sources use a generic template until parity with the original Python
-        builder lands.
+        The builder exposes {sourceCount}+ sources and major warehouse destinations. Tier-1 connectors (GitHub, HubSpot,
+        Salesforce, Stripe, Postgres, and more) ship with production codegen, credential forms, and{" "}
+        <Link href="/docs/run-slices">run slice</Link> wiring where applicable. Browse the public{" "}
+        <Link href="/connectors">connector catalog</Link> for trust tier, sync mode, and scenario recipes.
       </p>
 
       <h2>Visual canvas</h2>
       <p>
-        The <Link href="/builder?view=canvas">canvas</Link> edits the same pipeline as the form builder — including{" "}
-        <code>sourceConfiguration.canvas</code> for the node graph and transform inspector fields. Transform nodes sync{" "}
-        <code>dlt_dbt</code> / <code>post_transform</code> back into source config on save. The canvas transform
-        inspector includes the same <strong>workspace dbt project picker</strong> as the builder.
+        The <Link href="/builder?view=canvas">visual canvas</Link> is eltPulse&apos;s Lakeflow-style designer — the
+        same pipeline as the form builder, optimized for graph editing:
       </p>
+      <ul>
+        <li>
+          <strong>Node graph</strong> — stored in <code>sourceConfiguration.canvas</code>; source, transform, and
+          destination nodes with typed edges.
+        </li>
+        <li>
+          <strong>Transform inspector</strong> — dbt, <code>dlt_dbt</code>, and <code>post_transform</code> sync back
+          into source config on save; includes the workspace dbt project picker.
+        </li>
+        <li>
+          <strong>Pulse AI integration</strong> — AI can add nodes, wire edges, and patch configs from chat (see{" "}
+          <Link href="/docs/ai-builder">Pulse AI</Link>).
+        </li>
+        <li>
+          <strong>Any warehouse</strong> — Snowflake, BigQuery, Redshift, MotherDuck, Postgres, DuckDB, Databricks as
+          destinations on one graph.
+        </li>
+      </ul>
 
-      <h2>AI Builder</h2>
+      <h2>Form builder &amp; Quick start</h2>
       <p>
-        Describe a pipeline in natural language from the builder create tab or floating widget. The AI generates{" "}
-        <code>savePayload</code> compatible with <code>POST /api/elt/pipelines</code>, including optional post-load dbt
-        and <code>dbtProjectId</code>. See <Link href="/docs/ai-builder">AI Builder</Link>.
+        The tabbed builder supports catalog wizard, manual JSON, and Pulse AI create flows.{" "}
+        <Link href="/quick-start">Quick start</Link> is the fastest path: destination → source → credentials → run on
+        managed workers.
       </p>
 
       <h2>Artifacts</h2>
       <ul>
         <li>
-          <strong>Sync runner</strong> — the executable artifact eltPulse generates for your pipeline.
+          <strong>Sync runner</strong> — generated Python (dlt) or <code>replication.yaml</code> (Sling).
         </li>
         <li>
-          <strong>config.yaml</strong> — Serialized source/destination configuration for reproducibility. Link saved{" "}
-          <Link href="/connections">connections</Link> from the builder (stored as <code>sourceConnectionId</code> /{" "}
-          <code>destinationConnectionId</code>); generated YAML may include resolved <code>source_connection</code> /{" "}
-          <code>destination_connection</code> names when those links exist (see <Link href="/docs/concepts">Concepts</Link>
-          ).
+          <strong>config.yaml</strong> — serialized source/destination configuration. Link saved{" "}
+          <Link href="/connections">connections</Link> (<code>sourceConnectionId</code> /{" "}
+          <code>destinationConnectionId</code>); generated YAML may include resolved connection names.
         </li>
         <li>
-          <strong>eltpulse_workspace.yaml</strong> — Workspace metadata (scheduling, retries, code location) for your
-          repo layout. See <Link href="/docs/orchestration">Orchestration</Link> for how schedules relate to pipeline
-          definitions.
+          <strong>eltpulse_workspace.yaml</strong> — scheduling, retries, and code location metadata. See{" "}
+          <Link href="/docs/orchestration">Orchestration</Link>.
         </li>
       </ul>
 
       <h2>Declarative YAML (GitOps)</h2>
       <p>
-        You can define or update a pipeline without the visual builder by posting a **YAML declaration** to{" "}
-        <code>POST /api/elt/pipelines/declaration</code> (same session auth as the rest of the app). The document must
-        include <code>eltpulse_pipeline_declaration: 1</code> and the same fields as{" "}
-        <code>POST /api/elt/pipelines</code> (e.g. <code>name</code>, <code>sourceType</code>,{" "}
-        <code>destinationType</code>, <code>sourceConfiguration</code>, optional <code>dbt</code> transform config,{" "}
-        <code>dbtProjectId</code>, <code>_partitionConfig</code>, execution settings).
+        Define or update pipelines without the UI via <code>POST /api/elt/pipelines/declaration</code>. The document
+        must include <code>eltpulse_pipeline_declaration: 1</code> and the same fields as{" "}
+        <code>POST /api/elt/pipelines</code> (name, source/destination types, <code>sourceConfiguration</code>, optional
+        dbt, <code>dbtProjectId</code>, <code>_partitionConfig</code>, execution settings).
       </p>
       <ul>
         <li>
-          <strong>Upsert:</strong> set <code>upsert: true</code> in YAML, or call with query{" "}
-          <code>?mode=upsert</code>, to create or **replace** the pipeline with the same <code>name</code> and resolved{" "}
-          <code>tool</code> (idempotent applies from GitHub Actions).
+          <strong>Upsert:</strong> <code>upsert: true</code> or <code>?mode=upsert</code> for idempotent GitHub Actions
+          applies.
         </li>
         <li>
-          <strong>Content-Type:</strong> send raw YAML as <code>application/yaml</code>, or JSON{" "}
-          <code>{`{ "declaration": "..." }`}</code> if your client prefers JSON wrapping.
+          <strong>Content-Type:</strong> raw YAML or JSON <code>{`{ "declaration": "..." }`}</code>.
         </li>
         <li>
-          Example file in the product repo: <code className="text-sm">examples/eltpulse-pipeline.declaration.example.yaml</code>.
+          Example: <code className="text-sm">examples/eltpulse-pipeline.declaration.example.yaml</code>.
         </li>
       </ul>
+
+      <h2>Runs on (execution targeting)</h2>
       <p>
-        After the control plane stores the definition, your **gateway** polls <code>GET /api/agent/runs</code> and
-        receives <code>pipelineCode</code>, <code>configYaml</code>, and <code>workspaceYaml</code> — the same as
-        pipelines created in the UI.
+        Each pipeline has <strong>Runs on</strong>: Inherit (account default), eltPulse-managed, or Customer gateway.
+        Set a <strong>default gateway</strong> token to route new runs to a named connector. Resolution order and
+        monitor behavior are documented in <Link href="/docs/concepts">Concepts</Link>; gateway deployment in{" "}
+        <Link href="/docs/gateway">Gateway</Link>.
       </p>
 
       <h2>Edit and delete</h2>
       <p>
-        Use <strong>Edit</strong> on a row to change definition; we regenerate all artifacts on save. Delete removes the
-        row from your workspace storage.
-      </p>
-
-      <h2>Where runs execute (Runs on)</h2>
-      <p>
-        In the builder, each pipeline has <strong>Runs on</strong>: <strong>Inherit</strong> (follow your account
-        execution plane), <strong>eltPulse-managed</strong>, or <strong>Customer gateway</strong>. You can also set a{" "}
-        <strong>default gateway</strong> (named token) so new runs route to that connector unless a run is created with an
-        explicit override.
-      </p>
-      <p>
-        For the full resolution order (per-run override → pipeline default → org default → account default →
-        single-token auto-pin) and how monitors use the same ideas, read{" "}
-        <Link href="/docs/concepts">Concepts</Link>. For deploying the process that polls runs, see{" "}
-        <Link href="/docs/gateway">Gateway</Link>.
+        <strong>Edit</strong> regenerates all artifacts on save (and may auto-push to GitHub). Delete removes the
+        pipeline from workspace storage.
       </p>
 
       <p>
-        <Link href="/builder">Open Pipelines</Link> · <Link href="/docs/concepts">Concepts</Link> ·{" "}
-        <Link href="/docs/repositories">Repositories layout</Link>
+        <Link href="/builder">Open Pipelines</Link> · <Link href="/builder?view=canvas">Open canvas</Link> ·{" "}
+        <Link href="/docs/concepts">Concepts</Link> · <Link href="/docs/repositories">Repositories</Link>
       </p>
     </DocsProse>
   );

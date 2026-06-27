@@ -34,8 +34,13 @@ const FAQ = [
     href: "/assets",
   },
   {
+    q: "How do run slices and backfills work?",
+    a: "Configure partition columns on Run slices — slice values pass into generated dlt/Sling code as partition_key. See the docs for tier-1 connector coverage.",
+    href: "/docs/run-slices",
+  },
+  {
     q: "Where are connectors documented?",
-    a: "Public docs cover getting started, pipelines, orchestration, and security. The Source Registry lists 111+ connectors.",
+    a: "Public docs cover canvas, Pulse AI, run slices, orchestration, and security. The connector catalog lists 111+ sources with trust tiers.",
     href: "/docs",
   },
 ];
@@ -55,7 +60,8 @@ export default function HelpPage() {
             { href: "/quick-start", icon: Zap, title: "Quick start", desc: "First pipeline in 3 steps" },
             { href: "/assets", icon: Layers, title: "Workspace assets", desc: "Data map from pipeline config" },
             { href: "/docs/getting-started", icon: Rocket, title: "Getting started", desc: "Full setup guide" },
-            { href: "/docs/pipelines", icon: Layers, title: "Pipelines", desc: "Builder, codegen, canvas" },
+            { href: "/docs/pipelines", icon: Layers, title: "Pipelines & canvas", desc: "Visual designer, codegen, Pulse AI" },
+            { href: "/docs/run-slices", icon: Zap, title: "Run slices", desc: "Backfills and incremental windows" },
             { href: "/docs/runs", icon: Play, title: "Runs", desc: "Telemetry and webhooks" },
           ].map(({ href, icon: Icon, title, desc }) => (
             <li key={href}>

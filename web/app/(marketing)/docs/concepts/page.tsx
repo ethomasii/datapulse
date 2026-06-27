@@ -9,7 +9,7 @@ import {
 export const metadata: Metadata = {
   title: "Concepts",
   description:
-    "How pipelines, runs, connections, monitors, and gateways relate — and how to route work to a specific gateway.",
+    "Visual ELT canvas, pipelines, runs, run slices, connections, monitors, and gateway targeting.",
 };
 
 export default function ConceptsDocsPage() {

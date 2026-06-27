@@ -48,11 +48,11 @@ export default function DbtDocsPage() {
         </li>
       </ol>
 
-      <h2>AI Builder</h2>
+      <h2>Pulse AI</h2>
       <p>
-        The <Link href="/docs/ai-builder">AI Builder</Link> can generate EL+T pipelines with{" "}
+        <Link href="/docs/ai-builder">Pulse AI</Link> can generate EL+T pipelines with{" "}
         <code>post_transform_type=dbt</code>, list existing workspace projects, and set <code>dbtProjectId</code> on the
-        save payload. See <Link href="/docs/ai-builder">AI Builder docs</Link>.
+        save payload. See <Link href="/docs/ai-builder">Pulse AI docs</Link>.
       </p>
 
       <h2>Configuration shape</h2>
@@ -103,7 +103,7 @@ export default function DbtDocsPage() {
 
       <p>
         <Link href="/catalog/dbt">dbt projects (app)</Link> · <Link href="/docs/pipelines">Pipelines</Link> ·{" "}
-        <Link href="/docs/ai-builder">AI Builder</Link>
+        <Link href="/docs/ai-builder">Pulse AI</Link>
       </p>
     </DocsProse>
   );

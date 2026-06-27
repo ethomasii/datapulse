@@ -4,7 +4,7 @@ import { DocsProse } from "@/components/docs/docs-prose";
 
 export const metadata: Metadata = {
   title: "Integrations",
-  description: "GitHub, connectors, and environment configuration.",
+  description: "GitHub, webhooks, MCP servers, ServicePulse, workspace API keys, and external systems.",
 };
 
 export default function IntegrationsDocsPage() {
@@ -12,45 +12,59 @@ export default function IntegrationsDocsPage() {
     <DocsProse>
       <h1>Integrations</h1>
       <p>
-        The <Link href="/integrations">Integrations</Link> area covers how eltPulse connects to external systems on
-        your behalf. For how <Link href="/connections">Connections</Link> relate to pipelines, monitors, and gateways, see{" "}
-        <Link href="/docs/concepts">Concepts</Link>.
+        The <Link href="/integrations">Integrations</Link> area and related app pages cover how eltPulse connects to
+        external systems. For how <Link href="/connections">Connections</Link> relate to pipelines, monitors, and
+        gateways, see <Link href="/docs/concepts">Concepts</Link>.
       </p>
 
-      <h2>Managed GitHub (default)</h2>
+      <h2>GitHub</h2>
       <p>
-        In the standard product, <strong>customers do not sign in to GitHub</strong>. eltPulse provisions repositories
-        under <strong>your</strong> GitHub organization using a GitHub App or machine user. Service credentials live
-        only on the server.
+        <strong>Managed GitHub (default)</strong> — in the standard product, customers do not sign in to GitHub
+        directly. eltPulse provisions repositories under your organization using a GitHub App or machine user.
+      </p>
+      <p>
+        <strong>Bring your own GitHub</strong> — operators can enable <code>CUSTOMER_GITHUB_OAUTH_ENABLED=true</code>{" "}
+        so users connect personal or org accounts. Tokens are encrypted at rest. Off by default.
+      </p>
+      <p>
+        Pipeline YAML auto-pushes on save when connected — see <Link href="/docs/repositories">Repositories</Link>.
       </p>
 
-      <h2>Optional: bring your own GitHub</h2>
+      <h2>Webhooks</h2>
       <p>
-        For enterprise or testing, operators can enable <code>CUSTOMER_GITHUB_OAUTH_ENABLED=true</code> so users may
-        connect their own GitHub account. Tokens are encrypted at rest. This path is off by default.
+        <Link href="/webhooks">Webhooks</Link> support outgoing run notifications (global or per-pipeline) and incoming
+        triggers via a workspace token. Full contract: <Link href="/docs/webhooks">Webhooks (docs)</Link>.
+      </p>
+
+      <h2>MCP servers</h2>
+      <p>
+        Register <Link href="/mcp-servers">MCP servers</Link> to extend Pulse AI with custom tools — HTTP or stdio
+        transports, encrypted secrets, and a template catalog for common providers. Pulse AI invokes registered tools during
+        AI-assisted pipeline editing.
+      </p>
+
+      <h2>Workspace API keys</h2>
+      <p>
+        Create Bearer tokens under <Link href="/account/developers">Account → Developers</Link> for automation — same
+        REST endpoints as the browser session (pipelines, runs, connections, webhooks). Audit log entries record key
+        usage where enabled.
       </p>
 
       <h2>ServicePulse</h2>
       <p>
-        You use{" "}
         <a href="https://servicepulse.dev" target="_blank" rel="noreferrer">
           ServicePulse
         </a>{" "}
-        by opening that site directly; eltPulse does not host or proxy it. The in-app{" "}
-        <Link href="/integrations">Integrations</Link> page includes a shortcut to the same URL. An optional “with
-        context” link passes your deployment’s public base as <code>eltpulse_origin</code> for future cross-product
-        setup (no credentials). Pipeline <Link href="/runs">run webhooks</Link> may include{" "}
-        <code>source: &quot;eltpulse&quot;</code> so a receiver like ServicePulse can identify the emitter. Set{" "}
+        is a separate product for service health and incident response. eltPulse includes a shortcut on Integrations;
+        optional <code>eltpulse_origin</code> query param passes your deployment base URL for cross-product setup. Run
+        webhooks may include <code>source: &quot;eltpulse&quot;</code> for receiver filtering. Set{" "}
         <code>NEXT_PUBLIC_SERVICEPULSE_URL</code> if ServicePulse is not at the default host.
       </p>
 
-      <h2>Future connectors</h2>
+      <h2>Stripe &amp; Clerk</h2>
       <p>
-        Slack, warehouse SSO, and notification channels will appear here as the product matures — similar to how{" "}
-        <a href="https://servicepulse.dev/docs#integrations" target="_blank" rel="noreferrer">
-          ServicePulse
-        </a>{" "}
-        documents integrations by surface area.
+        Billing uses Stripe (Team/Pro plans); authentication uses Clerk. Webhook endpoints for those providers are
+        server-side only — not user-configurable.
       </p>
 
       <p>

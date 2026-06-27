@@ -21,17 +21,18 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   title: {
-    default: "eltPulse — ELT pipelines without the friction",
+    default: "eltPulse — Visual ELT for any warehouse",
     template: "%s | eltPulse",
   },
   description:
-    "Design and ship data pipelines with a git-native control plane. eltPulse handles orchestration, metadata, and observability — run on our infrastructure or yours.",
+    "Lakeflow-style visual canvas and Pulse AI for EL+T — on Snowflake, BigQuery, MotherDuck, and more. Fivetran-grade connectors, run slices, Git-native code export.",
   openGraph: {
     type: "website",
     locale: "en_US",
     siteName: "eltPulse",
-    title: "eltPulse",
-    description: "ELT builder and control plane for modern data teams.",
+    title: "eltPulse — Visual ELT for any warehouse",
+    description:
+      "Visual pipeline canvas, Pulse AI, and 111+ connectors. The Lakeflow designer experience without Databricks lock-in.",
   },
 };
 

@@ -104,7 +104,7 @@ export function validatePipelineCanvasGraph(
 
   if (transformOnly && dests.length > 0) {
     if (components.length === 0 && transforms.length === 0 && filtered.length === 0) {
-      // Empty canvas with warehouse anchor only — ok until user adds steps via starter/Genie.
+      // Empty canvas with warehouse anchor only — ok until user adds steps via starter/Pulse AI.
     } else if (filtered.length > 0) {
       assertReachableFromRoots(
         nodes,

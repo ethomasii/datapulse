@@ -126,7 +126,7 @@ export default function SourcesPage() {
             and incremental loading built in. Click any source to open the pipeline builder pre-configured for it,
             or use the{" "}
             <span className="inline-flex items-center gap-1 font-medium text-teal-700 dark:text-teal-400">
-              <Sparkles className="h-3.5 w-3.5" /> AI Builder
+              <Sparkles className="h-3.5 w-3.5" /> Pulse AI
             </span>{" "}
             to describe what you want in plain English.
           </>

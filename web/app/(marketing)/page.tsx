@@ -6,46 +6,55 @@ import {
   GitBranch,
   Layers,
   LineChart,
+  PenLine,
   Shield,
   Sparkles,
   Workflow,
   Zap,
 } from "lucide-react";
 import { ConnectorIcon } from "@/components/marketing/connector-icon";
-import { ProductPreview } from "@/components/marketing/product-preview";
+import { ProductShowcase } from "@/components/marketing/product-showcase";
 import { getSourceCount } from "@/lib/marketing/connector-catalog";
 
 const CONNECTOR_CHIPS: { label: string; slug: string }[] = [
   { label: "Snowflake", slug: "snowflake" },
   { label: "BigQuery", slug: "bigquery" },
+  { label: "MotherDuck", slug: "motherduck" },
   { label: "Postgres", slug: "postgres" },
-  { label: "DuckDB", slug: "duckdb" },
   { label: "GitHub", slug: "github" },
   { label: "Stripe", slug: "stripe_analytics" },
   { label: "Salesforce", slug: "salesforce" },
   { label: "HubSpot", slug: "hubspot" },
   { label: "S3", slug: "s3" },
-  { label: "Kafka", slug: "kafka" },
+  { label: "Databricks", slug: "databricks" },
 ];
+
+const WAREHOUSE_CHIPS = ["Snowflake", "BigQuery", "Redshift", "MotherDuck", "Postgres", "DuckDB", "Databricks"];
 
 const features = [
   {
-    icon: Layers,
-    title: "Any source, any destination",
+    icon: PenLine,
+    title: "Visual ELT canvas",
     description:
-      "Pick from the connector catalog. eltPulse scaffolds production-ready sync code for your stack.",
+      "Lakeflow-style designer for every warehouse — drag sources, transforms, and destinations. Export real dlt, Sling, and dbt code.",
+  },
+  {
+    icon: Bot,
+    title: "Pulse AI",
+    description:
+      "Describe pipelines in plain English. Pulse AI adds steps, patches configs, and wires the graph — warehouse-agnostic, tied to real codegen.",
+  },
+  {
+    icon: Layers,
+    title: "111+ connectors",
+    description:
+      "Fivetran-competitive catalog with run slices, managed workers, and honest incremental wiring — you own the generated code.",
   },
   {
     icon: Zap,
     title: "Minutes to first sync",
     description:
-      "Connect credentials, pick a source, hit Run. Managed execution is the default — no Docker or gateway setup required.",
-  },
-  {
-    icon: Bot,
-    title: "AI-assisted pipelines",
-    description:
-      "Describe what you need in plain English. The builder scaffolds source config, tests, and workspace YAML for you.",
+      "Quick start, managed execution by default, partition backfills for day/key slices — no Airflow boilerplate.",
   },
   {
     icon: LineChart,
@@ -65,12 +74,18 @@ const features = [
     description:
       "Run on eltPulse-managed workers or deploy a gateway in your VPC. Enterprise keeps data on-prem; we only see metadata.",
   },
+  {
+    icon: Workflow,
+    title: "EL + T in one plane",
+    description:
+      "Extract and load with dlt & Sling, transform with dbt and native components — orchestration-ready from day one.",
+  },
 ];
 
 const testimonials = [
   {
     quote:
-      "We went from zero to a Stripe → Snowflake pipeline in under ten minutes. No Airflow DAG, no custom Python boilerplate.",
+      "We wanted Lakeflow's visual designer without betting the farm on Databricks. eltPulse gives us the canvas and Pulse AI on Snowflake.",
     name: "Alex Kim",
     role: "Data Engineer @ Series B startup",
   },
@@ -122,49 +137,110 @@ export default function HomePage() {
   const sourceCount = getSourceCount();
   return (
     <div>
-      {/* Hero — two column with product preview */}
+      {/* Hero */}
       <section className="border-b border-slate-200 bg-gradient-to-b from-white via-slate-50/50 to-slate-50 px-4 py-16 dark:border-slate-800 dark:from-slate-950 dark:via-slate-900/50 dark:to-slate-900 sm:px-6 sm:py-20">
-        <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2 lg:gap-16">
-          <div className="text-center lg:text-left">
-            <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-200">
-              <Sparkles className="h-3.5 w-3.5" aria-hidden />
-              Now with Quick start — first sync in minutes
-            </p>
-            <h1 className="text-balance text-4xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-5xl lg:text-[2.75rem] lg:leading-tight">
-              ELT pipelines without the friction
-            </h1>
-            <p className="mt-6 text-lg text-slate-600 dark:text-slate-300">
-              As easy as <span className="font-medium text-slate-800 dark:text-slate-200">Fivetran</span>, as flexible
-              as owning your own pipelines. Design, run, and observe data movement — you own the code, we handle
-              orchestration.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-4 lg:justify-start">
+        <div className="mx-auto max-w-6xl text-center lg:text-left">
+          <div className="lg:grid lg:grid-cols-2 lg:items-center lg:gap-16">
+            <div>
+              <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-medium text-violet-800 dark:border-violet-900 dark:bg-violet-950 dark:text-violet-200">
+                <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                Visual ELT for any warehouse — not just Databricks
+              </p>
+              <h1 className="text-balance text-4xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-5xl lg:text-[2.75rem] lg:leading-tight">
+                The Lakeflow designer for{" "}
+                <span className="text-sky-600 dark:text-sky-400">every</span> warehouse
+              </h1>
+              <p className="mt-6 text-lg text-slate-600 dark:text-slate-300">
+                As easy as <span className="font-medium text-slate-800 dark:text-slate-200">Fivetran</span>, as flexible
+                as owning your pipelines. Visual canvas, Pulse AI, run slices, and{" "}
+                {sourceCount}+ connectors — on Snowflake, BigQuery, MotherDuck, and more.
+              </p>
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-4 lg:justify-start">
+                <Link
+                  href="/sign-up"
+                  className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/25 hover:bg-sky-500"
+                >
+                  Start free — no card required
+                  <ArrowRight className="h-4 w-4" aria-hidden />
+                </Link>
+                <Link
+                  href="/features"
+                  className="text-sm font-medium text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline dark:text-slate-300 dark:hover:text-white"
+                >
+                  See the canvas & Pulse AI
+                </Link>
+              </div>
+              <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+                <Link href="/connectors" className="hover:text-sky-600 dark:hover:text-sky-400">
+                  {sourceCount}+ connectors
+                </Link>
+                {" · "}
+                <Link href="/compare/vs-databricks-lakeflow" className="hover:text-sky-600 dark:hover:text-sky-400">
+                  vs Lakeflow
+                </Link>
+                {" · Managed execution · Git-native export"}
+              </p>
+            </div>
+            <div className="mt-12 lg:mt-0">
+              <ProductShowcase />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Lakeflow positioning */}
+      <section className="border-b border-slate-200 bg-slate-900 px-4 py-14 text-white dark:border-slate-800 sm:px-6">
+        <div className="mx-auto max-w-6xl">
+          <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-sky-400">Why teams switch</p>
+              <h2 className="mt-2 text-2xl font-bold sm:text-3xl">
+                Lakeflow’s UX. Your warehouse. Your code.
+              </h2>
+              <p className="mt-4 text-slate-300">
+                Databricks Lakeflow Designer is compelling — if your entire stack lives on Databricks.
+                eltPulse delivers the same visual EL+T experience with{" "}
+                <strong className="font-semibold text-white">warehouse choice</strong>,{" "}
+                <strong className="font-semibold text-white">open engines</strong> (dlt, Sling, dbt), and{" "}
+                <strong className="font-semibold text-white">Git export</strong> so you never lose ownership.
+              </p>
+              <ul className="mt-6 space-y-2 text-sm text-slate-300">
+                {[
+                  "Visual canvas with source → transform → load nodes",
+                  "Pulse AI that edits the graph and codegen",
+                  "Run slices for partition backfills (Fivetran-competitive)",
+                  "Snowflake, BigQuery, Postgres, MotherDuck — not DBX-only",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" aria-hidden />
+                    {item}
+                  </li>
+                ))}
+              </ul>
               <Link
-                href="/sign-up"
-                className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/25 hover:bg-sky-500"
+                href="/compare/vs-databricks-lakeflow"
+                className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-sky-400 hover:text-sky-300"
               >
-                Start free — no card required
-                <ArrowRight className="h-4 w-4" aria-hidden />
-              </Link>
-              <Link
-                href="/docs/getting-started"
-                className="text-sm font-medium text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline dark:text-slate-300 dark:hover:text-white"
-              >
-                Read the docs
+                Full Lakeflow comparison <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
-            <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
-              <Link href="/connectors" className="hover:text-sky-600 dark:hover:text-sky-400">
-                {sourceCount}+ connectors
-              </Link>
-              {" · "}
-              <Link href="/scenarios" className="hover:text-sky-600 dark:hover:text-sky-400">
-                Pipeline scenarios
-              </Link>
-              {" · Managed execution · Git-native export"}
-            </p>
+            <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Works with</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {WAREHOUSE_CHIPS.map((w) => (
+                  <span
+                    key={w}
+                    className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm font-medium text-slate-200"
+                  >
+                    {w}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-6 text-xs text-slate-500">
+                Same designer whether you land in a cloud warehouse, lakehouse, or embedded DuckDB/MotherDuck starter.
+              </p>
+            </div>
           </div>
-          <ProductPreview />
         </div>
       </section>
 
@@ -191,23 +267,18 @@ export default function HomePage() {
             +{Math.max(0, sourceCount - CONNECTOR_CHIPS.length)} more
           </Link>
         </div>
-        <p className="mt-4 text-center text-sm">
-          <Link href="/scenarios" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-            See pipeline scenarios →
-          </Link>
-        </p>
       </section>
 
       {/* Problem statement */}
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">
-            Stop duct-taping your data stack
+            Stop choosing between lock-in and DIY
           </h2>
           <p className="mt-4 text-slate-600 dark:text-slate-300">
-            Fivetran is push-button but you don&apos;t own the logic. DIY open-source stacks are powerful but you still
-            wire up runners, secrets, and observability yourself. eltPulse gives you both: one-click scaffolding and
-            full code export.
+            Fivetran is push-button but you don&apos;t own the logic. Lakeflow is visual but Databricks-only. DIY
+            open-source stacks are powerful but you wire runners, secrets, and observability yourself. eltPulse is the
+            middle path: canvas + Pulse AI + code export + managed runs.
           </p>
         </div>
       </section>
@@ -218,7 +289,7 @@ export default function HomePage() {
           <h2 className="text-center text-2xl font-bold text-slate-900 dark:text-white">
             Built for data engineers who ship
           </h2>
-          <ul className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {features.map(({ icon: Icon, title, description }) => (
               <li
                 key={title}
@@ -240,6 +311,7 @@ export default function HomePage() {
           </p>
         </div>
       </section>
+
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <h2 className="text-center text-2xl font-bold text-slate-900 dark:text-white">Three steps to flowing data</h2>
         <ol className="mt-12 grid gap-8 sm:grid-cols-3">
@@ -251,13 +323,13 @@ export default function HomePage() {
             },
             {
               step: "2",
-              title: "Build",
-              desc: "Pick a connector from the catalog or ask the AI assistant. Review and export generated pipeline code.",
+              title: "Design",
+              desc: "Use the visual canvas or ask Pulse AI. Review generated dlt, Sling, and dbt artifacts.",
             },
             {
               step: "3",
               title: "Run",
-              desc: "Trigger a sync from the builder or schedule it. Watch live telemetry in Runs.",
+              desc: "Trigger a sync or schedule it. Backfill with run slices. Watch live telemetry in Runs.",
             },
           ].map(({ step, title, desc }) => (
             <li key={step} className="text-center">
@@ -354,11 +426,11 @@ export default function HomePage() {
                   : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
               }`}
             >
-              {tier.popular && (
+              {tier.popular ? (
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-sky-600 px-3 py-0.5 text-xs font-semibold text-white">
                   Most popular
                 </span>
-              )}
+              ) : null}
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{tier.name}</h3>
               <div className="mt-2 flex items-baseline gap-1">
                 <span className="text-2xl font-bold text-slate-900 dark:text-white">{tier.price}</span>
@@ -384,7 +456,7 @@ export default function HomePage() {
           </Link>
           {" · "}
           <Link href="/compare" className="font-medium text-sky-600 hover:underline dark:text-sky-400">
-            Compare vs Fivetran & Airbyte →
+            Compare vs Fivetran & Lakeflow →
           </Link>
         </p>
       </section>
@@ -394,7 +466,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-2xl font-bold text-white sm:text-3xl">Your first pipeline is minutes away.</h2>
           <p className="mt-4 text-sky-100">
-            Join data teams using eltPulse to move faster without giving up code ownership.
+            Open the canvas, ask Pulse AI, or use Quick start — join teams shipping EL+T without warehouse lock-in.
           </p>
           <Link
             href="/sign-up"

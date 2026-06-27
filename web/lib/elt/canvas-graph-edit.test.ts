@@ -73,7 +73,7 @@ describe("canvas-graph-edit", () => {
     expect(transform).toBeDefined();
   });
 
-  it("appends Genie-added components after the pipeline tail with layout spacing", () => {
+  it("appends Pulse AI-added components after the pipeline tail with layout spacing", () => {
     const chainConfig = {
       canvas: {
         v: 1,
@@ -118,7 +118,7 @@ describe("canvas-graph-edit", () => {
     expect(edgePairs).toContain(`c1->${genie!.id}`);
   });
 
-  it("replaces a component in place for Genie swap requests", () => {
+  it("replaces a component in place for Pulse AI swap requests", () => {
     const r = applyCanvasGraphEdits(
       {
         canvas: {

@@ -4,7 +4,7 @@ import { DocsProse } from "@/components/docs/docs-prose";
 
 export const metadata: Metadata = {
   title: "Repositories",
-  description: "eltpulse/ repository layout and managed Git.",
+  description: "eltpulse/ repository layout, GitHub sync, and auto-push on pipeline save.",
 };
 
 export default function RepositoriesDocsPage() {
@@ -12,34 +12,59 @@ export default function RepositoriesDocsPage() {
     <DocsProse>
       <h1>Repositories</h1>
       <p>
-        Each customer workspace will map to a <strong>private repository</strong> under your GitHub organization. The
-        on-disk layout uses a dedicated top-level folder so it stays distinct from arbitrary application code:
+        eltPulse is <strong>Git-native</strong>: pipeline definitions generate real artifacts you can copy, review in
+        PRs, or sync to a connected GitHub repository. Manage connections on{" "}
+        <Link href="/repos">Repositories</Link> in the app.
+      </p>
+
+      <h2>On-disk layout</h2>
+      <p>
+        Customer repos use a dedicated top-level folder so pipeline code stays distinct from application code:
       </p>
       <pre className="not-prose overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-100">
         {`repo/
-    eltpulse/
+  eltpulse/
     pipelines/
       my_pipeline/
-        pipeline.py          # or replication.yaml
+        pipeline.py          # or replication.yaml (Sling)
         config.yaml
-    eltpulse_workspace.yaml   # optional per-repo aggregate (future)`}
+    eltpulse_workspace.yaml   # optional per-repo aggregate`}
       </pre>
+
+      <h2>GitHub connection</h2>
+      <p>
+        Connect GitHub under Repositories — managed org provisioning (default) or optional BYO OAuth when enabled by
+        your operator. Set default <strong>owner</strong>, <strong>repository</strong>, and <strong>branch</strong> for
+        pushes.
+      </p>
+
+      <h2>Auto-push on save</h2>
+      <p>
+        When GitHub is connected, pipeline YAML declarations can <strong>auto-push on every save</strong> (Pro plan and
+        above). The push uses the same declarative format as{" "}
+        <code>POST /api/elt/pipelines/declaration</code> — idempotent for GitOps workflows. Disable with{" "}
+        <code>ELTPULSE_AUTO_GIT_PUSH=false</code> in server env if you prefer manual sync only.
+      </p>
+      <p>
+        Manual <strong>Sync all</strong> and per-pipeline push remain available on the Repositories page. Asset history
+        can surface recent GitHub commits for linked pipelines.
+      </p>
 
       <h2>Workspace manifest</h2>
       <p>
-        Generated <code>eltpulse_workspace.yaml</code> (stored alongside definitions in the app) describes scheduling
-        hints, retries, and a logical code location for automation — consumable by eltPulse or by an external
-        orchestrator (Airflow, Prefect, etc.) if you prefer to run triggers outside our control plane.
+        Generated <code>eltpulse_workspace.yaml</code> describes scheduling hints, retries, and a logical code location
+        — consumable by eltPulse cron or external orchestrators (Airflow, Prefect, GitHub Actions).
       </p>
 
-      <h2>Status</h2>
+      <h2>Manual export</h2>
       <p>
-        Automated commits from the app into managed repos are <strong>in development</strong>. Today, use{" "}
-        <strong>Code</strong> in the builder to copy files into the repo your runners use.
+        Without GitHub, open <strong>Code</strong> on any pipeline row to copy artifacts into whatever repo your runners
+        use. You always own the generated Python/YAML.
       </p>
 
       <p>
-        <Link href="/repos">Repositories (app preview)</Link> · <Link href="/docs/concepts">Concepts</Link>
+        <Link href="/repos">Repositories (app)</Link> · <Link href="/docs/pipelines">Pipelines</Link> ·{" "}
+        <Link href="/docs/integrations">Integrations</Link> · <Link href="/docs/security">Security</Link>
       </p>
     </DocsProse>
   );

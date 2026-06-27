@@ -18,7 +18,7 @@ export function isInPlaceCanvasPatch(
   return beforeNodes.every((n) => afterIds.has(n.id));
 }
 
-/** Genie designer: preview on canvas without server save (append or in-place edit). */
+/** Pulse AI canvas: preview on canvas without server save (append or in-place edit). */
 export function isLocalCanvasPreviewPatch(
   beforeNodes: { id: string }[],
   afterNodes: { id: string }[]

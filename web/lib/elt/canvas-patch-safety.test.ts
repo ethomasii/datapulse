@@ -37,7 +37,7 @@ describe("isInPlaceCanvasPatch", () => {
 describe("isLocalCanvasPreviewPatch", () => {
   const before = [{ id: "n1" }, { id: "n2" }];
 
-  it("allows Genie preview for append and in-place edits", () => {
+  it("allows Pulse AI preview for append and in-place edits", () => {
     expect(isLocalCanvasPreviewPatch(before, [...before, { id: "n3" }])).toBe(true);
     expect(isLocalCanvasPreviewPatch(before, before)).toBe(true);
     expect(isLocalCanvasPreviewPatch(before, [{ id: "n1" }, { id: "n9" }])).toBe(false);

@@ -57,10 +57,10 @@ type ManifestIndex = {
 
 const index = manifestIndex as ManifestIndex;
 
-/** Not canvas components — Dagster policy/metadata only; hidden from catalog and Genie. */
+/** Not canvas components — Dagster policy/metadata only; hidden from catalog and Pulse AI. */
 export const CATALOG_EXCLUDED_COMPONENT_IDS = new Set<string>(["freshness_check"]);
 
-/** Extra search phrases → component id (helps Genie match natural language). */
+/** Extra search phrases → component id (helps Pulse AI match natural language). */
 const COMPONENT_SEARCH_ALIASES: Record<string, string[]> = {
   alter_row: ["alter row", "alter rows", "alterrow", "cdc marker", "change type", "adf alter row"],
 };

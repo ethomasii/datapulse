@@ -6,29 +6,46 @@ import {
   Key,
   Layers,
   LineChart,
+  PenLine,
   Shield,
   Users,
   Workflow,
   Zap,
 } from "lucide-react";
 import type { Metadata } from "next";
-import { BuilderPreview } from "@/components/marketing/builder-preview";
+import { CanvasPreview } from "@/components/marketing/canvas-preview";
+import { PulseAiPreview } from "@/components/marketing/pulse-ai-preview";
 import { ProductPreview } from "@/components/marketing/product-preview";
 import { RunsPreview } from "@/components/marketing/runs-preview";
+import { PULSE_AI_NAME } from "@/lib/brand/pulse-ai";
 
 export const metadata: Metadata = {
   title: "Features",
   description:
-    "eltPulse features — visual pipeline builder, managed execution, observability, Git-native workflows, team workspaces, and a public API.",
+    "eltPulse features — visual ELT canvas, Pulse AI assistant, Lakeflow-style designer for any warehouse, managed execution, observability, and Git-native workflows.",
 };
 
 const FEATURES = [
   {
+    icon: PenLine,
+    title: "Visual ELT canvas",
+    description:
+      "Drag-and-drop pipeline designer — sources, native transforms, dbt, and any warehouse on one graph. The Lakeflow experience without Databricks lock-in.",
+    preview: "canvas" as const,
+  },
+  {
+    icon: Bot,
+    title: "Pulse AI",
+    description:
+      "Describe changes in plain English. Pulse AI patches the canvas graph, component configs, and generated pipeline code — then you review and save.",
+    preview: "pulse-ai" as const,
+  },
+  {
     icon: Layers,
     title: "111+ connectors",
     description:
-      "Snowflake, BigQuery, Postgres, Stripe, Salesforce, and more. Browse the catalog and pipeline scenarios — eltPulse scaffolds production-ready sync code.",
-    preview: "builder" as const,
+      "Snowflake, BigQuery, Postgres, Stripe, Salesforce, and more. Run slices, managed workers, and production-ready codegen.",
+    preview: "canvas" as const,
   },
   {
     icon: Zap,
@@ -45,18 +62,11 @@ const FEATURES = [
     preview: "runs" as const,
   },
   {
-    icon: Bot,
-    title: "AI-assisted builder",
-    description:
-      "Describe pipelines in plain English. Scaffold source config, tests, and workspace YAML — then edit in the visual canvas.",
-    preview: "builder" as const,
-  },
-  {
     icon: GitBranch,
     title: "Git-native artifacts",
     description:
       "Export pipeline projects to your repo. Pipeline YAML auto-pushes on save when GitHub is connected — review in PRs.",
-    preview: "builder" as const,
+    preview: "canvas" as const,
   },
   {
     icon: Users,
@@ -91,7 +101,7 @@ const FEATURES = [
 const CASE_STUDIES = [
   {
     quote:
-      "We replaced a brittle Airbyte + custom scripts setup with eltPulse in an afternoon. Managed runs meant we didn't provision workers on day one.",
+      "We wanted Lakeflow's canvas on Snowflake. eltPulse gave us the designer and Pulse AI without a Databricks migration.",
     role: "Data engineer",
     company: "Series B SaaS",
   },
@@ -109,9 +119,10 @@ const CASE_STUDIES = [
   },
 ];
 
-function FeaturePreview({ kind }: { kind: "quickstart" | "builder" | "runs" | null }) {
+function FeaturePreview({ kind }: { kind: "quickstart" | "canvas" | "pulse-ai" | "runs" | null }) {
   if (kind === "quickstart") return <ProductPreview />;
-  if (kind === "builder") return <BuilderPreview />;
+  if (kind === "canvas") return <CanvasPreview />;
+  if (kind === "pulse-ai") return <PulseAiPreview />;
   if (kind === "runs") return <RunsPreview />;
   return null;
 }
@@ -123,11 +134,11 @@ export default function FeaturesPage() {
         <div className="mx-auto max-w-6xl">
           <p className="text-sm font-semibold uppercase tracking-wide text-sky-600">Platform</p>
           <h1 className="mt-2 max-w-3xl text-4xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-5xl">
-            Everything you need to compete with Fivetran, Airbyte, and legacy managed ELT
+            Visual EL+T for any warehouse — canvas, {PULSE_AI_NAME}, and code you own
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-slate-600 dark:text-slate-400">
-            Visual builder, real execution paths, team collaboration, and transparent billing — built for data teams
-            who want control without running another self-hosted platform.
+            Lakeflow-style designer, Fivetran-grade connectors, and open engines (dlt, Sling, dbt) — one control plane
+            for teams who refuse to pick between ease and ownership.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
@@ -137,10 +148,10 @@ export default function FeaturesPage() {
               Start free <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
-              href="/compare"
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-900"
+              href="/compare/vs-databricks-lakeflow"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
             >
-              Compare vendors
+              vs Lakeflow
             </Link>
           </div>
         </div>
