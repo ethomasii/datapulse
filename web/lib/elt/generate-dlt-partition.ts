@@ -110,3 +110,58 @@ export function buildVerifiedPartitionBlock(spec: VerifiedSourceSpec): string {
   }
   return buildKwargPartitionBlock(spec);
 }
+
+/** Python injected after REST advanced config decode. */
+export function buildRestAdvancedPartitionBlock(): string {
+  return `
+    if partition_key:
+        from datetime import date, timedelta
+        pk = partition_key.strip()
+        resources = config.get("resources") or []
+        end_val = None
+        if len(pk) >= 10 and pk[4:5] == "-" and pk[7:8] == "-":
+            try:
+                _day = date.fromisoformat(pk[:10])
+                end_val = (_day + timedelta(days=1)).isoformat()
+            except ValueError:
+                pass
+        for res in resources:
+            if not isinstance(res, dict):
+                continue
+            endpoint = res.setdefault("endpoint", {})
+            params = endpoint.setdefault("params", {})
+            if "since" not in params and "start_date" not in params:
+                params["since"] = pk
+            inc = endpoint.get("incremental")
+            if isinstance(inc, dict):
+                inc["initial_value"] = pk
+                if end_val:
+                    inc["end_value"] = end_val`;
+}
+
+/** Postgres dlt: scope sql_database incremental via partition column from pipeline config. */
+export function buildPostgresDltPartitionBlock(partitionColumn: string | null): string {
+  if (!partitionColumn) {
+    return `
+    if partition_key:
+        print("[eltpulse] partition_key set but no _partitionConfig.column saved — slice ignored", flush=True)`;
+  }
+  return `
+    partition_column = "${escapePyString(partitionColumn)}"
+    if partition_key and partition_column:
+        from datetime import date, timedelta
+        pk = partition_key.strip()
+        initial = pk if "T" in pk else f"{pk[:10]}T00:00:00Z"
+        end_val = None
+        if len(pk) >= 10 and pk[4:5] == "-" and pk[7:8] == "-":
+            try:
+                _day = date.fromisoformat(pk[:10])
+                end_val = f"{(_day + timedelta(days=1)).isoformat()}T00:00:00Z"
+            except ValueError:
+                pass
+        for _table in table_names:
+            _prefix = "SOURCES__SQL_DATABASE__" + _table.upper() + "__" + partition_column.upper() + "__"
+            os.environ.setdefault(_prefix + "INITIAL_VALUE", initial)
+            if end_val:
+                os.environ.setdefault(_prefix + "END_VALUE", end_val)`;
+}

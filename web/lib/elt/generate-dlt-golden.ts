@@ -2,6 +2,7 @@ import type { PipelineRequest } from "./types";
 import { escapePyString } from "./escape-py";
 import { dltDbtRunnerBeforeReturn } from "./generate-dlt-dbt-append";
 import { postTransformBeforeReturn } from "./generate-post-transform";
+import { buildPostgresDltPartitionBlock } from "./generate-dlt-partition";
 import { eltpulsePythonModuleHeader } from "./codegen-branding";
 import { normalizeStripeEndpoints } from "./source-resource-mappings";
 
@@ -102,6 +103,12 @@ export function generatePostgresDltPipeline(request: PipelineRequest): string {
     ? tablesRaw.split(",").map((t) => t.trim()).filter(Boolean)
     : ["users"];
   const tableList = tables.map((t) => `"${escapePyString(t)}"`).join(", ");
+  const pc = config._partitionConfig as { type?: string; column?: string } | undefined;
+  const partitionColumn =
+    pc && pc.type !== "none" && typeof pc.column === "string" && pc.column.trim()
+      ? pc.column.trim()
+      : null;
+  const partitionBlock = buildPostgresDltPartitionBlock(partitionColumn);
   const { destination, destinationComment, datasetName } = destinationBlock(request);
   const desc = request.description || `Replicate Postgres (${schema}) to ${request.destinationType}`;
 
@@ -128,8 +135,8 @@ def run(partition_key: str = None):
         schema="${escapePyString(schema)}",
         table_names=[${tableList}],
     )
-    if partition_key and hasattr(source, "with_resources"):
-        pass  # partition_key reserved for future slice filters
+    table_names = [${tableList}]
+${partitionBlock}
 
     info = pipeline.run(
         source,

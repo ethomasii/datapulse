@@ -13,6 +13,13 @@ from .settings import OBJECT_TYPE_PLURAL, HS_TO_DLT_TYPE
 BASE_URL = "https://api.hubapi.com/"
 
 
+def _iso_to_hubspot_ms(value: str) -> str:
+    from dlt.common import pendulum
+
+    dt = pendulum.parse(value)
+    return str(int(dt.timestamp() * 1000))
+
+
 def get_url(endpoint: str) -> str:
     """Get absolute hubspot endpoint URL"""
     return urllib.parse.urljoin(BASE_URL, endpoint)
@@ -124,6 +131,56 @@ def fetch_property_history(
             _data = r.json()
         else:
             _data = None
+
+
+def fetch_data_search(
+    object_type: str,
+    api_key: str,
+    props: List[str],
+    since: Optional[str] = None,
+    until: Optional[str] = None,
+    context: Optional[Dict[str, Any]] = None,
+) -> Iterator[List[Dict[str, Any]]]:
+    """Fetch CRM objects via search API filtered on last modified timestamp (ms)."""
+    plural = OBJECT_TYPE_PLURAL.get(object_type, f"{object_type}s")
+    url = get_url(f"/crm/v3/objects/{plural}/search")
+    headers = _get_headers(api_key)
+    mod_prop = "hs_lastmodifieddate"
+    filters: List[Dict[str, Any]] = []
+    if since:
+        filters.append(
+            {"propertyName": mod_prop, "operator": "GTE", "value": _iso_to_hubspot_ms(since)}
+        )
+    if until:
+        filters.append(
+            {"propertyName": mod_prop, "operator": "LT", "value": _iso_to_hubspot_ms(until)}
+        )
+    body: Dict[str, Any] = {
+        "filterGroups": [{"filters": filters}] if filters else [],
+        "properties": props,
+        "limit": 100,
+    }
+    while True:
+        r = requests.post(url, headers=headers, json=body)
+        r.raise_for_status()
+        _data = r.json()
+        if "results" in _data:
+            _objects: List[Dict[str, Any]] = []
+            for _result in _data["results"]:
+                _obj = _result.get("properties", _result)
+                if "id" not in _obj and "id" in _result:
+                    _obj["id"] = _result["id"]
+                if context:
+                    _obj.update(context)
+                _objects.append(_obj)
+            if _objects:
+                yield _objects
+        paging = _data.get("paging", {})
+        nxt = paging.get("next", {})
+        after = nxt.get("after") if isinstance(nxt, dict) else None
+        if not after:
+            break
+        body["after"] = after
 
 
 def fetch_data(

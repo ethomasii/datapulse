@@ -43,6 +43,7 @@ from .helpers import (
     _get_property_names_types,
     _to_dlt_columns_schema,
     fetch_data,
+    fetch_data_search,
     fetch_property_history,
     get_properties_labels,
 )
@@ -73,6 +74,8 @@ def fetch_data_for_properties(
     api_key: str,
     object_type: str,
     soft_delete: bool,
+    since: Optional[str] = None,
+    until: Optional[str] = None,
 ) -> Iterator[TDataItems]:
     """
     Fetch data for a given set of properties from the HubSpot API.
@@ -93,6 +96,17 @@ def fetch_data_for_properties(
         {SOFT_DELETE_KEY: False} if soft_delete else None
     )
 
+    if since or until:
+        yield from fetch_data_search(
+            object_type,
+            api_key,
+            sorted(props),
+            since=since,
+            until=until,
+            context=context,
+        )
+        return
+
     yield from fetch_data(
         CRM_OBJECT_ENDPOINTS[object_type], api_key, params=params, context=context
     )
@@ -111,6 +125,8 @@ def crm_objects(
     props: List[str],
     include_custom_props: bool = True,
     archived: bool = False,
+    since: Optional[str] = None,
+    until: Optional[str] = None,
 ) -> Iterator[TDataItems]:
     """
     Fetch CRM object data (e.g., companies, contacts) from the HubSpot API.
@@ -136,7 +152,7 @@ def crm_objects(
         for prop, hb_type in props_to_type.items()
     }
     for batch in fetch_data_for_properties(
-        list(props_to_type.keys()), api_key, object_type, archived
+        list(props_to_type.keys()), api_key, object_type, archived, since=since, until=until
     ):
         yield dlt.mark.with_hints(batch, dlt.mark.make_hints(columns=col_type_hints))
 
@@ -259,6 +275,8 @@ def hubspot(
     soft_delete: bool = False,
     include_custom_props: bool = True,
     properties: Optional[Dict[str, List[str]]] = None,
+    since: Optional[str] = None,
+    until: Optional[str] = None,
 ) -> Iterator[DltResource]:
     """
     A dlt source that retrieves data from the HubSpot API using the
@@ -413,6 +431,8 @@ def hubspot(
             props=properties.get(obj),
             include_custom_props=include_custom_props,
             archived=soft_delete,
+            since=since,
+            until=until,
         )
 
     # corresponding history resources

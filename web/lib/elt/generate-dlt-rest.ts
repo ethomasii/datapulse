@@ -2,6 +2,7 @@ import type { PipelineRequest } from "./types";
 import { escapePyString } from "./escape-py";
 import { dltDbtRunnerBeforeReturn } from "./generate-dlt-dbt-append";
 import { postTransformBeforeReturn } from "./generate-post-transform";
+import { buildRestAdvancedPartitionBlock } from "./generate-dlt-partition";
 import { eltpulsePythonModuleHeader } from "./codegen-branding";
 
 // SWC/webpack misparses Python triple-quotes inside JS template literals.
@@ -183,10 +184,7 @@ def run(partition_key: str = None):
 
     # REST API configuration (advanced mode) -- decoded from eltPulse UI JSON
     config = json.loads(base64.b64decode("${b64}").decode("utf-8"))
-
-    # TODO: if you want partition_key to filter the request, inject it here, e.g.:
-    # if partition_key and config.get("resources"):
-    #     config["resources"][0].setdefault("endpoint", {}).setdefault("params", {})["since"] = partition_key
+${buildRestAdvancedPartitionBlock()}
 
     source = rest_api_source(config)
 

@@ -5,6 +5,7 @@ import { eltpulseReportLoadInfoPython } from "./generate-eltpulse-run-reporting"
 import { postTransformBeforeReturn } from "./generate-post-transform";
 import { generateRestApiAdvanced, generateRestApiPipeline } from "./generate-dlt-rest";
 import { generatePostgresDltPipeline, generateStripePipeline } from "./generate-dlt-golden";
+import { generateFilesystemPipeline, isFilesystemSource } from "./generate-dlt-filesystem";
 import { generateVerifiedSourcePipeline } from "./generate-dlt-verified";
 import { isVerifiedPackageSource } from "./verified-source-spec";
 import { eltpulsePythonModuleHeader, ELTPULSE_PIPELINES_DOCS } from "./codegen-branding";
@@ -24,6 +25,7 @@ export function generateDltPipeline(request: PipelineRequest): string {
   if (sourceType === "stripe" || sourceType === "stripe_analytics") return generateStripePipeline(request);
   if (sourceType === "postgres" || sourceType === "postgresql") return generatePostgresDltPipeline(request);
   if (isVerifiedPackageSource(sourceType)) return generateVerifiedSourcePipeline(request);
+  if (isFilesystemSource(sourceType)) return generateFilesystemPipeline(request);
   if (sourceType === "rest_api") {
     const c = request.sourceConfiguration;
     if (c.advanced_mode && c.advanced_config) {

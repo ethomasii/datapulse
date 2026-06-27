@@ -71,11 +71,8 @@ const CAPABILITIES: Record<string, RunSliceCapability> = {
   stripe: { ...DLT_SINCE, mechanism: "stripe_source(start_date=partition_key)" },
   shopify: { ...DLT_SINCE, mechanism: "shopify_source(start_date=partition_key)" },
   hubspot: {
-    mode: "none_only" as const,
-    label: "Full merge load only",
-    detail:
-      "HubSpot CRM objects load with merge disposition; date/key run slices are not wired yet (no source-level since filter). Use scheduled full runs or web analytics events separately.",
-    mechanism: "hubspot() — no partition_key filter",
+    ...DLT_SINCE,
+    mechanism: "hubspot(since=partition_key, until=next_day) via CRM search API",
   },
   salesforce: {
     ...DLT_SINCE,
@@ -85,13 +82,43 @@ const CAPABILITIES: Record<string, RunSliceCapability> = {
   facebook_ads: { ...DLT_DATE_RANGE, mechanism: "facebook_ads_source(start_date=partition_key)" },
   google_ads: { ...DLT_DATE_RANGE, mechanism: "google_ads(start_date=partition_key)" },
   slack: { ...DLT_SINCE, mechanism: "slack_source(start_date=partition_key)" },
-  notion: { ...DLT_SINCE, mechanism: "notion_source(start_date=partition_key)" },
-  airtable: { ...DLT_SINCE, mechanism: "airtable_source(start_date=partition_key)" },
+  notion: {
+    mode: "none_only",
+    label: "Full replace load only",
+    detail:
+      "Notion databases load with replace disposition; the verified source has no start_date / slice filter parameter.",
+    mechanism: "notion_databases() — no partition_key filter",
+  },
+  airtable: {
+    mode: "none_only",
+    label: "Full replace load only",
+    detail:
+      "Airtable tables load with replace disposition; the verified source has no incremental date parameter.",
+    mechanism: "airtable_source() — no partition_key filter",
+  },
   jira: { ...DLT_SINCE, mechanism: "jira_search JQL updated range for day slices" },
   zendesk: { ...DLT_SINCE, mechanism: "zendesk_support(start_date=partition_key)" },
-  intercom: { ...DLT_SINCE, mechanism: "intercom_source(start_date=partition_key)" },
-  mixpanel: { ...DLT_DATE_RANGE, mechanism: "mixpanel_source(start_date=partition_key)" },
-  segment: { ...DLT_SINCE, mechanism: "segment_source(start_date=partition_key)" },
+  intercom: {
+    mode: "none_only",
+    label: "Heuristic template only",
+    detail:
+      "Intercom uses generic verified codegen without a confirmed slice parameter; configure a custom REST or verified source before using run slices.",
+    mechanism: "generic — no partition_key filter",
+  },
+  mixpanel: {
+    mode: "none_only",
+    label: "Heuristic template only",
+    detail:
+      "Mixpanel uses generic verified codegen without a confirmed slice parameter; configure a custom REST or verified source before using run slices.",
+    mechanism: "generic — no partition_key filter",
+  },
+  segment: {
+    mode: "none_only",
+    label: "Heuristic template only",
+    detail:
+      "Segment uses generic verified codegen without a confirmed slice parameter; configure a custom REST or verified source before using run slices.",
+    mechanism: "generic — no partition_key filter",
+  },
   asana: {
     ...DLT_SINCE,
     mechanism: "asana tasks modified_at incremental bounds via partition_key",
@@ -106,7 +133,13 @@ const CAPABILITIES: Record<string, RunSliceCapability> = {
   json: { ...DLT_PREFIX, mechanism: "filesystem(file_glob=f'*{partition_key}*.json')" },
   parquet: { ...DLT_PREFIX, mechanism: "filesystem(file_glob=f'*{partition_key}*')" },
 
-  postgres: { ...SLING_INCREMENTAL, mechanism: "update_key: updated_at, mode: incremental" },
+  postgres: {
+    ...SLING_INCREMENTAL,
+    label: "Date & key slice via update_key",
+    detail:
+      "Sling replication uses update_key from saved partition config. dlt sql_database runs honor partition_key via incremental env bounds when partition column is saved.",
+    mechanism: "Sling: update_key; dlt: SOURCES__SQL_DATABASE__{table}__{column}__*",
+  },
   mysql: { ...SLING_INCREMENTAL, mechanism: "update_key: updated_at, mode: incremental" },
   mssql: { ...SLING_INCREMENTAL, mechanism: "update_key: updated_at, mode: incremental" },
   oracle: { ...SLING_INCREMENTAL, mechanism: "update_key: updated_at, mode: incremental" },
