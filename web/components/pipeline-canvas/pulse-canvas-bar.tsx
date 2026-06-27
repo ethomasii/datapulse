@@ -2,11 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Edge, Node } from "@xyflow/react";
-import { Bot, ChevronUp, Loader2, Send } from "lucide-react";
+import { Bot, ChevronUp, Loader2, Lock, Send } from "lucide-react";
 import clsx from "clsx";
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
 import type { PatchPipelinePayload } from "@/app/api/elt/ai-assistant/route";
 import { PULSE_AI_NAME, PULSE_AI_SHORT } from "@/lib/brand/pulse-ai";
+import { usePlanFeatures } from "@/lib/hooks/use-plan-features";
+import { PulseAiFeatureTeaser } from "@/components/billing/pulse-ai-feature-teaser";
+import { PlanGatePill } from "@/components/account/plan-gate-pill";
 
 export type CanvasPulseNodeContext = {
   nodeId: string;
@@ -35,6 +38,8 @@ export function PulseCanvasBar({
   onPatchNode,
   onReplaceGraph,
 }: Props) {
+  const { features, loading: planLoading } = usePlanFeatures();
+  const aiAllowed = features.aiAssistant ?? false;
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -79,7 +84,7 @@ export function PulseCanvasBar({
 
   const sendQuick = useCallback(async () => {
     const text = draft.trim();
-    if (!text || !pipelineId || sending) return;
+    if (!text || !pipelineId || sending || !aiAllowed) return;
     setSending(true);
     setQuickReply(null);
     setPendingPatch(null);
@@ -152,7 +157,7 @@ export function PulseCanvasBar({
     } finally {
       setSending(false);
     }
-  }, [canvasNode, draft, getCanvasSnapshot, onPatchNode, onReplaceGraph, pipelineId, sending]);
+  }, [aiAllowed, canvasNode, draft, getCanvasSnapshot, onPatchNode, onReplaceGraph, pipelineId, sending]);
 
   useEffect(() => {
     if (!expanded) return;
@@ -162,8 +167,12 @@ export function PulseCanvasBar({
   return (
     <div className="relative z-30 shrink-0 isolate border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
       <div className="flex items-end gap-2 px-3 py-2">
-        <Bot className="mb-2 h-4 w-4 shrink-0 text-teal-600" aria-hidden />
+        <Bot className={clsx("mb-2 h-4 w-4 shrink-0", aiAllowed ? "text-teal-600" : "text-slate-400")} aria-hidden />
         <div className="min-w-0 flex-1">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400">{PULSE_AI_NAME}</span>
+            {!aiAllowed && !planLoading ? <PlanGatePill minTier="team" /> : null}
+          </div>
           <textarea
             ref={textareaRef}
             value={draft}
@@ -175,8 +184,16 @@ export function PulseCanvasBar({
               }
             }}
             rows={1}
-            placeholder={placeholder}
-            className="w-full resize-none bg-transparent text-sm text-slate-800 placeholder-slate-400 outline-none dark:text-slate-100"
+            placeholder={
+              aiAllowed
+                ? placeholder
+                : `Upgrade to Team to ask ${PULSE_AI_SHORT} — e.g. filter active rows, dedupe by id…`
+            }
+            disabled={!aiAllowed && !planLoading}
+            className={clsx(
+              "w-full resize-none bg-transparent text-sm placeholder-slate-400 outline-none dark:text-slate-100",
+              aiAllowed ? "text-slate-800" : "cursor-not-allowed text-slate-500"
+            )}
           />
           {quickReply ? (
             <p className="mt-1 line-clamp-3 text-[11px] text-slate-600 dark:text-slate-400">{quickReply}</p>
@@ -208,11 +225,17 @@ export function PulseCanvasBar({
         <button
           type="button"
           onClick={() => void sendQuick()}
-          disabled={!draft.trim() || sending || !pipelineId}
+          disabled={!draft.trim() || sending || !pipelineId || (!aiAllowed && !planLoading)}
           className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-40"
-          aria-label={`Send to ${PULSE_AI_NAME}`}
+          aria-label={aiAllowed ? `Send to ${PULSE_AI_NAME}` : `${PULSE_AI_NAME} requires Team plan`}
         >
-          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          {!aiAllowed && !planLoading ? (
+            <Lock className="h-4 w-4" />
+          ) : sending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
         </button>
         <button
           type="button"
@@ -224,18 +247,34 @@ export function PulseCanvasBar({
           <ChevronUp className={clsx("h-4 w-4 transition", expanded ? "rotate-180" : "")} aria-hidden />
         </button>
       </div>
+      {!aiAllowed && !planLoading && !expanded ? (
+        <p className="px-3 pb-2 text-[11px] text-slate-500 dark:text-slate-400">
+          Describe pipeline changes in plain English —{" "}
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="font-medium text-sky-600 hover:underline dark:text-sky-400"
+          >
+            see what {PULSE_AI_SHORT} can do
+          </button>
+        </p>
+      ) : null}
       {expanded ? (
         <div className="border-t border-slate-200 px-3 pb-3 pt-2 dark:border-slate-800">
-          <AiPipelineAssistant
-            inline
-            canvasMode
-            pipelineId={pipelineId}
-            canvasNodeContext={canvasNode ?? undefined}
-            getCanvasSnapshot={getCanvasSnapshot}
-            onPatchNode={onPatchNode}
-            onReplaceGraph={onReplaceGraph}
-            onPipelinePatched={onPipelinePatched}
-          />
+          {!aiAllowed && !planLoading ? (
+            <PulseAiFeatureTeaser variant="compact" />
+          ) : (
+            <AiPipelineAssistant
+              inline
+              canvasMode
+              pipelineId={pipelineId}
+              canvasNodeContext={canvasNode ?? undefined}
+              getCanvasSnapshot={getCanvasSnapshot}
+              onPatchNode={onPatchNode}
+              onReplaceGraph={onReplaceGraph}
+              onPipelinePatched={onPipelinePatched}
+            />
+          )}
         </div>
       ) : null}
     </div>

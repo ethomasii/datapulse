@@ -66,6 +66,7 @@ const TIERS: TierDef[] = [
     monthlyUsd: PLAN_PRICES_USD.team.monthly,
     features: [
       "Everything in Pro",
+      "Pulse AI — natural-language pipeline builder",
       "Multiple workspace members",
       "Role-based access control",
       "1-year run history",

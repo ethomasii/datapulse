@@ -15,6 +15,8 @@ import { usePlanFeatures } from '@/lib/hooks/use-plan-features';
 import { builderUrl } from '@/lib/elt/builder-nav';
 import { PULSE_AI_NAME } from '@/lib/brand/pulse-ai';
 import { PlanUpgradeHint } from '@/components/billing/plan-upgrade-hint';
+import { PulseAiFeatureTeaser } from '@/components/billing/pulse-ai-feature-teaser';
+import { PlanGatePill } from '@/components/account/plan-gate-pill';
 import { Lock } from 'lucide-react';
 
 interface Message {
@@ -600,6 +602,9 @@ export function AiPipelineAssistant({
 
   // ── Inline variant: embedded in the builder page ─────────────────────────────
   if (inline) {
+    if (planGateReady && !aiAllowed) {
+      return <PulseAiFeatureTeaser variant={canvasMode ? "compact" : "panel"} />;
+    }
     return (
       <div className={clsx('flex flex-col', canvasMode ? 'h-[320px]' : '')} style={canvasMode ? undefined : { height: '420px' }}>
         {planUpgradeBanner}
@@ -701,6 +706,7 @@ export function AiPipelineAssistant({
         >
           {aiAllowed ? <Sparkles className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
           <span>{PULSE_AI_NAME}</span>
+          {!aiAllowed && planGateReady ? <PlanGatePill minTier="team" className="!text-[9px]" /> : null}
         </button>
       )}
 
@@ -725,8 +731,10 @@ export function AiPipelineAssistant({
 
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
-            {planUpgradeBanner}
             {readOnlyBanner}
+            {planGateReady && !aiAllowed && messages.length === 0 ? (
+              <PulseAiFeatureTeaser variant="dark" />
+            ) : null}
             {messages.length === 0 && aiAllowed && (
               <div className="space-y-3">
                 <div className="flex items-start gap-2">

@@ -23,6 +23,8 @@ import {
   Bot,
 } from "lucide-react";
 import { AiPipelineAssistant } from "@/components/elt/ai-pipeline-assistant";
+import { PlanGatePill } from "@/components/account/plan-gate-pill";
+import { usePlanFeatures } from "@/lib/hooks/use-plan-features";
 import { AppPage, AppPageHeader } from "@/components/layout/app-page";
 import { ExecutionStatusBanner } from "@/components/elt/execution-status-banner";
 import { DbtConfigFields } from "@/components/dbt/dbt-config-fields";
@@ -113,6 +115,8 @@ export function BuilderClient({
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { features: planFeatures, loading: planLoading } = usePlanFeatures();
+  const pulseAiAllowed = planFeatures.aiAssistant ?? false;
   /** Client query wins so soft navigation from Canvas / links always opens the right pipeline. */
   const pipelineIdFromUrl = searchParams.get("pipeline");
   const openPipelineIdFromQuery =
@@ -994,6 +998,7 @@ export function BuilderClient({
                 >
                   <Sparkles className="h-3.5 w-3.5" />
                   Pulse AI
+                  {!pulseAiAllowed && !planLoading ? <PlanGatePill minTier="team" className="!py-0" /> : null}
                 </button>
                 <button
                   type="button"
@@ -1147,12 +1152,15 @@ export function BuilderClient({
           {/* Pulse AI panel */}
           {!editingId && newPipelineKind === "elt" && createMode === "ai" && (
             <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-4 dark:border-teal-800 dark:bg-teal-900/10">
-              <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
-                Describe what you want to load — Pulse AI will generate the pipeline. Review and edit before saving.
-              </p>
+              {pulseAiAllowed ? (
+                <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
+                  Describe what you want to load — Pulse AI will generate the pipeline. Review and edit before saving.
+                </p>
+              ) : null}
               <AiPipelineAssistant
                 onPipelineSaved={() => { void load(); setShowCreateForm(false); }}
                 inline
+                planAllowed={pulseAiAllowed ? undefined : false}
               />
             </div>
           )}
