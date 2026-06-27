@@ -865,9 +865,11 @@ export function motherduckDatabaseName(
   secrets: Record<string, string>,
   config: Record<string, unknown>
 ): string {
+  // Prefer connection config (and per-query overrides) over merged env secrets so
+  // cross-catalog discovery can query my_db while the saved profile says eltpulse.
   return (
-    secret(secrets, "MOTHERDUCK_DATABASE") ||
     configString(config, "database") ||
+    secret(secrets, "MOTHERDUCK_DATABASE", "DESTINATION__MOTHERDUCK__CREDENTIALS__DATABASE") ||
     STARTER_WAREHOUSE_DEFAULT_DB
   );
 }

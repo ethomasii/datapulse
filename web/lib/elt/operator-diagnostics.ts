@@ -40,7 +40,13 @@ export function buildOperatorDiagnostic(
     ) {
       hint =
         "Open your MotherDuck destination connection and set Database to where dlt loaded data (often my_db, not eltpulse). Run a sync if the table is new.";
-    } else if (lower.includes("destination connection")) {
+    } else if (
+      !alreadyExplainsCatalog &&
+      (lower.includes("link a destination connection") ||
+        (lower.includes("destination connection") &&
+          !lower.includes("set database") &&
+          !lower.includes("motherduck")))
+    ) {
       hint = "Link a destination connection on this pipeline (Destination node or ingest settings), then save.";
     } else if (lower.includes("wire") || lower.includes("input table")) {
       hint = "Wire the Select Columns step from the Destination node so it reads landed warehouse data.";
