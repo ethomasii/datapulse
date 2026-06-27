@@ -635,9 +635,53 @@ type MotherDuckSqlResponse = {
   message?: string;
 };
 
-function rowsFromMotherDuckResponse(body: MotherDuckSqlResponse): string[][] {
-  const raw = body.rows ?? body.data ?? [];
-  return raw.map((row) => (Array.isArray(row) ? row.map((c) => String(c ?? "")) : []));
+export type MotherduckQueryRowset = {
+  columns: string[];
+  rows: unknown[][];
+};
+
+export function parseMotherduckSqlResponse(body: MotherDuckSqlResponse): MotherduckQueryRowset {
+  const rawRows = body.rows ?? body.data ?? [];
+  const rows = rawRows.filter((r): r is unknown[] => Array.isArray(r));
+  const columns = (body.columns ?? []).map((c) => String(c.name ?? "")).filter(Boolean);
+  if (columns.length === 0 && rows.length > 0) {
+    const width = rows[0]?.length ?? 0;
+    return { columns: Array.from({ length: width }, (_, i) => `col_${i}`), rows };
+  }
+  return { columns, rows };
+}
+
+export function motherduckDatabaseName(
+  secrets: Record<string, string>,
+  config: Record<string, unknown>
+): string {
+  return secret(secrets, "MOTHERDUCK_DATABASE") || configString(config, "database") || "my_db";
+}
+
+/** Run a read-only SQL statement against MotherDuck via the HTTP API. */
+export async function runMotherduckReadOnlyQuery(
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  sql: string
+): Promise<MotherduckQueryRowset> {
+  const token = secret(secrets, "MOTHERDUCK_TOKEN");
+  const database = motherduckDatabaseName(secrets, config);
+  if (!token) throw new Error("Set MOTHERDUCK_TOKEN to query MotherDuck.");
+
+  const res = await fetch("https://api.motherduck.com/v1/sql", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ database, sql }),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  const body = (await res.json()) as MotherDuckSqlResponse & { detail?: string };
+  if (!res.ok) {
+    throw new Error(body.error ?? body.message ?? body.detail ?? `MotherDuck API returned ${res.status}.`);
+  }
+  return parseMotherduckSqlResponse(body);
 }
 
 export async function introspectMotherduck(
@@ -645,28 +689,15 @@ export async function introspectMotherduck(
   config: Record<string, unknown>
 ): Promise<WarehouseIntrospectionResult> {
   const token = secret(secrets, "MOTHERDUCK_TOKEN");
-  const database = secret(secrets, "MOTHERDUCK_DATABASE") || configString(config, "database") || "my_db";
+  const database = motherduckDatabaseName(secrets, config);
 
   if (!token) return fail("motherduck", "Set MOTHERDUCK_TOKEN to verify MotherDuck tables.");
 
   const sql = `SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema NOT IN ('information_schema', 'pg_catalog') AND table_type = 'BASE TABLE' LIMIT ${TABLE_LIMIT}`;
 
   try {
-    const res = await fetch("https://api.motherduck.com/v1/sql", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ database, sql }),
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    const body = (await res.json()) as MotherDuckSqlResponse & { detail?: string };
-    if (!res.ok) {
-      return fail("motherduck", body.error ?? body.message ?? body.detail ?? `MotherDuck API returned ${res.status}.`);
-    }
-    const rowset = rowsFromMotherDuckResponse(body);
-    const tables = rowset.map((row) => ({
+    const rowset = await runMotherduckReadOnlyQuery(secrets, config, sql);
+    const tables = rowset.rows.map((row) => ({
       schema: String(row[0] ?? "main"),
       table: String(row[1] ?? ""),
       qualified: `${row[0] ?? "main"}.${row[1] ?? ""}`,

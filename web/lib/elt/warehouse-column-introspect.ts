@@ -7,6 +7,7 @@ import type { AssetColumnDef } from "@/lib/elt/catalog-metadata";
 import { parseLandingQualified } from "@/lib/elt/warehouse-introspect";
 import {
   buildPostgresConnectionString,
+  runMotherduckReadOnlyQuery,
   runSnowflakeReadOnlyQuery,
 } from "@/lib/elt/warehouse-introspect-connectors";
 import type { DestinationConnectionRow } from "@/lib/elt/warehouse-introspect";
@@ -159,9 +160,31 @@ export async function fetchWarehouseColumnsForAsset(
       };
     }
 
+    if (connector === "motherduck") {
+      const sql = `SELECT column_name, data_type
+        FROM information_schema.columns
+        WHERE table_schema = '${ref.schema.replace(/'/g, "''")}'
+          AND table_name = '${ref.table.replace(/'/g, "''")}'
+        ORDER BY ordinal_position
+        LIMIT ${COL_LIMIT}`;
+      const result = await runMotherduckReadOnlyQuery(secrets, config, sql);
+      const columns = result.rows
+        .map((row) => ({
+          name: String(row[0] ?? ""),
+          type: row[1] ? String(row[1]) : undefined,
+          source: "warehouse" as const,
+        }))
+        .filter((c) => c.name);
+      return {
+        ok: columns.length > 0,
+        message: columns.length ? `Found ${columns.length} column(s) in MotherDuck.` : "Table not found or empty.",
+        columns,
+      };
+    }
+
     return {
       ok: false,
-      message: `Column introspection is not supported for ${connector} yet. Use Postgres, BigQuery, or Snowflake destinations.`,
+      message: `Column introspection is not supported for ${connector} yet. Use Postgres, BigQuery, Snowflake, or MotherDuck destinations.`,
       columns: [],
     };
   } catch (e) {

@@ -4,7 +4,11 @@
  */
 
 import { parseStoredConnectionSecrets } from "@/lib/elt/connection-secrets-store";
-import { buildPostgresConnectionString, runSnowflakeReadOnlyQuery } from "@/lib/elt/warehouse-introspect-connectors";
+import {
+  buildPostgresConnectionString,
+  runMotherduckReadOnlyQuery,
+  runSnowflakeReadOnlyQuery,
+} from "@/lib/elt/warehouse-introspect-connectors";
 import type { DestinationConnectionRow } from "@/lib/elt/warehouse-introspect";
 import { parseTableRef } from "@/lib/elt/warehouse-column-introspect";
 
@@ -132,6 +136,28 @@ async function queryBigQuerySample(
   };
 }
 
+async function queryMotherduck(
+  secrets: Record<string, string>,
+  config: Record<string, unknown>,
+  sql: string,
+  limit: number
+): Promise<ReadOnlyQueryResult> {
+  const result = await runMotherduckReadOnlyQuery(secrets, config, sql);
+  const columns =
+    result.columns.length > 0
+      ? result.columns
+      : Array.from({ length: result.rows[0]?.length ?? 0 }, (_, i) => `col_${i}`);
+  const rows = rowsToObjects(columns, result.rows.slice(0, limit));
+  return {
+    ok: true,
+    message: rows.length ? `Returned ${rows.length} row(s) from MotherDuck.` : "No rows returned.",
+    columns: rows.length ? Object.keys(rows[0] ?? {}) : columns,
+    rows,
+    rowCount: result.rows.length,
+    truncated: result.rows.length > limit,
+  };
+}
+
 /** Sample rows from an asset's landing table. */
 export async function sampleAssetData(
   connection: DestinationConnectionRow,
@@ -179,6 +205,10 @@ export async function sampleAssetData(
         truncated: false,
       };
     }
+    if (connector === "motherduck") {
+      const mdSql = `SELECT * FROM "${ref.schema.replace(/"/g, '""')}"."${ref.table.replace(/"/g, '""')}" LIMIT ${capped}`;
+      return await queryMotherduck(secrets, config, mdSql, capped);
+    }
     return { ok: false, message: `Data preview not supported for ${connector}.`, columns: [], rows: [], rowCount: 0, truncated: false };
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
@@ -222,6 +252,9 @@ export async function runReadOnlyQuery(
         rowCount: rows.length,
         truncated: result.rows.length > capped,
       };
+    }
+    if (connector === "motherduck") {
+      return await queryMotherduck(secrets, config, limitedSql, capped);
     }
     return { ok: false, message: `Query not supported for ${connector}.`, columns: [], rows: [], rowCount: 0, truncated: false };
   } catch (e) {
