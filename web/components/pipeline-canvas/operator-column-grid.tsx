@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Plus } from "lucide-react";
 import clsx from "clsx";
 
+import { operatorColumnGridMode } from "@/lib/elt/operator-column-grid-mode";
+
 type ColumnMeta = { name: string; type?: string };
 
 type Props = {
@@ -53,19 +55,7 @@ export function OperatorColumnGrid({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const mode = useMemo(() => {
-    if (componentId === "rename_columns" || componentId === "field_mapper" || componentId === "dynamic_rename") {
-      return "rename" as const;
-    }
-    if (
-      componentId === "select_columns" ||
-      componentId === "project_columns" ||
-      componentId === "column_select"
-    ) {
-      return "select" as const;
-    }
-    return null;
-  }, [componentId]);
+  const mode = useMemo(() => operatorColumnGridMode(componentId), [componentId]);
 
   const loadColumns = useCallback(async () => {
     if (!inputTable) {

@@ -67,7 +67,7 @@ function pickConnectionSubset(values: Record<string, string>, keys: string[]): R
   return out;
 }
 
-/** Canvas editor for one pipeline â€” mounted from /builder?view=canvas&pipeline=â€¦ */
+/** Canvas editor for one pipeline — mounted from /builder?view=canvas&pipeline=… */
 export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -198,7 +198,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
         return;
       }
       canvasControlRef.current?.replaceGraph(result.nodes, result.edges);
-      let notice = `${result.title}: ${result.stepCount} warehouse SQL steps on canvas â€” save to compile on your destination.`;
+      let notice = `${result.title}: ${result.stepCount} warehouse SQL steps on canvas — save to compile on your destination.`;
       if (result.medallion) {
         const merged = {
           ...lastFullSourceConfigRef.current,
@@ -328,7 +328,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
       });
       if (!result.nodes.length) return;
       canvasControlRef.current.replaceGraph(result.nodes, result.edges);
-      setStarterNotice(`${result.title} loaded â€” save pipeline to compile warehouse SQL.`);
+      setStarterNotice(`${result.title} loaded — save pipeline to compile warehouse SQL.`);
       starterAppliedRef.current = true;
     }, 400);
     return () => window.clearTimeout(timer);
@@ -755,7 +755,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
           <div className={stickyHeaderClass}>
             <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Transform</h2>
             <p className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-400">
-              Code transform (dbt / SQL / Python). Native steps â€” cleanse, join, aggregate â€” use{" "}
+              Code transform (dbt / SQL / Python). Native steps — cleanse, join, aggregate — use{" "}
               <strong className="font-medium text-violet-800 dark:text-violet-200">Native</strong> on the toolbar or the
               catalog below.
             </p>
@@ -782,7 +782,8 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
           <div className={stickyHeaderClass}>
             <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Operator configuration</h2>
             <p className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-400">
-              Column mapping, filters, and step settings â€” same panel as Lakeflow&apos;s operator config.
+              Set the input table, pick columns or filters, and choose where results land. Wire upstream nodes on
+              the graph to auto-fill the input.
             </p>
           </div>
           <CanvasComponentInspector

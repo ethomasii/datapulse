@@ -49,10 +49,9 @@ const ALL_PALETTE_TABS = [
   { id: "ai", label: "AI & MCP" },
 ] as const;
 
-/** Canvas designer — asset operators only (no ingest/monitor templates). */
+/** Canvas designer — transform + AI asset operators only (no checks / ingest / monitors). */
 const TRANSFORM_PALETTE_TABS = [
   { id: "transformation", label: "Transform" },
-  { id: "check", label: "Validate" },
   { id: "ai", label: "AI & MCP" },
 ] as const;
 
@@ -145,7 +144,7 @@ export function ComponentPalette({
         </p>
         <p className="mt-0.5 text-xs text-slate-500">
           {transformDesigner
-            ? `${total} asset steps — Transform · Validate · AI (EL source/dest handles ingest)`
+            ? `${total} asset steps — Transform · AI (EL source/dest handles ingest; quality checks live in orchestration)`
             : nativeOnly
             ? `${total} native compilers — Transform · Validate · Ingest · Monitor`
             : executableOnly

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { ComponentCatalogAssetPanel } from "@/components/elt/component-catalog-asset-panel";
@@ -8,6 +8,8 @@ import { ComponentSchemaForm } from "@/components/elt/component-schema-form";
 import { ComponentDataPreview } from "@/components/elt/component-data-preview";
 import { RunStepPanel } from "@/components/elt/run-step-panel";
 import { OperatorColumnGrid } from "@/components/pipeline-canvas/operator-column-grid";
+import { TransformStepIoPanel } from "@/components/pipeline-canvas/transform-step-io-panel";
+import { resolveCanvasInspectorLayout } from "@/lib/elt/canvas-inspector-layout";
 import { inputTableFromConfig } from "@/lib/elt/pipeline-asset-keys";
 import type { NativeComponentField } from "@/lib/elt/native-components";
 import { compileTargetLabel } from "@/lib/elt/compile-target-labels";
@@ -121,6 +123,15 @@ export function CanvasComponentInspector({
   );
 
   const inputTable = inputTableFromConfig(config);
+  const layout = useMemo(
+    () => resolveCanvasInspectorLayout(componentId, formFields),
+    [componentId, formFields]
+  );
+
+  function applyConfig(next: Record<string, unknown>, silent = false) {
+    if (autoApply && !readOnly) queueAutoApply(next);
+    else saveConfig(next, silent);
+  }
 
   if (loading) {
     return (
@@ -129,6 +140,8 @@ export function CanvasComponentInspector({
       </div>
     );
   }
+
+  const schemaFields = layout.visibleFormFields;
 
   return (
     <div className="space-y-4">
@@ -187,6 +200,63 @@ export function CanvasComponentInspector({
         </p>
       ) : null}
 
+      {layout.showStepIoPanel ? (
+        <TransformStepIoPanel
+          pipelineId={pipelineId}
+          config={config}
+          readOnly={readOnly}
+          showOutput={layout.showOutputTable}
+          onChange={(next) => applyConfig(next, true)}
+        />
+      ) : null}
+
+      {layout.columnGridMode ? (
+        <OperatorColumnGrid
+          pipelineId={pipelineId}
+          inputTable={inputTable}
+          componentId={componentId}
+          config={config}
+          readOnly={readOnly}
+          onChange={(next) => applyConfig(next, true)}
+        />
+      ) : null}
+
+      {schemaFields.length > 0 && !showAdvancedJson ? (
+        <>
+          <ComponentSchemaForm
+            fields={schemaFields}
+            values={config}
+            readOnly={readOnly}
+            pipelineId={pipelineId}
+            onChange={(next) => (autoApply ? queueAutoApply(next) : setConfig(next))}
+          />
+          {!readOnly && !autoApply ? (
+            <button
+              type="button"
+              onClick={() => saveConfig(config)}
+              className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-500"
+            >
+              Apply config
+            </button>
+          ) : null}
+          {autoApply ? (
+            <p className="text-[10px] text-slate-500">Changes apply automatically — preview updates below.</p>
+          ) : null}
+        </>
+      ) : formFields.length === 0 || showAdvancedJson ? (
+        <label className="block text-sm">
+          <span className="font-medium text-slate-700 dark:text-slate-300">Component config (JSON)</span>
+          <textarea
+            value={configJson}
+            onChange={(e) => setConfigJson(e.target.value)}
+            readOnly={readOnly}
+            rows={8}
+            spellCheck={false}
+            className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 px-2 py-1.5 font-mono text-xs dark:border-slate-600 dark:bg-slate-950"
+          />
+        </label>
+      ) : null}
+
       {detail?.isExecutable || detail?.compilerTier === "category" ? (
         <>
           <RunStepPanel
@@ -215,57 +285,14 @@ export function CanvasComponentInspector({
         </p>
       ) : null}
 
-      <ComponentCatalogAssetPanel
-        pipelineId={pipelineId}
-        config={config}
-        readOnly={readOnly}
-        onChange={(next) => (autoApply ? queueAutoApply(next) : saveConfig(next))}
-      />
-
-      <OperatorColumnGrid
-        pipelineId={pipelineId}
-        inputTable={inputTable}
-        componentId={componentId}
-        config={config}
-        readOnly={readOnly}
-        onChange={(next) => (autoApply ? queueAutoApply(next) : saveConfig(next))}
-      />
-
-      {formFields.length > 0 && !showAdvancedJson ? (
-        <>
-          <ComponentSchemaForm
-            fields={formFields}
-            values={config}
-            readOnly={readOnly}
-            pipelineId={pipelineId}
-            onChange={(next) => (autoApply ? queueAutoApply(next) : setConfig(next))}
-          />
-          {!readOnly && !autoApply ? (
-            <button
-              type="button"
-              onClick={() => saveConfig(config)}
-              className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-500"
-            >
-              Apply config
-            </button>
-          ) : null}
-          {autoApply ? (
-            <p className="text-[10px] text-slate-500">Changes apply automatically — preview updates below.</p>
-          ) : null}
-        </>
-      ) : (
-        <label className="block text-sm">
-          <span className="font-medium text-slate-700 dark:text-slate-300">Component config (JSON)</span>
-          <textarea
-            value={configJson}
-            onChange={(e) => setConfigJson(e.target.value)}
-            readOnly={readOnly}
-            rows={8}
-            spellCheck={false}
-            className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 px-2 py-1.5 font-mono text-xs dark:border-slate-600 dark:bg-slate-950"
-          />
-        </label>
-      )}
+      {!layout.hideCatalogPanel ? (
+        <ComponentCatalogAssetPanel
+          pipelineId={pipelineId}
+          config={config}
+          readOnly={readOnly}
+          onChange={(next) => applyConfig(next, true)}
+        />
+      ) : null}
 
       {formFields.length > 0 ? (
         <button

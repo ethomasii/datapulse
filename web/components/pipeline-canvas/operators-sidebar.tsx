@@ -6,7 +6,6 @@ import {
   Layers,
   Loader2,
   Search,
-  ShieldCheck,
   Sparkles,
   Target,
   Workflow,
@@ -15,6 +14,7 @@ import clsx from "clsx";
 import { ComponentIcon } from "@/components/elt/component-icon";
 import { ELTPULSE_COMPONENT_DRAG_MIME } from "@/lib/elt/canvas-drag";
 import type { ComponentListItem } from "@/components/elt/component-palette";
+import { filterCanvasOperatorComponents } from "@/lib/elt/canvas-operator-scope";
 
 type Props = {
   onSelect: (component: ComponentListItem) => void;
@@ -131,17 +131,13 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [transformItems, setTransformItems] = useState<ComponentListItem[]>([]);
-  const [validateItems, setValidateItems] = useState<ComponentListItem[]>([]);
   const [aiItems, setAiItems] = useState<ComponentListItem[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [transformRes, validateRes, aiRes] = await Promise.all([
+      const [transformRes, aiRes] = await Promise.all([
         fetch("/api/elt/components?nativeOnly=1&executableOnly=1&category=transformation&limit=120", {
-          credentials: "same-origin",
-        }),
-        fetch("/api/elt/components?nativeOnly=1&executableOnly=1&category=check&limit=40", {
           credentials: "same-origin",
         }),
         fetch("/api/elt/components?nativeOnly=1&executableOnly=1&category=ai&limit=40", {
@@ -150,11 +146,7 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
       ]);
       if (transformRes.ok) {
         const data = (await transformRes.json()) as { components: ComponentListItem[] };
-        setTransformItems(data.components ?? []);
-      }
-      if (validateRes.ok) {
-        const data = (await validateRes.json()) as { components: ComponentListItem[] };
-        setValidateItems(data.components ?? []);
+        setTransformItems(filterCanvasOperatorComponents(data.components ?? []));
       }
       if (aiRes.ok) {
         const data = (await aiRes.json()) as { components: ComponentListItem[] };
@@ -169,10 +161,7 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
     void load();
   }, [load]);
 
-  const allItems = useMemo(
-    () => [...transformItems, ...validateItems, ...aiItems],
-    [transformItems, validateItems, aiItems]
-  );
+  const allItems = useMemo(() => [...transformItems, ...aiItems], [transformItems, aiItems]);
 
   const featured = useMemo(() => {
     const byId = new Map(transformItems.map((c) => [c.id, c]));
@@ -217,13 +206,6 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
               items: featured,
             },
             {
-              id: "validate",
-              title: "Validate assets",
-              subtitle: "Terminal checks — assert only, no output",
-              icon: ShieldCheck,
-              items: validateItems,
-            },
-            {
               id: "ai",
               title: "AI & MCP",
               subtitle: "Row enrichment and tool calls on asset data",
@@ -231,7 +213,7 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
               items: featuredAi,
             },
           ],
-    [featured, featuredAi, filteredSearch, validateItems, q]
+    [featured, featuredAi, filteredSearch, q]
   );
 
   function onQuickAction(action: "source" | "dest") {
@@ -250,7 +232,7 @@ export function OperatorsSidebar({ onSelect, onAddSource, onAddDestination, clas
       <div className="shrink-0 border-b border-slate-200 p-3 dark:border-slate-800">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Asset operators</p>
         <p className="mt-0.5 text-[9px] leading-snug text-slate-400">
-          Transforms &amp; checks on the graph — use Source/Output for EL ingest and landing.
+          Transforms on the graph — use Source/Output for EL ingest and landing.
         </p>
         <div className="relative mt-2">
           <Search className="pointer-events-none absolute left-2 top-2 h-3.5 w-3.5 text-slate-400" aria-hidden />

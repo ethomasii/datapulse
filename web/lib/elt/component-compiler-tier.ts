@@ -44,7 +44,7 @@ export function compilerTierLabel(tier: ComponentCompilerTier): string {
 export function compilerTierHint(tier: ComponentCompilerTier): string {
   switch (tier) {
     case "native":
-      return "Executable compiler — runs the real transform/ingest/check logic.";
+      return "Executable compiler — runs the real transform logic on your warehouse.";
     case "category":
       return "Category fallback only — wires ingest/quality/monitor or copies a table; not this template's full logic.";
     case "schema":
