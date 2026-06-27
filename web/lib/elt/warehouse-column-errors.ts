@@ -21,8 +21,23 @@ export function formatMotherduckColumnError(
   if (lastError && !isMotherduckMissingObjectError(lastError)) {
     return lastError.slice(0, 200);
   }
-  return (
-    `No columns found for ${schema}.${table} in MotherDuck database "${configuredDatabase}". ` +
-    `Set Database on your destination connection to where dlt wrote data (often "my_db", not "${STARTER_WAREHOUSE_DEFAULT_DB}"), then retry.`
-  );
+  const configured = configuredDatabase.trim() || STARTER_WAREHOUSE_DEFAULT_DB;
+  const dltDefault = STARTER_WAREHOUSE_DEFAULT_DB;
+  const catalogHint =
+    configured.toLowerCase() === dltDefault.toLowerCase()
+      ? "Run a pipeline sync if the table is new, then retry."
+      : `Set Database on your destination connection to "${dltDefault}" (currently "${configured}") where dlt wrote data, then retry.`;
+  return `No columns found for ${schema}.${table} in MotherDuck database "${configured}". ${catalogHint}`;
+}
+
+/** Parse schema.table and format a MotherDuck column-load error. */
+export function formatMotherduckColumnErrorForTableRef(
+  tableRef: string,
+  configuredDatabase: string,
+  lastError?: string
+): string {
+  const parts = tableRef.trim().split(".");
+  const table = parts.length ? parts[parts.length - 1]! : "table";
+  const schema = parts.length > 1 ? parts.slice(0, -1).join(".") : "main";
+  return formatMotherduckColumnError(schema, table, configuredDatabase, lastError);
 }

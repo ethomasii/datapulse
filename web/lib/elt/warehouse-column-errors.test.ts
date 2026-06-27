@@ -6,6 +6,7 @@ describe("formatMotherduckColumnError", () => {
     const msg = formatMotherduckColumnError("github_dlt_hub_dlt", "issues", "eltpulse", "Not Found");
     expect(msg).toContain("github_dlt_hub_dlt.issues");
     expect(msg).toContain("my_db");
+    expect(msg).toContain("eltpulse");
     expect(msg).not.toBe("Not Found");
   });
 

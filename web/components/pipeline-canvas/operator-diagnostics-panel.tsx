@@ -11,11 +11,18 @@ type Props = {
   /** Compact bar above preview strip; default is full sidebar card. */
   variant?: "sidebar" | "strip";
   className?: string;
+  /** Sidebar panel starts collapsed to reduce layout shift while editing. */
+  defaultExpanded?: boolean;
 };
 
 /** Aggregated step issues — column load, input/output preview, warehouse connection hints. */
-export function OperatorDiagnosticsPanel({ diagnostics, variant = "sidebar", className }: Props) {
-  const [expanded, setExpanded] = useState(true);
+export function OperatorDiagnosticsPanel({
+  diagnostics,
+  variant = "sidebar",
+  className,
+  defaultExpanded = false,
+}: Props) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
 
   if (!diagnostics.length) return null;
 
@@ -75,7 +82,7 @@ export function OperatorDiagnosticsPanel({ diagnostics, variant = "sidebar", cla
       </button>
 
       {expanded ? (
-        <ul className="space-y-2 border-t border-amber-200/80 px-3 py-2 dark:border-amber-900/40">
+        <ul className="max-h-40 space-y-2 overflow-y-auto overscroll-contain border-t border-amber-200/80 px-3 py-2 dark:border-amber-900/40">
           {diagnostics.map((item) => (
             <li key={item.id} className="text-[11px]">
               <p className="font-medium text-amber-950 dark:text-amber-100">

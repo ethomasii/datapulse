@@ -6,6 +6,7 @@ import { db } from "@/lib/db/client";
 import { previewTableFromConfig } from "@/lib/elt/pipeline-asset-keys";
 import { resolvePreviewTableRefWithWarehouse } from "@/lib/elt/pipeline-assets";
 import { stripDuckdbCatalogPrefix, parseDuckdbTableRef } from "@/lib/elt/duckdb-table-ref";
+import { formatMotherduckColumnErrorForTableRef, isMotherduckMissingObjectError } from "@/lib/elt/warehouse-column-errors";
 import { fetchWarehouseColumnsForAsset } from "@/lib/elt/warehouse-column-introspect";
 import { introspectDestinationConnection } from "@/lib/elt/warehouse-introspect";
 import { motherduckDatabaseName } from "@/lib/elt/warehouse-introspect-connectors";
@@ -21,6 +22,29 @@ const pipelineSelect = {
   sourceConfiguration: true,
   destinationConnectionId: true,
 } as const;
+
+function enrichMotherduckPreviewMessage(
+  message: string,
+  conn: { connector: string },
+  table: string,
+  configuredDatabase?: string
+): string {
+  if (conn.connector?.toLowerCase() !== "motherduck" || !configuredDatabase) return message;
+  if (!isMotherduckMissingObjectError(message)) return message;
+  const ref = parseDuckdbTableRef(table, configuredDatabase);
+  if (!ref) return message;
+  return formatMotherduckColumnErrorForTableRef(`${ref.schema}.${ref.table}`, configuredDatabase, message);
+}
+
+function motherduckConfiguredDatabase(conn: {
+  connector: string;
+  config: unknown;
+  connectionSecretsEnc: string | null;
+}): string | undefined {
+  if (conn.connector?.toLowerCase() !== "motherduck") return undefined;
+  const { secrets, config } = resolveDestinationConnectionContext(conn);
+  return motherduckDatabaseName(secrets, config);
+}
 
 function motherduckPreviewQueryOptions(
   conn: { connector: string; config: unknown; connectionSecretsEnc: string | null },
@@ -130,6 +154,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ error: "table must be schema.table format" }, { status: 400 });
   }
 
+  const configuredDatabase = motherduckConfiguredDatabase(conn);
+
   if (body.columnsOnly) {
     try {
       const columnMeta = await fetchWarehouseColumnsForAsset(conn, warehouseRef);
@@ -141,10 +167,23 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         rows: [],
         rowCount: 0,
         truncated: false,
+        configuredDatabase,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      return NextResponse.json({ error: msg, ok: false, message: msg, columns: [], rows: [], rowCount: 0, truncated: false }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: msg,
+          ok: false,
+          message: msg,
+          columns: [],
+          rows: [],
+          rowCount: 0,
+          truncated: false,
+          configuredDatabase,
+        },
+        { status: 400 }
+      );
     }
   }
 
@@ -168,15 +207,26 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         result = {
           ...result,
           ok: false,
-          message:
+          message: enrichMotherduckPreviewMessage(
             columnMeta.message ||
-            `No table or columns found for ${table}. Confirm the MotherDuck database on your connection matches where dlt wrote data, then run a sync.`,
+              `No table or columns found for ${table}. Confirm the MotherDuck database on your connection matches where dlt wrote data, then run a sync.`,
+            conn,
+            warehouseRef,
+            configuredDatabase
+          ),
         };
       }
     }
-    return NextResponse.json({ table, ...result });
+    if (!result.ok && result.message) {
+      result = {
+        ...result,
+        message: enrichMotherduckPreviewMessage(result.message, conn, warehouseRef, configuredDatabase),
+      };
+    }
+    return NextResponse.json({ table, configuredDatabase, ...result });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: msg }, { status: 400 });
+    const raw = e instanceof Error ? e.message : String(e);
+    const msg = enrichMotherduckPreviewMessage(raw, conn, warehouseRef, configuredDatabase);
+    return NextResponse.json({ error: msg, configuredDatabase }, { status: 400 });
   }
 }

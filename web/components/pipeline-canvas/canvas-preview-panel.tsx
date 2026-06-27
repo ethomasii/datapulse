@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import clsx from "clsx";
 import type { CanvasInspectorFocus } from "@/components/pipeline-canvas/pipeline-canvas";
@@ -30,12 +30,13 @@ function PreviewPane({ title, table, pipelineId, config, className, onDiagnostic
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PreviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const onDiagnosticChangeRef = useRef(onDiagnosticChange);
+  onDiagnosticChangeRef.current = onDiagnosticChange;
 
   const load = useCallback(async () => {
     if (!table) return;
     setLoading(true);
     setError(null);
-    onDiagnosticChange?.(null);
     try {
       const res = await fetch(`/api/elt/pipelines/${encodeURIComponent(pipelineId)}/preview`, {
         method: "POST",
@@ -44,19 +45,19 @@ function PreviewPane({ title, table, pipelineId, config, className, onDiagnostic
         body: JSON.stringify({ table, config, limit: 8 }),
       });
       const data = await readClientFetchJson<PreviewResult & { error?: string }>(res);
-      if (!res.ok) throw new Error(data.error ?? "Preview failed");
+      if (!res.ok) throw new Error(data.error ?? data.message ?? "Preview failed");
       if (data.ok === false) throw new Error(data.message ?? data.error ?? "Preview failed");
       setResult(data);
-      onDiagnosticChange?.(null);
+      onDiagnosticChangeRef.current?.(null);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Preview failed";
       setError(msg);
-      onDiagnosticChange?.(msg);
+      onDiagnosticChangeRef.current?.(msg);
       setResult(null);
     } finally {
       setLoading(false);
     }
-  }, [pipelineId, config, table, onDiagnosticChange]);
+  }, [pipelineId, config, table]);
 
   const configKey = JSON.stringify(config);
 
@@ -64,12 +65,12 @@ function PreviewPane({ title, table, pipelineId, config, className, onDiagnostic
     if (!table) {
       setResult(null);
       setError(null);
-      onDiagnosticChange?.(null);
+      onDiagnosticChangeRef.current?.(null);
       return;
     }
     const t = setTimeout(() => void load(), 350);
     return () => clearTimeout(t);
-  }, [table, load, configKey, onDiagnosticChange]);
+  }, [table, load, configKey]);
 
   return (
     <div className={clsx("flex min-h-0 min-w-0 flex-1 flex-col border-r border-slate-200 last:border-r-0 dark:border-slate-800", className)}>
@@ -77,7 +78,7 @@ function PreviewPane({ title, table, pipelineId, config, className, onDiagnostic
         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{title}</p>
         {table ? <p className="truncate font-mono text-[10px] text-slate-400">{table}</p> : null}
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-2">
+      <div className="min-h-[3.5rem] flex-1 overflow-auto p-2">
         {!table ? (
           <p className="text-[11px] text-slate-500">Select a transform step with a wired table.</p>
         ) : loading ? (
@@ -86,7 +87,9 @@ function PreviewPane({ title, table, pipelineId, config, className, onDiagnostic
             Loading…
           </p>
         ) : error ? (
-          <p className="text-[11px] text-amber-700 dark:text-amber-300">{error}</p>
+          <p className="line-clamp-3 text-[11px] text-amber-700 dark:text-amber-300" title={error}>
+            {error}
+          </p>
         ) : result?.rows?.length ? (
           <table className="w-full text-left text-[10px]">
             <thead className="sticky top-0 bg-slate-100 dark:bg-slate-900">

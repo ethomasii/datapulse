@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Plus } from "lucide-react";
 import clsx from "clsx";
 
 import { operatorColumnGridMode } from "@/lib/elt/operator-column-grid-mode";
 import { readClientFetchJson } from "@/lib/elt/fetch-json-body";
-import { formatMotherduckColumnError } from "@/lib/elt/warehouse-column-errors";
+import { formatMotherduckColumnErrorForTableRef } from "@/lib/elt/warehouse-column-errors";
 
 type ColumnMeta = { name: string; type?: string };
 
@@ -45,13 +45,17 @@ function selectedColumns(config: Record<string, unknown>): string[] {
   return [];
 }
 
-function friendlyColumnLoadError(message: string, tableRef: string): string {
+function friendlyColumnLoadError(
+  message: string,
+  tableRef: string,
+  configuredDatabase?: string
+): string {
   const trimmed = message.trim();
   if (/^not found$/i.test(trimmed)) {
-    return formatMotherduckColumnError(
-      tableRef.split(".")[0] ?? "schema",
-      tableRef.split(".").pop() ?? "table",
-      "eltpulse"
+    return formatMotherduckColumnErrorForTableRef(
+      tableRef,
+      configuredDatabase ?? "your connection catalog",
+      trimmed
     );
   }
   return message;
@@ -70,6 +74,8 @@ export function OperatorColumnGrid({
   const [columns, setColumns] = useState<ColumnMeta[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const onDiagnosticChangeRef = useRef(onDiagnosticChange);
+  onDiagnosticChangeRef.current = onDiagnosticChange;
 
   const mode = useMemo(() => operatorColumnGridMode(componentId), [componentId]);
 
@@ -77,12 +83,12 @@ export function OperatorColumnGrid({
     const tableRef = inputTable?.trim() || null;
     if (!tableRef) {
       setColumns([]);
-      onDiagnosticChange?.(null);
+      setError(null);
+      onDiagnosticChangeRef.current?.(null);
       return;
     }
     setLoading(true);
     setError(null);
-    onDiagnosticChange?.(null);
     try {
       const res = await fetch(`/api/elt/pipelines/${encodeURIComponent(pipelineId)}/preview`, {
         method: "POST",
@@ -97,6 +103,7 @@ export function OperatorColumnGrid({
         rows?: Record<string, unknown>[];
         error?: string;
         table?: string;
+        configuredDatabase?: string;
       }>(res);
       if (!res.ok) {
         throw new Error(data.error ?? data.message ?? "Could not load columns");
@@ -111,25 +118,26 @@ export function OperatorColumnGrid({
         const msg = friendlyColumnLoadError(
           data.message ??
             `No columns found for ${data.table ?? tableRef}. Run a sync and confirm your MotherDuck connection Database (e.g. my_db) matches where dlt wrote data.`,
-          data.table ?? tableRef
+          data.table ?? tableRef,
+          data.configuredDatabase
         );
         setColumns([]);
         setError(msg);
-        onDiagnosticChange?.(msg);
+        onDiagnosticChangeRef.current?.(msg);
         return;
       }
       setColumns(names.map((name) => ({ name })));
-      onDiagnosticChange?.(null);
+      onDiagnosticChangeRef.current?.(null);
     } catch (e) {
       const raw = e instanceof Error ? e.message : "Column load failed";
       const msg = friendlyColumnLoadError(raw, tableRef);
       setError(msg);
-      onDiagnosticChange?.(msg);
+      onDiagnosticChangeRef.current?.(msg);
       setColumns([]);
     } finally {
       setLoading(false);
     }
-  }, [pipelineId, inputTable, onDiagnosticChange]);
+  }, [pipelineId, inputTable]);
 
   useEffect(() => {
     const t = setTimeout(() => void loadColumns(), 250);
@@ -195,7 +203,7 @@ export function OperatorColumnGrid({
         ) : null}
       </div>
 
-      <div className="max-h-56 overflow-y-auto overscroll-contain">
+      <div className="max-h-56 min-h-[4.5rem] overflow-y-auto overscroll-contain">
         {!inputTable ? (
           <p className="px-3 py-4 text-[11px] text-slate-500">Wire an input table to load columns.</p>
         ) : loading ? (
@@ -204,11 +212,12 @@ export function OperatorColumnGrid({
             Loading columns…
           </p>
         ) : error ? (
-          <p className="px-3 py-4 text-[11px] text-amber-700 dark:text-amber-300">{error}</p>
+          <p className="px-3 py-4 text-[11px] text-amber-700 dark:text-amber-300">
+            Couldn&apos;t load columns. Expand <strong>Step diagnostics</strong> above for details.
+          </p>
         ) : columns.length === 0 ? (
           <p className="px-3 py-4 text-[11px] text-slate-500">
-            No columns found for {inputTable}. Run a sync, confirm your MotherDuck connection Database matches where
-            dlt wrote data (e.g. my_db), or pick the table from the asset picker.
+            No columns yet for {inputTable}. Run a sync or check Step diagnostics above.
           </p>
         ) : (
           <table className="w-full text-left text-[11px]">

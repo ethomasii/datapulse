@@ -29,7 +29,15 @@ export function buildOperatorDiagnostic(
   let hint = input.hint;
 
   if (!hint) {
-    if (lower === "not found" || lower.includes("motherduck") || lower.includes("my_db")) {
+    const alreadyExplainsCatalog =
+      lower.includes("set database") ||
+      lower.includes("currently \"") ||
+      lower.includes("where dlt wrote") ||
+      message.length > 120;
+    if (
+      !alreadyExplainsCatalog &&
+      (lower === "not found" || lower.includes("motherduck database"))
+    ) {
       hint =
         "Open your MotherDuck destination connection and set Database to where dlt loaded data (often my_db, not eltpulse). Run a sync if the table is new.";
     } else if (lower.includes("destination connection")) {

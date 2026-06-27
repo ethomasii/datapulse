@@ -185,6 +185,19 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
     []
   );
 
+  const reportStepDiagnosticRef = useRef(reportStepDiagnostic);
+  reportStepDiagnosticRef.current = reportStepDiagnostic;
+
+  const reportColumnsDiagnostic = useCallback((message: string | null) => {
+    reportStepDiagnosticRef.current("columns", "columns", message);
+  }, []);
+  const reportInputPreviewDiagnostic = useCallback((message: string | null) => {
+    reportStepDiagnosticRef.current("input_preview", "input_preview", message);
+  }, []);
+  const reportOutputPreviewDiagnostic = useCallback((message: string | null) => {
+    reportStepDiagnosticRef.current("output_preview", "output_preview", message);
+  }, []);
+
   useEffect(() => {
     setStepDiagnostics([]);
   }, [inspectorFocus.kind === "component" ? inspectorFocus.nodeId : ""]);
@@ -814,7 +827,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
             </p>
           </div>
           {stepDiagnostics.length ? (
-            <OperatorDiagnosticsPanel diagnostics={stepDiagnostics} />
+            <OperatorDiagnosticsPanel diagnostics={stepDiagnostics} defaultExpanded={false} />
           ) : null}
           <CanvasComponentInspector
             key={focus.nodeId}
@@ -824,7 +837,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
             readOnly={!canWrite}
             hideInlinePreview
             autoApply
-            onColumnDiagnosticChange={(msg) => reportStepDiagnostic("columns", "columns", msg)}
+            onColumnDiagnosticChange={reportColumnsDiagnostic}
             onPatch={(p) => canvasControlRef.current?.patchNodeData(focus.nodeId, p)}
           />
         </div>
@@ -1136,16 +1149,13 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
             onPipelinePatched={() => void loadPipelineGraph(selectedId)}
           />
           <div className="flex shrink-0 flex-col">
-            {stepDiagnostics.length ? (
-              <OperatorDiagnosticsPanel variant="strip" diagnostics={stepDiagnostics} />
-            ) : null}
             <CanvasPreviewPanel
               pipelineId={selectedId}
               focus={inspectorFocus}
               liveConfig={liveStepConfig}
               className="h-48 shrink-0 xl:h-56 2xl:h-64"
-              onInputDiagnosticChange={(msg) => reportStepDiagnostic("input_preview", "input_preview", msg)}
-              onOutputDiagnosticChange={(msg) => reportStepDiagnostic("output_preview", "output_preview", msg)}
+              onInputDiagnosticChange={reportInputPreviewDiagnostic}
+              onOutputDiagnosticChange={reportOutputPreviewDiagnostic}
             />
           </div>
           <DesignerMobileChrome
