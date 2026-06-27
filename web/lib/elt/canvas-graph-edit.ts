@@ -21,7 +21,7 @@ import {
   positionForAppend,
   type CanvasAppendNodeSpec,
 } from "@/lib/elt/canvas-node-placement";
-import { wireInputFromUpstreamEdge } from "@/lib/elt/canvas-wire-input";
+import { wireInputFromUpstreamEdge, rewireAllComponentInputs, type WireInputContext } from "@/lib/elt/canvas-wire-input";
 
 export type CanvasGraphEditAction =
   | {
@@ -126,7 +126,13 @@ function addTransformNode(
 export function applyCanvasGraphEdits(
   sourceConfiguration: Record<string, unknown>,
   actions: CanvasGraphEditAction[],
-  meta: { sourceType: string; destinationType: string; pipelineName?: string; transformOnly?: boolean }
+  meta: {
+    sourceType: string;
+    destinationType: string;
+    pipelineName?: string;
+    transformOnly?: boolean;
+    wireInputContext?: WireInputContext;
+  }
 ): {
   sourceConfiguration: Record<string, unknown>;
   canvas: PipelineCanvasGraph;
@@ -243,8 +249,14 @@ export function applyCanvasGraphEdits(
             edges.push(makeEdge(afterNode.id, node.id));
           }
         }
-      } else if (wireFrom && isValidPipelineCanvasEdge(wireFrom, node)) {
+      } else       if (wireFrom && isValidPipelineCanvasEdge(wireFrom, node)) {
         edges.push(makeEdge(wireFrom.id, node.id));
+      }
+      const wired = wireInputFromUpstreamEdge(nodes, edges, id, meta.wireInputContext);
+      if (wired) {
+        nodes = nodes.map((n) =>
+          n.id === wired.nodeId ? { ...n, data: { ...n.data, config: wired.configPatch } } : n
+        );
       }
       messages.push(`Added component ${catalog.name}`);
     } else if (action.op === "add_transform") {
@@ -301,7 +313,7 @@ export function applyCanvasGraphEdits(
           },
         };
       });
-      const wired = wireInputFromUpstreamEdge(nodes, edges, target.id);
+      const wired = wireInputFromUpstreamEdge(nodes, edges, target.id, meta.wireInputContext);
       if (wired) {
         nodes = nodes.map((n) =>
           n.id === wired.nodeId ? { ...n, data: { ...n.data, config: wired.configPatch } } : n
@@ -325,6 +337,7 @@ export function applyCanvasGraphEdits(
   }
 
   edges = filterCanvasEdges(nodes, edges);
+  nodes = rewireAllComponentInputs(nodes, edges, meta.wireInputContext);
   nodes = relayoutPipelineCanvas(nodes, edges);
   const canvas: PipelineCanvasGraph = { nodes, edges, v: 1 };
   const next: Record<string, unknown> = { ...sourceConfiguration, canvas };

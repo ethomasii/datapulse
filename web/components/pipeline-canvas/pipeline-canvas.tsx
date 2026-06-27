@@ -785,8 +785,10 @@ function FlowCanvas({
       addSourceNode: () => addNode("sourceNode"),
       addDestinationNode: () => addNode("destNode"),
       replaceGraph: (nextNodes: Node[], nextEdges: Edge[]) => {
-        setNodes(nextNodes);
-        setEdges(resolveCanvasEdges(nextNodes, nextEdges));
+        const resolved = resolveCanvasEdges(nextNodes, nextEdges);
+        const wired = rewireAllComponentInputs(nextNodes, resolved, wireInputContextRef.current);
+        setNodes(wired);
+        setEdges(resolved);
         setLocalValidationError(null);
         setTimeout(fit, 60);
       },

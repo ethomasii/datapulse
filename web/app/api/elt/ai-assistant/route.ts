@@ -27,6 +27,8 @@ import {
   type AiPipelineComponentInput,
 } from "@/lib/elt/ai-pipeline-canvas-build";
 import { applyCanvasGraphEdits, type CanvasGraphEditAction } from "@/lib/elt/canvas-graph-edit";
+import type { WireInputContext } from "@/lib/elt/canvas-wire-input";
+import { inferRawLandingTables, resolveLandingDataset } from "@/lib/elt/pipeline-assets";
 import { isAdditiveCanvasPatch, isLocalCanvasPreviewPatch } from "@/lib/elt/canvas-patch-safety";
 import { isTransformOnlyPipeline } from "@/lib/elt/pipeline-mode";
 import { AI_PIPELINE_PLAYBOOKS, listPlaybooksForPrompt, matchPlaybook } from "@/lib/elt/ai-pipeline-playbook";
@@ -98,7 +100,11 @@ When the user mentions monitors, sensors, quality checks, or data validation:
 3. **Existing pipeline** (pipeline context below): call **add_pipeline_components** with the same \`components\` array — nodes land on the visual canvas and sync to v2 YAML on apply.
 4. **Wire the graph** (connect/disconnect steps, add dbt transform after load): call **edit_pipeline_canvas** with \`actions[]\` — use node labels or ids like "source", "dest", "join", "filter".
 5. **Playbooks** — call **list_pipeline_playbooks** or **build_lake_pipeline** for curated recipes; apply with add_pipeline_components + edit_pipeline_canvas in one turn.
-6. Prefer **native** component ids (filter_rows, join_tables, lookup, group_aggregate, data_cleansing, **alter_row**, datetime_parser, pivot, anti_join, dq_check) — they compile and run inline on the canvas.
+6. Prefer **specific native** transform operators (filter_rows, join_tables, lookup, group_aggregate, **fill_nulls**, data_cleansing, **alter_row**, datetime_parser, pivot, anti_join, dq_check, etc.) — they compile and run inline on the canvas.
+   - **fill_nulls** — replace null/missing values (e.g. all columns → `"N/A"` via \`values\` JSON or a plain string \`"N/A"\` for every column). Use this when the user says fill/impute/replace nulls.
+   - **data_cleansing** — trim strings, optional lowercase, drop all-null rows only. Does **not** fill nulls with literals.
+   - When the user wants both string cleanup **and** null imputation, add **two** steps chained: \`data_cleansing\` then \`fill_nulls\` (pass both in one \`components[]\` or two \`add_component\` actions).
+   - **sql_transform** (SQL Transform) — **fallback only** when **search_components** / **get_component_details** show no native operator fits. Use one \`sql_transform\` step with \`config.sql\` (CTAS/SELECT referencing the upstream table). Do **not** default to raw SQL when a native id exists (e.g. fill nulls → fill_nulls, not SQL).
 7. **AI / MCP** — use **list_mcp_server_catalog** for known integrations (Stripe, GitHub, **Dagster+**, **FastMCP**, **Prefect Horizon**, …); **list_mcp_servers** for workspace registrations. Custom tools: build with [FastMCP](https://gofastmcp.com), deploy via [Horizon](https://www.prefect.io/horizon), register the HTTP URL here, wire **litellm_agent**. Dagster+: \`https://mcp.agent.dagster.cloud/mcp/\` with Bearer token + \`Dagster-Cloud-Organization\` header. Native ids: **mcp_tool_call**, **litellm_agent**, **litellm_inference_asset**, **llm_evaluator**. See [agent family demo](https://dagster-component-ui.vercel.app/examples/agent_family).
 
 ## Curated playbooks (use list_pipeline_playbooks)
@@ -131,6 +137,7 @@ Component config defaults:
 - **generate_pipeline** accepts \`components[]\` to place nodes on the canvas for new pipelines.
 - **add_pipeline_components** adds nodes to an open pipeline (canvas edit mode).
 - Prefer native executable components over platform-only schema templates.
+- Operator priority: (1) specific native transforms (filter_rows, fill_nulls, join_tables, …), (2) chain multiple natives if needed, (3) **sql_transform** only when no native operator matches after **search_components**.
 
 ## Format
 - Be extremely brief. 1-3 sentences max after a generation.
@@ -1163,6 +1170,28 @@ function pulseCanvasGraphShrinkError(beforeNodes: Node[], afterNodes: Node[], pu
   return null;
 }
 
+function wireInputContextFromPipeline(
+  pipeline: {
+    name: string;
+    sourceType: string;
+    destinationType: string;
+    tool: string;
+  },
+  sourceConfiguration: Record<string, unknown>
+): WireInputContext {
+  return {
+    rawLandingTables: inferRawLandingTables({
+      name: pipeline.name,
+      sourceType: pipeline.sourceType,
+      destinationType: pipeline.destinationType,
+      tool: pipeline.tool,
+      sourceConfiguration,
+    }),
+    landingDataset: resolveLandingDataset(pipeline.sourceType, sourceConfiguration, pipeline.name),
+    pipelineName: pipeline.name,
+  };
+}
+
 async function toolEditPipelineCanvas(
   userId: string,
   contextPipelineId: string | undefined,
@@ -1201,6 +1230,7 @@ async function toolEditPipelineCanvas(
     destinationType: pipeline.destinationType,
     pipelineName: pipeline.name,
     transformOnly: isTransformOnlyPipeline(base),
+    wireInputContext: wireInputContextFromPipeline(pipeline, base),
   });
 
   if (edited.errors.length && !edited.messages.length) {
@@ -1264,7 +1294,11 @@ async function toolAddPipelineComponents(
   userId: string,
   contextPipelineId: string | undefined,
   params: { pipeline_id?: string; components?: unknown },
-  options?: { canvasSnapshot?: CanvasSnapshot | null; pulseCanvasMode?: boolean }
+  options?: {
+    canvasSnapshot?: CanvasSnapshot | null;
+    pulseCanvasMode?: boolean;
+    pulseTargetNodeId?: string;
+  }
 ) {
   const pipelineId = String(params.pipeline_id ?? contextPipelineId ?? "").trim();
   const components = normalizeAiComponents(params.components);
@@ -1276,6 +1310,23 @@ async function toolAddPipelineComponents(
   }
   if (components.length === 0) {
     return { success: false, error: "components array is required and must include at least one component_id." };
+  }
+
+  // Pulse bar "add after this step" — insert on the anchored node, not at pipeline tail.
+  if (options?.pulseCanvasMode && options.pulseTargetNodeId) {
+    let after = options.pulseTargetNodeId;
+    const actions: CanvasGraphEditAction[] = components.map((c) => {
+      const action: CanvasGraphEditAction = {
+        op: "add_component",
+        component_id: c.component_id,
+        label: c.label,
+        config: c.config,
+        after,
+      };
+      after = c.label?.trim() || c.component_id;
+      return action;
+    });
+    return toolEditPipelineCanvas(userId, pipelineId, { pipeline_id: pipelineId, actions }, options);
   }
 
   const ownerIds = await getAccessibleResourceOwnerIds(userId);
@@ -1603,8 +1654,13 @@ When they describe a brand-new pipeline instead, use **generate_pipeline** witho
         pipelineContextBlock += `
 
 ## Pulse AI (canvas designer bar — primary use cases)
-1. **Add a step** — "add a filter", "dedupe after bronze", "aggregate by day":
-   - Call **add_pipeline_components** with one \`component_id\` (prefer native: filter_rows, dedupe_rows, group_aggregate, data_cleansing, **alter_row** (CDC alter row / ADF semantics), select_columns, join_tables, etc.)
+1. **Add a step** — "add a filter", "dedupe after bronze", "aggregate by day", "fill nulls with N/A":
+   - **search_components** first when the transform type is unclear — pick the best native \`component_id\`.
+   - Call **add_pipeline_components** with one or more native ids (filter_rows, dedupe_rows, group_aggregate, **fill_nulls**, data_cleansing, **alter_row**, select_columns, join_tables, etc.)
+   - For **fill nulls / impute / replace missing with a literal**, use **fill_nulls** — not data_cleansing. Example config: \`{ "values": "N/A" }\` (all columns) or \`{ "values": {"col_a":"N/A","col_b":"N/A"} }\`.
+   - For **trim/lowercase/drop empty rows**, use **data_cleansing**.
+   - When both are needed, pass **two** components in order: data_cleansing then fill_nulls.
+   - **sql_transform** only if no native operator fits — single step with \`config: { "sql": "CREATE OR REPLACE TABLE … AS SELECT …" }\` referencing the wired upstream table. Never use SQL when fill_nulls, filter_rows, join_tables, etc. apply.
    - OR **edit_pipeline_canvas** with \`add_component\` + \`after\` set to the upstream node id/label
    - **Preserve every node** in the live canvas snapshot — only append/wire new steps
 2. **Replace a step** — "swap data cleansing for alter row", "use filter_rows instead":
@@ -1813,6 +1869,7 @@ Use this as the source of truth for graph edits — not the last saved pipeline 
           }, {
             canvasSnapshot,
             pulseCanvasMode: Boolean(canvasSnapshot?.nodes?.length),
+            pulseTargetNodeId: canvasNodeContext?.nodeId,
           });
         } else if (name === "edit_pipeline_canvas") {
           result = await toolEditPipelineCanvas(user.id, pipelineId, {

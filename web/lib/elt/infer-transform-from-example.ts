@@ -43,6 +43,7 @@ const ALLOWED_COMPONENTS = [
   "data_cleansing",
   "fill_nulls",
   "replace_values",
+  "sql_transform",
 ] as const;
 
 function rowsToMarkdownTable(rows: Record<string, unknown>[], columns?: string[]): string {
@@ -82,7 +83,8 @@ Rules:
 - For select_columns use "columns" (array).
 - For join_tables include left_table, right_table, on, how, output_table when inferring joins.
 - Always set output_table to a sensible schema.table under the same schema as input.
-- Pick the simplest single step that explains the transformation.`;
+- Pick the simplest single step that explains the transformation.
+- Prefer a specific native operator from the list above. Use **sql_transform** only when no listed native operator can express the transform; then set config.sql to warehouse SQL (CTAS/SELECT) over the input table.`;
 
   const userParts: Anthropic.MessageParam["content"] = [];
 

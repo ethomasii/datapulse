@@ -242,24 +242,35 @@ export const fillNullsComponent: NativeComponentDefinition = {
     const output = String(config.output_table ?? table).trim();
     let values: Record<string, unknown> = {};
     const raw = config.values ?? config.fillna;
+    let scalarFill: string | null = null;
     if (typeof raw === "string") {
-      try {
-        values = JSON.parse(raw) as Record<string, unknown>;
-      } catch {
-        return { warnings: ["fill_nulls: values must be valid JSON"], python: [] };
+      const trimmed = raw.trim();
+      if (trimmed.startsWith("{")) {
+        try {
+          values = JSON.parse(trimmed) as Record<string, unknown>;
+        } catch {
+          return { warnings: ["fill_nulls: values must be valid JSON"], python: [] };
+        }
+      } else if (trimmed.length) {
+        scalarFill = trimmed.replace(/^"|"$/g, "");
       }
     } else if (raw && typeof raw === "object") {
       values = raw as Record<string, unknown>;
     }
-    if (!table || !Object.keys(values).length) {
+    if (!table) {
+      return { warnings: ["fill_nulls: table required"], python: [] };
+    }
+    if (!scalarFill && !Object.keys(values).length) {
       return { warnings: ["fill_nulls: table and values required"], python: [] };
     }
-    const valuesPy = JSON.stringify(values);
+    const fillLine = scalarFill
+      ? `    _df = _df.fillna(${JSON.stringify(scalarFill)})`
+      : `    _df = _df.fillna(${JSON.stringify(values)})`;
     const python = [
       `# ── fill_nulls: ${table} ──`,
       "try:",
       ...pandasReadTable(table).map((l) => (l.startsWith("import") ? l : `    ${l}`)),
-      `    _df = _df.fillna(${valuesPy})`,
+      fillLine,
       ...pandasWriteTable(output, "fill_nulls"),
       "except Exception as _fill_err:",
       '    print(f"[fill_nulls] failed: {_fill_err}")',
