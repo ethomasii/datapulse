@@ -5,6 +5,7 @@ import { Cable, Check, ChevronDown, Save } from "lucide-react";
 import {
   CREDENTIAL_SENSITIVE_KEY_SET,
   credentialKeysForConnectionSide,
+  formValuesToConnectionConfig,
 } from "@/lib/elt/credential-payload";
 
 export type StoredConnection = {
@@ -101,17 +102,14 @@ export function ConnectionPicker({
     setSaving(true);
     setSaveError("");
     // Non-secret catalog fields → `config`; password/textarea fields for this connector → `secrets` (encrypted server-side).
-    const safeConfig: Record<string, string> = {};
+    const safeConfig = formValuesToConnectionConfig(connector, currentValues);
     const allowedCredKeys = credentialKeysForConnectionSide(connectionType, connector);
     const secrets: Record<string, string> = {};
     for (const [k, v] of Object.entries(currentValues)) {
       if (!v.trim()) continue;
       if (CREDENTIAL_SENSITIVE_KEY_SET.has(k) && allowedCredKeys.has(k)) {
         secrets[k] = v.trim();
-        continue;
       }
-      if (CREDENTIAL_SENSITIVE_KEY_SET.has(k)) continue;
-      safeConfig[k] = v;
     }
     const payload: Record<string, unknown> = {
       name: saveName.trim(),

@@ -66,7 +66,7 @@ function CategoricalProfileBar({ profile }: { profile: ColumnProfile }) {
   );
 }
 
-/** Compact MotherDuck-style column profile under preview headers. */
+/** Compact column profile mini-chart under preview headers. */
 export function ColumnProfileBar({ profile, className }: Props) {
   if (!profile) {
     return <div className={clsx("mt-1 h-[1.375rem]", className)} aria-hidden />;

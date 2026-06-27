@@ -201,6 +201,11 @@ function FlowCanvas({
   const [selectedFlowEdges, setSelectedFlowEdges] = useState<Edge[]>([]);
   const [localValidationError, setLocalValidationError] = useState<string | null>(null);
 
+  const wireInputContextRef = useRef(wireInputContext);
+  wireInputContextRef.current = wireInputContext;
+  const edgesRef = useRef(edges);
+  edgesRef.current = edges;
+
   useEffect(() => {
     if (!pipelineId) return;
     const hasGraph = loadedGraph && Array.isArray(loadedGraph.nodes);
@@ -209,14 +214,19 @@ function FlowCanvas({
       ? resolveCanvasEdges(baseNodes, loadedGraph.edges)
       : resolveCanvasEdges(demoNodes, demoEdges);
     const nextEdges = preferDestinationWireEdges(baseNodes, baseEdges);
-    const nextNodes = rewireAllComponentInputs(baseNodes, nextEdges, wireInputContext);
+    const nextNodes = rewireAllComponentInputs(baseNodes, nextEdges, wireInputContextRef.current);
     setNodes(nextNodes);
     setEdges(nextEdges);
     const t = setTimeout(() => rfRef.current?.fitView({ padding: 0.2 }), 80);
     return () => clearTimeout(t);
-    // graphRevision drives re-sync; omit loadedGraph/setters from deps to prevent load/fit loops with @xyflow/react.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadedGraph read from latest render when graphRevision changes
-  }, [pipelineId, graphRevision, wireInputContext]);
+    // graphRevision reload only — wireInputContext read from ref to avoid resetting graph while typing in sidebar
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadedGraph read when graphRevision changes
+  }, [pipelineId, graphRevision]);
+
+  useEffect(() => {
+    if (!pipelineId) return;
+    setNodes((nds) => rewireAllComponentInputs(nds, edgesRef.current, wireInputContext));
+  }, [pipelineId, wireInputContext, setNodes]);
 
   useEffect(() => {
     setMounted(true);

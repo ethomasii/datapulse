@@ -85,6 +85,8 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
   const [detailLoading, setDetailLoading] = useState(true);
   const [loadedGraph, setLoadedGraph] = useState<{ nodes: Node[]; edges: Edge[] } | null>(null);
   const [loadedSig, setLoadedSig] = useState("");
+  /** Bumps when saved sourceConfiguration changes (load/save) — not on every sidebar keystroke. */
+  const [savedSourceConfigRevision, setSavedSourceConfigRevision] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pipelineSourceType, setPipelineSourceType] = useState("");
@@ -103,9 +105,10 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
   const [sourceCfg, setSourceCfg] = useState<Record<string, unknown>>({});
   const [connectionValues, setConnectionValues] = useState<Record<string, string>>({});
   const [sourceConnectionId, setSourceConnectionId] = useState<string | null>(null);
-  const linkedSourceConnection = useLinkedConnectionMeta(sourceConnectionId);
+  const { meta: linkedSourceConnection } = useLinkedConnectionMeta(sourceConnectionId);
   const [destinationConnectionId, setDestinationConnectionId] = useState<string | null>(null);
-  const linkedDestConnection = useLinkedConnectionMeta(destinationConnectionId);
+  const { meta: linkedDestConnection, refresh: refreshLinkedDestConnection } =
+    useLinkedConnectionMeta(destinationConnectionId);
   /** When the catalog has no source schema, connector fields are edited as JSON. */
   const [connectorJson, setConnectorJson] = useState("{}");
   const [advancedJsonDirty, setAdvancedJsonDirty] = useState(false);
@@ -443,6 +446,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
       const st = typeof row.sourceType === "string" ? row.sourceType : "github";
       const dt = typeof row.destinationType === "string" ? row.destinationType : "duckdb";
       hydrateFormFromSourceConfig(cfg, st, dt);
+      setSavedSourceConfigRevision((n) => n + 1);
       let canvas =
         hydrateCanvasFromSourceConfiguration(cfg, row.name) ?? getCanvasFromSourceConfig(cfg);
       if (!canvas?.nodes?.length) {
@@ -550,6 +554,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
                 ? data.pipeline.destinationType
                 : pipelineDestinationType || "duckdb";
             hydrateFormFromSourceConfig(sc, st, dt);
+            setSavedSourceConfigRevision((n) => n + 1);
           }
         }
       } catch (e) {
@@ -751,6 +756,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
         const full = data.pipeline.sourceConfiguration;
         lastFullSourceConfigRef.current = { ...full };
         hydrateFormFromSourceConfig(full, st, dt);
+        setSavedSourceConfigRevision((n) => n + 1);
       }
     } catch (e) {
       setSourceConfigError(e instanceof Error ? e.message : "Save failed");
@@ -1001,14 +1007,8 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
             onSourceCfgChange={setSourceCfg}
             connectionValues={connectionValues}
             onConnectionPatch={patchConnection}
-            linkedDestConnection={
-              linkedDestConnection
-                ? {
-                    name: linkedDestConnection.name,
-                    hasStoredSecrets: Boolean(linkedDestConnection.hasStoredSecrets),
-                  }
-                : null
-            }
+            linkedDestConnection={linkedDestConnection}
+            onLinkedConnectionUpdated={() => refreshLinkedDestConnection()}
           />
         </FormAccordion>
 
@@ -1067,11 +1067,17 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
     [sourceCfg, loadedSig, selectedId]
   );
 
+  const wireInputSourceConfiguration = useMemo(
+    () => ({ ...lastFullSourceConfigRef.current }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ref snapshot; revision bumps on load/save only
+    [savedSourceConfigRevision, selectedId]
+  );
+
   const wireInputContext = useMemo((): WireInputContext => {
     if (!selectedId) return {};
     const landingDataset = resolveLandingDataset(
       pipelineSourceType || "github",
-      lineageSourceConfig,
+      wireInputSourceConfiguration,
       selectedName || "pipeline"
     );
     return {
@@ -1080,7 +1086,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
         sourceType: pipelineSourceType || "github",
         destinationType: pipelineDestinationType || "motherduck",
         tool: pipelineTool,
-        sourceConfiguration: lineageSourceConfig,
+        sourceConfiguration: wireInputSourceConfiguration,
       }),
       landingDataset,
       pipelineName: selectedName || "pipeline",
@@ -1091,7 +1097,7 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
     pipelineSourceType,
     pipelineDestinationType,
     pipelineTool,
-    lineageSourceConfig,
+    wireInputSourceConfiguration,
   ]);
 
   function renderDesignerWorkspace() {
@@ -1309,14 +1315,8 @@ export function CanvasPageClient({ pipelineId }: { pipelineId: string }) {
               onSourceCfgChange={setSourceCfg}
               connectionValues={connectionValues}
               onConnectionPatch={patchConnection}
-              linkedDestConnection={
-                linkedDestConnection
-                  ? {
-                      name: linkedDestConnection.name,
-                      hasStoredSecrets: Boolean(linkedDestConnection.hasStoredSecrets),
-                    }
-                  : null
-              }
+              linkedDestConnection={linkedDestConnection}
+              onLinkedConnectionUpdated={() => refreshLinkedDestConnection()}
             />
             <div className="mt-3">
               <CopyEnvButton values={destinationEnvValues} />

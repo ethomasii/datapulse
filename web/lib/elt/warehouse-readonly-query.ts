@@ -38,9 +38,12 @@ export type ReadOnlyQueryOptions = {
   schema?: string;
   table?: string;
   catalogFromRef?: string;
+  /** Internal sampling (column profiles). Capped at 10_000 rows. */
+  rowCap?: number;
 };
 
 const MAX_ROWS = 25;
+export const PROFILE_SAMPLE_ROW_CAP = 10_000;
 const QUERY_TIMEOUT_MS = 15_000;
 
 type RowsetRunner = (
@@ -345,6 +348,11 @@ export async function sampleAssetData(
   }
 }
 
+function resolveRowCap(options?: ReadOnlyQueryOptions): number {
+  const cap = options?.rowCap ?? MAX_ROWS;
+  return Math.min(Math.max(1, cap), PROFILE_SAMPLE_ROW_CAP);
+}
+
 /** Run a user-provided read-only SQL against a destination connection. */
 export async function runReadOnlyQuery(
   connection: DestinationConnectionRow,
@@ -353,7 +361,7 @@ export async function runReadOnlyQuery(
   options?: ReadOnlyQueryOptions
 ): Promise<ReadOnlyQueryResult> {
   assertReadOnlySql(sql);
-  const capped = Math.min(MAX_ROWS, Math.max(1, limit));
+  const capped = Math.min(Math.max(1, limit), resolveRowCap(options));
   const limitedSql = /\blimit\s+\d+/i.test(sql) ? sql : `${sql.replace(/;\s*$/, "")} LIMIT ${capped}`;
 
   try {

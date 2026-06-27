@@ -2,7 +2,7 @@ import {
   getDestinationCredentials,
   getSourceCredentials,
 } from "./credentials-catalog";
-import { ALL_CONNECTORS } from "./connectors-registry";
+import { ALL_CONNECTORS, getConnectorConfigFields } from "./connectors-registry";
 
 /** Env keys we never persist (passwords, pasted JSON blobs, private keys). */
 export const CREDENTIAL_SENSITIVE_KEY_SET: ReadonlySet<string> = (() => {
@@ -107,6 +107,23 @@ export function connectionConfigToFormValues(
       out.MOTHERDUCK_DATABASE = db;
     }
     delete out.database;
+  }
+  return out;
+}
+
+/** Map credential form values into connection `config` JSON (non-secrets). */
+export function formValuesToConnectionConfig(
+  connector: string,
+  values: Record<string, string>
+): Record<string, string> {
+  const slug = connector.toLowerCase().trim();
+  const out: Record<string, string> = {};
+  for (const f of getConnectorConfigFields(slug)) {
+    let v = values[f.key]?.trim();
+    if (slug === "motherduck" && f.key === "database" && !v) {
+      v = values.MOTHERDUCK_DATABASE?.trim();
+    }
+    if (v) out[f.key] = v;
   }
   return out;
 }

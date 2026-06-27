@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export type LinkedConnectionMeta = {
   id: string;
@@ -21,6 +21,9 @@ function flattenConnectionConfig(raw: Record<string, unknown> | undefined): Reco
 
 export function useLinkedConnectionMeta(connectionId: string | null | undefined) {
   const [meta, setMeta] = useState<LinkedConnectionMeta | null>(null);
+  const [refreshSeq, setRefreshSeq] = useState(0);
+
+  const refresh = useCallback(() => setRefreshSeq((n) => n + 1), []);
 
   useEffect(() => {
     if (!connectionId) {
@@ -51,7 +54,7 @@ export function useLinkedConnectionMeta(connectionId: string | null | undefined)
     return () => {
       cancelled = true;
     };
-  }, [connectionId]);
+  }, [connectionId, refreshSeq]);
 
-  return meta;
+  return { meta, refresh };
 }

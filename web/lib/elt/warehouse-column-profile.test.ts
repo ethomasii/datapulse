@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  computeColumnProfilesFromSample,
   enrichProfilesFromSampleRows,
   parseSummarizeRowset,
+  profileKindForType,
   type ColumnProfile,
 } from "./warehouse-column-profile";
 
@@ -54,5 +56,44 @@ describe("enrichProfilesFromSampleRows", () => {
     );
     expect(enriched.state.topValue).toBe("open");
     expect(enriched.state.topValueShare).toBeCloseTo(2 / 3);
+  });
+});
+
+describe("profileKindForType", () => {
+  it("recognizes warehouse numeric type names", () => {
+    expect(profileKindForType("int4", [])).toBe("numeric");
+    expect(profileKindForType("float8", [])).toBe("numeric");
+    expect(profileKindForType("NUMBER(38,0)", [])).toBe("numeric");
+    expect(profileKindForType("varchar", [])).toBe("other");
+  });
+});
+
+describe("computeColumnProfilesFromSample", () => {
+  it("computes numeric quartiles and categorical top values from sample rows", () => {
+    const profiles = computeColumnProfilesFromSample(
+      [
+        { name: "amount", type: "double precision" },
+        { name: "status", type: "text" },
+      ],
+      [
+        { amount: 10, status: "open" },
+        { amount: 20, status: "open" },
+        { amount: 30, status: "closed" },
+        { amount: null, status: null },
+      ]
+    );
+    expect(profiles.amount).toMatchObject({
+      kind: "numeric",
+      min: 10,
+      max: 30,
+      q50: 20,
+      nullPct: 25,
+    });
+    expect(profiles.status).toMatchObject({
+      kind: "other",
+      topValue: "open",
+      topValueShare: 0.5,
+      nullPct: 25,
+    });
   });
 });

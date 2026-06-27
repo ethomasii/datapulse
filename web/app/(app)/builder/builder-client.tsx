@@ -180,9 +180,10 @@ export function BuilderClient({
   );
   /** Saved Connection rows linked to this pipeline (persisted as FKs; not stored in source_configuration). */
   const [sourceConnectionId, setSourceConnectionId] = useState<string | null>(null);
-  const linkedSourceConnection = useLinkedConnectionMeta(sourceConnectionId);
+  const { meta: linkedSourceConnection } = useLinkedConnectionMeta(sourceConnectionId);
   const [destinationConnectionId, setDestinationConnectionId] = useState<string | null>(null);
-  const linkedDestConnection = useLinkedConnectionMeta(destinationConnectionId);
+  const { meta: linkedDestConnection, refresh: refreshLinkedDestConnection } =
+    useLinkedConnectionMeta(destinationConnectionId);
   const [postTransformType, setPostTransformType] = useState<"" | "python" | "sql" | "dbt">("");
   const [postTransformCode, setPostTransformCode] = useState("");
   const [dbtPackagePath, setDbtPackagePath] = useState("");
@@ -1343,14 +1344,8 @@ export function BuilderClient({
                     onSourceCfgChange={setSourceCfg}
                     connectionValues={connectionValues}
                     onConnectionPatch={patchConnection}
-                    linkedDestConnection={
-                      linkedDestConnection
-                        ? {
-                            name: linkedDestConnection.name,
-                            hasStoredSecrets: Boolean(linkedDestConnection.hasStoredSecrets),
-                          }
-                        : null
-                    }
+                    linkedDestConnection={linkedDestConnection}
+                    onLinkedConnectionUpdated={() => refreshLinkedDestConnection()}
                   />
                   <div className="mt-4">
                     <CopyEnvButton values={connectionValues} />

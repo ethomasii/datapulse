@@ -74,7 +74,7 @@ const bodySchema = z.object({
   limit: z.number().int().min(1).max(25).optional(),
   /** Skip row sample — only resolve column names (for Select Columns sidebar). */
   columnsOnly: z.boolean().optional(),
-  /** DuckDB-family SUMMARIZE stats under preview headers (default true). */
+  /** Column distribution stats under preview headers (default true). */
   includeProfiles: z.boolean().optional(),
 });
 
@@ -159,7 +159,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   const configuredDatabase = motherduckConfiguredDatabase(conn);
-  const destContext = resolveDestinationConnectionContext(conn);
 
   if (body.columnsOnly) {
     try {
@@ -234,13 +233,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     if (includeProfiles && result.ok && result.columns.length > 0) {
       const duckRef = parseDuckdbTableRef(warehouseRef, configuredDatabase ?? "");
       columnProfiles = await fetchWarehouseColumnProfiles({
-        connector: conn.connector,
-        secrets: destContext.secrets,
-        config: destContext.config,
+        connection: conn,
         quotedTable: quoted,
-        catalogFromRef: duckRef?.database ?? queryOptions?.catalogFromRef,
-        schema: duckRef?.schema ?? queryOptions?.schema,
-        table: duckRef?.table ?? queryOptions?.table,
+        warehouseRef,
+        queryOptions: {
+          schema: duckRef?.schema ?? queryOptions?.schema,
+          table: duckRef?.table ?? queryOptions?.table,
+          catalogFromRef: duckRef?.database ?? queryOptions?.catalogFromRef,
+        },
       });
     }
 
