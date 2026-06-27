@@ -6,6 +6,7 @@ import { createHash, createHmac, createPrivateKey, createPublicKey, createSign, 
 import { fetchGcpAccessToken } from "@/lib/elt/gcp-access-token";
 import { resolveDuckdbDatabaseLocation } from "@/lib/elt/duckdb-destination";
 import { readFetchJsonBody } from "@/lib/elt/fetch-json-body";
+import { isDuckdbModuleMissingError, openDuckdbReadOnly } from "@/lib/elt/duckdb-native";
 import { buildMotherduckDsn, motherduckDatabaseName, motherduckToken } from "@/lib/elt/motherduck-dsn";
 import { runMotherduckMcpQuery } from "@/lib/elt/motherduck-mcp-client";
 import type { WarehouseIntrospectionResult, WarehouseTableRef } from "@/lib/elt/warehouse-introspect";
@@ -927,7 +928,7 @@ export type MotherduckSqlResult = {
   attachDatabase?: string;
 };
 
-/** Run SQL against MotherDuck via MCP HTTP API (serverless-safe; no native duckdb). */
+/** Run SQL against MotherDuck via native DuckDB md: DSN (MCP fallback if duckdb is unavailable). */
 export async function executeMotherduckSql(
   secrets: Record<string, string>,
   sql: string,
@@ -937,8 +938,19 @@ export async function executeMotherduckSql(
   const catalog = motherduckDatabaseName(secrets, config);
   const token = motherduckToken(secrets);
   if (!token) throw new Error("Set MOTHERDUCK_TOKEN to query MotherDuck.");
-  const rowset = await runMotherduckMcpQuery(token, catalog, sql);
-  return { rowset, attachDatabase: catalog };
+
+  const dsn = buildMotherduckDsn(secrets, { database: catalog });
+  try {
+    const rowset = await runDuckdbFileReadOnlyQuery(dsn, sql);
+    return { rowset, attachDatabase: catalog };
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    if (isDuckdbModuleMissingError(detail)) {
+      const rowset = await runMotherduckMcpQuery(token, catalog, sql);
+      return { rowset, attachDatabase: catalog };
+    }
+    throw e;
+  }
 }
 
 /** Run a read-only SQL statement against MotherDuck. */
@@ -994,10 +1006,7 @@ async function introspectDuckdbFile(
   }
 
   try {
-    const duckdb = await import(/* webpackIgnore: true */ "duckdb");
-    const { Database } = duckdb.default ?? duckdb;
-    const db = new Database(dbPath, { access_mode: "READ_ONLY" });
-    const conn = db.connect();
+    const { db, conn } = await openDuckdbReadOnly(dbPath);
     const rows = await new Promise<string[][]>((resolve, reject) => {
       conn.all(
         `SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema NOT IN ('information_schema', 'pg_catalog') AND table_type = 'BASE TABLE' LIMIT ${TABLE_LIMIT}`,
@@ -1038,10 +1047,7 @@ export async function runDuckdbFileReadOnlyQuery(
     throw new Error("Set a database path or location to query DuckDB/SQLite.");
   }
 
-  const duckdb = await import(/* webpackIgnore: true */ "duckdb");
-  const { Database } = duckdb.default ?? duckdb;
-  const db = new Database(dbPath, { access_mode: "READ_ONLY" });
-  const conn = db.connect();
+  const { db, conn } = await openDuckdbReadOnly(dbPath);
   try {
     const result = await new Promise<Record<string, unknown>[]>((resolve, reject) => {
       conn.all(sql, (err: Error | null, rows: unknown) => {
