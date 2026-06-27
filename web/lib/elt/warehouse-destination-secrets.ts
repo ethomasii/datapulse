@@ -2,6 +2,11 @@ import { parseStoredConnectionSecrets } from "@/lib/elt/connection-secrets-store
 import { mergeConnectionRuntimeSecrets } from "@/lib/elt/duckdb-destination";
 import type { DestinationConnectionRow } from "@/lib/elt/warehouse-introspect";
 
+export type DestinationConnectionContextInput = Pick<
+  DestinationConnectionRow,
+  "connector" | "config" | "connectionSecretsEnc"
+>;
+
 /** Decrypted secrets + connection config mapped to dlt/runtime env (shared by web + agent API). */
 export function resolveConnectionRuntimeSecrets(
   connectionType: "source" | "destination",
@@ -21,7 +26,7 @@ export function resolveConnectionRuntimeSecrets(
   );
 }
 
-export function resolveDestinationConnectionContext(row: DestinationConnectionRow): {
+export function resolveDestinationConnectionContext(row: DestinationConnectionContextInput): {
   secrets: Record<string, string>;
   config: Record<string, unknown>;
   connector: string;
